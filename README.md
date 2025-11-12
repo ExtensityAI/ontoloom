@@ -1,4 +1,5 @@
 # **HyDRA: A Hybrid-Driven Reasoning Architecture for Verifiable Knowledge Graphs**
+
 <img src="https://raw.githubusercontent.com/ExtensityAI/symbolicai/refs/heads/main/assets/images/banner.png">
 
 <div align="center">
@@ -37,75 +38,92 @@ uv sync
 ```
 
 Now, you need to configure your `symbolicai` config. First, run:
+
 ```bash
 uv run symconfig
 ```
 
 Upon running this command for the first time, it will start the initial packages caching and initializing the `symbolicai` configuration files in the `uv`'s `.venv` directory, ultimately displaying the following warning:
+
 ```text
 UserWarning: No configuration file found for the environment. A new configuration file has been created at <full-path>/ontology-hydra/.venv/.symai/symai.config.json. Please configure your environment.
 ```
 
 You then must edit the `symai.config.json` file. A neurosymbolic engine is **required** for the `symbolicai` framework to be used. More about configuration management [here](https://extensityai.gitbook.io/symbolicai/installation#configuration-file).
 
-Once you've set up the `symbolicai` config, you can must also installed an additional plugin for the `ontopipe` package:
-```bash
-uv run sympkg i ExtensityAI/chonkie-symai
-```
-
-Now, you are set up.
-
 ## Usage
 
 ### Generating Ontologies and Knowledge Graphs
 
-You can use the ontopipe API to generate ontologies and knowledge graphs for a specific domain:
+You can use the `ontology_hydra` API to generate ontologies and knowledge graphs for a specific domain:
 
 ```python
 from pathlib import Path
 
-from symai import Import, Symbol
-
-from ontopipe import generate_kg, ontopipe
-from ontopipe.models import KG, Ontology
+from ontology_hydra import generate_kg, ontopipe
+from ontology_hydra.ontology.models import Ontology
 
 # Define the domain and output directory
-domain = "fiction"
-cache_path = Path("cache")
+domain = "biography"
+cache_path = Path("output/cache")
+cache_path.mkdir(parents=True, exist_ok=True)
 
 # Generate ontology
-ontology = ontopipe(domain, cache_path=cache_path) # saves to cache_path / 'ontology.json'
-# or load from cache
-# ontology = Ontology.from_json_file(cache_path / 'ontology.json')
+ontology = ontopipe(
+    domain=domain,
+    cache_path=cache_path,
+    group_size=4,  # number of committee members to group for scope/CQ generation
+    cqs_per_batch=4  # number of CQs to process per batch during ontology generation
+)
+# The ontology is automatically saved to cache_path / 'ontology.json'
 
-texts = ['...'] # provide your list of texts chunks here
-                # the chunk length has an impact on the quality of the generated KG
-                # shorter chunks, denser KG
-                # longer chunks, sparser KG
-
-# We also provide functionality to easily chunk text appropriately to your needs.
-# We built on top of the chonkie library.
-# E.g.:
-# ex_str = Symbol('this is a test string to generate a knowledge graph')
-# ChonkieChunker = Import.load_expression(
-#     'ExtensityAI/chonkie-symai',
-#     'ChonkieChunker'
+# Or load from cache
+# ontology = Ontology.model_validate_json(
+#     (cache_path / 'ontology.json').read_text(encoding='utf-8', errors='ignore')
 # )
-# chonkie = ChonkieChunker(tokenizer_name='gpt2')
-# texts = chonkie(ex_str, chunk_size=...)
 
+# Prepare your text data
+texts = ['...']  # provide your list of text chunks here
+                 # the chunk length has an impact on the quality of the generated KG
+                 # shorter chunks = denser KG
+                 # longer chunks = sparser KG
+
+# We recommend using the chonkie library for text chunking
+# Install the symai plugin: uv run sympkg i ExtensityAI/chonkie-symai
+# Example:
+import tiktoken
+from chonkie import TokenChunker
+
+tokenizer = tiktoken.get_encoding("o200k_base")
+chunker = TokenChunker(chunk_size=1024, chunk_overlap=256, tokenizer=tokenizer)
+
+# Assuming you have your text in a list
+raw_texts = ["Your text content here..."]
+chunks = chunker(raw_texts)
+texts = [c.text for cg in chunks for c in cg]
+
+# Generate knowledge graph
 kg = generate_kg(
     texts=texts,
     ontology=ontology,
     cache_path=cache_path,
-    kg_name='test_kg',
-    epochs=1 # iterates multiple times over the texts to improve the KG
+    batch_size=1,  # number of texts to process in parallel
+    epochs=3  # iterates multiple times over the texts to improve the KG
 )
-# or load from cache
-# kg = KG.from_json_file(cache_path / 'kg.json')
+# The KG is automatically saved to cache_path / 'kg.json'
 
-from ontopipe.vis import visualize_kg, visualize_ontology
+# Or load from cache
+# kg_model = generate_kg_schema(ontology)  # get the dynamic KG schema
+# kg = kg_model.model_validate_json(
+#     (cache_path / 'kg.json').read_text(encoding='utf-8', errors='ignore')
+# )
 
-visualize_ontology(ontology, output_html_path=cache_path / 'ontology_vis.html')
-visualize_kg(kg, output_html_path=cache_path / 'kg_vis.html')
+# Visualize results (requires pyvis)
+from ontology_hydra.vis import visualize_knowledge_graph
+
+visualize_knowledge_graph(
+    ontology=ontology,
+    kg=kg.model_dump(),  # convert to dict
+    output_path=cache_path / 'kg_visualization.html'
+)
 ```
