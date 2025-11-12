@@ -34,7 +34,7 @@ def generate_comittee_for_domain(domain: str):
 
     groups = generate_groups_for_domain(domain)
 
-    for group in groups.items:
+    for group in groups:
         personas = generate_personas_for_group(domain, group)
 
         for persona in personas:

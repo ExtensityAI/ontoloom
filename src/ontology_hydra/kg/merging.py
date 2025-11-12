@@ -1,7 +1,6 @@
 from typing import cast
 
 from ontology_hydra.kg.schema import DynamicPartialEntity, DynamicPartialKnowledgeGraph
-from ontology_hydra.ontology.models import Ontology
 
 _IGNORE_MERGE_KEYS = {"name", "cls"}
 
@@ -9,14 +8,12 @@ _IGNORE_MERGE_KEYS = {"name", "cls"}
 def _merge_values(a: list | None, b: list | None):
     if a is not None and b is not None:
         return list(set(a + b))  # deduplicate values
-    elif a is not None:
+    if a is not None:
         return list(a)
-    else:
-        return list(b)  # b is guaranteed to be not None here (given call args)
+    return list(b)  # b is guaranteed to be not None here (given call args)
 
 
 def try_merge(
-    ontology: Ontology,
     kg_type: type[DynamicPartialKnowledgeGraph],
     a: DynamicPartialKnowledgeGraph,
     b: DynamicPartialKnowledgeGraph,
@@ -24,9 +21,9 @@ def try_merge(
     issues = []
 
     a_dict = cast(
-        dict[str, DynamicPartialEntity], {e.name: e for e in a.data}
+        "dict[str, DynamicPartialEntity]", {e.name: e for e in a.data}
     )  # both have data, we might be able to solve linter errors with Protocols
-    b_dict = cast(dict[str, DynamicPartialEntity], {e.name: e for e in b.data})
+    b_dict = cast("dict[str, DynamicPartialEntity]", {e.name: e for e in b.data})
 
     # TODO right now, with this, we essentially do not guarantee order of entities - maybe this is bad, because it might be the case that recently generated entities have more relevance for the following text chunks? Or maybe randomized order every time could increase robustness?
 
@@ -43,10 +40,11 @@ def try_merge(
         if a_entity is not None and b_entity is not None and not a_entity.cls == b_entity.cls:
             # detected conflicting classes, this is an error
             # TODO yield issue
-            raise NotImplementedError()
+            raise NotImplementedError
 
         entity_type = cast(
-            type[DynamicPartialEntity], a_entity.__class__ if a_entity is not None else b_entity.__class__
+            "type[DynamicPartialEntity]",
+            a_entity.__class__ if a_entity is not None else b_entity.__class__,
         )  # get the actual Python type from the entities (at least one of them is not None)
         class_name = a_entity.cls if a_entity is not None else b_entity.cls
 
@@ -61,7 +59,11 @@ def try_merge(
 
         all_keys = (set(a_json.keys()) | set(b_json.keys())) - _IGNORE_MERGE_KEYS
 
-        d = {"name": name, "cls": class_name, **{k: _merge_values(a_json.get(k), b_json.get(k)) for k in all_keys}}
+        d = {
+            "name": name,
+            "cls": class_name,
+            **{k: _merge_values(a_json.get(k), b_json.get(k)) for k in all_keys},
+        }
         output.append(entity_type.model_validate(d))
 
     success = len(issues) == 0

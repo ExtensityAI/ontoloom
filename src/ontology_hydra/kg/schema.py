@@ -44,7 +44,7 @@ def _generate_description(description: Description | None):
 
     return (
         f"{description.description or 'No description provided.'}\n"
-        + f"(Constraints: {description.constraints or 'None'})\n"
+        f"(Constraints: {description.constraints or 'None'})\n"
     )
 
 
@@ -67,8 +67,8 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
 
     # TODO for date, time and datetime, add format information
 
-    elif isinstance(prop, ObjectProperty):
-        range = ", ".join(prop.range)
+    if isinstance(prop, ObjectProperty):
+        # TODO prop_range = ", ".join(prop.range)
 
         return (
             list[str]
@@ -80,6 +80,9 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
                 description=f"Provide a list of entity names ONLY OF the specified range ({range}). {_generate_description(prop.description)}",
             ),
         )
+
+    msg = "Unknown property type."
+    raise ValueError(msg)
 
 
 # TODO improve __doc__ and everything for the schemas, mention that the model can use it to extract partial data from the knowledge graph, i.e. just one field for a specific class
@@ -107,17 +110,22 @@ def generate_kg_schema(ontology: Ontology):
     """Generates a Pydantic model schema for a knowledge graph based on the provided ontology."""
 
     if not ontology.classes:
-        raise ValueError("Ontology must contain at least one class.")
+        msg = "Ontology must contain at least one class."
+        raise ValueError(msg)
 
     # we do not allow the root class in the schema, as it should not be instantiated directly (TODO: check if this is good)
-    classes = [_generate_class_schema(ontology, cls) for cls in ontology.classes.values() if cls.superclass is not None]
+    classes = [
+        _generate_class_schema(ontology, cls)
+        for cls in ontology.classes.values()
+        if cls.superclass is not None
+    ]
 
     # create a union type out of the classes
     any_class_type = classes[0]
     for cls in classes[1:]:
         any_class_type |= cls
 
-    PartialKnowledgeGraph = create_model(
+    return create_model(
         "PartialKnowledgeGraph",
         __base__=DynamicPartialKnowledgeGraph,
         __doc__="A partial knowledge graph containing structured data.",
@@ -126,5 +134,3 @@ def generate_kg_schema(ontology: Ontology):
             Field(default_factory=list),
         ),
     )
-
-    return PartialKnowledgeGraph

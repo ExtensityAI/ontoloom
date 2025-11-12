@@ -13,7 +13,9 @@ logger = getLogger("ontopipe.cqs")
 
 class ScopeDocumentGenerationInput(LLMDataModel):
     domain: str = Field(..., description="The domain of the ontology")
-    personas: list[Persona] = Field(..., description="The personas for which to generate a scope document")
+    personas: list[Persona] = Field(
+        ..., description="The personas for which to generate a scope document"
+    )
 
 
 class ScopeDocument(LLMDataModel):
@@ -30,21 +32,27 @@ class ScopeDocumentMergeInput(LLMDataModel):
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class ScopeDocumentGenerator(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: ScopeDocumentGenerationInput, **kwargs) -> ScopeDocument:
+    def forward(self, _: ScopeDocumentGenerationInput) -> ScopeDocument:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
         return self.contract_result
 
     def post(self, output: ScopeDocument) -> bool:
-        if not output.content or len(output.content) < 100:
-            return False
-        return True
+        return not (not output.content or len(output.content) < 100)
 
     @property
     def prompt(self) -> str:
@@ -56,21 +64,27 @@ class ScopeDocumentGenerator(Expression):
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class ScopeDocumentMerger(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: ScopeDocumentMergeInput, **kwargs) -> ScopeDocument:
+    def forward(self, _: ScopeDocumentMergeInput) -> ScopeDocument:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
         return self.contract_result
 
     def post(self, output: ScopeDocument) -> bool:
-        if not output.content or len(output.content) < 100:
-            return False
-        return True
+        return not (not output.content or len(output.content) < 100)
 
     @property
     def prompt(self) -> str:

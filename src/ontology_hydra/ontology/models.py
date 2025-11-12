@@ -50,9 +50,9 @@ class DataProperty(Model):
     name: str
     description: Description | None = None
 
-    characteristics: list[Characteristic] = []
+    characteristics: list[Characteristic] = Field(default_factory=list)
 
-    domain: list[str] = []
+    domain: list[str] = Field(default_factory=list)
     range: DataType
 
 
@@ -60,10 +60,10 @@ class ObjectProperty(Model):
     name: str
     description: Description | None = None
 
-    characteristics: list[Characteristic] = []
+    characteristics: list[Characteristic] = Field(default_factory=list)
 
-    domain: list[str] = []
-    range: list[str] = []
+    domain: list[str] = Field(default_factory=list)
+    range: list[str] = Field(default_factory=list)
 
 
 class Class(Model):
@@ -75,14 +75,16 @@ class Class(Model):
 
 
 class Ontology(Model):
-    classes: dict[str, Class] = dict()
-    object_properties: dict[str, ObjectProperty] = dict()
-    data_properties: dict[str, DataProperty] = dict()
+    classes: dict[str, Class] = Field(default_factory=dict)
+    object_properties: dict[str, ObjectProperty] = Field(default_factory=dict)
+    data_properties: dict[str, DataProperty] = Field(default_factory=dict)
 
     @property
     def properties(self):
         """Returns a combined dictionary of all object and data properties."""
-        return dict[str, DataProperty | ObjectProperty](**self.object_properties, **self.data_properties)
+        return dict[str, DataProperty | ObjectProperty](
+            **self.object_properties, **self.data_properties
+        )
 
     @property
     def root(

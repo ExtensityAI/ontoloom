@@ -162,7 +162,9 @@ def chunk_text(text: str, chunk_size: int = 512) -> list[str]:
     Returns:
         list of text chunks
     """
-    chunker = Import.load_expression("ExtensityAI/chonkie-symai", "ChonkieChunker")(tokenizer_name="Xenova/gpt-4o")  # pyright: ignore[reportCallIssue]
+    chunker = Import.load_expression("ExtensityAI/chonkie-symai", "ChonkieChunker")(
+        tokenizer_name="Xenova/gpt-4o"
+    )  # pyright: ignore[reportCallIssue]
     sym = Symbol(text)
     chunks = chunker(sym, chunk_size=chunk_size)
 
@@ -269,7 +271,7 @@ def compute_ontology_and_kg(
     # Validate arguments
     if not ontology_file and not domain:
         raise ValueError("Either an ontology file or a domain name must be provided.")
-    elif ontology_file and domain:
+    if ontology_file and domain:
         print(f"Both ontology file and domain provided. Using ontology file: {ontology_file}")
 
     print(f"Processing input: {input_path}")
@@ -295,7 +297,9 @@ def compute_ontology_and_kg(
     print(f"Total number of text documents: {len(texts)}")
 
     # Preprocess texts by chunking them into smaller parts
-    print(f"Preprocessing texts by chunking into smaller segments (chunk size: {chunk_size} tokens)...")
+    print(
+        f"Preprocessing texts by chunking into smaller segments (chunk size: {chunk_size} tokens)..."
+    )
     chunked_texts = []
 
     # Use a threshold for chunking based on approximate character count
@@ -337,7 +341,9 @@ def compute_ontology_and_kg(
     try:
         print(f"Generating knowledge graph with {len(chunked_texts)} text segments...")
         print("Ontology file:", ontology_file)
-        ontology = Ontology.model_validate_json(ontology_file.read_text(encoding="utf-8", errors="ignore"))
+        ontology = Ontology.model_validate_json(
+            ontology_file.read_text(encoding="utf-8", errors="ignore")
+        )
         # visualize_ontology(ontology, output_path / "ontology_kg.html")
         kg = generate_kg(
             cache_path=output_path / "kg.json",
@@ -392,7 +398,9 @@ def visualize_from_files(
     if ontology_json_file and ontology_json_file.exists():
         try:
             print(f"Loading ontology from {ontology_json_file}")
-            ontology = Ontology.model_validate_json(ontology_json_file.read_text(encoding="utf-8", errors="ignore"))
+            ontology = Ontology.model_validate_json(
+                ontology_json_file.read_text(encoding="utf-8", errors="ignore")
+            )
             ontology_html = output_path / "ontology_visualization.html"
             # visualize_ontology(ontology, ontology_html)
             print(f"Ontology visualization saved to {ontology_html}")
@@ -466,7 +474,9 @@ def main():
         help="Domain to create ontology for if --ontology not provided",
     )
     parser.add_argument("--name", "-n", default="EnhancedKG", help="Name for the knowledge graph")
-    parser.add_argument("--output", default="output", help="Output directory for the knowledge graph")
+    parser.add_argument(
+        "--output", default="output", help="Output directory for the knowledge graph"
+    )
     parser.add_argument(
         "--threshold",
         "-t",
@@ -495,15 +505,21 @@ def main():
         action="store_true",
         help="Only visualize existing files without regenerating",
     )
-    parser.add_argument("--kg-json", help="Path to existing knowledge graph JSON file for visualization")
-    parser.add_argument("--ontology-json", help="Path to existing ontology JSON file for visualization")
+    parser.add_argument(
+        "--kg-json", help="Path to existing knowledge graph JSON file for visualization"
+    )
+    parser.add_argument(
+        "--ontology-json", help="Path to existing ontology JSON file for visualization"
+    )
 
     args = parser.parse_args()
 
     # Process visualization-only mode
     if args.visualize_only:
         if not args.kg_json and not args.ontology_json:
-            print("Error: In visualization-only mode, you must specify at least one of --kg-json or --ontology-json")
+            print(
+                "Error: In visualization-only mode, you must specify at least one of --kg-json or --ontology-json"
+            )
             return None
 
         kg_json_file = Path(args.kg_json) if args.kg_json else None

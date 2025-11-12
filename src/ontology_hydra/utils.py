@@ -19,14 +19,14 @@ def chunked(lst: list, n: int):
 
 
 def load_ontology(json_file: Path) -> dict:
-    with open(json_file, "r") as f:
+    with json_file.open("r", encoding="utf-8") as f:
         ontology = json.load(f)
     logger.info(f"Ontology loaded from {json_file}")
     return ontology
 
 
 def save_ontology(js: dict, json_file: Path):
-    with open(json_file, "w") as f:
+    with json_file.open("w", encoding="utf-8") as f:
         json.dump(js, f, indent=4)
     logger.success(f"Ontology saved to {json_file}")
 
@@ -42,7 +42,9 @@ def save_graph(net: Network, fname: str | Path):
 def build_ontology_graph(data: dict) -> Network:
     net = Network(height="100vh", width="100%", bgcolor="#ffffff", font_color="black")
     net.toggle_physics(True)
-    net.force_atlas_2based(gravity=-50, central_gravity=0.01, spring_length=100, spring_strength=0.08)
+    net.force_atlas_2based(
+        gravity=-50, central_gravity=0.01, spring_length=100, spring_strength=0.08
+    )
 
     # Visualize subclass relations as edges between classes
     for relation in data.get("subclass_relations", []):
@@ -95,7 +97,9 @@ def build_ontology_graph(data: dict) -> Network:
 def build_kg_graph(kg_data: dict) -> Network:
     net = Network(height="100vh", width="100%", bgcolor="#ffffff", font_color="black")
     net.toggle_physics(True)
-    net.force_atlas_2based(gravity=-50, central_gravity=0.01, spring_length=100, spring_strength=0.08)
+    net.force_atlas_2based(
+        gravity=-50, central_gravity=0.01, spring_length=100, spring_strength=0.08
+    )
 
     entity_color = "#3498DB"  # Blue for entities
 

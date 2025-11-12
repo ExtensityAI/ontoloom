@@ -37,7 +37,14 @@ def visualize_knowledge_graph(ontology: Ontology, kg: dict, output_path: Path):
         n_edges = sum(len(v) if isinstance(v, list) else 1 for _, v in props)
 
         if n_edges > 2:
-            net.add_node(name, label=name, title=cls, color=COLORS[cid], shape="circle", size=30 + n_edges * 5)
+            net.add_node(
+                name,
+                label=name,
+                title=cls,
+                color=COLORS[cid],
+                shape="circle",
+                size=30 + n_edges * 5,
+            )
 
     for entity in kg["data"]:
         name = entity["name"]

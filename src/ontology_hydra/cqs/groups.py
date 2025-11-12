@@ -35,19 +35,27 @@ class DomainDefinition(LLMDataModel):
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class GroupsGenerator(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: DomainDefinition, **kwargs) -> Groups:
+    def forward(self, _: DomainDefinition) -> Groups:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
 
         return self.contract_result
 
-    def post(self, output: Groups) -> bool:
+    def post(self, _: Groups) -> bool:
         return True
 
     @property
@@ -58,11 +66,9 @@ class GroupsGenerator(Expression):
 def generate_groups_for_domain(domain: str):
     generator = GroupsGenerator()
     with MetadataTracker() as tracker:
-        x = generator(input=DomainDefinition(domain=domain))
+        x: Groups = generator(input=DomainDefinition(domain=domain))
 
         generator.contract_perf_stats()
         logger.debug("API Usage: %s", tracker.usage)
 
-        print(x)
-
-        return x
+    return x.items

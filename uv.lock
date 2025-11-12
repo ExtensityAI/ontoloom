@@ -842,7 +842,7 @@ wheels = [
 ]
 
 [[package]]
-name = "ontopipe"
+name = "ontology-hydra"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
@@ -858,7 +858,7 @@ dev = [
 requires-dist = [{ name = "symbolicai", git = "https://github.com/ExtensityAI/symbolicai.git?branch=dev" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.12.7" }]
+dev = [{ name = "ruff", specifier = ">=0.14.4" }]
 
 [[package]]
 name = "openai"

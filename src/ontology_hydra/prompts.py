@@ -8,7 +8,9 @@ prompt_registry = PromptRegistry()
 # ==================================================#
 # Tags
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_class", "OWL CLASS")
-prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_subclass_relation", "OWL SUBCLASS RELATION")
+prompt_registry.register_tag(
+    PromptLanguage.ENGLISH, "owl_subclass_relation", "OWL SUBCLASS RELATION"
+)
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_object_property", "OWL OBJECT PROPERTY")
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_data_property", "OWL DATA PROPERTY")
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "competency_question", "COMPETENCY QUESTION")

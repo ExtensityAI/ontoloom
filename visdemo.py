@@ -9,7 +9,9 @@ ontology = Path("temp/biography/output-gpt5/cache/ontology.json")
 output_path = Path("temp/biography/output-gpt5/ontology.html")
 
 ontology = Ontology.model_validate_json(ontology.read_text(encoding="utf-8"))
-kg = json.loads(Path("temp/biography/output-gpt5/cache/kg.partial.json").read_text(encoding="utf-8"))
+kg = json.loads(
+    Path("temp/biography/output-gpt5/cache/kg.partial.json").read_text(encoding="utf-8")
+)
 
 
 def visualize_ontology(ontology: Ontology, output_path: Path):
@@ -209,7 +211,7 @@ def visualize_kg(ontology: Ontology, kg, output_path: Path):
     # Safe access to KG data (supports both Pydantic model instance and dict)
     kg_items = []
     if hasattr(kg, "data"):
-        data = getattr(kg, "data")
+        data = kg.data
         if isinstance(data, list):
             kg_items = data
     elif isinstance(kg, dict) and "data" in kg:
@@ -239,7 +241,7 @@ def visualize_kg(ontology: Ontology, kg, output_path: Path):
 
         # Add data properties (if schema aligns with ontology)
         if hasattr(ontology, "data_properties") and isinstance(ontology.data_properties, dict):
-            for dp_name in ontology.data_properties.keys():
+            for dp_name in ontology.data_properties:
                 if dp_name in d and d[dp_name] is not None:
                     val = d[dp_name]
                     if isinstance(val, list):
@@ -276,19 +278,18 @@ def visualize_kg(ontology: Ontology, kg, output_path: Path):
                 )
 
     # 5) Add object property edges (entity -> entity)
-    obj_props = getattr(ontology, "object_properties", {}) if hasattr(ontology, "object_properties") else {}
+    obj_props = (
+        getattr(ontology, "object_properties", {}) if hasattr(ontology, "object_properties") else {}
+    )
     for name, d in entities:
-        for prop_name in obj_props.keys():
+        for prop_name in obj_props:
             if prop_name not in d or d[prop_name] is None:
                 continue
             targets = d[prop_name]
             if not isinstance(targets, list):
                 targets = [targets]
             for t in targets:
-                if isinstance(t, dict):
-                    tname = _get_name(t) or str(t)
-                else:
-                    tname = str(t)
+                tname = _get_name(t) or str(t) if isinstance(t, dict) else str(t)
                 if not tname:
                     continue
                 # ensure target node exists (placeholder if unseen)

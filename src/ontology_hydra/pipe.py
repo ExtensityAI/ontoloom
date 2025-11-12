@@ -32,7 +32,9 @@ def _generate_comittee_with_cache(domain: str, cache_path: Path):
     return comittee
 
 
-def _generate_scope_documents_with_cache(domain: str, comittee: Comittee, cache_path: Path, group_size):
+def _generate_scope_documents_with_cache(
+    domain: str, comittee: Comittee, cache_path: Path, group_size
+):
     groups = comittee.divide_into_groups(group_size)
     documents = [None] * len(groups)
 
@@ -50,7 +52,7 @@ def _generate_scope_documents_with_cache(domain: str, comittee: Comittee, cache_
         for i, doc in results:
             documents[i] = doc
 
-    return cast(list[str], documents)
+    return cast("list[str]", documents)
 
 
 def _merge_scope_documents_with_cache(domain: str, documents: list[str], cache_path: Path):
@@ -94,8 +96,8 @@ def _deduplicate_cqs(cqs: list[str], cache_path: Path) -> list[str]:
     cache_path.write_text(res.model_dump_json(indent=2), encoding="utf-8")
 
     # deduplicate CQs based on the duplicates found (1. take new questions and 2. add all non-duplicates)
-    deduplicated_cqs = set(d.question for d in res.duplicates)
-    deduplicated_cqs.update(set(cqs) - set(cqs[i] for d in res.duplicates for i in d.indexes))
+    deduplicated_cqs = {d.question for d in res.duplicates}
+    deduplicated_cqs.update(set(cqs) - {cqs[i] for d in res.duplicates for i in d.indexes})
 
     len_before = len(cqs)
     cqs = _sort_cqs(deduplicated_cqs)
@@ -150,7 +152,9 @@ def _generate_ontology_with_cache(
     cqs_per_batch: int = 4,
 ):
     if cache_path.exists():
-        ontology = Ontology.model_validate_json(cache_path.read_text(encoding="utf-8", errors="ignore"))
+        ontology = Ontology.model_validate_json(
+            cache_path.read_text(encoding="utf-8", errors="ignore")
+        )
 
     else:
         logger.debug("Generating ontology from %d CQs", len(cqs))
@@ -178,7 +182,8 @@ def ontopipe(
         cache_path = Path(tempfile.mkdtemp("ontopipe"))
 
     if not cache_path.exists() or not cache_path.is_dir():
-        raise ValueError(f"Cache path '{cache_path}' is not a directory or does not exist")
+        msg = f"Cache path '{cache_path}' is not a directory or does not exist"
+        raise ValueError(msg)
 
     logger.debug("Generating ontology for domain: '%s'", domain)
     logger.debug("Using cache path: %s", cache_path)

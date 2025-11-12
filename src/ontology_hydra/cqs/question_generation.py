@@ -13,7 +13,9 @@ logger = getLogger("ontopipe.cqs")
 
 class QuestionGenerationInput(LLMDataModel):
     domain: str = Field(..., description="The domain of the ontology")
-    group: list[ComitteeMember] = Field(..., description="The committee members generating questions")
+    group: list[ComitteeMember] = Field(
+        ..., description="The committee members generating questions"
+    )
     scope_document: str = Field(..., description="The scope document containing domain information")
 
 
@@ -33,12 +35,15 @@ class Questions(LLMDataModel):
 class Duplicate(LLMDataModel):
     question: str = Field(..., description="The question text that is duplicated")
     indexes: list[int] = Field(
-        ..., description="List of indexes of duplicates (including the original! thus, length is at least 2)"
+        ...,
+        description="List of indexes of duplicates (including the original! thus, length is at least 2)",
     )
 
 
 class Duplicates(LLMDataModel):
-    duplicates: list[Duplicate] = Field(..., description="List of duplicates found in the questions")
+    duplicates: list[Duplicate] = Field(
+        ..., description="List of duplicates found in the questions"
+    )
 
 
 @contract(
@@ -46,22 +51,28 @@ class Duplicates(LLMDataModel):
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class QuestionGenerator(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: QuestionGenerationInput, **kwargs) -> QuestionGeneratorOutput:
+    def forward(self, _: QuestionGenerationInput) -> QuestionGeneratorOutput:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
         return self.contract_result
 
     def post(self, output: QuestionGeneratorOutput) -> bool:
         # Ensure we have at least one question (TODO in the future improve this massively, and maybe skip the scoping step as well!)
-        if not output.items or len(output.items) == 0:
-            return False
-        return True
+        return not (not output.items or len(output.items) == 0)
 
     @property
     def prompt(self) -> str:
@@ -87,18 +98,26 @@ def generate_questions(domain: str, group: list[ComitteeMember], scope_document:
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class QuestionDeduplicator(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: Questions, **kwargs) -> Duplicates:
+    def forward(self, _: Questions) -> Duplicates:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
         return self.contract_result
 
-    def post(self, output: Duplicates) -> bool:
+    def post(self, _: Duplicates) -> bool:
         return True
 
     @property

@@ -26,7 +26,9 @@ class OntologyGeneratorInput(LLMDataModel):
 
 
 class OntologyGeneratorOutput(LLMDataModel):
-    additions: list[Concept] = Field(description="List of new concepts that should be added to the ontology.")
+    additions: list[Concept] = Field(
+        description="List of new concepts that should be added to the ontology."
+    )
 
 
 # TODO: make sure that properties are not applied to a class and to its superclass (could be autofixed, but rather not have the model generate that. Also, maybe allow moving properties around or EXTENDING properties?)
@@ -39,7 +41,14 @@ class OntologyGeneratorOutput(LLMDataModel):
     pre_remedy=False,
     post_remedy=True,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class OntologyGenerator(Expression):
     def __init__(self, ontology: Ontology, *args, **kwargs):
@@ -50,12 +59,13 @@ class OntologyGenerator(Expression):
     def prompt(self) -> str:
         return prompt_registry.instruction("ontology_generator")
 
-    def forward(self, input: OntologyGeneratorInput, **kwargs) -> OntologyGeneratorOutput:
+    def forward(self, _: OntologyGeneratorInput) -> OntologyGeneratorOutput:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
         return self.contract_result
 
-    def pre(self, input: OntologyGeneratorInput):
+    def pre(self, _: OntologyGeneratorInput):
         return True
 
     def post(self, output: OntologyGeneratorOutput):
@@ -63,7 +73,8 @@ class OntologyGenerator(Expression):
 
         if not is_valid:
             raise ValueError(
-                "Ontology validation failed with the following errors:\n- " + "\n- ".join(map(str, issues))
+                "Ontology validation failed with the following errors:\n- "
+                + "\n- ".join(map(str, issues))
             )
 
         return True
@@ -88,10 +99,10 @@ def generate_ontology(
         for i in tqdm(range(0, len(cqs), cqs_per_batch)):
             batch_cqs = cqs[i : i + cqs_per_batch]
 
-            input = OntologyGeneratorInput(cqs=batch_cqs, ontology=ontology)
+            generator_input = OntologyGeneratorInput(cqs=batch_cqs, ontology=ontology)
 
             try:
-                output: OntologyGeneratorOutput = generator(input=input)
+                _output: OntologyGeneratorOutput = generator(input=generator_input)
                 # TODO do not like that the ontology is just implicitly mutated here, change this in the future again
             except Exception as e:
                 logger.error(f"Error getting state update for batch: {e}")

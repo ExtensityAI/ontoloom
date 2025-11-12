@@ -2,12 +2,13 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import tiktoken
-from chonkie import RecursiveChunker, TokenChunker
-from tokenizers import Tokenizer
+from chonkie import TokenChunker
 
 from ontology_hydra import generate_kg, ontopipe
 
-parser = ArgumentParser(description="Run the ontopipe pipeline to generate an ontology and knowledge graph.")
+parser = ArgumentParser(
+    description="Run the ontopipe pipeline to generate an ontology and knowledge graph."
+)
 parser.add_argument(
     "--domain",
     type=str,
@@ -15,7 +16,11 @@ parser.add_argument(
     help="The domain for which to generate the ontology.",
 )
 parser.add_argument(
-    "-o", "--output", type=Path, required=True, help="Output directory for the generated ontology and knowledge graph."
+    "-o",
+    "--output",
+    type=Path,
+    required=True,
+    help="Output directory for the generated ontology and knowledge graph.",
 )
 parser.add_argument(
     "-i",
@@ -38,7 +43,9 @@ if not output_path.exists():
 
 cache_path = output_path / "cache"
 
-ontology = ontopipe(domain, cache_path=cache_path, cqs_per_batch=100)  # saves to cache_path / 'ontology.json'
+ontology = ontopipe(
+    domain, cache_path=cache_path, cqs_per_batch=100
+)  # saves to cache_path / 'ontology.json'
 # use 100 CQs per batch because we use GPT-5 and it produced so much data, else it would take way too long
 
 texts = [

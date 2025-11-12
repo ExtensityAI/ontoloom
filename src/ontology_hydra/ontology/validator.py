@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 
-from ontology_hydra.ontology.models import Class, ClassModel, Concept, DataProperty, ObjectProperty, Ontology
+from ontology_hydra.ontology.models import (
+    Class,
+    ClassModel,
+    Concept,
+    DataProperty,
+    ObjectProperty,
+    Ontology,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,23 +83,26 @@ def _validate_class_hierarchy(
             continue
 
         # ensure we have no cycles in class hierarchy
-        for cls in classes:
-            if (sup := ontology.get_superclass(cls)) is None:
+        for other_cls in classes:
+            if (sup := ontology.get_superclass(other_cls)) is None:
                 # if class has no superclass, it can't have a circular relation
                 continue
 
-            cls_descendants = [c.name for c in ontology.get_descendants(cls)]
+            cls_descendants = [c.name for c in ontology.get_descendants(other_cls)]
             sup_ancestors = [c.name for c in ontology.get_ancestors(sup)]
 
             # TODO consider allowing redefinition of types? i.e. choosing a different parent?
 
-            if any(sc in sup_ancestors for sc in cls_descendants) or cls.name in sup_ancestors:
+            if (
+                any(sc in sup_ancestors for sc in cls_descendants)
+                or other_cls.name in sup_ancestors
+            ):
                 # if any descendant of the class or the class itself is an ancestor of the superclass, we have a circular relation
                 yield Issue(
                     code="circular_class_hierarchy",
-                    path=f"class:{cls.name}",
+                    path=f"class:{other_cls.name}",
                     message="Circular hierarchy detected",
-                    context=f"'{cls.superclass}' is already a subclass of '{cls.name}' (directly or indirectly)",
+                    context=f"'{other_cls.superclass}' is already a subclass of '{other_cls.name}' (directly or indirectly)",
                     hint="Remove this relation or restructure the hierarchy",
                 )
                 continue
@@ -211,7 +221,9 @@ def try_add_concepts(ontology: Ontology, concepts: list[Concept]):
     """Try to add concepts to the ontology, returning any issues found. If no issues are found, the ontology is updated with the new concepts."""
 
     original_ontology = ontology
-    ontology = ontology.model_copy(deep=True)  # ensure we do not modify the original ontology while validating
+    ontology = ontology.model_copy(
+        deep=True
+    )  # ensure we do not modify the original ontology while validating
 
     issues = list[Issue]()
 
@@ -246,8 +258,7 @@ def try_add_concepts(ontology: Ontology, concepts: list[Concept]):
 
             _update_own_properties(original_ontology)
     except Exception as e:
-        print(e)
-        print(e.__traceback__)
-        return 1 / 0
+        # TODO: handle this
+        raise e
 
     return is_valid, issues

@@ -207,7 +207,14 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
         pre_remedy=False,
         post_remedy=True,
         verbose=True,
-        remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+        remedy_retry_params={
+            "tries": 25,
+            "delay": 0.5,
+            "max_delay": 15,
+            "jitter": 0.1,
+            "backoff": 2,
+            "graceful": False,
+        },
         accumulate_errors=False,
     )
     class Extractor(Expression):
@@ -216,12 +223,13 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
             self._ontology = ontology
             self._kg = kg
 
-        def forward(self, input: Input, **kwargs) -> PartialKnowledgeGraphType:  # pyright: ignore[reportInvalidTypeForm] we again use dynamically defined schema here
+        def forward(self, _: Input) -> PartialKnowledgeGraphType:  # pyright: ignore[reportInvalidTypeForm] we again use dynamically defined schema here
             if self.contract_result is None:
-                raise ValueError("Contract failed!")
+                msg = "Contract failed!"
+                raise ValueError(msg)
             return self.contract_result
 
-        def pre(self, input: Input) -> bool:
+        def pre(self, _: Input) -> bool:
             return True
 
         def post(self, output: PartialKnowledgeGraphType) -> bool:  # pyright: ignore[reportInvalidTypeForm] here too
@@ -231,7 +239,7 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
 
             # TODO validate that all object properties are related to the correct ontology classes, i.e. no leo hasParent car (if car is not a Person but a Car and leo is a Person)
 
-            success, issues, merged = try_merge(self._ontology, PartialKnowledgeGraphType, self._kg, output)
+            success, issues, merged = try_merge(PartialKnowledgeGraphType, self._kg, output)
 
             if not success or merged is None:
                 raise ValueError("Some issues occured while merging:" + "\n".join(issues))
@@ -264,7 +272,8 @@ def generate_kg(
     partial_html_cache_path = cache_path.with_suffix(".partial.html")
 
     if not ontology:
-        raise NotImplementedError("For now, ontology must be provided to generate a knowledge graph due to update.")
+        msg = "For now, ontology must be provided to generate a knowledge graph due to update."
+        raise NotImplementedError(msg)
 
     PartialKnowledgeGraph = generate_kg_schema(ontology)
 

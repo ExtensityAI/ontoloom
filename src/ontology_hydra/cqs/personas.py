@@ -47,19 +47,27 @@ _priority_to_n = {
     post_remedy=True,
     accumulate_errors=False,
     verbose=True,
-    remedy_retry_params=dict(tries=25, delay=0.5, max_delay=15, jitter=0.1, backoff=2, graceful=False),
+    remedy_retry_params={
+        "tries": 25,
+        "delay": 0.5,
+        "max_delay": 15,
+        "jitter": 0.1,
+        "backoff": 2,
+        "graceful": False,
+    },
 )
 class PersonasGenerator(Expression):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def forward(self, input: PersonasGeneratorInput, **kwargs) -> Personas:
+    def forward(self, _: PersonasGeneratorInput) -> Personas:
         if self.contract_result is None:
-            raise ValueError("Contract failed!")
+            msg = "Contract failed!"
+            raise ValueError(msg)
 
         return self.contract_result
 
-    def post(self, output: Personas) -> bool:
+    def post(self, _: Personas) -> bool:
         return True
 
     @property
