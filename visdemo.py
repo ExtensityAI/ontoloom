@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pyvis.network import Network
 
-from ontopipe.ontology.models import Ontology
+from ontology_hydra.ontology.models import Ontology
 
 ontology = Path("temp/biography/output-gpt5/cache/ontology.json")
 output_path = Path("temp/biography/output-gpt5/ontology.html")

@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pyvis.network import Network
 
-from ontopipe.ontology.models import Ontology
+from ontology_hydra.ontology.models import Ontology
 
 COLORS = [
     "#dc2626",  # red-600

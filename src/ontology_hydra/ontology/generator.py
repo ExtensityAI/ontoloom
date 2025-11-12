@@ -7,9 +7,9 @@ from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 from tqdm import tqdm
 
-from ontopipe.ontology.models import Concept, Ontology
-from ontopipe.ontology.validator import try_add_concepts
-from ontopipe.prompts import prompt_registry
+from ontology_hydra.ontology.models import Concept, Ontology
+from ontology_hydra.ontology.validator import try_add_concepts
+from ontology_hydra.prompts import prompt_registry
 
 # from ontopipe.vis import visualize_ontology
 

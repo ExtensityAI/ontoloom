@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from ontopipe.ontology.models import Class, ClassModel, Concept, DataProperty, ObjectProperty, Ontology
+from ontology_hydra.ontology.models import Class, ClassModel, Concept, DataProperty, ObjectProperty, Ontology
 
 
 @dataclass(frozen=True, slots=True)

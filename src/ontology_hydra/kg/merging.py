@@ -1,7 +1,7 @@
 from typing import cast
 
-from ontopipe.kg.schema import DynamicPartialEntity, DynamicPartialKnowledgeGraph
-from ontopipe.ontology.models import Ontology
+from ontology_hydra.kg.schema import DynamicPartialEntity, DynamicPartialKnowledgeGraph
+from ontology_hydra.ontology.models import Ontology
 
 _IGNORE_MERGE_KEYS = {"name", "cls"}
 

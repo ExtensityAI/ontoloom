@@ -1,13 +1,10 @@
 [project]
-name = "ontopipe"
+name = "ontology-hydra"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12.0,<3.13"
-dependencies = [
-    "chonkie[tiktoken]>=1.1.1",
-    "symbolicai",
-]
+dependencies = ["symbolicai"]
 
 
 [build-system]
@@ -18,9 +15,7 @@ build-backend = "hatchling.build"
 symbolicai = { git = "https://github.com/ExtensityAI/symbolicai.git", branch = "dev" }
 
 [dependency-groups]
-dev = [
-    "ruff>=0.12.7",
-]
+dev = ["ruff>=0.14.4"]
 
 [tool.ruff]
 line-length = 120

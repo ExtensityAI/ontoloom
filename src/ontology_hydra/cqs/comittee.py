@@ -2,8 +2,8 @@ from random import Random
 
 from pydantic import BaseModel
 
-from ontopipe.cqs.groups import Group, generate_groups_for_domain
-from ontopipe.cqs.personas import Persona, generate_personas_for_group
+from ontology_hydra.cqs.groups import Group, generate_groups_for_domain
+from ontology_hydra.cqs.personas import Persona, generate_personas_for_group
 
 rng = Random(42)  # for reproducibility
 
@@ -23,10 +23,7 @@ class Comittee(BaseModel):
     def divide_into_groups(self, group_size: int):
         """Returns a list of groups, each containing a sample of the comittee members."""
 
-        return [
-            self.members[i : i + group_size]
-            for i in range(0, len(self.members), group_size)
-        ]
+        return [self.members[i : i + group_size] for i in range(0, len(self.members), group_size)]
 
 
 def generate_comittee_for_domain(domain: str):

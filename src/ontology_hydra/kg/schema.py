@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from pydantic import Field, create_model
 from symai.strategy import LLMDataModel
 
-from ontopipe.ontology.models import (
+from ontology_hydra.ontology.models import (
     Class,
     DataProperty,
     DataType,

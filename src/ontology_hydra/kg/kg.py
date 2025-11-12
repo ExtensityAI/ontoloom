@@ -6,10 +6,10 @@ from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 from tqdm import tqdm
 
-from ontopipe.kg.merging import try_merge
-from ontopipe.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_schema
-from ontopipe.ontology.models import Ontology
-from ontopipe.prompts import prompt_registry
+from ontology_hydra.kg.merging import try_merge
+from ontology_hydra.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_schema
+from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.prompts import prompt_registry
 
 logger = getLogger("ontopipe.kg")
 

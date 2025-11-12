@@ -5,7 +5,7 @@ import tiktoken
 from chonkie import RecursiveChunker, TokenChunker
 from tokenizers import Tokenizer
 
-from ontopipe import generate_kg, ontopipe
+from ontology_hydra import generate_kg, ontopipe
 
 parser = ArgumentParser(description="Run the ontopipe pipeline to generate an ontology and knowledge graph.")
 parser.add_argument(

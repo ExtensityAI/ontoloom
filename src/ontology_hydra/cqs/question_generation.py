@@ -5,8 +5,8 @@ from symai import Expression
 from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
-from ontopipe.cqs.comittee import ComitteeMember
-from ontopipe.prompts import prompt_registry
+from ontology_hydra.cqs.comittee import ComitteeMember
+from ontology_hydra.prompts import prompt_registry
 
 logger = getLogger("ontopipe.cqs")
 

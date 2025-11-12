@@ -8,9 +8,9 @@ import networkx as nx
 from symai import Import, Symbol
 from symai.components import FileReader
 
-from ontopipe import generate_kg
-from ontopipe.ontology.models import Ontology
-from ontopipe.pipe import ontopipe
+from ontology_hydra import generate_kg
+from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.pipe import ontopipe
 
 # from ontopipe.vis import visualize_kg, visualize_ontology
 

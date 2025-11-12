@@ -7,17 +7,17 @@ from typing import Literal, cast
 
 from symai.components import MetadataTracker
 
-from ontopipe.cqs.comittee import Comittee, generate_comittee_for_domain
-from ontopipe.cqs.question_generation import (
+from ontology_hydra.cqs.comittee import Comittee, generate_comittee_for_domain
+from ontology_hydra.cqs.question_generation import (
     Duplicates,
     Question,
     QuestionDeduplicator,
     Questions,
     generate_questions,
 )
-from ontopipe.cqs.scoping import generate_scope_document, merge_scope_documents
-from ontopipe.ontology.generator import generate_ontology
-from ontopipe.ontology.models import Ontology
+from ontology_hydra.cqs.scoping import generate_scope_document, merge_scope_documents
+from ontology_hydra.ontology.generator import generate_ontology
+from ontology_hydra.ontology.models import Ontology
 
 logger = getLogger("ontopipe.pipe")
 # use standard logging module as ontopipe is a tool/library and we do not want to enforce a specific logging library on users
