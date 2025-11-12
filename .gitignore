@@ -179,3 +179,5 @@ experiment.ipynb
 symai.config.json
 
 temp/
+
+.ruff-cache/
