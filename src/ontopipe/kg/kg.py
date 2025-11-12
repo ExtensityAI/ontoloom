@@ -257,7 +257,7 @@ def generate_kg(
     ontology: Ontology | None = None,
     batch_size: int = 1,
     epochs: int = 3,
-) -> None:
+) -> DynamicPartialKnowledgeGraph:
     cache_path = cache_path / "kg.json"
 
     partial_json_cache_path = cache_path.with_suffix(".partial.json")
@@ -295,8 +295,8 @@ def generate_kg(
         extractor.contract_perf_stats()
         logger.debug("API Usage: %s", usage)
 
-    kg = extractor.get_kg()
-    cache_path.write_text(kg.model_dump_json(indent=2), encoding="utf-8")
+    kg = extractor.kg
+    cache_path.write_text(kg.model_dump_json(indent=2, exclude_none=True), encoding="utf-8")
 
     # remove partial cache files once again
     partial_json_cache_path.unlink(missing_ok=True)

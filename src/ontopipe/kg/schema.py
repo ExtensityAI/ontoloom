@@ -33,6 +33,8 @@ _data_type_to_python: dict[DataType, type] = {
     "time": time,
 }
 
+# TODO auto-provide format information for datetime, date, and time types in the schema
+
 
 def _generate_description(description: Description | None):
     """Generates a description string for a class or property."""

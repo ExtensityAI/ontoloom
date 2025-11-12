@@ -38,14 +38,15 @@ if not output_path.exists():
 
 cache_path = output_path / "cache"
 
-ontology = ontopipe(domain, cache_path=cache_path)  # saves to cache_path / 'ontology.json'
+ontology = ontopipe(domain, cache_path=cache_path, cqs_per_batch=100)  # saves to cache_path / 'ontology.json'
+# use 100 CQs per batch because we use GPT-5 and it produced so much data, else it would take way too long
 
 texts = [
     tp.read_text(encoding="utf-8", errors="ignore") for tp in text_paths
 ]  # TODO add support for other text formats
 
 tokenizer = tiktoken.get_encoding("o200k_base")
-chunker = TokenChunker(chunk_size=4096, chunk_overlap=512, tokenizer=tokenizer)
+chunker = TokenChunker(chunk_size=1024, chunk_overlap=256, tokenizer=tokenizer)
 
 chunks = chunker(texts)
 
@@ -58,5 +59,5 @@ kg = generate_kg(
     texts=texts,
     ontology=ontology,
     cache_path=cache_path,
-    epochs=1,  # iterates multiple times over the texts to improve the KG
+    epochs=5,  # iterates multiple times over the texts to improve the KG
 )
