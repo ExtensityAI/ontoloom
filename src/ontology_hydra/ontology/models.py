@@ -121,7 +121,7 @@ class Ontology(Model):
         props = dict[str, DataProperty | ObjectProperty]()
 
         for c in chain:
-            props.update({pn: all_props[pn] for pn in c.own_properties})
+            props.update({prop_name: all_props[prop_name] for prop_name in c.own_properties})
 
         return props
 

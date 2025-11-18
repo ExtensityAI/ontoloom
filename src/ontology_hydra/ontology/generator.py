@@ -10,6 +10,7 @@ from tqdm import tqdm
 from ontology_hydra.ontology.models import Concept, Ontology
 from ontology_hydra.ontology.validator import try_add_concepts
 from ontology_hydra.prompts import prompt_registry
+from ontology_hydra.utils.cache import Cache, CacheKey
 
 # from ontopipe.vis import visualize_ontology
 
@@ -81,9 +82,7 @@ class OntologyGenerator(Expression):
 
 
 def generate_ontology(
-    cqs: list[str],
-    cache_path: Path,
-    cqs_per_batch: int = 1,
+    cqs: list[str], cqs_per_batch: int = 1, cache: Cache | None = None
 ) -> Ontology:
     # TODO consider providing scope document
     # TODO do this iteratively, i.e. generate until done. Then, critique ontology and regenerate from there.
@@ -91,8 +90,8 @@ def generate_ontology(
     ontology = Ontology()
     generator = OntologyGenerator(ontology)
 
-    partial_json_cache_path = cache_path.with_suffix(".partial.json")
-    partial_html_cache_path = cache_path.with_suffix(".partial.html")
+    partial_json_ck: CacheKey = ("ontology", "partial.json")
+    partial_html_ck: CacheKey = ("ontology", "partial.html")  # for visualization
 
     usage = None
     with MetadataTracker() as tracker:  # For gpt-* models
@@ -108,26 +107,19 @@ def generate_ontology(
                 logger.error(f"Error getting state update for batch: {e}")
                 continue
 
-            partial_json_cache_path.write_text(
-                ontology.model_dump_json(indent=2),
-                encoding="utf-8",
-            )
+            if cache is not None:
+                cache.write(partial_json_ck, ontology.model_dump_json(indent=2))
 
-            # visualize_ontology(ontology, partial_html_cache_path, open_browser=False)
+            # visualize_ontology(ontology, partial_html_cache_path, open_browser=False) TODO update
 
         generator.contract_perf_stats()
         usage = tracker.usage
 
     logger.debug("API Usage:\n%s", usage)
 
-    cache_path.write_text(
-        ontology.model_dump_json(indent=2),
-        encoding="utf-8",
-    )
-
-    # remove partial cache files once again
-    partial_json_cache_path.unlink(missing_ok=True)
-    partial_html_cache_path.unlink(missing_ok=True)
+    if cache is not None:
+        cache.write(("ontology", "final.json"), ontology.model_dump_json(indent=2))
+        cache.delete(partial_json_ck, partial_html_ck)
 
     logger.debug("Ontology creation completed!")
 

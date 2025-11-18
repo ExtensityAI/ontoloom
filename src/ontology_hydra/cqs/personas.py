@@ -1,4 +1,5 @@
 from logging import getLogger
+from typing import cast
 
 from pydantic import Field
 from symai import Expression
@@ -7,6 +8,7 @@ from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.groups import Group
 from ontology_hydra.prompts import prompt_registry
+from ontology_hydra.utils.general import begin_tracking
 
 logger = getLogger("ontopipe.cqs")
 
@@ -84,8 +86,8 @@ def generate_personas_for_group(domain: str, group_def: Group, n: int = PROPORTI
 
     # TODO maybe provide all personas here, so it can generate more diverse ones - right now we only provide the ones from the current group!
 
-    generator = PersonasGenerator()
-    with MetadataTracker() as tracker:
+    generator = cast("PersonasGenerator", PersonasGenerator())
+    with begin_tracking() as tracker:
         while len(personas) < n:
             n_remaining = n - len(personas)
             new_personas = generator(

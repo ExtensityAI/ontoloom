@@ -5,8 +5,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import Literal, cast
 
-from symai.components import MetadataTracker
-
 from ontology_hydra.cqs.comittee import Comittee, generate_comittee_for_domain
 from ontology_hydra.cqs.question_generation import (
     Duplicates,
@@ -18,33 +16,38 @@ from ontology_hydra.cqs.question_generation import (
 from ontology_hydra.cqs.scoping import generate_scope_document, merge_scope_documents
 from ontology_hydra.ontology.generator import generate_ontology
 from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.utils.cache import Cache, CacheKey, DirectoryCache
+from ontology_hydra.utils.general import begin_tracking
 
 logger = getLogger("ontopipe.pipe")
 # use standard logging module as ontopipe is a tool/library and we do not want to enforce a specific logging library on users
 
 
-def _generate_comittee_with_cache(domain: str, cache_path: Path):
-    if cache_path.exists():
-        return Comittee.model_validate_json(cache_path.read_text(encoding="utf-8", errors="ignore"))
+def _generate_comittee(domain: str, cache: Cache):
+    ck: CacheKey = ("comittee.json",)
+    if (json := cache.read(ck)) is not None:
+        return Comittee.model_validate_json(json)
 
     comittee = generate_comittee_for_domain(domain)
-    cache_path.write_text(comittee.model_dump_json(indent=2), encoding="utf-8")
+    cache.write(ck, comittee.model_dump_json(indent=2))
+
     return comittee
 
 
-def _generate_scope_documents_with_cache(
-    domain: str, comittee: Comittee, cache_path: Path, group_size
-):
+def _generate_scope_documents_with_cache(domain: str, comittee: Comittee, cache: Cache, group_size):
     groups = comittee.divide_into_groups(group_size)
-    documents = [None] * len(groups)
+    documents = [""] * len(groups)
 
     def process_group(i_group):
         i, group = i_group
-        doc_cache_path = cache_path / f"scope_{i}.txt"
-        if doc_cache_path.exists():
-            return i, doc_cache_path.read_text(encoding="utf-8", errors="ignore")
+        ck: CacheKey = ("scopes", f"{i}.txt")
+
+        if (cached_doc := cache.read(ck)) is not None:
+            return i, cached_doc
+
         doc = generate_scope_document(domain, [m.persona for m in group])
-        doc_cache_path.write_text(doc, encoding="utf-8")
+        cache.write(ck, doc)
+
         return i, doc
 
     with ThreadPoolExecutor() as executor:
@@ -55,25 +58,27 @@ def _generate_scope_documents_with_cache(
     return cast("list[str]", documents)
 
 
-def _merge_scope_documents_with_cache(domain: str, documents: list[str], cache_path: Path):
-    if cache_path.exists():
-        return cache_path.read_text(encoding="utf-8", errors="ignore")
+def _merge_scope_documents_with_cache(domain: str, documents: list[str], cache: Cache):
+    ck: CacheKey = ("scopes", "merged.txt")
+    if (cached_scope := cache.read(ck)) is not None:
+        return cached_scope
 
     merged_scope = merge_scope_documents(domain, documents)
-    cache_path.write_text(merged_scope, encoding="utf-8")
+    cache.write(ck, merged_scope)
+
     return merged_scope
 
 
-def _generate_scope_with_cache(domain: str, comittee: Comittee, group_size: int, cache_path: Path):
-    merged_scope_path = cache_path / "scope_merged.txt"
+def _generate_scope_with_cache(domain: str, comittee: Comittee, group_size: int, cache: Cache):
+    ck: CacheKey = ("scopes", "merged.txt")
 
     # in case the merged scope exists, we can load it directly and skip everything else
-    if merged_scope_path.exists():
-        return merged_scope_path.read_text(encoding="utf-8", errors="ignore")
+    if (cached_scope := cache.read(ck)) is not None:
+        return cached_scope
 
-    documents = _generate_scope_documents_with_cache(domain, comittee, cache_path, group_size)
+    documents = _generate_scope_documents_with_cache(domain, comittee, cache, group_size)
 
-    return _merge_scope_documents_with_cache(domain, documents, merged_scope_path)
+    return _merge_scope_documents_with_cache(domain, documents, cache)
 
 
 def _sort_cqs(cqs: Iterable[str]):
@@ -81,19 +86,19 @@ def _sort_cqs(cqs: Iterable[str]):
     return sorted(cqs, key=lambda x: len(x.split(" ")), reverse=True)
 
 
-def _deduplicate_cqs(cqs: list[str], cache_path: Path) -> list[str]:
+def _deduplicate_cqs(cqs: list[str], cache: Cache) -> list[str]:
     cqs = _sort_cqs(set(cqs))
     questions = Questions(items=[Question(index=i, text=q) for i, q in enumerate(cqs)])
 
-    with MetadataTracker() as tracker:
-        deduplicator = QuestionDeduplicator()
+    with begin_tracking() as tracker:
+        deduplicator = cast("QuestionDeduplicator", QuestionDeduplicator())
         res: Duplicates = deduplicator(input=questions)
 
         deduplicator.contract_perf_stats()
         logger.debug("CQ Deduplication API Usage: %s", tracker.usage)
 
     # TODO write duplicates to cache file, but not only with indexes but actual questions!
-    cache_path.write_text(res.model_dump_json(indent=2), encoding="utf-8")
+    cache.write(("cqs", "duplicates.json"), res.model_dump_json(indent=2))
 
     # deduplicate CQs based on the duplicates found (1. take new questions and 2. add all non-duplicates)
     deduplicated_cqs = {d.question for d in res.duplicates}
@@ -110,24 +115,26 @@ def _generate_cqs_with_cache(
     merged_scope: str,
     group_size: int,
     comittee: Comittee,
-    cache_path: Path,
+    cache: Cache,
 ):
-    combined_cqs_path = cache_path / "cqs_combined.txt"
+    ck: CacheKey = ("cqs", "cqs_combined.txt")
 
     # in case all cqs were generated and combined, we can load them directly and skip everything else
-    if combined_cqs_path.exists():
-        return combined_cqs_path.read_text(encoding="utf-8", errors="ignore").split("\n")
+    if (cached_cqs := cache.read(ck)) is not None:
+        return cached_cqs.split("\n")
 
     groups = list(comittee.divide_into_groups(group_size))
-    cqs = [None] * len(groups)
+    cqs = [""] * len(groups)
 
     def process_group(i_group):
         i, group = i_group
-        group_cqs_cache_path = cache_path / f"cqs_{i}.txt"
-        if group_cqs_cache_path.exists():
-            return i, group_cqs_cache_path.read_text(encoding="utf-8", errors="ignore").split("\n")
+        group_ck: CacheKey = ("cqs", f"cqs_{i}.txt")
+        if (cached_group_cqs := cache.read(group_ck)) is not None:
+            return i, cached_group_cqs.split("\n")
+
         group_cqs = generate_questions(domain, group, merged_scope)
-        group_cqs_cache_path.write_text("\n".join(group_cqs), encoding="utf-8")
+        cache.write(group_ck, "\n".join(group_cqs))
+
         return i, group_cqs
 
     with ThreadPoolExecutor() as executor:
@@ -139,26 +146,24 @@ def _generate_cqs_with_cache(
     cqs = [cq for gcq in cqs for cq in gcq]
 
     # deduplicate CQs
-    cqs = _deduplicate_cqs(cqs, cache_path / "duplicates.json")
+    cqs = _deduplicate_cqs(cqs, cache)
 
-    combined_cqs_path.write_text("\n".join(cqs), encoding="utf-8")
+    cache.write(ck, "\n".join(cqs))
 
     return cqs
 
 
 def _generate_ontology_with_cache(
     cqs: list[str],
-    cache_path: Path,
+    cache: Cache,
     cqs_per_batch: int = 4,
 ):
-    if cache_path.exists():
-        ontology = Ontology.model_validate_json(
-            cache_path.read_text(encoding="utf-8", errors="ignore")
-        )
-
+    ck: CacheKey = ("ontology.json",)
+    if (cached_ontology := cache.read(ck)) is not None:
+        ontology = Ontology.model_validate_json(cached_ontology)
     else:
         logger.debug("Generating ontology from %d CQs", len(cqs))
-        ontology = generate_ontology(cqs, cache_path, cqs_per_batch=cqs_per_batch)
+        ontology = generate_ontology(cqs, cqs_per_batch=cqs_per_batch, cache=cache)
 
     return ontology
 
@@ -188,28 +193,22 @@ def ontopipe(
     logger.debug("Generating ontology for domain: '%s'", domain)
     logger.debug("Using cache path: %s", cache_path)
 
-    comittee_path = cache_path / "comittee.json"
-    scopes_path: Path = cache_path / "scopes"
-    cqs_path = cache_path / "cqs"
-    ontology_path = cache_path / "ontology.json"
+    cache = DirectoryCache(cache_path)
 
-    scopes_path.mkdir(exist_ok=True, parents=True)
-    cqs_path.mkdir(exist_ok=True, parents=True)
-
-    comittee = _generate_comittee_with_cache(domain, comittee_path)
+    comittee = _generate_comittee(domain, cache)
     logger.debug(
         "Generated comittee for domain '%s' with %d members",
         domain,
         len(comittee.members),
     )
 
-    scope = _generate_scope_with_cache(domain, comittee, group_size, scopes_path)
+    scope = _generate_scope_with_cache(domain, comittee, group_size, cache)
     logger.debug("Generated scope for domain '%s' with %d words", domain, len(scope.split(" ")))
 
-    cqs = _generate_cqs_with_cache(domain, scope, group_size, comittee, cqs_path)
+    cqs = _generate_cqs_with_cache(domain, scope, group_size, comittee, cache)
     logger.debug("Generated %d CQs for domain '%s'", len(cqs), domain)
 
-    ontology = _generate_ontology_with_cache(cqs, ontology_path, cqs_per_batch=cqs_per_batch)
+    ontology = _generate_ontology_with_cache(cqs, cache, cqs_per_batch=cqs_per_batch)
 
     logger.debug(
         "Generated ontology for domain '%s' with %d classes and %d properties",

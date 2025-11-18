@@ -8,9 +8,14 @@ _IGNORE_MERGE_KEYS = {"name", "cls"}
 def _merge_values(a: list | None, b: list | None):
     if a is not None and b is not None:
         return list(set(a + b))  # deduplicate values
+
     if a is not None:
-        return list(a)
-    return list(b)  # b is guaranteed to be not None here (given call args)
+        return a
+
+    if b is not None:
+        return b
+
+    return None
 
 
 def try_merge(

@@ -1,4 +1,5 @@
 from logging import getLogger
+from typing import cast
 
 from pydantic import Field
 from symai import Expression
@@ -7,6 +8,7 @@ from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.comittee import ComitteeMember
 from ontology_hydra.prompts import prompt_registry
+from ontology_hydra.utils.general import begin_tracking
 
 logger = getLogger("ontopipe.cqs")
 
@@ -80,9 +82,9 @@ class QuestionGenerator(Expression):
 
 
 def generate_questions(domain: str, group: list[ComitteeMember], scope_document: str) -> list[str]:
-    generator = QuestionGenerator()
+    generator = cast("QuestionGenerator", QuestionGenerator())
 
-    with MetadataTracker() as tracker:
+    with begin_tracking() as tracker:
         result: QuestionGeneratorOutput = generator(
             input=QuestionGenerationInput(domain=domain, group=group, scope_document=scope_document)
         )

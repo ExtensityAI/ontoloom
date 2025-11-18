@@ -1,4 +1,5 @@
 from logging import getLogger
+from typing import cast
 
 from pydantic import Field
 from symai import Expression
@@ -7,6 +8,7 @@ from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.personas import Persona
 from ontology_hydra.prompts import prompt_registry
+from ontology_hydra.utils.general import begin_tracking
 
 logger = getLogger("ontopipe.cqs")
 
@@ -93,9 +95,9 @@ class ScopeDocumentMerger(Expression):
 
 def generate_scope_document(domain: str, personas: list[Persona]) -> str:
     """Generate a scope document for a given domain and group of personas."""
-    generator = ScopeDocumentGenerator()
+    generator = cast("ScopeDocumentGenerator", ScopeDocumentGenerator())
 
-    with MetadataTracker() as tracker:
+    with begin_tracking() as tracker:
         result = generator(input=ScopeDocumentGenerationInput(domain=domain, personas=personas))
 
         generator.contract_perf_stats()

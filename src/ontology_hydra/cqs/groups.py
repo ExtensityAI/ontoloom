@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import Field
 from symai import Expression
@@ -7,6 +7,7 @@ from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.prompts import prompt_registry
+from ontology_hydra.utils.general import begin_tracking
 
 logger = getLogger("ontopipe.cqs")
 
@@ -64,8 +65,8 @@ class GroupsGenerator(Expression):
 
 
 def generate_groups_for_domain(domain: str):
-    generator = GroupsGenerator()
-    with MetadataTracker() as tracker:
+    generator = cast("GroupsGenerator", GroupsGenerator())
+    with begin_tracking() as tracker:
         x: Groups = generator(input=DomainDefinition(domain=domain))
 
         generator.contract_perf_stats()
