@@ -171,6 +171,23 @@ wheels = [
 ]
 
 [[package]]
+name = "chonkie"
+version = "1.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9a/ea/bb7194a4237d896e9d5eb9c8aa4baad6430b71b8685668bb4742421c520c/chonkie-1.4.2.tar.gz", hash = "sha256:1df0476d6af580d5ff8dfe4b163f6a2e71d139a20c42aab483da5291f4847445", size = 409741, upload-time = "2025-11-14T18:31:34.714Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bf/00/cb817e1a8053df91b918ea3da2fb0c49645be264b078d108ec8737866a87/chonkie-1.4.2-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:65446acca7c19a8a034ac45a8de250b8945e015289e88c303823d69ad90137af", size = 534910, upload-time = "2025-11-14T18:31:16.386Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/e6/2636fe9c24e06e849a70e50ef5d339ef2d6ccde990f319e72e0ae0ee8425/chonkie-1.4.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:565993159ce718a11c1bccf37013a6a0e8b2e1118bd208c684320ed0ea7842d8", size = 532025, upload-time = "2025-11-14T18:31:17.423Z" },
+    { url = "https://files.pythonhosted.org/packages/92/e5/7380587b2993ef6167dc458c4d3e929f69f13885dc87ffbb251cb3cbe646/chonkie-1.4.2-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9b6148b421f6d616664a9d96b7ab48604b1cfbe054a3c9089f29e9accf1c5937", size = 1020235, upload-time = "2025-11-14T18:31:18.751Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/c4/837df1812da9bc57f6246e08d0d94551fcbaec7e9c92fa89b83ba734f6b7/chonkie-1.4.2-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:220747ff600ab00808b3ed2814eae5a3559c4ef1a512ebf9560a9805e9b04c17", size = 1029374, upload-time = "2025-11-14T18:31:19.981Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/db/c0445f446bee8a498e0dd993cebe2cca743d27dff9ac6bfd6f6031461ea6/chonkie-1.4.2-cp312-cp312-win_amd64.whl", hash = "sha256:fb46a1a77721d1166411a9d71d1d1202fb350fe62b6acae2e397f4a5e206b289", size = 537010, upload-time = "2025-11-14T18:31:20.985Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -851,6 +868,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "chonkie" },
     { name = "ruff" },
 ]
 
@@ -858,7 +876,10 @@ dev = [
 requires-dist = [{ name = "symbolicai", git = "https://github.com/ExtensityAI/symbolicai.git?branch=dev" }]
 
 [package.metadata.requires-dev]
-dev = [{ name = "ruff", specifier = ">=0.14.4" }]
+dev = [
+    { name = "chonkie", specifier = ">=1.4.2" },
+    { name = "ruff", specifier = ">=0.14.4" },
+]
 
 [[package]]
 name = "openai"
