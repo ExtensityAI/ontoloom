@@ -3,13 +3,12 @@ from typing import Literal, cast
 
 from pydantic import Field
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.prompts import prompt_registry
 from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.cqs")
+logger = getLogger("ontology-hydra.cqs")
 
 
 class Priority(LLMDataModel):

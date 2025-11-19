@@ -17,9 +17,8 @@ from ontology_hydra.cqs.scoping import generate_scope_document, merge_scope_docu
 from ontology_hydra.ontology.generator import generate_ontology
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.utils.cache import Cache, CacheKey, DirectoryCache
-from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.pipe")
+logger = getLogger("ontology-hydra.pipe")
 # use standard logging module as ontopipe is a tool/library and we do not want to enforce a specific logging library on users
 
 
@@ -90,12 +89,10 @@ def _deduplicate_cqs(cqs: list[str], cache: Cache) -> list[str]:
     cqs = _sort_cqs(set(cqs))
     questions = Questions(items=[Question(index=i, text=q) for i, q in enumerate(cqs)])
 
-    with begin_tracking() as tracker:
-        deduplicator = cast("QuestionDeduplicator", QuestionDeduplicator())
-        res: Duplicates = deduplicator(input=questions)
+    deduplicator = cast("QuestionDeduplicator", QuestionDeduplicator())
+    res: Duplicates = deduplicator(input=questions)
 
-        deduplicator.contract_perf_stats()
-        logger.debug("CQ Deduplication API Usage: %s", tracker.usage)
+    deduplicator.contract_perf_stats()
 
     # TODO write duplicates to cache file, but not only with indexes but actual questions!
     cache.write(("cqs", "duplicates.json"), res.model_dump_json(indent=2))
@@ -159,11 +156,13 @@ def _generate_ontology_with_cache(
     cqs_per_batch: int = 4,
 ):
     ck: CacheKey = ("ontology.json",)
+
     if (cached_ontology := cache.read(ck)) is not None:
-        ontology = Ontology.model_validate_json(cached_ontology)
-    else:
-        logger.debug("Generating ontology from %d CQs", len(cqs))
-        ontology = generate_ontology(cqs, cqs_per_batch=cqs_per_batch, cache=cache)
+        return Ontology.model_validate_json(cached_ontology)
+
+    logger.debug("Generating ontology from %d CQs", len(cqs))
+    ontology = generate_ontology(cqs, cqs_per_batch=cqs_per_batch, cache=cache)
+    cache.write(ck, ontology.model_dump_json(indent=2))
 
     return ontology
 
@@ -172,28 +171,21 @@ def ontopipe(
     domain: str,
     group_size: int = 4,
     cqs_per_batch: int = 4,
-    cache_path: Path | Literal["use_temp"] = "use_temp",
-):
-    """Runs the ontopipe pipeline to generate an ontology for the given domain.
+    cache: Cache | Literal["use_temp_dir"] = "use_temp_dir",
+) -> Ontology:
+    """Runs the ontology-hydra pipeline to generate an ontology for the given domain.
 
     Args:
         domain (str): The domain for which to generate the ontology.
         group_size (int): The number of committee members to group together for scope and cq generation. Defaults to 4.
         cqs_per_batch (int): The number of CQs to process in a single batch during ontology generation. Defaults to 4.
-        cache_path (Path): The path to the cache directory. If it does not exist, a temp directory will be created."""
+        cache (Cache | Literal["use_temp_dir"]): The cache instance or 'use_temp_dir' to create a new temporary directory for caching."""
 
-    if cache_path == "use_temp":
+    if cache == "use_temp_dir":
         # use temp path for caching
-        cache_path = Path(tempfile.mkdtemp("ontopipe"))
-
-    if not cache_path.exists() or not cache_path.is_dir():
-        msg = f"Cache path '{cache_path}' is not a directory or does not exist"
-        raise ValueError(msg)
+        cache = DirectoryCache(Path(tempfile.mkdtemp("ontopipe")))
 
     logger.debug("Generating ontology for domain: '%s'", domain)
-    logger.debug("Using cache path: %s", cache_path)
-
-    cache = DirectoryCache(cache_path)
 
     comittee = _generate_comittee(domain, cache)
     logger.debug(

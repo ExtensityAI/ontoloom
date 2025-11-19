@@ -1,9 +1,8 @@
 import logging
-from pathlib import Path
+from typing import cast
 
 from pydantic import Field
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 from tqdm import tqdm
 
@@ -14,7 +13,7 @@ from ontology_hydra.utils.cache import Cache, CacheKey
 
 # from ontopipe.vis import visualize_ontology
 
-logger = logging.getLogger("ontopipe.ontology.generator")
+logger = logging.getLogger("ontology-hydra.ontology.generator")
 
 
 class OntologyGeneratorInput(LLMDataModel):
@@ -88,34 +87,27 @@ def generate_ontology(
     # TODO do this iteratively, i.e. generate until done. Then, critique ontology and regenerate from there.
 
     ontology = Ontology()
-    generator = OntologyGenerator(ontology)
+    generator = cast("OntologyGenerator", OntologyGenerator(ontology))
 
     partial_json_ck: CacheKey = ("ontology", "partial.json")
     partial_html_ck: CacheKey = ("ontology", "partial.html")  # for visualization
 
-    usage = None
-    with MetadataTracker() as tracker:  # For gpt-* models
-        for i in tqdm(range(0, len(cqs), cqs_per_batch)):
-            batch_cqs = cqs[i : i + cqs_per_batch]
+    for i in tqdm(range(0, len(cqs), cqs_per_batch)):
+        batch_cqs = cqs[i : i + cqs_per_batch]
 
-            generator_input = OntologyGeneratorInput(cqs=batch_cqs, ontology=ontology)
+        generator_input = OntologyGeneratorInput(cqs=batch_cqs, ontology=ontology)
 
-            try:
-                _output: OntologyGeneratorOutput = generator(input=generator_input)
-                # TODO do not like that the ontology is just implicitly mutated here, change this in the future again
-            except Exception as e:
-                logger.error(f"Error getting state update for batch: {e}")
-                continue
+        try:
+            _output = generator(input=generator_input)
+            # TODO do not like that the ontology is just implicitly mutated here, change this in the future again
+        except Exception as e:
+            logger.error(f"Error getting state update for batch: {e}")
+            continue
 
-            if cache is not None:
-                cache.write(partial_json_ck, ontology.model_dump_json(indent=2))
+        if cache is not None:
+            cache.write(partial_json_ck, ontology.model_dump_json(indent=2))
 
-            # visualize_ontology(ontology, partial_html_cache_path, open_browser=False) TODO update
-
-        generator.contract_perf_stats()
-        usage = tracker.usage
-
-    logger.debug("API Usage:\n%s", usage)
+        # visualize_ontology(ontology, partial_html_cache_path, open_browser=False) TODO update
 
     if cache is not None:
         cache.write(("ontology", "final.json"), ontology.model_dump_json(indent=2))

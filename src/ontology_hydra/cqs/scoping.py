@@ -3,14 +3,12 @@ from typing import cast
 
 from pydantic import Field
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.personas import Persona
 from ontology_hydra.prompts import prompt_registry
-from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.cqs")
+logger = getLogger("ontology-hydra.cqs")
 
 
 class ScopeDocumentGenerationInput(LLMDataModel):
@@ -97,11 +95,7 @@ def generate_scope_document(domain: str, personas: list[Persona]) -> str:
     """Generate a scope document for a given domain and group of personas."""
     generator = cast("ScopeDocumentGenerator", ScopeDocumentGenerator())
 
-    with begin_tracking() as tracker:
-        result = generator(input=ScopeDocumentGenerationInput(domain=domain, personas=personas))
-
-        generator.contract_perf_stats()
-        logger.debug("API Usage: %s", tracker.usage)
+    result = generator(input=ScopeDocumentGenerationInput(domain=domain, personas=personas))
 
     return result.content
 
@@ -127,12 +121,8 @@ def merge_scope_documents(domain: str, documents: list[str], chunk_size=CHUNK_SI
 
 def _do_merge(domain: str, documents: list[str]) -> str:
     """Merge a small set of documents using the ScopeDocumentMerger contract."""
-    merger = ScopeDocumentMerger()
+    merger = cast("ScopeDocumentMerger", ScopeDocumentMerger())
 
-    with MetadataTracker() as tracker:
-        result = merger(input=ScopeDocumentMergeInput(domain=domain, documents=documents))
-
-        merger.contract_perf_stats()
-        logger.debug("API Usage: %s", tracker.usage)
+    result = merger(input=ScopeDocumentMergeInput(domain=domain, documents=documents))
 
     return result.content

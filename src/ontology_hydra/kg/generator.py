@@ -1,9 +1,7 @@
 from logging import getLogger
-from pathlib import Path
 from typing import cast
 
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 from tqdm import tqdm
 
@@ -12,18 +10,19 @@ from ontology_hydra.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_s
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.prompts import prompt_registry
 from ontology_hydra.utils.cache import Cache, CacheKey
-from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.kg")
+logger = getLogger("ontology-hydra.kg")
 
 
 def is_snake_case(s):
     # Must not start or end with underscore
     if not s or s[0] == "_" or s[-1] == "_":
         return False
+
     # Must not have consecutive underscores
     if "__" in s:
         return False
+
     # Must only contain lowercase letters, numbers, or underscores
     return all(c.islower() or c.isdigit() or c == "_" for c in s)
 
@@ -90,13 +89,12 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
 
 
 def generate_kg(
+    cache: Cache,
     texts: list[str],
     ontology: Ontology | None = None,
     batch_size: int = 1,
     epochs: int = 3,
-    cache: Cache
 ) -> DynamicPartialKnowledgeGraph:
-
     partial_json_ck: CacheKey = ("kg", "partial.json")
     partial_html_ck: CacheKey = ("kg", "partial.html")
 
@@ -108,33 +106,25 @@ def generate_kg(
 
     Input, Extractor = _create_extractor(PartialKnowledgeGraph)
 
-    usage = None
     kg = PartialKnowledgeGraph(data=[])
 
     extractor = Extractor(ontology, kg)
 
-    with begin_tracking() as tracker:
-        for i in range(epochs):
-            for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
-                input_data = Input(
-                    texts=texts[j : j + batch_size],
-                    kg=kg,
-                )
+    for i in range(epochs):
+        for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
+            input_data = Input(
+                texts=texts[j : j + batch_size],
+                kg=kg,
+            )
 
-                # TODO annotate output with chunk information!
+            # TODO annotate output with chunk information!
 
-                _ = extractor(input=input_data)  # pyright: ignore[reportInvalidTypeForm] once again
+            _ = extractor(input=input_data)  # pyright: ignore[reportInvalidTypeForm] once again
 
-                kg = extractor.kg
+            kg = extractor.kg
 
-                if cache is not None:
-                    cache.write(partial_json_ck, kg.model_dump_json(indent=2))
-
-        usage = tracker.usage
-        extractor.contract_perf_stats()
-        logger.debug("API Usage: %s", usage)
-
-    kg = extractor.kg
+            if cache is not None:
+                cache.write(partial_json_ck, kg.model_dump_json(indent=2))
 
     if cache is not None:
         cache.write(("kg", "final.json"), kg.model_dump_json(indent=2, exclude_none=True))

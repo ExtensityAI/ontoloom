@@ -3,14 +3,13 @@ from typing import cast
 
 from pydantic import Field
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.groups import Group
 from ontology_hydra.prompts import prompt_registry
 from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.cqs")
+logger = getLogger("ontology-hydra.cqs")
 
 # note: if personas seem low-dimensional, or if they "overfit" to our goal, maybe prompt to modify them without stating our goal, just to make them more realistic
 
@@ -87,22 +86,18 @@ def generate_personas_for_group(domain: str, group_def: Group, n: int = PROPORTI
     # TODO maybe provide all personas here, so it can generate more diverse ones - right now we only provide the ones from the current group!
 
     generator = cast("PersonasGenerator", PersonasGenerator())
-    with begin_tracking() as tracker:
-        while len(personas) < n:
-            n_remaining = n - len(personas)
-            new_personas = generator(
-                input=PersonasGeneratorInput(
-                    domain=domain,
-                    group=group_def,
-                    n=n_remaining,
-                    existing_personas=personas,
-                )
+    while len(personas) < n:
+        n_remaining = n - len(personas)
+        new_personas = generator(
+            input=PersonasGeneratorInput(
+                domain=domain,
+                group=group_def,
+                n=n_remaining,
+                existing_personas=personas,
             )
+        )
 
-            # add at most n_remaining personas
-            personas.extend(new_personas.items[:n_remaining])
-
-            generator.contract_perf_stats()
-            logger.debug("API Usage: %s", tracker.usage)
+        # add at most n_remaining personas
+        personas.extend(new_personas.items[:n_remaining])
 
     return personas

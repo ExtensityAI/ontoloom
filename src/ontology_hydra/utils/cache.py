@@ -1,5 +1,6 @@
 import shutil
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
 

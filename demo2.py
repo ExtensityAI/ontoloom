@@ -2,9 +2,10 @@ from argparse import ArgumentParser
 from pathlib import Path
 
 import tiktoken
-from chonkie import TokenChunker
+from chonkie.chunker.token import TokenChunker
 
 from ontology_hydra import generate_kg, ontopipe
+from ontology_hydra.utils.cache import DirectoryCache
 
 parser = ArgumentParser(
     description="Run the ontopipe pipeline to generate an ontology and knowledge graph."
@@ -41,11 +42,9 @@ text_paths = args.input
 if not output_path.exists():
     raise ValueError(f"Output path '{output_path}' does not exist or is not a directory.")
 
-cache_path = output_path / "cache"
+cache = DirectoryCache(output_path)
 
-ontology = ontopipe(
-    domain, cache_path=cache_path, cqs_per_batch=100
-)  # saves to cache_path / 'ontology.json'
+ontology = ontopipe(domain, cache=cache, cqs_per_batch=100)  # saves to cache_path / 'ontology.json'
 # use 100 CQs per batch because we use GPT-5 and it produced so much data, else it would take way too long
 
 texts = [
@@ -65,6 +64,6 @@ print(f"Generated {len(texts)} text chunks for knowledge graph generation.")
 kg = generate_kg(
     texts=texts,
     ontology=ontology,
-    cache_path=cache_path,
+    cache=cache,
     epochs=5,  # iterates multiple times over the texts to improve the KG
 )

@@ -3,14 +3,12 @@ from typing import cast
 
 from pydantic import Field
 from symai import Expression
-from symai.components import MetadataTracker
 from symai.strategy import LLMDataModel, contract
 
 from ontology_hydra.cqs.comittee import ComitteeMember
 from ontology_hydra.prompts import prompt_registry
-from ontology_hydra.utils.general import begin_tracking
 
-logger = getLogger("ontopipe.cqs")
+logger = getLogger("ontology-hydra.cqs")
 
 
 class QuestionGenerationInput(LLMDataModel):
@@ -74,7 +72,7 @@ class QuestionGenerator(Expression):
 
     def post(self, output: QuestionGeneratorOutput) -> bool:
         # Ensure we have at least one question (TODO in the future improve this massively, and maybe skip the scoping step as well!)
-        return not (not output.items or len(output.items) == 0)
+        return output.items is not None and len(output.items) > 0
 
     @property
     def prompt(self) -> str:
@@ -84,13 +82,9 @@ class QuestionGenerator(Expression):
 def generate_questions(domain: str, group: list[ComitteeMember], scope_document: str) -> list[str]:
     generator = cast("QuestionGenerator", QuestionGenerator())
 
-    with begin_tracking() as tracker:
-        result: QuestionGeneratorOutput = generator(
-            input=QuestionGenerationInput(domain=domain, group=group, scope_document=scope_document)
-        )
-
-        generator.contract_perf_stats()
-        logger.debug("API Usage: %s", tracker.usage)
+    result: QuestionGeneratorOutput = generator(
+        input=QuestionGenerationInput(domain=domain, group=group, scope_document=scope_document)
+    )
 
     return result.items
 
