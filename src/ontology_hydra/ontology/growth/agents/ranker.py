@@ -1,0 +1,1 @@
+"""The ranker agent evaluates proposed changes to the ontology and ranks them based on their potential impact and relevance. It takes as input user intent and the current ontology state, but not the actual data samples."""

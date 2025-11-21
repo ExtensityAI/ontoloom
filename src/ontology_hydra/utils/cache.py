@@ -1,6 +1,5 @@
 import shutil
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
 
@@ -39,6 +38,10 @@ class DirectoryCache(Cache):
         self._path = path
         self._encoding = encoding
         self._lock = RLock()  # allows same thread to acquire multiple times
+
+    @property
+    def path(self) -> Path:
+        return self._path
 
     def _get_cache_file_path(self, key: CacheKey):
         return self._path / Path(*map(str, key))
