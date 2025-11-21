@@ -22,15 +22,8 @@ class Model(LLMDataModel):
 
 class Class(Model):
     name: ClassName
-    parent: "ClassName | None" = None
+    parent: "ClassName | None"
 
-    description: str
-
-
-class ObjectProperty(Model):
-    name: PropertyName
-    domain: vartuple[ClassName]
-    range: vartuple[ClassName]
     description: str
 
 
@@ -41,28 +34,50 @@ class DataProperty(Model):
     description: str
 
 
+class ObjectProperty(Model):
+    name: PropertyName
+    domain: vartuple[ClassName]
+    range: vartuple[ClassName]
+    description: str
+
+
 Property = ObjectProperty | DataProperty
 
 
 class OntologyState(Model):
     classes: vartuple[Class]
-    properties: vartuple[Property]
+    data_properties: vartuple[DataProperty]
+    object_properties: vartuple[ObjectProperty]
 
-    def get_class(self, name: ClassName) -> Class | None:
+    @property
+    def properties(self) -> vartuple[Property]:
+        return self.data_properties + self.object_properties
+
+    def get_class(self, name: ClassName):
         return next((cls for cls in self.classes if cls.name == name), None)
 
-    def get_property(self, name: PropertyName) -> Property | None:
+    def get_property(self, name: PropertyName):
         return next((prop for prop in self.properties if prop.name == name), None)
 
+    def get_subclasses(self, parent_name: ClassName):
+        return tuple(cls for cls in self.classes if cls.parent == parent_name)
+
+
+THING_CLASS = Class(
+    name="Thing",
+    parent=None,
+    description="The root class of all things.",
+)
+
+DISPLAY_NAME_PROPERTY = DataProperty(
+    name="displayName",
+    domain=("Thing",),
+    range="string",
+    description="A human-readable name for the entity.",
+)
 
 DEFAULT_ONTOLOGY_STATE = OntologyState(
-    classes=(Class(name="Thing", description="The root class of all things."),),
-    properties=(
-        DataProperty(
-            name="displayName",
-            domain=("Thing",),
-            range="string",
-            description="A human-readable name for the entity.",
-        ),
-    ),
+    classes=(THING_CLASS,),
+    data_properties=(DISPLAY_NAME_PROPERTY,),
+    object_properties=(),
 )
