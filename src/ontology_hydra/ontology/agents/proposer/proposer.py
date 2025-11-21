@@ -4,8 +4,8 @@ from pydantic import Field
 from symai.components import Expression
 from symai.strategy import contract
 
-from ontology_hydra.ontology.growth.agents.proposer.ops import Operation
-from ontology_hydra.ontology.growth.models import Model, OntologyState
+from ontology_hydra.ontology.agents.proposer.ops import Operation
+from ontology_hydra.ontology.models import Model, OntologyState
 
 
 class Proposal(Model):
@@ -17,6 +17,9 @@ class Proposal(Model):
         description="Summarize your proposal and explain in detail why it is needed.",
     )
     title: str = Field(..., description="Title for your proposal. Make it short and descriptive.")
+
+    def get_ops_of_type[T: Operation](self, op_type: type[T]) -> list[T]:
+        return [op for op in self.ops if isinstance(op, op_type)]
 
 
 class ProposerInput(Model):
@@ -46,4 +49,7 @@ def propose_changes(state: OntologyState, samples: list[str], intent: str):
 
     output: Proposal = proposer(input=ProposerInput(intent=intent, state=state, samples=samples))
 
-    print(output.model_dump_json(indent=2))
+    # TODO: validate that operations are valid given the current ontology state
+    # TODO: maybe also validate if there are any obvious issues and allow proposer to fix them?
+
+    return output

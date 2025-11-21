@@ -2,8 +2,8 @@ import tempfile
 from itertools import islice
 from pathlib import Path
 
-from ontology_hydra.ontology.growth.agents.proposer.proposer import propose_changes
-from ontology_hydra.ontology.growth.models import DEFAULT_ONTOLOGY_STATE
+from ontology_hydra.ontology.agents.proposer.proposer import Proposal, propose_changes
+from ontology_hydra.ontology.models import DEFAULT_ONTOLOGY_STATE, OntologyState
 from ontology_hydra.utils.cache import DirectoryCache
 
 print("Beginning...")
@@ -29,6 +29,7 @@ cache = DirectoryCache(Path(tempfile.mkdtemp(prefix="ontology-hydra.")))
 
 print(f"Cache path: {cache.path}")
 
+
 for epoch in range(N_EPOCHS):
     print(f"--> Epoch {epoch}")
     for i in range(0, len(SAMPLES), BATCH_SIZE):
@@ -36,7 +37,11 @@ for epoch in range(N_EPOCHS):
         samples = SAMPLES[i : i + BATCH_SIZE]
 
         proposals = propose_changes(state=state, samples=samples, intent=INTENT)
-        ranked_proposals = rank_proposals(proposals=proposals, state=state, intent=INTENT)
+        # TODO: try to apply proposal here. If it does not work, send it back.
 
-        best_proposal = ranked_proposals[0]
+        cache.write((f"e{epoch}", f"b{i}"), proposals.model_dump_json(indent=2))
+
+        # ranked_proposals = rank_proposals(proposals=proposals, state=state, intent=INTENT)
+        # best_proposal = ranked_proposals[0]
+
         state = apply_proposal(state=state, proposal=best_proposal)

@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from ontology_hydra.ontology.growth.models import (
+from ontology_hydra.ontology.state.models import (
     ClassName,
     Model,
     PrimitiveDataType,

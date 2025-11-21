@@ -43,31 +43,29 @@ class DirectoryCache(Cache):
     def path(self) -> Path:
         return self._path
 
-    def _get_cache_file_path(self, key: CacheKey):
+    def get_path(self, key: CacheKey):
         return self._path / Path(*map(str, key))
 
     def exists(self, key: CacheKey) -> bool:
         with self._lock:
-            return self._get_cache_file_path(key).exists()
+            return self.get_path(key).exists()
 
     def read(self, key: CacheKey) -> str | None:
         with self._lock:
             return (
-                self._get_cache_file_path(key).read_text(encoding=self._encoding)
-                if self.exists(key)
-                else None
+                self.get_path(key).read_text(encoding=self._encoding) if self.exists(key) else None
             )
 
     def write(self, key: CacheKey, value: str):
         with self._lock:
-            path = self._get_cache_file_path(key)
+            path = self.get_path(key)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(value, encoding=self._encoding)
 
     def delete(self, *keys: CacheKey):
         with self._lock:
             for key in keys:
-                path = self._get_cache_file_path(key)
+                path = self.get_path(key)
 
                 if self.exists(key):
                     path.unlink()

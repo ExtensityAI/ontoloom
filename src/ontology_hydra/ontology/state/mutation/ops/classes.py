@@ -2,18 +2,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from ontology_hydra.ontology.growth.models import ClassName, Model
-
-
-class AddClassOperation(Model):
-    """Add a new class to the ontology."""
-
-    type: Literal["add_class"] = "add_class"
-
-    name: ClassName = Field(..., description="Name of the class to add")
-    parent: ClassName = Field(..., description="Name of parent class")
-
-    description: str = Field(..., description="Description of the class to add")
+from ontology_hydra.ontology.state.models import ClassName, Model
 
 
 class RemoveClassOperation(Model):
