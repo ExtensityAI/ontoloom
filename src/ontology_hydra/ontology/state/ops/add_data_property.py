@@ -18,19 +18,19 @@ from ontology_hydra.ontology.state.ops.results import (
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
-class AddDataPropertyOperation(Model):
+class AddDataPropertyArgs(Model):
     """Add a new data property to the ontology."""
 
     type: Literal["add_data_prop"] = "add_data_prop"
 
-    name: PropertyName = Field(..., description="Name of the property to add")
-    domain: vartuple[ClassName] = Field(..., description="Domain classes for the property")
-    range: PrimitiveDataType = Field(..., description="Range data types for the property")
+    name: PropertyName = Field(..., description="Name of the property")
+    domain: vartuple[ClassName] = Field(..., description="Domain classes of the property")
+    range: PrimitiveDataType = Field(..., description="Range data type of the property")
 
-    description: str = Field(..., description="Description of the property to add")
+    description: str = Field(..., description="Description of the property")
 
 
-def apply_add_data_property(state: OntologyState, op: AddDataPropertyOperation):
+def apply_add_data_property(state: OntologyState, op: AddDataPropertyArgs):
     if state.get_property(op.name) is not None:
         return OperationFailure(reason=f"Property '{op.name}' already exists in the ontology.")
 

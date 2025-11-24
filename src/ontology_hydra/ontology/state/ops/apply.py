@@ -5,7 +5,7 @@ from typing import Literal
 from ontology_hydra.ontology.state.models import OntologyState, vartuple
 from ontology_hydra.ontology.state.ops.add_class import AddClassOperation, apply_add_class
 from ontology_hydra.ontology.state.ops.add_data_property import (
-    AddDataPropertyOperation,
+    AddDataPropertyArgs,
     apply_add_data_property,
 )
 from ontology_hydra.ontology.state.ops.add_object_property import (
@@ -17,7 +17,7 @@ from ontology_hydra.ontology.state.ops.del_class import (
     apply_delete_class,
 )
 from ontology_hydra.ontology.state.ops.results import OperationResult
-from ontology_hydra.ontology.state.ops.types import Operation
+from ontology_hydra.ontology.state.ops.types import OperationArgs
 from ontology_hydra.ontology.state.ops.update_class import (
     UpdateClassOperation,
     apply_update_class,
@@ -37,7 +37,7 @@ class OperationInapplicableIssue(Model):
     """An operation could not be applied."""
 
     type: Literal["bad_op"] = "bad_op"
-    operation: Operation
+    operation: OperationArgs
     reason: str
 
 
@@ -52,16 +52,16 @@ class Success(BaseSuccess):
     state: OntologyState
 
 
-def _extract_ops_of_type[T: Operation](ops: list[Operation], op_type: type[T]):
+def _extract_ops_of_type[T: OperationArgs](ops: list[OperationArgs], op_type: type[T]):
     return (
         [op for op in ops if isinstance(op, op_type)],
         [op for op in ops if not isinstance(op, op_type)],
     )
 
 
-def apply_ops_of_type[T: Operation](
+def apply_ops_of_type[T: OperationArgs](
     state: OntologyState,
-    ops: list[Operation],
+    ops: list[OperationArgs],
     op_type: type[T],
     apply: Callable[[OntologyState, T], OperationResult],
 ):
@@ -78,7 +78,7 @@ def apply_ops_of_type[T: Operation](
     return state, remaining_ops
 
 
-def apply(state: OntologyState, ops: list[Operation]):
+def apply(state: OntologyState, ops: list[OperationArgs]):
     # TODO: validate operations list. A specific class/property name can only appear in one of ADD/DELETE/UPDATE ops.
     issues = list[Issue]()
 
@@ -91,7 +91,7 @@ def apply(state: OntologyState, ops: list[Operation]):
     # finally add classes as other operations might depend on them
     state, ops = apply_ops_of_type(state, ops, AddClassOperation, apply_add_class)
 
-    state, ops = apply_ops_of_type(state, ops, AddDataPropertyOperation, apply_add_data_property)
+    state, ops = apply_ops_of_type(state, ops, AddDataPropertyArgs, apply_add_data_property)
     state, ops = apply_ops_of_type(
         state, ops, AddObjectPropertyOperation, apply_add_object_property
     )

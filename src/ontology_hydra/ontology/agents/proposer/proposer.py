@@ -5,11 +5,11 @@ from symai.components import Expression
 from symai.strategy import contract
 
 from ontology_hydra.ontology.state.models import Model, OntologyState
-from ontology_hydra.ontology.state.ops.types import Operation
+from ontology_hydra.ontology.state.ops.types import OperationArgs
 
 
 class Proposal(Model):
-    ops: list[Operation] = Field(
+    ops: list[OperationArgs] = Field(
         ..., description="All operations that are required to achieve your proposal"
     )
     summary: str = Field(
