@@ -1,4 +1,6 @@
+from collections import defaultdict
 from collections.abc import Callable
+from typing import Literal
 
 from ontology_hydra.ontology.state.models import OntologyState, vartuple
 from ontology_hydra.ontology.state.ops.add_class import AddClassOperation, apply_add_class
@@ -28,19 +30,25 @@ from ontology_hydra.ontology.state.ops.update_object_property import (
     UpdateObjectPropertyOperation,
     apply_update_object_property,
 )
-from ontology_hydra.utils.results import Failure, Model, Success
+from ontology_hydra.utils.results import BaseFailure, BaseSuccess, Model
 
 
-class FailedOperation(Model):
+class OperationInapplicableIssue(Model):
+    """An operation could not be applied."""
+
+    type: Literal["bad_op"] = "bad_op"
     operation: Operation
     reason: str
 
 
-class ApplyFailure(Failure):
-    failures: vartuple[FailedOperation]
+Issue = OperationInapplicableIssue
 
 
-class ApplySuccess(Success):
+class Failure(BaseFailure):
+    issues: list[Issue]
+
+
+class Success(BaseSuccess):
     state: OntologyState
 
 
@@ -70,7 +78,10 @@ def apply_ops_of_type[T: Operation](
     return state, remaining_ops
 
 
-def apply(state: OntologyState, ops: list[Operation]) -> OntologyState:
+def apply(state: OntologyState, ops: list[Operation]):
+    # TODO: validate operations list. A specific class/property name can only appear in one of ADD/DELETE/UPDATE ops.
+    issues = list[Issue]()
+
     # first delete properties as nothing depends on them and they might be recreated by the model again
     state, ops = apply_ops_of_type(state, ops, DeleteClassOperation, apply_delete_class)
 
@@ -95,4 +106,4 @@ def apply(state: OntologyState, ops: list[Operation]) -> OntologyState:
 
     assert len(ops) == 0, f"Some operations were not applied: {ops}"  # TODO: make exception
 
-    return state
+    return Failure(issues=issues) if len(issues) > 0 else Success(state=state)

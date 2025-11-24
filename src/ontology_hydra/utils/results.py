@@ -10,12 +10,12 @@ class Model(BaseModel):
     )
 
 
-class Failure(Model):
+class BaseFailure(Model):
     success: Literal[False] = False
 
 
-class Success(Model):
+class BaseSuccess(Model):
     success: Literal[True] = True
 
 
-type Result = Success | Failure
+type Result = BaseSuccess | BaseFailure

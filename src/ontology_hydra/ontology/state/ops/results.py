@@ -1,12 +1,12 @@
 from ontology_hydra.ontology.state.models import OntologyState
-from ontology_hydra.utils.results import Failure, Success
+from ontology_hydra.utils.results import BaseFailure, BaseSuccess
 
 
-class OperationSuccess(Success):
+class OperationSuccess(BaseSuccess):
     state: OntologyState
 
 
-class OperationFailure(Failure):
+class OperationFailure(BaseFailure):
     reason: str
 
 
