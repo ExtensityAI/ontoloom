@@ -4,34 +4,39 @@ from pydantic import Field
 
 from ontology_hydra.ontology.state.models import (
     ClassName,
+    DataProperty,
     Model,
-    ObjectProperty,
     OntologyState,
+    PrimitiveDataType,
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.mutation.ops.results import OperationFailure, OperationSuccess
-from ontology_hydra.ontology.state.mutation.utils import (
-    replace_object_property,
+from ontology_hydra.ontology.state.ops.results import (
+    OperationFailure,
+    OperationSuccess,
+)
+from ontology_hydra.ontology.state.ops.utils import (
+    replace_data_property,
     replace_ontology_state,
 )
 
 
-class UpdateObjectPropertyOperation(Model):
-    """Update an existing object property in the ontology."""
+class UpdateDataPropertyOperation(Model):
+    """Update an existing data property in the ontology."""
 
-    type: Literal["update_obj_prop"] = "update_obj_prop"
+    type: Literal["update_data_prop"] = "update_data_prop"
 
     name: PropertyName = Field(..., description="Name of the property to update")
 
     new_name: PropertyName | None = Field(
         None, description="New name for the property (omit if unchanged)"
     )
+
     new_domain: vartuple[ClassName] | None = Field(
         None, description="New domain classes for the property (omit if unchanged)"
     )
-    new_range: vartuple[ClassName] | None = Field(
-        None, description="New range classes for the property (omit if unchanged)"
+    new_range: PrimitiveDataType | None = Field(
+        None, description="New range data type for the property (omit if unchanged)"
     )
 
     new_description: str | None = Field(
@@ -39,16 +44,16 @@ class UpdateObjectPropertyOperation(Model):
     )
 
 
-def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyOperation):
+def apply_update_data_property(state: OntologyState, op: UpdateDataPropertyOperation):
     target = state.get_property(op.name)
 
     if target is None:
         return OperationFailure(reason=f"Property '{op.name}' does not exist in the ontology.")
 
-    # make sure it's an object property
-    if not isinstance(target, ObjectProperty):
+    # make sure it's a data property
+    if not isinstance(target, DataProperty):
         return OperationFailure(
-            reason=f"Property '{op.name}' is not an object property, but a data property."
+            reason=f"Property '{op.name}' is not a data property, but an object property."
         )
 
     # if changing name, make sure the new name is not already taken
@@ -63,17 +68,9 @@ def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyO
                     reason=f"Domain class '{domain_class}' does not exist in the ontology."
                 )
 
-    # make sure that all range classes exist
-    if op.new_range is not None:
-        for range_class in op.new_range:
-            if state.get_class(range_class) is None:
-                return OperationFailure(
-                    reason=f"Range class '{range_class}' does not exist in the ontology."
-                )
-
     # success!
 
-    updated_prop = replace_object_property(
+    updated_prop = replace_data_property(
         target,
         name=op.new_name or target.name,
         domain=op.new_domain or target.domain,
@@ -82,7 +79,7 @@ def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyO
     )
 
     remaining_props = tuple(
-        prop if prop.name != target.name else updated_prop for prop in state.object_properties
+        prop if prop.name != target.name else updated_prop for prop in state.data_properties
     )
 
-    return OperationSuccess(state=replace_ontology_state(state, object_properties=remaining_props))
+    return OperationSuccess(state=replace_ontology_state(state, data_properties=remaining_props))

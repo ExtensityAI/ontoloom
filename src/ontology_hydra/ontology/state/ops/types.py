@@ -1,4 +1,4 @@
-from ontology_hydra.ontology.state.mutation.ops.update_class import UpdateClassOperation
+from ontology_hydra.ontology.state.ops.update_class import UpdateClassOperation
 
 from .add_class import AddClassOperation
 from .add_data_property import AddDataPropertyOperation

@@ -3,14 +3,14 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, PropertyName
-from ontology_hydra.ontology.state.mutation.ops.results import (
+from ontology_hydra.ontology.state.ops.results import (
     OperationFailure,
     OperationSuccess,
 )
-from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
+from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
-class DeletePropertyOperation(Model):
+class RemovePropertyOperation(Model):
     """Remove an existing object/data property from the ontology."""
 
     type: Literal["del_prop"] = "del_prop"
@@ -18,7 +18,7 @@ class DeletePropertyOperation(Model):
     name: PropertyName = Field(..., description="Name of the object/data property to delete")
 
 
-def apply_delete_property(state: OntologyState, op: DeletePropertyOperation):
+def apply_remove_property(state: OntologyState, op: RemovePropertyOperation):
     target = state.get_property(op.name)
 
     if target is None:

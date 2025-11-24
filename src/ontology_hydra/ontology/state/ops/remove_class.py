@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import Field
 
@@ -8,20 +8,20 @@ from ontology_hydra.ontology.state.models import (
     Model,
     ObjectProperty,
     OntologyState,
+    vartuple,
 )
-from ontology_hydra.ontology.state.mutation.ops.results import (
+from ontology_hydra.ontology.state.ops.results import (
     OperationFailure,
-    OperationResult,
     OperationSuccess,
 )
-from ontology_hydra.ontology.state.mutation.utils import (
+from ontology_hydra.ontology.state.ops.utils import (
     replace_data_property,
     replace_object_property,
     replace_ontology_state,
 )
 
 
-class DeleteClassOperation(Model):
+class RemoveClassOperation(Model):
     """Remove an existing class from the ontology."""
 
     type: Literal["del_class"] = "del_class"
@@ -44,7 +44,7 @@ def _remove_class_from_object_property(
     return replace_object_property(prop, domain=new_domain, range=new_range)
 
 
-def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> OperationResult:
+def apply_remove_class(state: OntologyState, op: RemoveClassOperation):
     if (target := state.get_class(op.name)) is None:
         return OperationFailure(reason=f"Class '{op.name}' does not exist in the ontology.")
 
@@ -53,16 +53,16 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> Operat
 
     for subclass in subclasses:
         # implicitly create a remove op for the subclass and recursively remove it
-        result = apply_delete_class(
+        result = apply_remove_class(
             state,
-            DeleteClassOperation(name=subclass.name),
+            RemoveClassOperation(name=subclass.name),
         )
 
-        if result.success is False:
+        if isinstance(result, OperationFailure):
             # TODO: improve error here, though this should never happen. we want to provide better context on which operation originated this error
-            return OperationFailure(reason=result.reason)
+            return result
 
-        # update state, the subclass has been deleted
+        # update state, it is now without the subclass
         state = result.state
 
         # TODO: also consider that at some point, some properties might have NO DOMAIN/RANGE left, we definitely want to penalize this in the judge
@@ -71,13 +71,20 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> Operat
     new_classes = tuple(c for c in state.classes if c != target)
 
     # remove from domain and range in obj props
-    new_object_properties = tuple(
-        _remove_class_from_object_property(target.name, prop) for prop in state.object_properties
+    new_object_properties = cast(
+        "vartuple[ObjectProperty]",
+        tuple(
+            _remove_class_from_object_property(target.name, prop)
+            for prop in state.object_properties
+        ),
     )
 
     # remove from domain in data props
-    new_data_properties = tuple(
-        _remove_class_from_data_property(target.name, prop) for prop in state.data_properties
+    new_data_properties = cast(
+        "vartuple[DataProperty]",
+        tuple(
+            _remove_class_from_data_property(target.name, prop) for prop in state.data_properties
+        ),
     )
 
     return OperationSuccess(

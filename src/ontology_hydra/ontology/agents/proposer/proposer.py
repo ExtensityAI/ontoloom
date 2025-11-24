@@ -5,7 +5,7 @@ from symai.components import Expression
 from symai.strategy import contract
 
 from ontology_hydra.ontology.state.models import Model, OntologyState
-from ontology_hydra.ontology.state.mutation.ops.types import Operation
+from ontology_hydra.ontology.state.ops.types import Operation
 
 
 class Proposal(Model):

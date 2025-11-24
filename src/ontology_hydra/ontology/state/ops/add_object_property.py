@@ -10,11 +10,11 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.mutation.ops.results import (
+from ontology_hydra.ontology.state.ops.results import (
     OperationFailure,
     OperationSuccess,
 )
-from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
+from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
 class AddObjectPropertyOperation(Model):
