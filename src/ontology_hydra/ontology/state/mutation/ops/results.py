@@ -1,13 +1,19 @@
+from dataclasses import dataclass
+from typing import Literal
+
 from ontology_hydra.ontology.state.models import OntologyState
-from ontology_hydra.utils.results import Failure, Success
 
 
-class OperationSuccess(Success):
+@dataclass(frozen=True, slots=True)
+class OperationSuccess:
     state: OntologyState
+    success: Literal[True] = True
 
 
-class OperationFailure(Failure):
+@dataclass(frozen=True, slots=True)
+class OperationFailure:
     reason: str
+    success: Literal[False] = False
 
 
 type OperationResult = OperationSuccess | OperationFailure

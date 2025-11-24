@@ -12,7 +12,6 @@ from ontology_hydra.ontology.state.models import (
 )
 from ontology_hydra.ontology.state.mutation.ops.results import (
     OperationFailure,
-    OperationResult,
     OperationSuccess,
 )
 from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state

@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import Field
 
@@ -8,10 +8,10 @@ from ontology_hydra.ontology.state.models import (
     Model,
     ObjectProperty,
     OntologyState,
-    vartuple,
 )
 from ontology_hydra.ontology.state.mutation.ops.results import (
     OperationFailure,
+    OperationResult,
     OperationSuccess,
 )
 from ontology_hydra.ontology.state.mutation.utils import (
@@ -44,7 +44,7 @@ def _remove_class_from_object_property(
     return replace_object_property(prop, domain=new_domain, range=new_range)
 
 
-def apply_delete_class(state: OntologyState, op: DeleteClassOperation):
+def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> OperationResult:
     if (target := state.get_class(op.name)) is None:
         return OperationFailure(reason=f"Class '{op.name}' does not exist in the ontology.")
 
@@ -58,11 +58,11 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation):
             DeleteClassOperation(name=subclass.name),
         )
 
-        if isinstance(result, OperationFailure):
+        if result.success is False:
             # TODO: improve error here, though this should never happen. we want to provide better context on which operation originated this error
-            return result
+            return OperationFailure(reason=result.reason)
 
-        # update state, it is now without the subclass
+        # update state, the subclass has been deleted
         state = result.state
 
         # TODO: also consider that at some point, some properties might have NO DOMAIN/RANGE left, we definitely want to penalize this in the judge
@@ -71,20 +71,13 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation):
     new_classes = tuple(c for c in state.classes if c != target)
 
     # remove from domain and range in obj props
-    new_object_properties = cast(
-        "vartuple[ObjectProperty]",
-        tuple(
-            _remove_class_from_object_property(target.name, prop)
-            for prop in state.object_properties
-        ),
+    new_object_properties = tuple(
+        _remove_class_from_object_property(target.name, prop) for prop in state.object_properties
     )
 
     # remove from domain in data props
-    new_data_properties = cast(
-        "vartuple[DataProperty]",
-        tuple(
-            _remove_class_from_data_property(target.name, prop) for prop in state.data_properties
-        ),
+    new_data_properties = tuple(
+        _remove_class_from_data_property(target.name, prop) for prop in state.data_properties
     )
 
     return OperationSuccess(
