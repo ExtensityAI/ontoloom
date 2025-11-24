@@ -1,0 +1,15 @@
+from .add_class import AddClassOperation as AddClassOperation
+from .add_class import apply_add_class as apply_add_class
+from .add_data_property import AddDataPropertyOperation as AddDataPropertyOperation
+from .add_data_property import apply_add_data_property as apply_add_data_property
+from .add_object_property import AddObjectPropertyOperation as AddObjectPropertyOperation
+from .add_object_property import apply_add_object_property as apply_add_object_property
+from .del_class import DeleteClassOperation as DeleteClassOperation
+from .del_class import apply_delete_class as apply_delete_class
+from .types import Operation as Operation
+from .update_class import UpdateClassOperation as UpdateClassOperation
+from .update_class import apply_update_class as apply_update_class
+from .update_data_property import UpdateDataPropertyOperation as UpdateDataPropertyOperation
+from .update_data_property import apply_update_data_property as apply_update_data_property
+from .update_object_property import UpdateObjectPropertyOperation as UpdateObjectPropertyOperation
+from .update_object_property import apply_update_object_property as apply_update_object_property

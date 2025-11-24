@@ -11,7 +11,7 @@ from ontology_hydra.ontology.state.models import (
 )
 
 
-def update_class(
+def replace_class(
     cls: Class,
     name: ClassName | None = None,
     parent: ClassName | None = None,

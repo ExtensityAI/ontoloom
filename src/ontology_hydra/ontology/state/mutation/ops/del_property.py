@@ -3,11 +3,14 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, PropertyName
-from ontology_hydra.ontology.state.mutation.results import MutationFailed, MutationSucceeded
+from ontology_hydra.ontology.state.mutation.ops.results import (
+    OperationFailure,
+    OperationSuccess,
+)
 from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
 
 
-class RemovePropertyOperation(Model):
+class DeletePropertyOperation(Model):
     """Remove an existing object/data property from the ontology."""
 
     type: Literal["del_prop"] = "del_prop"
@@ -15,11 +18,11 @@ class RemovePropertyOperation(Model):
     name: PropertyName = Field(..., description="Name of the object/data property to delete")
 
 
-def remove_property(state: OntologyState, op: RemovePropertyOperation):
+def apply_delete_property(state: OntologyState, op: DeletePropertyOperation):
     target = state.get_property(op.name)
 
     if target is None:
-        return MutationFailed(reason=f"Property '{op.name}' does not exist in the ontology.")
+        return OperationFailure(reason=f"Property '{op.name}' does not exist in the ontology.")
 
     # success!
 
@@ -31,4 +34,4 @@ def remove_property(state: OntologyState, op: RemovePropertyOperation):
         state, data_properties=data_props, object_properties=object_props
     )
 
-    return MutationSucceeded(state=new_state)
+    return OperationSuccess(state=new_state)

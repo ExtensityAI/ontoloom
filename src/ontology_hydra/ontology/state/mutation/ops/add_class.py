@@ -3,7 +3,10 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, Model, OntologyState
-from ontology_hydra.ontology.state.mutation.results import MutationFailed, MutationSucceeded
+from ontology_hydra.ontology.state.mutation.ops.results import (
+    OperationFailure,
+    OperationSuccess,
+)
 from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
 
 
@@ -18,14 +21,16 @@ class AddClassOperation(Model):
     description: str = Field(..., description="Description of the class to add")
 
 
-def add_class(state: OntologyState, op: AddClassOperation):
+def apply_add_class(state: OntologyState, op: AddClassOperation):
     if state.get_class(op.name) is not None:
-        return MutationFailed(reason=f"Class '{op.name}' already exists in the ontology.")
+        return OperationFailure(reason=f"Class '{op.name}' already exists in the ontology.")
 
     parent = state.get_class(op.parent)
 
     if parent is None:
-        return MutationFailed(reason=f"Parent class '{op.parent}' does not exist in the ontology.")
+        return OperationFailure(
+            reason=f"Parent class '{op.parent}' does not exist in the ontology."
+        )
 
     # success!
 
@@ -35,6 +40,6 @@ def add_class(state: OntologyState, op: AddClassOperation):
         description=op.description,
     )
 
-    return MutationSucceeded(
+    return OperationSuccess(
         state=replace_ontology_state(state, classes=(*state.classes, new_class))
     )

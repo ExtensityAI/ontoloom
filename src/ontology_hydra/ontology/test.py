@@ -3,7 +3,7 @@ from itertools import islice
 from pathlib import Path
 
 from ontology_hydra.ontology.agents.proposer.proposer import Proposal, propose_changes
-from ontology_hydra.ontology.models import DEFAULT_ONTOLOGY_STATE, OntologyState
+from ontology_hydra.ontology.state.models import DEFAULT_ONTOLOGY_STATE, OntologyState
 from ontology_hydra.utils.cache import DirectoryCache
 
 print("Beginning...")

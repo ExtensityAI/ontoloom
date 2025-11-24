@@ -11,7 +11,10 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.mutation.results import MutationFailed, MutationSucceeded
+from ontology_hydra.ontology.state.mutation.ops.results import (
+    OperationFailure,
+    OperationSuccess,
+)
 from ontology_hydra.ontology.state.mutation.utils import (
     replace_data_property,
     replace_ontology_state,
@@ -41,27 +44,27 @@ class UpdateDataPropertyOperation(Model):
     )
 
 
-def update_data_property(state: OntologyState, op: UpdateDataPropertyOperation):
+def apply_update_data_property(state: OntologyState, op: UpdateDataPropertyOperation):
     target = state.get_property(op.name)
 
     if target is None:
-        return MutationFailed(reason=f"Property '{op.name}' does not exist in the ontology.")
+        return OperationFailure(reason=f"Property '{op.name}' does not exist in the ontology.")
 
     # make sure it's a data property
     if not isinstance(target, DataProperty):
-        return MutationFailed(
+        return OperationFailure(
             reason=f"Property '{op.name}' is not a data property, but an object property."
         )
 
     # if changing name, make sure the new name is not already taken
     if op.new_name is not None and state.get_property(op.new_name) is not None:
-        return MutationFailed(reason=f"Property '{op.new_name}' already exists in the ontology.")
+        return OperationFailure(reason=f"Property '{op.new_name}' already exists in the ontology.")
 
     # make sure that all domain classes exist
     if op.new_domain is not None:
         for domain_class in op.new_domain:
             if state.get_class(domain_class) is None:
-                return MutationFailed(
+                return OperationFailure(
                     reason=f"Domain class '{domain_class}' does not exist in the ontology."
                 )
 
@@ -79,4 +82,4 @@ def update_data_property(state: OntologyState, op: UpdateDataPropertyOperation):
         prop if prop.name != target.name else updated_prop for prop in state.data_properties
     )
 
-    return MutationSucceeded(state=replace_ontology_state(state, data_properties=remaining_props))
+    return OperationSuccess(state=replace_ontology_state(state, data_properties=remaining_props))

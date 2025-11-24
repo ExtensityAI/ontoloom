@@ -10,7 +10,11 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.mutation.results import MutationFailed, MutationSucceeded
+from ontology_hydra.ontology.state.mutation.ops.results import (
+    OperationFailure,
+    OperationResult,
+    OperationSuccess,
+)
 from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
 
 
@@ -25,24 +29,24 @@ class AddObjectPropertyOperation(Model):
     )  # TODO: what if domain is both applied to class and it's subclass? is that allowed?
     range: vartuple[ClassName] = Field(..., description="Range classes for the property")
 
-    description: str | None = Field(None, description="Description of the property to add")
+    description: str = Field(..., description="Description of the property to add")
 
 
-def add_object_property(state: OntologyState, op: AddObjectPropertyOperation):
+def apply_add_object_property(state: OntologyState, op: AddObjectPropertyOperation):
     if state.get_property(op.name) is not None:
-        return MutationFailed(reason=f"Property '{op.name}' already exists in the ontology.")
+        return OperationFailure(reason=f"Property '{op.name}' already exists in the ontology.")
 
     # make sure that all domain classes exist
     for domain_class in op.domain:
         if state.get_class(domain_class) is None:
-            return MutationFailed(
+            return OperationFailure(
                 reason=f"Domain class '{domain_class}' does not exist in the ontology."
             )
 
     # make sure that all range classes exist
     for range_class in op.range:
         if state.get_class(range_class) is None:
-            return MutationFailed(
+            return OperationFailure(
                 reason=f"Range class '{range_class}' does not exist in the ontology."
             )
 
@@ -52,9 +56,9 @@ def add_object_property(state: OntologyState, op: AddObjectPropertyOperation):
         name=op.name,
         domain=op.domain,
         range=op.range,
-        description=op.description or "",
+        description=op.description,
     )
 
-    return MutationSucceeded(
+    return OperationSuccess(
         state=replace_ontology_state(state, object_properties=(*state.object_properties, new_prop))
     )

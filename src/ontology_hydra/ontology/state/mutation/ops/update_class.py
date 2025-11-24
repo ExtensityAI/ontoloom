@@ -3,7 +3,10 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, Model, OntologyState
-from ontology_hydra.ontology.state.mutation.results import MutationFailed, MutationSucceeded
+from ontology_hydra.ontology.state.mutation.ops.results import (
+    OperationFailure,
+    OperationSuccess,
+)
 from ontology_hydra.ontology.state.mutation.utils import replace_ontology_state
 
 
@@ -34,16 +37,16 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
     return cls
 
 
-def update_class(state: OntologyState, op: UpdateClassOperation):
+def apply_update_class(state: OntologyState, op: UpdateClassOperation):
     target = state.get_class(op.name)
 
     if target is None:
-        return MutationFailed(reason=f"Class '{op.name}' does not exist in the ontology.")
+        return OperationFailure(reason=f"Class '{op.name}' does not exist in the ontology.")
 
     # TODO: check that name is valid here or somewhere else? probably here is the correct location. DO THIS FOR ALL OPS
 
     if op.new_name and state.get_class(op.new_name) is not None:
-        return MutationFailed(reason=f"Class '{op.new_name}' already exists in the ontology.")
+        return OperationFailure(reason=f"Class '{op.new_name}' already exists in the ontology.")
 
     # update this class
     updated_class = Class(
@@ -60,4 +63,4 @@ def update_class(state: OntologyState, op: UpdateClassOperation):
         for cls in state.classes
     )
 
-    return MutationSucceeded(state=replace_ontology_state(state, classes=new_classes))
+    return OperationSuccess(state=replace_ontology_state(state, classes=new_classes))
