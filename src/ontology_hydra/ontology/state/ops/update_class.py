@@ -7,7 +7,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import replace_class, replace_ontology_state
 
 
@@ -41,11 +41,11 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
 
 
 def _create_requirements(args: UpdateClassOperationArgs):
-    reqs: list[RequiresPresence] = [RequiresPresence(kind="class", name=args.name, exists=True)]
+    reqs: list[PresenceRequired] = [PresenceRequired(kind="class", name=args.name, exists=True)]
 
     # If renaming, the new name must be free.
     if args.new_name:
-        reqs.append(RequiresPresence(kind="class", name=args.new_name, exists=False))
+        reqs.append(PresenceRequired(kind="class", name=args.new_name, exists=False))
 
     return tuple(reqs)
 

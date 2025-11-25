@@ -7,7 +7,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
@@ -21,7 +21,7 @@ class DeletePropertyOperationArgs(BaseOperationArgs):
 
 def _create_requirements(args: DeletePropertyOperationArgs):
     # Property must exist (data or object).
-    return (RequiresPresence(kind="any_property", name=args.name, exists=True),)
+    return (PresenceRequired(kind="any_property", name=args.name, exists=True),)
 
 
 class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):

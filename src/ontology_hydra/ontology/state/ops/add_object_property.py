@@ -13,7 +13,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
@@ -32,17 +32,17 @@ class AddObjectPropertyOperationArgs(BaseOperationArgs):
 
 
 def _create_requirements(args: AddObjectPropertyOperationArgs):
-    reqs: list[RequiresPresence] = [
-        RequiresPresence(kind="object_property", name=args.name, exists=False),
+    reqs: list[PresenceRequired] = [
+        PresenceRequired(kind="object_property", name=args.name, exists=False),
     ]
 
     # require all domain classes to exist
     for domain_class in args.domain:
-        reqs.append(RequiresPresence(kind="class", name=domain_class, exists=True))
+        reqs.append(PresenceRequired(kind="class", name=domain_class, exists=True))
 
     # require all range classes to exist
     for range_class in args.range:
-        reqs.append(RequiresPresence(kind="class", name=range_class, exists=True))
+        reqs.append(PresenceRequired(kind="class", name=range_class, exists=True))
 
     return tuple(reqs)
 

@@ -14,7 +14,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import (
     replace_data_property,
     replace_ontology_state,
@@ -45,18 +45,18 @@ class UpdateDataPropertyOperationArgs(BaseOperationArgs):
 
 
 def _create_requirements(args: UpdateDataPropertyOperationArgs):
-    reqs: list[RequiresPresence] = [
-        RequiresPresence(kind="data_property", name=args.name, exists=True)
+    reqs: list[PresenceRequired] = [
+        PresenceRequired(kind="data_property", name=args.name, exists=True)
     ]
 
     # If renaming, the new name must be free.
     if args.new_name:
-        reqs.append(RequiresPresence(kind="data_property", name=args.new_name, exists=False))
+        reqs.append(PresenceRequired(kind="data_property", name=args.new_name, exists=False))
 
     # If changing domain, ensure every referenced class exists.
     if args.new_domain:
         reqs.extend(
-            RequiresPresence(kind="class", name=domain_class, exists=True)
+            PresenceRequired(kind="class", name=domain_class, exists=True)
             for domain_class in args.new_domain
         )
 

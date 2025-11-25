@@ -7,7 +7,9 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.effects import PresenceEffect
+from ontology_hydra.ontology.state.ops.preconditions import PresencePrecondition
+from ontology_hydra.ontology.state.ops.resources import ResourceRef
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
@@ -22,15 +24,32 @@ class AddClassOperationArgs(BaseOperationArgs):
     description: str = Field(..., description="Description of the class to add")
 
 
-def _create_requirements(args: AddClassOperationArgs):
-    # New class must not already exist; parent must be present.
+def _create_preconditions(args: AddClassOperationArgs):
     return (
-        RequiresPresence(kind="class", name=args.name, exists=False),
-        RequiresPresence(kind="class", name=args.parent, exists=True),
+        PresencePrecondition(
+            resource=ResourceRef(kind="class", name=args.name), value="absent"
+        ),  # new class must not exist yet
+        PresencePrecondition(
+            resource=ResourceRef(kind="class", name=args.parent), value="present"
+        ),  # parent class must exist
+    )
+
+
+def _create_effects(args: AddClassOperationArgs):
+    return (
+        PresenceEffect(
+            resource=ResourceRef(kind="class", name=args.name), value="present"
+        ),  # creates new class
     )
 
 
 class AddClassOperation(BaseOperation[AddClassOperationArgs]):
+    def __init__(
+        self,
+        args: AddClassOperationArgs,
+    ):
+        super().__init__(args, _create_preconditions(args), _create_effects(args))
+
     def _apply(self, state: OntologyState):
         new_class = Class(
             name=self.args.name,
@@ -42,4 +61,4 @@ class AddClassOperation(BaseOperation[AddClassOperationArgs]):
 
     @classmethod
     def from_args(cls, args: AddClassOperationArgs):
-        return cls(args, _create_requirements(args))
+        return cls(args)

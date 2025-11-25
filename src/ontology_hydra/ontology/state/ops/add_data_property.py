@@ -14,7 +14,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
@@ -31,13 +31,13 @@ class AddDataPropertyOperationArgs(BaseOperationArgs):
 
 
 def _create_requirements(args: AddDataPropertyOperationArgs):
-    reqs: list[RequiresPresence] = [
-        RequiresPresence(kind="data_property", name=args.name, exists=False),
+    reqs: list[PresenceRequired] = [
+        PresenceRequired(kind="data_property", name=args.name, exists=False),
     ]
 
     # Require all domain classes to exist before adding.
     reqs.extend(
-        RequiresPresence(kind="class", name=domain_class, exists=True)
+        PresenceRequired(kind="class", name=domain_class, exists=True)
         for domain_class in args.domain
     )
 

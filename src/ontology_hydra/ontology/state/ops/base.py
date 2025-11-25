@@ -1,8 +1,9 @@
-from abc import ABC, abstractclassmethod, abstractmethod
+from abc import ABC, abstractmethod
 from typing import Literal, Self
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, vartuple
-from ontology_hydra.ontology.state.ops.requirements import BaseRequirement
+from ontology_hydra.ontology.state.ops.effects import Effect
+from ontology_hydra.ontology.state.ops.preconditions import Precondition
 from ontology_hydra.utils.results import BaseFailure, BaseSuccess
 
 
@@ -13,7 +14,7 @@ class Success(BaseSuccess):
 
 class UnsatisfiedRequirementsFailure(BaseFailure):
     type: Literal["unsatisfied_requirements"] = "unsatisfied_requirements"
-    unsatisfied_requirements: vartuple[BaseRequirement]
+    unsatisfied_requirements: vartuple[Precondition]
 
 
 class ExceptionFailure(BaseFailure):
@@ -29,29 +30,34 @@ class BaseOperationArgs(Model):
 
 
 class BaseOperation[A: BaseOperationArgs](ABC):
-    def __init__(self, args: A, requirements: vartuple[BaseRequirement]):
+    def __init__(self, args: A, preconditions: vartuple[Precondition], effects: vartuple[Effect]):
         self._args = args
-        self._requirements = requirements
+        self._preconditions = preconditions
+        self._effects = effects
 
     @property
     def args(self) -> A:
         return self._args
 
     @property
-    def requirements(self) -> vartuple[BaseRequirement]:
-        return self._requirements
+    def preconditions(self) -> vartuple[Precondition]:
+        return self._preconditions
 
-    def test_for_unsatisfied_requirements(self, state: OntologyState) -> vartuple[BaseRequirement]:
-        """Check for unmet requirements without applying the operation."""
-        return tuple(req for req in self._requirements if not req.is_satisfied(state))
+    @property
+    def effects(self) -> vartuple[Effect]:
+        return self._effects
+
+    def test_for_unsatisfied_preconditions(self, state: OntologyState) -> vartuple[Precondition]:
+        """Check for unmet preconditions without applying the operation."""
+        return tuple(req for req in self._preconditions if not req.is_satisfied(state))
 
     def try_apply(self, state: OntologyState) -> Result:
-        unsatisfied_requirements = self.test_for_unsatisfied_requirements(state)
+        unsatisfied_preconditions = self.test_for_unsatisfied_preconditions(state)
 
-        if len(unsatisfied_requirements) > 0:
-            # some requirements are not satisfied, return early and do not apply
+        if len(unsatisfied_preconditions) > 0:
+            # some preconditions are not satisfied, return early and do not apply
             return UnsatisfiedRequirementsFailure(
-                unsatisfied_requirements=unsatisfied_requirements,
+                unsatisfied_requirements=unsatisfied_preconditions,
             )
 
         try:

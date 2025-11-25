@@ -10,7 +10,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import BaseRequirement, RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import Precondition, PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import (
     replace_ontology_state,
 )
@@ -24,7 +24,7 @@ class DeleteClassOperationArgs(BaseOperationArgs):
     name: ClassName = Field(..., description="Name of the class to delete")
 
 
-class RequiresEmptySubClasses(BaseRequirement):
+class RequiresEmptySubClasses(Precondition):
     """Class must not have subclasses before deletion."""
 
     class_name: ClassName
@@ -36,7 +36,7 @@ class RequiresEmptySubClasses(BaseRequirement):
 def _create_requirements(args: DeleteClassOperationArgs):
     # Target class must exist and have no subclasses.
     return (
-        RequiresPresence(kind="class", name=args.name, exists=True),
+        PresenceRequired(kind="class", name=args.name, exists=True),
         RequiresEmptySubClasses(class_name=args.name),
     )
 

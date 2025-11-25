@@ -13,7 +13,7 @@ from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
+from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
 from ontology_hydra.ontology.state.ops.utils import (
     replace_object_property,
     replace_ontology_state,
@@ -43,24 +43,24 @@ class UpdateObjectPropertyOperationArgs(BaseOperationArgs):
 
 
 def _create_requirements(args: UpdateObjectPropertyOperationArgs):
-    reqs: list[RequiresPresence] = [
-        RequiresPresence(kind="object_property", name=args.name, exists=True)
+    reqs: list[PresenceRequired] = [
+        PresenceRequired(kind="object_property", name=args.name, exists=True)
     ]
 
     # If renaming, the new name must be free.
     if args.new_name:
-        reqs.append(RequiresPresence(kind="object_property", name=args.new_name, exists=False))
+        reqs.append(PresenceRequired(kind="object_property", name=args.new_name, exists=False))
 
     # If changing domain/range, ensure referenced classes exist.
     if args.new_domain:
         reqs.extend(
-            RequiresPresence(kind="class", name=domain_class, exists=True)
+            PresenceRequired(kind="class", name=domain_class, exists=True)
             for domain_class in args.new_domain
         )
 
     if args.new_range:
         reqs.extend(
-            RequiresPresence(kind="class", name=range_class, exists=True)
+            PresenceRequired(kind="class", name=range_class, exists=True)
             for range_class in args.new_range
         )
 
