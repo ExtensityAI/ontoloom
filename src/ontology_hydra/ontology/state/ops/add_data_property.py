@@ -45,9 +45,6 @@ def _create_requirements(args: AddDataPropertyOperationArgs):
 
 
 class AddDataPropertyOperation(BaseOperation[AddDataPropertyOperationArgs]):
-    def __init__(self, args: AddDataPropertyOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         new_prop = DataProperty(
             name=self.args.name,
@@ -57,3 +54,7 @@ class AddDataPropertyOperation(BaseOperation[AddDataPropertyOperationArgs]):
         )
 
         return replace_ontology_state(state, data_properties=(*state.data_properties, new_prop))
+
+    @classmethod
+    def from_args(cls, args: AddDataPropertyOperationArgs):
+        return cls(args, _create_requirements(args))

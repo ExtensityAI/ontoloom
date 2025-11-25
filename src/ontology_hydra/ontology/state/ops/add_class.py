@@ -31,9 +31,6 @@ def _create_requirements(args: AddClassOperationArgs):
 
 
 class AddClassOperation(BaseOperation[AddClassOperationArgs]):
-    def __init__(self, args: AddClassOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         new_class = Class(
             name=self.args.name,
@@ -42,3 +39,7 @@ class AddClassOperation(BaseOperation[AddClassOperationArgs]):
         )
 
         return replace_ontology_state(state, classes=(*state.classes, new_class))
+
+    @classmethod
+    def from_args(cls, args: AddClassOperationArgs):
+        return cls(args, _create_requirements(args))

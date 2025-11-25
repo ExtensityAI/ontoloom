@@ -1,5 +1,5 @@
-from abc import ABC, abstractmethod
-from typing import Literal
+from abc import ABC, abstractclassmethod, abstractmethod
+from typing import Literal, Self
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, vartuple
 from ontology_hydra.ontology.state.ops.requirements import BaseRequirement
@@ -7,6 +7,7 @@ from ontology_hydra.utils.results import BaseFailure, BaseSuccess
 
 
 class Success(BaseSuccess):
+    type: Literal[None] = None
     state: OntologyState
 
 
@@ -60,4 +61,9 @@ class BaseOperation[A: BaseOperationArgs](ABC):
 
     @abstractmethod
     def _apply(self, state: OntologyState) -> OntologyState:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def from_args(cls, args: A) -> Self:
         raise NotImplementedError

@@ -42,11 +42,12 @@ def _create_requirements(args: DeleteClassOperationArgs):
 
 
 class DeleteClassOperation(BaseOperation[DeleteClassOperationArgs]):
-    def __init__(self, args: DeleteClassOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         # TODO also remove class from data and object props
         return replace_ontology_state(
             state, classes=tuple(c for c in state.classes if c.name != self.args.name)
         )
+
+    @classmethod
+    def from_args(cls, args: DeleteClassOperationArgs):
+        return cls(args, _create_requirements(args))

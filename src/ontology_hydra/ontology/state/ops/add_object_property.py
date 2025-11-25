@@ -48,12 +48,6 @@ def _create_requirements(args: AddObjectPropertyOperationArgs):
 
 
 class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
-    def __init__(self, args: AddObjectPropertyOperationArgs):
-        super().__init__(
-            args,
-            _create_requirements(args),
-        )
-
     def _apply(self, state: OntologyState):
         new_prop = ObjectProperty(
             name=self.args.name,
@@ -63,3 +57,7 @@ class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
         )
 
         return replace_ontology_state(state, object_properties=(*state.object_properties, new_prop))
+
+    @classmethod
+    def from_args(cls, args: AddObjectPropertyOperationArgs):
+        return cls(args, _create_requirements(args))

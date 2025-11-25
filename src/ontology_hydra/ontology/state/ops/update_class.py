@@ -41,9 +41,7 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
 
 
 def _create_requirements(args: UpdateClassOperationArgs):
-    reqs: list[RequiresPresence] = [
-        RequiresPresence(kind="class", name=args.name, exists=True)
-    ]
+    reqs: list[RequiresPresence] = [RequiresPresence(kind="class", name=args.name, exists=True)]
 
     # If renaming, the new name must be free.
     if args.new_name:
@@ -53,9 +51,6 @@ def _create_requirements(args: UpdateClassOperationArgs):
 
 
 class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
-    def __init__(self, args: UpdateClassOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         old_class = cast("Class", state.get_class(self.args.name))
 
@@ -76,3 +71,7 @@ class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
         )
 
         return replace_ontology_state(state, classes=new_classes)
+
+    @classmethod
+    def from_args(cls, args: UpdateClassOperationArgs):
+        return cls(args, _create_requirements(args))

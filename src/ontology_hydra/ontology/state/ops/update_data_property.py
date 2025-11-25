@@ -64,9 +64,6 @@ def _create_requirements(args: UpdateDataPropertyOperationArgs):
 
 
 class UpdateDataPropertyOperation(BaseOperation[UpdateDataPropertyOperationArgs]):
-    def __init__(self, args: UpdateDataPropertyOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         old_prop = cast("DataProperty", state.get_property(self.args.name))
 
@@ -85,3 +82,7 @@ class UpdateDataPropertyOperation(BaseOperation[UpdateDataPropertyOperationArgs]
         )
 
         return replace_ontology_state(state, data_properties=new_props)
+
+    @classmethod
+    def from_args(cls, args: UpdateDataPropertyOperationArgs):
+        return cls(args, _create_requirements(args))

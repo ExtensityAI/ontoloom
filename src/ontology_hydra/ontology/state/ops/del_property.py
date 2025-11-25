@@ -25,9 +25,6 @@ def _create_requirements(args: DeletePropertyOperationArgs):
 
 
 class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):
-    def __init__(self, args: DeletePropertyOperationArgs):
-        super().__init__(args, _create_requirements(args))
-
     def _apply(self, state: OntologyState):
         # Remove the property from both lists; only one will actually match.
         data_props = tuple(prop for prop in state.data_properties if prop.name != self.args.name)
@@ -38,3 +35,7 @@ class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):
         return replace_ontology_state(
             state, data_properties=data_props, object_properties=object_props
         )
+
+    @classmethod
+    def from_args(cls, args: DeletePropertyOperationArgs):
+        return cls(args, _create_requirements(args))

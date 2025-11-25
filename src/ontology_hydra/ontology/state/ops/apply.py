@@ -1,5 +1,3 @@
-from typing import Literal
-
 from ontology_hydra.ontology.state.models import OntologyState
 from ontology_hydra.ontology.state.ops.add_class import (
     AddClassOperation,
@@ -14,11 +12,7 @@ from ontology_hydra.ontology.state.ops.add_object_property import (
     AddObjectPropertyOperationArgs,
 )
 from ontology_hydra.ontology.state.ops.base import (
-    BaseOperation,
-    ExceptionFailure,
-    Result,
     Success,
-    UnsatisfiedRequirementsFailure,
 )
 from ontology_hydra.ontology.state.ops.del_class import (
     DeleteClassOperation,
@@ -41,92 +35,66 @@ from ontology_hydra.ontology.state.ops.update_object_property import (
     UpdateObjectPropertyOperation,
     UpdateObjectPropertyOperationArgs,
 )
-from ontology_hydra.utils.results import BaseFailure, BaseSuccess, Model
 
 
-class OperationInapplicableIssue(Model):
-    """An operation could not be applied."""
+def _as_operation(args: OperationArgs):
+    match args:
+        case AddClassOperationArgs():
+            return AddClassOperation.from_args(args)
 
-    type: Literal["bad_op"] = "bad_op"
-    operation: OperationArgs
-    reason: str
+        case UpdateClassOperationArgs():
+            return UpdateClassOperation.from_args(args)
 
+        case DeleteClassOperationArgs():
+            return DeleteClassOperation.from_args(args)
 
-Issue = OperationInapplicableIssue
+        case AddDataPropertyOperationArgs():
+            return AddDataPropertyOperation.from_args(args)
 
+        case UpdateDataPropertyOperationArgs():
+            return UpdateDataPropertyOperation.from_args(args)
 
-class Failure(BaseFailure):
-    issues: list[Issue]
+        case AddObjectPropertyOperationArgs():
+            return AddObjectPropertyOperation.from_args(args)
 
+        case UpdateObjectPropertyOperationArgs():
+            return UpdateObjectPropertyOperation.from_args(args)
 
-class Success(BaseSuccess):
-    state: OntologyState
-
-
-def _as_operation(arg: OperationArgs) -> BaseOperation:
-    if isinstance(arg, AddClassOperationArgs):
-        return AddClassOperation(arg)
-    if isinstance(arg, UpdateClassOperationArgs):
-        return UpdateClassOperation(arg)
-    if isinstance(arg, DeleteClassOperationArgs):
-        return DeleteClassOperation(arg)
-    if isinstance(arg, AddObjectPropertyOperationArgs):
-        return AddObjectPropertyOperation(arg)
-    if isinstance(arg, UpdateObjectPropertyOperationArgs):
-        return UpdateObjectPropertyOperation(arg)
-    if isinstance(arg, AddDataPropertyOperationArgs):
-        return AddDataPropertyOperation(arg)
-    if isinstance(arg, UpdateDataPropertyOperationArgs):
-        return UpdateDataPropertyOperation(arg)
-    if isinstance(arg, DeletePropertyOperationArgs):
-        return DeletePropertyOperation(arg)
-
-    msg = f"Unsupported operation args: {type(arg)}"
-    raise TypeError(msg)
+        case DeletePropertyOperationArgs():
+            return DeletePropertyOperation.from_args(args)
 
 
-def apply(state: OntologyState, ops: list[OperationArgs]):
-    issues = list[Issue]()
-    operations = [_as_operation(op) for op in ops]
+def apply(state: OntologyState, args: list[OperationArgs]):
+    remaining_ops = [_as_operation(arg) for arg in args]
 
-    remaining_ops = operations.copy()
     progress = True
 
+    # try to apply operations until no further progress can be made. Progress is defined as one operation being applied.
     while remaining_ops and progress:
         progress = False
 
+        # try to apply remaining operations
         for op in list(remaining_ops):
             missing_requirements = op.test_for_unsatisfied_requirements(state)
+
             if len(missing_requirements) > 0:
+                # operation not (yet) applicable
                 continue
 
-            result: Result = op.try_apply(state)
-            remaining_ops.remove(op)
+            result = op.try_apply(state)
 
-            if isinstance(result, Success):
+            if result.success is True:
+                # operation applied successfully
                 state = result.state
-            else:
-                if isinstance(result, UnsatisfiedRequirementsFailure):
-                    reqs = ", ".join(str(req) for req in result.unsatisfied_requirements)
-                    reason = f"Unsatisfied requirements: {reqs}"
-                elif isinstance(result, ExceptionFailure):
-                    reason = f"Exception during apply: {result.exception}"
-                else:
-                    reason = "Operation failed"
+                remaining_ops.remove(op)
+                progress = True
 
-                issues.append(OperationInapplicableIssue(operation=op.args, reason=reason))
-
-            progress = True
-
-        if not progress and remaining_ops:
-            for op in remaining_ops:
-                missing = op.test_for_unsatisfied_requirements(state)
-                missing_reasons = "; ".join(str(req) for req in missing)
-                issues.append(
-                    OperationInapplicableIssue(
-                        operation=op.args,
-                        reason=f"Requirements not satisfied: {missing_reasons}",
-                    )
-                )
+            if result.type == "exception":
+                # TODO some exception occured, not sure yet how to handle this
+                pass
+            elif result.type == "unsatisfied_requirements":
+                # should not happen, as we already checked for missing requirements
+                # TODO maybe raise exception or a warning or sth?
+                pass
 
     return Failure(issues=issues) if len(issues) > 0 else Success(state=state)
