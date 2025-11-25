@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import Field
 
+from dataclasses import dataclass
+
 from ontology_hydra.ontology.state.models import (
     ClassName,
     DataProperty,
@@ -11,9 +13,13 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.ops.results import (
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
     OperationFailure,
+    OperationResult,
     OperationSuccess,
+    Provision,
+    Requirement,
 )
 from ontology_hydra.ontology.state.ops.utils import (
     replace_data_property,
@@ -21,7 +27,7 @@ from ontology_hydra.ontology.state.ops.utils import (
 )
 
 
-class UpdateDataPropertyOperation(Model):
+class UpdateDataPropertyOperationArgs(Model):
     """Update an existing data property in the ontology."""
 
     type: Literal["update_data_prop"] = "update_data_prop"
@@ -44,7 +50,7 @@ class UpdateDataPropertyOperation(Model):
     )
 
 
-def apply_update_data_property(state: OntologyState, op: UpdateDataPropertyOperation):
+def apply_update_data_property(state: OntologyState, op: UpdateDataPropertyOperationArgs):
     target = state.get_property(op.name)
 
     if target is None:
@@ -83,3 +89,27 @@ def apply_update_data_property(state: OntologyState, op: UpdateDataPropertyOpera
     )
 
     return OperationSuccess(state=replace_ontology_state(state, data_properties=remaining_props))
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateDataPropertyOperation(BaseOperation[UpdateDataPropertyOperationArgs]):
+    def requires(self) -> tuple[Requirement, ...]:
+        requirements = [Requirement(kind="data_property", name=self.args.name, exists=True)]
+        if self.args.new_name:
+            requirements.append(
+                Requirement(kind="data_property", name=self.args.new_name, exists=False)
+            )
+        if self.args.new_domain:
+            requirements.extend(
+                Requirement(kind="class", name=domain_class, exists=True)
+                for domain_class in self.args.new_domain
+            )
+        return tuple(requirements)
+
+    def provides(self) -> tuple[Provision, ...]:
+        if self.args.new_name:
+            return (Provision(kind="data_property", name=self.args.new_name, exists=True),)
+        return ()
+
+    def apply(self, state: OntologyState) -> OperationResult:
+        return apply_update_data_property(state, self.args)

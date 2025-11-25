@@ -1,20 +1,20 @@
-from ontology_hydra.ontology.state.ops.update_class import UpdateClassOperation
+from ontology_hydra.ontology.state.ops.update_class import UpdateClassOperationArgs
 
-from .add_class import AddClassOperation
-from .add_data_property import AddDataPropertyArgs
-from .add_object_property import AddObjectPropertyOperation
-from .del_class import DeleteClassOperation
-from .del_property import DeletePropertyOperation
-from .update_data_property import UpdateDataPropertyOperation
-from .update_object_property import UpdateObjectPropertyOperation
+from .add_class import AddClassOperationArgs
+from .add_data_property import AddDataPropertyOperationArgs
+from .add_object_property import AddObjectPropertyOperationArgs
+from .del_class import DeleteClassOperationArgs
+from .del_property import DeletePropertyOperationArgs
+from .update_data_property import UpdateDataPropertyOperationArgs
+from .update_object_property import UpdateObjectPropertyOperationArgs
 
 OperationArgs = (
-    AddClassOperation
-    | UpdateClassOperation
-    | DeleteClassOperation
-    | AddObjectPropertyOperation
-    | UpdateObjectPropertyOperation
-    | AddDataPropertyArgs
-    | UpdateDataPropertyOperation
-    | DeletePropertyOperation
+    AddClassOperationArgs
+    | UpdateClassOperationArgs
+    | DeleteClassOperationArgs
+    | AddObjectPropertyOperationArgs
+    | UpdateObjectPropertyOperationArgs
+    | AddDataPropertyOperationArgs
+    | UpdateDataPropertyOperationArgs
+    | DeletePropertyOperationArgs
 )

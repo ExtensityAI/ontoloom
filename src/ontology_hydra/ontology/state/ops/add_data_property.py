@@ -11,14 +11,18 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.ops.results import (
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
     OperationFailure,
+    OperationResult,
     OperationSuccess,
+    Provision,
+    Requirement,
 )
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
-class AddDataPropertyArgs(Model):
+class AddDataPropertyOperationArgs(Model):
     """Add a new data property to the ontology."""
 
     type: Literal["add_data_prop"] = "add_data_prop"
@@ -30,7 +34,7 @@ class AddDataPropertyArgs(Model):
     description: str = Field(..., description="Description of the property")
 
 
-def apply_add_data_property(state: OntologyState, op: AddDataPropertyArgs):
+def apply_add_data_property(state: OntologyState, op: AddDataPropertyOperationArgs):
     if state.get_property(op.name) is not None:
         return OperationFailure(reason=f"Property '{op.name}' already exists in the ontology.")
 
@@ -53,3 +57,19 @@ def apply_add_data_property(state: OntologyState, op: AddDataPropertyArgs):
     return OperationSuccess(
         state=replace_ontology_state(state, data_properties=(*state.data_properties, new_prop))
     )
+
+
+class AddDataPropertyOperation(BaseOperation[AddDataPropertyOperationArgs]):
+    def requires(self):
+        base_requirements = (Requirement(kind="data_property", name=self.args.name, exists=False),)
+        domain_requirements = tuple(
+            Requirement(kind="class", name=domain_class, exists=True)
+            for domain_class in self.args.domain
+        )
+        return base_requirements + domain_requirements
+
+    def provides(self):
+        return (Provision(kind="data_property", name=self.args.name, exists=True),)
+
+    def apply(self, state: OntologyState):
+        return apply_add_data_property(state, self.args)

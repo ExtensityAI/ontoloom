@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import Field
 
+from dataclasses import dataclass
+
 from ontology_hydra.ontology.state.models import (
     ClassName,
     DataProperty,
@@ -9,10 +11,13 @@ from ontology_hydra.ontology.state.models import (
     ObjectProperty,
     OntologyState,
 )
-from ontology_hydra.ontology.state.ops.results import (
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
     OperationFailure,
     OperationResult,
     OperationSuccess,
+    Provision,
+    Requirement,
 )
 from ontology_hydra.ontology.state.ops.utils import (
     replace_data_property,
@@ -21,7 +26,7 @@ from ontology_hydra.ontology.state.ops.utils import (
 )
 
 
-class DeleteClassOperation(Model):
+class DeleteClassOperationArgs(Model):
     """Remove an existing class from the ontology."""
 
     type: Literal["del_class"] = "del_class"
@@ -44,7 +49,7 @@ def _remove_class_from_object_property(
     return replace_object_property(prop, domain=new_domain, range=new_range)
 
 
-def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> OperationResult:
+def apply_delete_class(state: OntologyState, op: DeleteClassOperationArgs) -> OperationResult:
     if (target := state.get_class(op.name)) is None:
         return OperationFailure(reason=f"Class '{op.name}' does not exist in the ontology.")
 
@@ -55,7 +60,7 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> Operat
         # implicitly create a remove op for the subclass and recursively remove it
         result = apply_delete_class(
             state,
-            DeleteClassOperation(name=subclass.name),
+            DeleteClassOperationArgs(name=subclass.name),
         )
 
         if result.success is False:
@@ -88,3 +93,15 @@ def apply_delete_class(state: OntologyState, op: DeleteClassOperation) -> Operat
             data_properties=new_data_properties,
         )
     )
+
+
+@dataclass(frozen=True, slots=True)
+class DeleteClassOperation(BaseOperation[DeleteClassOperationArgs]):
+    def requires(self) -> tuple[Requirement, ...]:
+        return (Requirement(kind="class", name=self.args.name, exists=True),)
+
+    def provides(self) -> tuple[Provision, ...]:
+        return (Provision(kind="class", name=self.args.name, exists=False),)
+
+    def apply(self, state: OntologyState) -> OperationResult:
+        return apply_delete_class(state, self.args)

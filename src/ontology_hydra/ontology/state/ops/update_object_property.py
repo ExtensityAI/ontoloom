@@ -2,6 +2,8 @@ from typing import Literal
 
 from pydantic import Field
 
+from dataclasses import dataclass
+
 from ontology_hydra.ontology.state.models import (
     ClassName,
     Model,
@@ -10,14 +12,21 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.ops.results import OperationFailure, OperationSuccess
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
+    OperationFailure,
+    OperationResult,
+    OperationSuccess,
+    Provision,
+    Requirement,
+)
 from ontology_hydra.ontology.state.ops.utils import (
     replace_object_property,
     replace_ontology_state,
 )
 
 
-class UpdateObjectPropertyOperation(Model):
+class UpdateObjectPropertyOperationArgs(Model):
     """Update an existing object property in the ontology."""
 
     type: Literal["update_obj_prop"] = "update_obj_prop"
@@ -39,7 +48,7 @@ class UpdateObjectPropertyOperation(Model):
     )
 
 
-def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyOperation):
+def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyOperationArgs):
     target = state.get_property(op.name)
 
     if target is None:
@@ -86,3 +95,34 @@ def apply_update_object_property(state: OntologyState, op: UpdateObjectPropertyO
     )
 
     return OperationSuccess(state=replace_ontology_state(state, object_properties=remaining_props))
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateObjectPropertyOperation(BaseOperation[UpdateObjectPropertyOperationArgs]):
+    def requires(self) -> tuple[Requirement, ...]:
+        requirements = [Requirement(kind="object_property", name=self.args.name, exists=True)]
+
+        if self.args.new_name:
+            requirements.append(
+                Requirement(kind="object_property", name=self.args.new_name, exists=False)
+            )
+        if self.args.new_domain:
+            requirements.extend(
+                Requirement(kind="class", name=domain_class, exists=True)
+                for domain_class in self.args.new_domain
+            )
+        if self.args.new_range:
+            requirements.extend(
+                Requirement(kind="class", name=range_class, exists=True)
+                for range_class in self.args.new_range
+            )
+
+        return tuple(requirements)
+
+    def provides(self) -> tuple[Provision, ...]:
+        if self.args.new_name:
+            return (Provision(kind="object_property", name=self.args.new_name, exists=True),)
+        return ()
+
+    def apply(self, state: OntologyState) -> OperationResult:
+        return apply_update_object_property(state, self.args)

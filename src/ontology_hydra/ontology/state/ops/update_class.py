@@ -2,15 +2,21 @@ from typing import Literal
 
 from pydantic import Field
 
+from dataclasses import dataclass
+
 from ontology_hydra.ontology.state.models import Class, ClassName, Model, OntologyState
-from ontology_hydra.ontology.state.ops.results import (
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
     OperationFailure,
+    OperationResult,
     OperationSuccess,
+    Provision,
+    Requirement,
 )
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
-class UpdateClassOperation(Model):
+class UpdateClassOperationArgs(Model):
     """Update an existing class in the ontology."""
 
     type: Literal["update_class"] = "update_class"
@@ -37,7 +43,7 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
     return cls
 
 
-def apply_update_class(state: OntologyState, op: UpdateClassOperation):
+def apply_update_class(state: OntologyState, op: UpdateClassOperationArgs):
     target = state.get_class(op.name)
 
     if target is None:
@@ -64,3 +70,21 @@ def apply_update_class(state: OntologyState, op: UpdateClassOperation):
     )
 
     return OperationSuccess(state=replace_ontology_state(state, classes=new_classes))
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
+    def requires(self) -> tuple[Requirement, ...]:
+        requirements = [Requirement(kind="class", name=self.args.name, exists=True)]
+        if self.args.new_name:
+            requirements.append(Requirement(kind="class", name=self.args.new_name, exists=False))
+        return tuple(requirements)
+
+    def provides(self) -> tuple[Provision, ...]:
+        # rename effectively provides the new class name if specified
+        if self.args.new_name:
+            return (Provision(kind="class", name=self.args.new_name, exists=True),)
+        return ()
+
+    def apply(self, state: OntologyState) -> OperationResult:
+        return apply_update_class(state, self.args)

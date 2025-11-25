@@ -56,6 +56,12 @@ class OntologyState(Model):
     def get_class(self, name: ClassName):
         return next((cls for cls in self.classes if cls.name == name), None)
 
+    def get_data_property(self, name: PropertyName):
+        return next((prop for prop in self.data_properties if prop.name == name), None)
+
+    def get_object_property(self, name: PropertyName):
+        return next((prop for prop in self.object_properties if prop.name == name), None)
+
     def get_property(self, name: PropertyName):
         return next((prop for prop in self.properties if prop.name == name), None)
 
