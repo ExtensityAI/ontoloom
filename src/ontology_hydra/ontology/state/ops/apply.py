@@ -13,7 +13,13 @@ from ontology_hydra.ontology.state.ops.add_object_property import (
     AddObjectPropertyOperation,
     AddObjectPropertyOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.base import BaseOperation, OperationResult
+from ontology_hydra.ontology.state.ops.base import (
+    BaseOperation,
+    ExceptionFailure,
+    Result,
+    Success,
+    UnsatisfiedRequirementsFailure,
+)
 from ontology_hydra.ontology.state.ops.del_class import (
     DeleteClassOperation,
     DeleteClassOperationArgs,
@@ -79,10 +85,6 @@ def _as_operation(arg: OperationArgs) -> BaseOperation:
     raise TypeError(msg)
 
 
-def _unsatisfied_requirements(op: BaseOperation, state: OntologyState):
-    return tuple(req for req in op.requires() if not req.is_satisfied(state))
-
-
 def apply(state: OntologyState, ops: list[OperationArgs]):
     issues = list[Issue]()
     operations = [_as_operation(op) for op in ops]
@@ -94,24 +96,32 @@ def apply(state: OntologyState, ops: list[OperationArgs]):
         progress = False
 
         for op in list(remaining_ops):
-            missing_requirements = _unsatisfied_requirements(op, state)
+            missing_requirements = op.test_for_unsatisfied_requirements(state)
             if len(missing_requirements) > 0:
                 continue
 
-            result: OperationResult = op.apply(state)
+            result: Result = op.try_apply(state)
             remaining_ops.remove(op)
 
-            if result.success is True:
+            if isinstance(result, Success):
                 state = result.state
             else:
-                issues.append(OperationInapplicableIssue(operation=op.args, reason=result.reason))
+                if isinstance(result, UnsatisfiedRequirementsFailure):
+                    reqs = ", ".join(str(req) for req in result.unsatisfied_requirements)
+                    reason = f"Unsatisfied requirements: {reqs}"
+                elif isinstance(result, ExceptionFailure):
+                    reason = f"Exception during apply: {result.exception}"
+                else:
+                    reason = "Operation failed"
+
+                issues.append(OperationInapplicableIssue(operation=op.args, reason=reason))
 
             progress = True
 
         if not progress and remaining_ops:
             for op in remaining_ops:
-                missing = _unsatisfied_requirements(op, state)
-                missing_reasons = "; ".join(req.describe(state) for req in missing)
+                missing = op.test_for_unsatisfied_requirements(state)
+                missing_reasons = "; ".join(str(req) for req in missing)
                 issues.append(
                     OperationInapplicableIssue(
                         operation=op.args,

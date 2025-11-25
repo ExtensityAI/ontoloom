@@ -5,8 +5,6 @@ from ontology_hydra.ontology.state.models import ClassName, Model, OntologyState
 
 
 class BaseRequirement(Model, ABC):
-    fixed: bool = False
-
     @abstractmethod
     def is_satisfied(self, state: OntologyState) -> bool:
         raise NotImplementedError

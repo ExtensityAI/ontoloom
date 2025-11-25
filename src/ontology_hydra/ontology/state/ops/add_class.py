@@ -22,12 +22,17 @@ class AddClassOperationArgs(BaseOperationArgs):
     description: str = Field(..., description="Description of the class to add")
 
 
+def _create_requirements(args: AddClassOperationArgs):
+    # New class must not already exist; parent must be present.
+    return (
+        RequiresPresence(kind="class", name=args.name, exists=False),
+        RequiresPresence(kind="class", name=args.parent, exists=True),
+    )
+
+
 class AddClassOperation(BaseOperation[AddClassOperationArgs]):
-    def requires(self):
-        return (
-            RequiresPresence(kind="class", name=self.args.name, exists=False),
-            RequiresPresence(kind="class", name=self.args.parent, exists=True),
-        )
+    def __init__(self, args: AddClassOperationArgs):
+        super().__init__(args, _create_requirements(args))
 
     def _apply(self, state: OntologyState):
         new_class = Class(

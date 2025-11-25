@@ -12,8 +12,6 @@ from ontology_hydra.ontology.state.models import (
 from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
     BaseOperationArgs,
-    OperationFailure,
-    OperationSuccess,
 )
 from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
@@ -33,55 +31,28 @@ class AddObjectPropertyOperationArgs(BaseOperationArgs):
     description: str = Field(..., description="Description of the property to add")
 
 
-def apply_add_object_property(state: OntologyState, op: AddObjectPropertyOperationArgs):
-    if state.get_property(op.name) is not None:
-        return OperationFailure(reason=f"Property '{op.name}' already exists in the ontology.")
+def _create_requirements(args: AddObjectPropertyOperationArgs):
+    reqs: list[RequiresPresence] = [
+        RequiresPresence(kind="object_property", name=args.name, exists=False),
+    ]
 
-    # make sure that all domain classes exist
-    for domain_class in op.domain:
-        if state.get_class(domain_class) is None:
-            return OperationFailure(
-                reason=f"Domain class '{domain_class}' does not exist in the ontology."
-            )
+    # require all domain classes to exist
+    for domain_class in args.domain:
+        reqs.append(RequiresPresence(kind="class", name=domain_class, exists=True))
 
-    # make sure that all range classes exist
-    for range_class in op.range:
-        if state.get_class(range_class) is None:
-            return OperationFailure(
-                reason=f"Range class '{range_class}' does not exist in the ontology."
-            )
+    # require all range classes to exist
+    for range_class in args.range:
+        reqs.append(RequiresPresence(kind="class", name=range_class, exists=True))
 
-    # success!
-
-    new_prop = ObjectProperty(
-        name=op.name,
-        domain=op.domain,
-        range=op.range,
-        description=op.description,
-    )
-
-    return OperationSuccess(
-        state=replace_ontology_state(state, object_properties=(*state.object_properties, new_prop))
-    )
+    return tuple(reqs)
 
 
 class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
-    def requires(self):
-        base_requirements = (
-            RequiresPresence(kind="object_property", name=self.args.name, exists=False),
+    def __init__(self, args: AddObjectPropertyOperationArgs):
+        super().__init__(
+            args,
+            _create_requirements(args),
         )
-
-        domain_requirements = tuple(
-            RequiresPresence(kind="class", name=domain_class, exists=True)
-            for domain_class in self.args.domain
-        )
-
-        range_requirements = tuple(
-            RequiresPresence(kind="class", name=range_class, exists=True)
-            for range_class in self.args.range
-        )
-
-        return base_requirements + domain_requirements + range_requirements
 
     def _apply(self, state: OntologyState):
         new_prop = ObjectProperty(

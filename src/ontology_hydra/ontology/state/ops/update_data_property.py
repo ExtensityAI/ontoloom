@@ -44,25 +44,30 @@ class UpdateDataPropertyOperationArgs(BaseOperationArgs):
     )
 
 
+def _create_requirements(args: UpdateDataPropertyOperationArgs):
+    reqs: list[RequiresPresence] = [
+        RequiresPresence(kind="data_property", name=args.name, exists=True)
+    ]
+
+    # If renaming, the new name must be free.
+    if args.new_name:
+        reqs.append(RequiresPresence(kind="data_property", name=args.new_name, exists=False))
+
+    # If changing domain, ensure every referenced class exists.
+    if args.new_domain:
+        reqs.extend(
+            RequiresPresence(kind="class", name=domain_class, exists=True)
+            for domain_class in args.new_domain
+        )
+
+    return tuple(reqs)
+
+
 class UpdateDataPropertyOperation(BaseOperation[UpdateDataPropertyOperationArgs]):
-    def requires(self):
-        requirements = [RequiresPresence(kind="data_property", name=self.args.name, exists=True)]
+    def __init__(self, args: UpdateDataPropertyOperationArgs):
+        super().__init__(args, _create_requirements(args))
 
-        # if changing name, make sure the new name is not already taken
-        if self.args.new_name:
-            requirements.append(
-                RequiresPresence(kind="data_property", name=self.args.new_name, exists=False)
-            )
-
-        # if changing domain, make sure all new domain classes exist
-        if self.args.new_domain:
-            requirements.extend(
-                RequiresPresence(kind="class", name=domain_class, exists=True)
-                for domain_class in self.args.new_domain
-            )
-        return tuple(requirements)
-
-    def apply(self, state: OntologyState):
+    def _apply(self, state: OntologyState):
         old_prop = cast("DataProperty", state.get_property(self.args.name))
 
         # update the property itself

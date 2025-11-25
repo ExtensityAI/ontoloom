@@ -30,18 +30,23 @@ class AddDataPropertyOperationArgs(BaseOperationArgs):
     description: str = Field(..., description="Description of the property")
 
 
+def _create_requirements(args: AddDataPropertyOperationArgs):
+    reqs: list[RequiresPresence] = [
+        RequiresPresence(kind="data_property", name=args.name, exists=False),
+    ]
+
+    # Require all domain classes to exist before adding.
+    reqs.extend(
+        RequiresPresence(kind="class", name=domain_class, exists=True)
+        for domain_class in args.domain
+    )
+
+    return tuple(reqs)
+
+
 class AddDataPropertyOperation(BaseOperation[AddDataPropertyOperationArgs]):
-    def requires(self):
-        base_requirements = (
-            RequiresPresence(kind="data_property", name=self.args.name, exists=False),
-        )
-
-        domain_requirements = tuple(
-            RequiresPresence(kind="class", name=domain_class, exists=True)
-            for domain_class in self.args.domain
-        )
-
-        return base_requirements + domain_requirements
+    def __init__(self, args: AddDataPropertyOperationArgs):
+        super().__init__(args, _create_requirements(args))
 
     def _apply(self, state: OntologyState):
         new_prop = DataProperty(

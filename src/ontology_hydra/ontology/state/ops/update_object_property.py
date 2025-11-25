@@ -42,33 +42,36 @@ class UpdateObjectPropertyOperationArgs(BaseOperationArgs):
     )
 
 
+def _create_requirements(args: UpdateObjectPropertyOperationArgs):
+    reqs: list[RequiresPresence] = [
+        RequiresPresence(kind="object_property", name=args.name, exists=True)
+    ]
+
+    # If renaming, the new name must be free.
+    if args.new_name:
+        reqs.append(RequiresPresence(kind="object_property", name=args.new_name, exists=False))
+
+    # If changing domain/range, ensure referenced classes exist.
+    if args.new_domain:
+        reqs.extend(
+            RequiresPresence(kind="class", name=domain_class, exists=True)
+            for domain_class in args.new_domain
+        )
+
+    if args.new_range:
+        reqs.extend(
+            RequiresPresence(kind="class", name=range_class, exists=True)
+            for range_class in args.new_range
+        )
+
+    return tuple(reqs)
+
+
 class UpdateObjectPropertyOperation(BaseOperation[UpdateObjectPropertyOperationArgs]):
-    def requires(self):  # -> tuple[Any, ...]:
-        requirements = [RequiresPresence(kind="object_property", name=self.args.name, exists=True)]
+    def __init__(self, args: UpdateObjectPropertyOperationArgs):
+        super().__init__(args, _create_requirements(args))
 
-        # if changing name, make sure the new name is not already taken
-        if self.args.new_name:
-            requirements.append(
-                RequiresPresence(kind="object_property", name=self.args.new_name, exists=False)
-            )
-
-        # if changing domain, make sure all new domain classes exist
-        if self.args.new_domain:
-            requirements.extend(
-                RequiresPresence(kind="class", name=domain_class, exists=True)
-                for domain_class in self.args.new_domain
-            )
-
-        # if changing range, make sure all new range classes exist
-        if self.args.new_range:
-            requirements.extend(
-                RequiresPresence(kind="class", name=range_class, exists=True)
-                for range_class in self.args.new_range
-            )
-
-        return tuple(requirements)
-
-    def apply(self, state: OntologyState):
+    def _apply(self, state: OntologyState):
         old_prop = cast("ObjectProperty", state.get_property(self.args.name))
 
         # update the property itself

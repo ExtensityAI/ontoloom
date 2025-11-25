@@ -25,7 +25,7 @@ class DeleteClassOperationArgs(BaseOperationArgs):
 
 
 class RequiresEmptySubClasses(BaseRequirement):
-    """"""
+    """Class must not have subclasses before deletion."""
 
     class_name: ClassName
 
@@ -33,14 +33,19 @@ class RequiresEmptySubClasses(BaseRequirement):
         return state.get_subclasses(self.class_name) == ()
 
 
-class DeleteClassOperation(BaseOperation[DeleteClassOperationArgs]):
-    def requires(self):
-        return (
-            RequiresPresence(kind="class", name=self.args.name, exists=True),
-            RequiresEmptySubClasses(class_name=self.args.name),
-        )
+def _create_requirements(args: DeleteClassOperationArgs):
+    # Target class must exist and have no subclasses.
+    return (
+        RequiresPresence(kind="class", name=args.name, exists=True),
+        RequiresEmptySubClasses(class_name=args.name),
+    )
 
-    def apply(self, state: OntologyState):
+
+class DeleteClassOperation(BaseOperation[DeleteClassOperationArgs]):
+    def __init__(self, args: DeleteClassOperationArgs):
+        super().__init__(args, _create_requirements(args))
+
+    def _apply(self, state: OntologyState):
         # TODO also remove class from data and object props
         return replace_ontology_state(
             state, classes=tuple(c for c in state.classes if c.name != self.args.name)

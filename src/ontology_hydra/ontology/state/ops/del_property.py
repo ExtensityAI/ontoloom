@@ -19,12 +19,17 @@ class DeletePropertyOperationArgs(BaseOperationArgs):
     name: PropertyName = Field(..., description="Name of the object/data property to delete")
 
 
-class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):
-    def requires(self):
-        return (RequiresPresence(kind="any_property", name=self.args.name, exists=True),)
+def _create_requirements(args: DeletePropertyOperationArgs):
+    # Property must exist (data or object).
+    return (RequiresPresence(kind="any_property", name=args.name, exists=True),)
 
-    def apply(self, state: OntologyState):
-        # delete this property
+
+class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):
+    def __init__(self, args: DeletePropertyOperationArgs):
+        super().__init__(args, _create_requirements(args))
+
+    def _apply(self, state: OntologyState):
+        # Remove the property from both lists; only one will actually match.
         data_props = tuple(prop for prop in state.data_properties if prop.name != self.args.name)
         object_props = tuple(
             prop for prop in state.object_properties if prop.name != self.args.name
