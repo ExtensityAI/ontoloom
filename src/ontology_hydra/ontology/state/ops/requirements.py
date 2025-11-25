@@ -5,6 +5,8 @@ from ontology_hydra.ontology.state.models import ClassName, Model, OntologyState
 
 
 class BaseRequirement(Model, ABC):
+    fixed: bool = False
+
     @abstractmethod
     def is_satisfied(self, state: OntologyState) -> bool:
         raise NotImplementedError
@@ -13,7 +15,7 @@ class BaseRequirement(Model, ABC):
 type ResourceKind = Literal["class", "data_property", "object_property", "any_property"]
 
 
-class ExistanceRequirement(BaseRequirement):
+class RequiresPresence(BaseRequirement):
     """Requirement that a resource exists or does not exist in the ontology."""
 
     kind: ResourceKind
@@ -34,6 +36,3 @@ class ExistanceRequirement(BaseRequirement):
         )
 
         return exists == self.exists
-
-
-Requirement = ExistanceRequirement

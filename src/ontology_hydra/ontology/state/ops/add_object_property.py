@@ -2,11 +2,8 @@ from typing import Literal
 
 from pydantic import Field
 
-from dataclasses import dataclass
-
 from ontology_hydra.ontology.state.models import (
     ClassName,
-    Model,
     ObjectProperty,
     OntologyState,
     PropertyName,
@@ -14,16 +11,15 @@ from ontology_hydra.ontology.state.models import (
 )
 from ontology_hydra.ontology.state.ops.base import (
     BaseOperation,
+    BaseOperationArgs,
     OperationFailure,
-    OperationResult,
     OperationSuccess,
-    Provision,
-    Requirement,
 )
+from ontology_hydra.ontology.state.ops.requirements import RequiresPresence
 from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
 
 
-class AddObjectPropertyOperationArgs(Model):
+class AddObjectPropertyOperationArgs(BaseOperationArgs):
     """Add a new object property to the ontology."""
 
     type: Literal["add_obj_prop"] = "add_obj_prop"
@@ -69,24 +65,30 @@ def apply_add_object_property(state: OntologyState, op: AddObjectPropertyOperati
     )
 
 
-@dataclass(frozen=True, slots=True)
 class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
-    def requires(self) -> tuple[Requirement, ...]:
+    def requires(self):
         base_requirements = (
-            Requirement(kind="object_property", name=self.args.name, exists=False),
+            RequiresPresence(kind="object_property", name=self.args.name, exists=False),
         )
+
         domain_requirements = tuple(
-            Requirement(kind="class", name=domain_class, exists=True)
+            RequiresPresence(kind="class", name=domain_class, exists=True)
             for domain_class in self.args.domain
         )
+
         range_requirements = tuple(
-            Requirement(kind="class", name=range_class, exists=True)
+            RequiresPresence(kind="class", name=range_class, exists=True)
             for range_class in self.args.range
         )
+
         return base_requirements + domain_requirements + range_requirements
 
-    def provides(self) -> tuple[Provision, ...]:
-        return (Provision(kind="object_property", name=self.args.name, exists=True),)
+    def _apply(self, state: OntologyState):
+        new_prop = ObjectProperty(
+            name=self.args.name,
+            domain=self.args.domain,
+            range=self.args.range,
+            description=self.args.description,
+        )
 
-    def apply(self, state: OntologyState) -> OperationResult:
-        return apply_add_object_property(state, self.args)
+        return replace_ontology_state(state, object_properties=(*state.object_properties, new_prop))

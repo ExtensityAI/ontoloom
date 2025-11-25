@@ -83,30 +83,9 @@ def _unsatisfied_requirements(op: BaseOperation, state: OntologyState):
     return tuple(req for req in op.requires() if not req.is_satisfied(state))
 
 
-def _collect_provision_conflicts(ops: list[BaseOperation]) -> list[Issue]:
-    seen: set[tuple[str, str, bool]] = set()
-    issues: list[Issue] = []
-
-    for op in ops:
-        for prov in op.provides():
-            key = (prov.kind, prov.name, prov.exists)
-            if key in seen:
-                issues.append(
-                    OperationInapplicableIssue(
-                        operation=op.args,
-                        reason=f"Provision conflict for {prov.kind} '{prov.name}' with exists={prov.exists}",
-                    )
-                )
-            seen.add(key)
-
-    return issues
-
-
 def apply(state: OntologyState, ops: list[OperationArgs]):
     issues = list[Issue]()
     operations = [_as_operation(op) for op in ops]
-
-    issues.extend(_collect_provision_conflicts(operations))
 
     remaining_ops = operations.copy()
     progress = True
