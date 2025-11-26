@@ -3,12 +3,14 @@ from typing import Literal, cast
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, OntologyState
-from ontology_hydra.ontology.state.ops.base import (
+from ontology_hydra.ontology.state.update.effects import ExistenceEffect
+from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
-from ontology_hydra.ontology.state.ops.utils import replace_class, replace_ontology_state
+from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
+from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.utils import replace_class, replace_ontology_state
 
 
 class UpdateClassOperationArgs(BaseOperationArgs):
@@ -40,17 +42,41 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
     return cls
 
 
-def _create_requirements(args: UpdateClassOperationArgs):
-    reqs: list[PresenceRequired] = [PresenceRequired(kind="class", name=args.name, exists=True)]
+def _create_preconditions(args: UpdateClassOperationArgs):
+    preconds = [
+        ExistencePrecondition(resource=ResourceRef(kind="class", name=args.name), value="existent")
+    ]
 
     # If renaming, the new name must be free.
     if args.new_name:
-        reqs.append(PresenceRequired(kind="class", name=args.new_name, exists=False))
+        preconds.append(
+            ExistencePrecondition(
+                resource=ResourceRef(kind="class", name=args.new_name), value="non-existent"
+            )
+        )
 
-    return tuple(reqs)
+    return tuple(preconds)
+
+
+def _create_effects(args: UpdateClassOperationArgs):
+    if not args.new_name:
+        # if we are not renaming, there is no relevant effect
+        return ()
+
+    return (
+        ExistenceEffect(
+            resource=ResourceRef(kind="class", name=args.name), value="non-existent"
+        ),  # old resource is gone
+        ExistenceEffect(
+            resource=ResourceRef(kind="class", name=args.new_name), value="existent"
+        ),  # new resource exists
+    )
 
 
 class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
+    def __init__(self, args: UpdateClassOperationArgs):
+        super().__init__(args, _create_preconditions(args), _create_effects(args))
+
     def _apply(self, state: OntologyState):
         old_class = cast("Class", state.get_class(self.args.name))
 
@@ -74,4 +100,4 @@ class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
 
     @classmethod
     def from_args(cls, args: UpdateClassOperationArgs):
-        return cls(args, _create_requirements(args))
+        return cls(args)

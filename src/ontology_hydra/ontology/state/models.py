@@ -1,7 +1,6 @@
 from typing import Literal
 
-from pydantic import ConfigDict
-from symai.strategy import LLMDataModel
+from ontology_hydra.types import Model
 
 type vartuple[T] = tuple[T, ...]
 """A tuple of variable length containing elements of type T."""
@@ -11,13 +10,6 @@ type PropertyName = str
 type PrimitiveDataType = Literal[
     "string", "integer", "float", "boolean", "date", "datetime", "time"
 ]
-
-
-class Model(LLMDataModel):
-    model_config = ConfigDict(
-        frozen=True,  # immutable by default
-        strict=True,  # no extra fields allowed
-    )
 
 
 class Class(Model):

@@ -16,15 +16,15 @@ class Cache(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def write(self, key: CacheKey, value: str):
+    def write(self, key: CacheKey, value: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def delete(self, *keys: CacheKey):
+    def delete(self, *keys: CacheKey) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def clear(self):
+    def clear(self) -> None:
         raise NotImplementedError
 
 

@@ -1,28 +1,35 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Literal, Self
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, vartuple
-from ontology_hydra.ontology.state.ops.effects import Effect
-from ontology_hydra.ontology.state.ops.preconditions import Precondition
-from ontology_hydra.utils.results import BaseFailure, BaseSuccess
+from ontology_hydra.ontology.state.update.effects import Effect
+from ontology_hydra.ontology.state.update.preconditions import Precondition
 
 
-class Success(BaseSuccess):
-    type: Literal[None] = None
+@dataclass(frozen=True, slots=True)
+class Success:
     state: OntologyState
+    success: Literal[True] = True
+    type: Literal["success"] = "success"
 
 
-class UnsatisfiedRequirementsFailure(BaseFailure):
-    type: Literal["unsatisfied_requirements"] = "unsatisfied_requirements"
-    unsatisfied_requirements: vartuple[Precondition]
+@dataclass(frozen=True, slots=True)
+class UnsatisfiedPreconditionsFailure:
+    error: vartuple[Precondition]
+
+    success: Literal[False] = False
+    type: Literal["unsat_preconds"] = "unsat_preconds"
 
 
-class ExceptionFailure(BaseFailure):
-    type: Literal["exception"] = "exception"
+@dataclass(frozen=True, slots=True)
+class ExceptionFailure:
     exception: Exception
+    success: Literal[False] = False
+    type: Literal["exception"] = "exception"
 
 
-type Result = Success | UnsatisfiedRequirementsFailure | ExceptionFailure
+type Result = Success | UnsatisfiedPreconditionsFailure | ExceptionFailure
 
 
 class BaseOperationArgs(Model):
@@ -52,13 +59,11 @@ class BaseOperation[A: BaseOperationArgs](ABC):
         return tuple(req for req in self._preconditions if not req.is_satisfied(state))
 
     def try_apply(self, state: OntologyState) -> Result:
-        unsatisfied_preconditions = self.test_for_unsatisfied_preconditions(state)
+        unsat_preconds = self.test_for_unsatisfied_preconditions(state)
 
-        if len(unsatisfied_preconditions) > 0:
+        if len(unsat_preconds) > 0:
             # some preconditions are not satisfied, return early and do not apply
-            return UnsatisfiedRequirementsFailure(
-                unsatisfied_requirements=unsatisfied_preconditions,
-            )
+            return UnsatisfiedPreconditionsFailure(error=unsat_preconds)
 
         try:
             return Success(state=self._apply(state))

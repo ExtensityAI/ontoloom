@@ -1,40 +1,4 @@
 from ontology_hydra.ontology.state.models import OntologyState
-from ontology_hydra.ontology.state.ops.add_class import (
-    AddClassOperation,
-    AddClassOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.add_data_property import (
-    AddDataPropertyOperation,
-    AddDataPropertyOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.add_object_property import (
-    AddObjectPropertyOperation,
-    AddObjectPropertyOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.base import (
-    Success,
-)
-from ontology_hydra.ontology.state.ops.del_class import (
-    DeleteClassOperation,
-    DeleteClassOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.del_property import (
-    DeletePropertyOperation,
-    DeletePropertyOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.types import OperationArgs
-from ontology_hydra.ontology.state.ops.update_class import (
-    UpdateClassOperation,
-    UpdateClassOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.update_data_property import (
-    UpdateDataPropertyOperation,
-    UpdateDataPropertyOperationArgs,
-)
-from ontology_hydra.ontology.state.ops.update_object_property import (
-    UpdateObjectPropertyOperation,
-    UpdateObjectPropertyOperationArgs,
-)
 
 
 def _as_operation(args: OperationArgs):

@@ -9,12 +9,14 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.ops.base import (
+from ontology_hydra.ontology.state.update.effects import ExistenceEffect
+from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.preconditions import PresenceRequired
-from ontology_hydra.ontology.state.ops.utils import (
+from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
+from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.utils import (
     replace_object_property,
     replace_ontology_state,
 )
@@ -42,32 +44,63 @@ class UpdateObjectPropertyOperationArgs(BaseOperationArgs):
     )
 
 
-def _create_requirements(args: UpdateObjectPropertyOperationArgs):
-    reqs: list[PresenceRequired] = [
-        PresenceRequired(kind="object_property", name=args.name, exists=True)
+def _create_preconditions(args: UpdateObjectPropertyOperationArgs):
+    preconds: list[ExistencePrecondition] = [
+        ExistencePrecondition(
+            resource=ResourceRef(kind="object_property", name=args.name), value="existent"
+        )
     ]
 
     # If renaming, the new name must be free.
     if args.new_name:
-        reqs.append(PresenceRequired(kind="object_property", name=args.new_name, exists=False))
+        preconds += (
+            ExistencePrecondition(
+                resource=ResourceRef(kind="object_property", name=args.new_name),
+                value="non-existent",
+            ),
+        )
 
     # If changing domain/range, ensure referenced classes exist.
     if args.new_domain:
-        reqs.extend(
-            PresenceRequired(kind="class", name=domain_class, exists=True)
+        preconds += (
+            ExistencePrecondition(
+                resource=ResourceRef(kind="class", name=domain_class), value="existent"
+            )
             for domain_class in args.new_domain
         )
 
     if args.new_range:
-        reqs.extend(
-            PresenceRequired(kind="class", name=range_class, exists=True)
+        preconds += (
+            ExistencePrecondition(
+                resource=ResourceRef(kind="class", name=range_class), value="existent"
+            )
             for range_class in args.new_range
         )
 
-    return tuple(reqs)
+    return tuple(preconds)
+
+
+def _create_effects(args: UpdateObjectPropertyOperationArgs):
+    if not args.new_name:
+        # if we are not renaming, there is no relevant effect
+        return ()
+
+    return (
+        ExistenceEffect(
+            resource=ResourceRef(kind="object_property", name=args.name),
+            value="non-existent",
+        ),
+        ExistenceEffect(
+            resource=ResourceRef(kind="object_property", name=args.new_name),
+            value="existent",
+        ),
+    )
 
 
 class UpdateObjectPropertyOperation(BaseOperation[UpdateObjectPropertyOperationArgs]):
+    def __init__(self, args: UpdateObjectPropertyOperationArgs):
+        super().__init__(args, _create_preconditions(args), _create_effects(args))
+
     def _apply(self, state: OntologyState):
         old_prop = cast("ObjectProperty", state.get_property(self.args.name))
 
@@ -89,4 +122,4 @@ class UpdateObjectPropertyOperation(BaseOperation[UpdateObjectPropertyOperationA
 
     @classmethod
     def from_args(cls, args: UpdateObjectPropertyOperationArgs):
-        return cls(args, _create_requirements(args))
+        return cls(args)

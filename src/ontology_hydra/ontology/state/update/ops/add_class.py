@@ -3,14 +3,14 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, OntologyState
-from ontology_hydra.ontology.state.ops.base import (
+from ontology_hydra.ontology.state.update.effects import ExistenceEffect
+from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.ops.effects import PresenceEffect
-from ontology_hydra.ontology.state.ops.preconditions import PresencePrecondition
-from ontology_hydra.ontology.state.ops.resources import ResourceRef
-from ontology_hydra.ontology.state.ops.utils import replace_ontology_state
+from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
+from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
 class AddClassOperationArgs(BaseOperationArgs):
@@ -26,19 +26,19 @@ class AddClassOperationArgs(BaseOperationArgs):
 
 def _create_preconditions(args: AddClassOperationArgs):
     return (
-        PresencePrecondition(
-            resource=ResourceRef(kind="class", name=args.name), value="absent"
+        ExistencePrecondition(
+            resource=ResourceRef(kind="class", name=args.name), value="non-existent"
         ),  # new class must not exist yet
-        PresencePrecondition(
-            resource=ResourceRef(kind="class", name=args.parent), value="present"
+        ExistencePrecondition(
+            resource=ResourceRef(kind="class", name=args.parent), value="existent"
         ),  # parent class must exist
     )
 
 
 def _create_effects(args: AddClassOperationArgs):
     return (
-        PresenceEffect(
-            resource=ResourceRef(kind="class", name=args.name), value="present"
+        ExistenceEffect(
+            resource=ResourceRef(kind="class", name=args.name), value="existent"
         ),  # creates new class
     )
 
