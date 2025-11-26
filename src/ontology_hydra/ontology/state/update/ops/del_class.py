@@ -31,7 +31,7 @@ class HasNoSubClassesPrecondition(Precondition):
 
     class_name: ClassName
 
-    def is_satisfied(self, state: OntologyState) -> bool:
+    def is_satisfied_in(self, state: OntologyState) -> bool:
         return state.get_subclasses(self.class_name) == ()
 
 

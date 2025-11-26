@@ -8,3 +8,7 @@ type ResourceKind = Literal["class", "data_property", "object_property", "any_pr
 class ResourceRef(Model):
     kind: ResourceKind
     name: ClassName | PropertyName
+
+    @property
+    def key(self):
+        return (self.kind, self.name)

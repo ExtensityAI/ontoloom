@@ -1,34 +1,9 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Literal, Self
+from typing import Self
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, vartuple
 from ontology_hydra.ontology.state.update.effects import Effect
 from ontology_hydra.ontology.state.update.preconditions import Precondition
-
-
-@dataclass(frozen=True, slots=True)
-class Success:
-    state: OntologyState
-    success: Literal[True] = True
-    type: Literal["success"] = "success"
-
-
-@dataclass(frozen=True, slots=True)
-class UnsatisfiedPreconditionsFailure:
-    error: vartuple[Precondition]
-    success: Literal[False] = False
-    type: Literal["unsat_preconds"] = "unsat_preconds"
-
-
-@dataclass(frozen=True, slots=True)
-class ExceptionFailure:
-    exception: Exception
-    success: Literal[False] = False
-    type: Literal["exception"] = "exception"
-
-
-type Result = Success | UnsatisfiedPreconditionsFailure | ExceptionFailure
 
 
 class BaseOperationArgs(Model):
@@ -58,16 +33,18 @@ class BaseOperation[A: BaseOperationArgs](ABC):
         return tuple(req for req in self._preconditions if not req.is_satisfied_in(state))
 
     def try_apply(self, state: OntologyState) -> Result:
-        unsat_preconds = self.test_for_unsatisfied_preconditions(state)
+        unsatisfied_preconditions = self.test_for_unsatisfied_preconditions(state)
 
-        if len(unsat_preconds) > 0:
+        if len(unsatisfied_preconditions) > 0:
             # some preconditions are not satisfied, return early and do not apply
-            return UnsatisfiedPreconditionsFailure(error=unsat_preconds)
+            return UnsatisfiedRequirementsFailure(
+                unsatisfied_requirements=unsatisfied_preconditions,
+            )
 
         try:
             return Success(state=self._apply(state))
-        except Exception as e:
-            return ExceptionFailure(exception=e)
+        except Exception:
+            return ExceptionFailure()
 
     @abstractmethod
     def _apply(self, state: OntologyState) -> OntologyState:
