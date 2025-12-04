@@ -6,7 +6,6 @@ from ontology_hydra.ontology.state.models import (
     ClassName,
     OntologyState,
 )
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
@@ -19,7 +18,7 @@ from ontology_hydra.ontology.state.utils import (
 
 
 class DeleteClassOperationArgs(BaseOperationArgs):
-    """Remove an existing class from the ontology."""
+    """Removes an existing class from the ontology."""
 
     type: Literal["del_class"] = "del_class"
 
@@ -27,7 +26,7 @@ class DeleteClassOperationArgs(BaseOperationArgs):
 
 
 class HasNoSubClassesPrecondition(Precondition):
-    """Class must not have subclasses before deletion."""
+    """Class can not have any subclasses."""
 
     class_name: ClassName
 
@@ -39,22 +38,16 @@ def _create_preconditions(args: DeleteClassOperationArgs):
     return (
         ExistencePrecondition(
             resource=ResourceRef(kind="class", name=args.name), value="existent"
-        ),  # target class must exist
-        HasNoSubClassesPrecondition(class_name=args.name),  # target class must have no subclasses
-    )
-
-
-def _create_effects(args: DeleteClassOperationArgs):
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="class", name=args.name), value="non-existent"
-        ),  # deletes the class
+        ),  # target class has to exist
+        HasNoSubClassesPrecondition(
+            class_name=args.name
+        ),  # target class can not have any subclasses
     )
 
 
 class DeleteClassOperation(BaseOperation[DeleteClassOperationArgs]):
     def __init__(self, args: DeleteClassOperationArgs):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         # TODO also remove class from data and object props

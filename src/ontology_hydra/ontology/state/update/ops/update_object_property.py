@@ -9,7 +9,6 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
@@ -23,7 +22,7 @@ from ontology_hydra.ontology.state.utils import (
 
 
 class UpdateObjectPropertyOperationArgs(BaseOperationArgs):
-    """Update an existing object property in the ontology."""
+    """Updates an existing object property in the ontology."""
 
     type: Literal["update_obj_prop"] = "update_obj_prop"
 
@@ -80,26 +79,9 @@ def _create_preconditions(args: UpdateObjectPropertyOperationArgs):
     return tuple(preconds)
 
 
-def _create_effects(args: UpdateObjectPropertyOperationArgs):
-    if not args.new_name:
-        # if we are not renaming, there is no relevant effect
-        return ()
-
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="object_property", name=args.name),
-            value="non-existent",
-        ),
-        ExistenceEffect(
-            resource=ResourceRef(kind="object_property", name=args.new_name),
-            value="existent",
-        ),
-    )
-
-
 class UpdateObjectPropertyOperation(BaseOperation[UpdateObjectPropertyOperationArgs]):
     def __init__(self, args: UpdateObjectPropertyOperationArgs):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         old_prop = cast("ObjectProperty", state.get_property(self.args.name))

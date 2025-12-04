@@ -3,18 +3,20 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import OntologyState, PropertyName
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
 )
-from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
+from ontology_hydra.ontology.state.update.preconditions import (
+    exists,
+    or_,
+)
 from ontology_hydra.ontology.state.update.resources import ResourceRef
 from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
 class DeletePropertyOperationArgs(BaseOperationArgs):
-    """Remove an existing object/data property from the ontology."""
+    """Removes an existing object/data property from the ontology."""
 
     type: Literal["del_prop"] = "del_prop"
 
@@ -24,23 +26,20 @@ class DeletePropertyOperationArgs(BaseOperationArgs):
 def _create_preconditions(args: DeletePropertyOperationArgs):
     # Property must exist (data or object).
     return (
-        ExistencePrecondition(
-            resource=ResourceRef(kind="any_property", name=args.name), value="existent"
-        ),
-    )
-
-
-def _create_effects(args: DeletePropertyOperationArgs):
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="any_property", name=args.name), value="non-existent"
+        or_(
+            exists(
+                ResourceRef(kind="data_property", name=args.name),
+            ),
+            exists(
+                ResourceRef(kind="object_property", name=args.name),
+            ),
         ),
     )
 
 
 class DeletePropertyOperation(BaseOperation[DeletePropertyOperationArgs]):
     def __init__(self, args: DeletePropertyOperationArgs):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         # Remove the property from both lists; only one will actually match.

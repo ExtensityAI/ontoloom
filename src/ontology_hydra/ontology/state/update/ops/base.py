@@ -3,7 +3,6 @@ from dataclasses import dataclass
 from typing import Literal, Self
 
 from ontology_hydra.ontology.state.models import Model, OntologyState, vartuple
-from ontology_hydra.ontology.state.update.effects import Effect
 from ontology_hydra.ontology.state.update.preconditions import Precondition
 
 
@@ -36,10 +35,9 @@ class BaseOperationArgs(Model):
 
 
 class BaseOperation[A: BaseOperationArgs](ABC):
-    def __init__(self, args: A, preconditions: vartuple[Precondition], effects: vartuple[Effect]):
+    def __init__(self, args: A, preconditions: vartuple[Precondition]):
         self._args = args
         self._preconditions = preconditions
-        self._effects = effects
 
     @property
     def args(self) -> A:
@@ -48,10 +46,6 @@ class BaseOperation[A: BaseOperationArgs](ABC):
     @property
     def preconditions(self) -> vartuple[Precondition]:
         return self._preconditions
-
-    @property
-    def effects(self) -> vartuple[Effect]:
-        return self._effects
 
     def test_for_unsatisfied_preconditions(self, state: OntologyState) -> vartuple[Precondition]:
         """Check for unmet preconditions without applying the operation."""

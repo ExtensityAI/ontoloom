@@ -3,7 +3,6 @@ from typing import Literal, cast
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, OntologyState
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
@@ -14,7 +13,7 @@ from ontology_hydra.ontology.state.utils import replace_class, replace_ontology_
 
 
 class UpdateClassOperationArgs(BaseOperationArgs):
-    """Update an existing class in the ontology."""
+    """Updates an existing class in the ontology."""
 
     type: Literal["update_class"] = "update_class"
 
@@ -58,24 +57,9 @@ def _create_preconditions(args: UpdateClassOperationArgs):
     return tuple(preconds)
 
 
-def _create_effects(args: UpdateClassOperationArgs):
-    if not args.new_name:
-        # if we are not renaming, there is no relevant effect
-        return ()
-
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="class", name=args.name), value="non-existent"
-        ),  # old resource is gone
-        ExistenceEffect(
-            resource=ResourceRef(kind="class", name=args.new_name), value="existent"
-        ),  # new resource exists
-    )
-
-
 class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
     def __init__(self, args: UpdateClassOperationArgs):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         old_class = cast("Class", state.get_class(self.args.name))

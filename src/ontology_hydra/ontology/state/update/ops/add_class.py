@@ -3,7 +3,6 @@ from typing import Literal
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, OntologyState
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
@@ -14,7 +13,7 @@ from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
 class AddClassOperationArgs(BaseOperationArgs):
-    """Add a new class to the ontology."""
+    """Adds a new class to the ontology. Requires that no class called `name` exists in the ontology yet."""
 
     type: Literal["add_class"] = "add_class"
 
@@ -35,20 +34,12 @@ def _create_preconditions(args: AddClassOperationArgs):
     )
 
 
-def _create_effects(args: AddClassOperationArgs):
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="class", name=args.name), value="existent"
-        ),  # creates new class
-    )
-
-
 class AddClassOperation(BaseOperation[AddClassOperationArgs]):
     def __init__(
         self,
         args: AddClassOperationArgs,
     ):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         new_class = Class(

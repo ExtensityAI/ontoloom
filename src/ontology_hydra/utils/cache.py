@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import RLock
 
+from pydantic import BaseModel
+
 CacheKey = tuple[str | int | bool, ...]
 
 
@@ -18,6 +20,13 @@ class Cache(ABC):
     @abstractmethod
     def write(self, key: CacheKey, value: str) -> None:
         raise NotImplementedError
+
+    def write_model(self, key: CacheKey, model: BaseModel):
+        self.write(key, model.model_dump_json(indent=2))
+
+    def read_model[T: BaseModel](self, key: CacheKey, type_: type[T]) -> T | None:
+        data = self.read(key)
+        return type_.model_validate_json(data, strict=True) if data is not None else None
 
     @abstractmethod
     def delete(self, *keys: CacheKey) -> None:

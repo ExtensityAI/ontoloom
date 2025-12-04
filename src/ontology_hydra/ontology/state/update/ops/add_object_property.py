@@ -9,7 +9,6 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.update.effects import ExistenceEffect
 from ontology_hydra.ontology.state.update.ops.base import (
     BaseOperation,
     BaseOperationArgs,
@@ -20,7 +19,7 @@ from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
 class AddObjectPropertyOperationArgs(BaseOperationArgs):
-    """Add a new object property to the ontology."""
+    """Adds a new object property to the ontology."""
 
     type: Literal["add_obj_prop"] = "add_obj_prop"
 
@@ -59,20 +58,12 @@ def _create_preconditions(args: AddObjectPropertyOperationArgs):
     return tuple(pcs)
 
 
-def _create_effects(args: AddObjectPropertyOperationArgs):
-    return (
-        ExistenceEffect(
-            resource=ResourceRef(kind="object_property", name=args.name), value="existent"
-        ),
-    )
-
-
 class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
     def __init__(
         self,
         args: AddObjectPropertyOperationArgs,
     ):
-        super().__init__(args, _create_preconditions(args), _create_effects(args))
+        super().__init__(args, _create_preconditions(args))
 
     def _apply(self, state: OntologyState):
         new_prop = ObjectProperty(

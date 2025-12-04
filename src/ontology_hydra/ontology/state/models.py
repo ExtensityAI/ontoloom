@@ -1,9 +1,6 @@
 from typing import Literal
 
-from ontology_hydra.types import Model
-
-type vartuple[T] = tuple[T, ...]
-"""A tuple of variable length containing elements of type T."""
+from ontology_hydra.types import Model, vartuple
 
 type ClassName = str
 type PropertyName = str
