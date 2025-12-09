@@ -1,33 +1,10 @@
-from typing import Literal, cast
+from typing import Literal
 
 from pydantic import Field
 
 from ontology_hydra.ontology.state.models import Class, ClassName, OntologyState
-from ontology_hydra.ontology.state.update.ops.base import (
-    BaseOperation,
-    BaseOperationArgs,
-)
-from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
-from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.update.ops.base import BaseOperation
 from ontology_hydra.ontology.state.utils import replace_class, replace_ontology_state
-
-
-class UpdateClassOperationArgs(BaseOperationArgs):
-    """Updates an existing class in the ontology."""
-
-    type: Literal["update_class"] = "update_class"
-
-    name: ClassName = Field(..., description="Name of the class to update")
-
-    new_name: ClassName | None = Field(
-        None, description="New name for the class (omit if unchanged)"
-    )
-
-    new_description: str | None = Field(
-        None, description="New description of the class (omit if unchanged)"
-    )
-
-    # TODO: allow parent reassignment?
 
 
 def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: ClassName):
@@ -41,34 +18,43 @@ def _replace_parent_name_if_required(cls: Class, old_name: ClassName, new_name: 
     return cls
 
 
-def _create_preconditions(args: UpdateClassOperationArgs):
-    preconds = [
-        ExistencePrecondition(resource=ResourceRef(kind="class", name=args.name), value="existent")
-    ]
+class UpdateClassOperation(BaseOperation):
+    """Updates an existing class in the ontology."""
 
-    # If renaming, the new name must be free.
-    if args.new_name:
-        preconds.append(
-            ExistencePrecondition(
-                resource=ResourceRef(kind="class", name=args.new_name), value="non-existent"
-            )
-        )
+    type: Literal["update_class"] = "update_class"
 
-    return tuple(preconds)
+    name: ClassName = Field(..., description="Name of the class to update")
+    new_name: ClassName | None = Field(
+        None, description="New name for the class (omit if unchanged)"
+    )
+    new_description: str | None = Field(
+        None, description="New description of the class (omit if unchanged)"
+    )
 
-
-class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
-    def __init__(self, args: UpdateClassOperationArgs):
-        super().__init__(args, _create_preconditions(args))
+    def describe(self):
+        changes = list[str]()
+        if self.new_name and self.new_name != self.name:
+            changes.append(f"name to '{self.new_name}'")
+        if self.new_description and self.new_description != "":
+            changes.append(f"description to '{self.new_description}'")
+        changes_str = " and ".join(changes)
+        return f"Update class '{self.name}': set {changes_str}"
 
     def _apply(self, state: OntologyState):
-        old_class = cast("Class", state.get_class(self.args.name))
+        old_class = state.get_class(self.name)
+        if not old_class:
+            msg = f"Class '{self.name}' does not exist"
+            raise ValueError(msg)
+
+        if self.new_name and self.new_name != self.name and state.get_class(self.new_name):
+            msg = f"Class '{self.new_name}' already exists"
+            raise ValueError(msg)
 
         # update the class itself
         updated_class = replace_class(
             old_class,
-            name=self.args.new_name or old_class.name,
-            description=self.args.new_description or old_class.description,
+            name=self.new_name or old_class.name,
+            description=self.new_description or old_class.description,
             parent=old_class.parent,
         )
 
@@ -81,7 +67,3 @@ class UpdateClassOperation(BaseOperation[UpdateClassOperationArgs]):
         )
 
         return replace_ontology_state(state, classes=new_classes)
-
-    @classmethod
-    def from_args(cls, args: UpdateClassOperationArgs):
-        return cls(args)

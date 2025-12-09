@@ -9,16 +9,11 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.update.ops.base import (
-    BaseOperation,
-    BaseOperationArgs,
-)
-from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
-from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.update.ops.base import BaseOperation
 from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
-class AddObjectPropertyOperationArgs(BaseOperationArgs):
+class AddObjectPropertyOperation(BaseOperation):
     """Adds a new object property to the ontology."""
 
     type: Literal["add_obj_prop"] = "add_obj_prop"
@@ -28,53 +23,33 @@ class AddObjectPropertyOperationArgs(BaseOperationArgs):
         ..., description="Domain classes for the property"
     )  # TODO: what if domain is both applied to class and it's subclass? is that allowed?
     range: vartuple[ClassName] = Field(..., description="Range classes for the property")
-
     description: str = Field(..., description="Description of the property to add")
 
-
-def _create_preconditions(args: AddObjectPropertyOperationArgs):
-    pcs = [
-        ExistencePrecondition(
-            resource=ResourceRef(kind="object_property", name=args.name), value="non-existent"
-        ),
-    ]
-
-    # require all domain classes to exist
-    pcs += (
-        ExistencePrecondition(
-            resource=ResourceRef(kind="class", name=domain_class), value="existent"
-        )
-        for domain_class in args.domain
-    )
-
-    # require all range classes to exist
-    pcs += (
-        ExistencePrecondition(
-            resource=ResourceRef(kind="class", name=range_class), value="existent"
-        )
-        for range_class in args.range
-    )
-
-    return tuple(pcs)
-
-
-class AddObjectPropertyOperation(BaseOperation[AddObjectPropertyOperationArgs]):
-    def __init__(
-        self,
-        args: AddObjectPropertyOperationArgs,
-    ):
-        super().__init__(args, _create_preconditions(args))
+    def describe(self):
+        return f"Add new object property '{self.name}' with domain '{', '.join(self.domain)}', range '{', '.join(self.range)}' and description '{self.description}'"
 
     def _apply(self, state: OntologyState):
+        if state.get_object_property(self.name):
+            msg = f"Object property '{self.name}' already exists"
+            raise ValueError(msg)
+
+        missing_domain = tuple(cls for cls in self.domain if not state.get_class(cls))
+        if missing_domain:
+            missing = "', '".join(missing_domain)
+            msg = f"Domain class(es) '{missing}' do not exist"
+            raise ValueError(msg)
+
+        missing_range = tuple(cls for cls in self.range if not state.get_class(cls))
+        if missing_range:
+            missing = "', '".join(missing_range)
+            msg = f"Range class(es) '{missing}' do not exist"
+            raise ValueError(msg)
+
         new_prop = ObjectProperty(
-            name=self.args.name,
-            domain=self.args.domain,
-            range=self.args.range,
-            description=self.args.description,
+            name=self.name,
+            domain=self.domain,
+            range=self.range,
+            description=self.description,
         )
 
         return replace_ontology_state(state, object_properties=(*state.object_properties, new_prop))
-
-    @classmethod
-    def from_args(cls, args: AddObjectPropertyOperationArgs):
-        return cls(args)

@@ -9,17 +9,6 @@ from . import (
     update_object_property,
 )
 
-OperationArgs = (
-    add_class.AddClassOperationArgs
-    | update_class.UpdateClassOperationArgs
-    | del_class.DeleteClassOperationArgs
-    | add_object_property.AddObjectPropertyOperationArgs
-    | update_object_property.UpdateObjectPropertyOperationArgs
-    | add_data_property.AddDataPropertyOperationArgs
-    | update_data_property.UpdateDataPropertyOperationArgs
-    | del_property.DeletePropertyOperationArgs
-)
-
 Operation = (
     add_class.AddClassOperation
     | update_class.UpdateClassOperation

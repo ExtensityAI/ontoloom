@@ -3,10 +3,15 @@ from typing import Literal
 from ontology_hydra.types import Model, vartuple
 
 type ClassName = str
+"""Defines the name of a class in the ontology."""
+
 type PropertyName = str
+"""Defines the name of a property in the ontology."""
+
 type PrimitiveDataType = Literal[
     "string", "integer", "float", "boolean", "date", "datetime", "time"
 ]
+"""Defines the primitive data types supported in the ontology."""
 
 
 class Class(Model):

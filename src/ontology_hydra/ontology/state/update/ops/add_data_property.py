@@ -10,16 +10,11 @@ from ontology_hydra.ontology.state.models import (
     PropertyName,
     vartuple,
 )
-from ontology_hydra.ontology.state.update.ops.base import (
-    BaseOperation,
-    BaseOperationArgs,
-)
-from ontology_hydra.ontology.state.update.preconditions import ExistencePrecondition
-from ontology_hydra.ontology.state.update.resources import ResourceRef
+from ontology_hydra.ontology.state.update.ops.base import BaseOperation
 from ontology_hydra.ontology.state.utils import replace_ontology_state
 
 
-class AddDataPropertyOperationArgs(BaseOperationArgs):
+class AddDataPropertyOperation(BaseOperation):
     """Adds a new data property to the ontology."""
 
     type: Literal["add_data_prop"] = "add_data_prop"
@@ -27,42 +22,27 @@ class AddDataPropertyOperationArgs(BaseOperationArgs):
     name: PropertyName = Field(..., description="Name of the property")
     domain: vartuple[ClassName] = Field(..., description="Domain classes of the property")
     range: PrimitiveDataType = Field(..., description="Range data type of the property")
-
     description: str = Field(..., description="Description of the property")
 
-
-def _create_preconditions(args: AddDataPropertyOperationArgs):
-    pcs = [
-        ExistencePrecondition(
-            resource=ResourceRef(kind="data_property", name=args.name), value="non-existent"
-        ),
-    ]
-
-    # Require all domain classes to exist before adding.
-    pcs += (
-        ExistencePrecondition(
-            resource=ResourceRef(kind="class", name=domain_class), value="existent"
-        )
-        for domain_class in args.domain
-    )
-
-    return tuple(pcs)
-
-
-class AddDataPropertyOperation(BaseOperation[AddDataPropertyOperationArgs]):
-    def __init__(self, args: AddDataPropertyOperationArgs):
-        super().__init__(args, _create_preconditions(args))
+    def describe(self):
+        return f"Add new data property '{self.name}' with domain '{', '.join(self.domain)}', range '{self.range}' and description '{self.description}'"
 
     def _apply(self, state: OntologyState):
+        if state.get_data_property(self.name):
+            msg = f"Data property '{self.name}' already exists"
+            raise ValueError(msg)
+
+        missing_domain = tuple(cls for cls in self.domain if not state.get_class(cls))
+        if missing_domain:
+            missing = "', '".join(missing_domain)
+            msg = f"Domain class(es) '{missing}' do not exist"
+            raise ValueError(msg)
+
         new_prop = DataProperty(
-            name=self.args.name,
-            domain=self.args.domain,
-            range=self.args.range,
-            description=self.args.description,
+            name=self.name,
+            domain=self.domain,
+            range=self.range,
+            description=self.description,
         )
 
         return replace_ontology_state(state, data_properties=(*state.data_properties, new_prop))
-
-    @classmethod
-    def from_args(cls, args: AddDataPropertyOperationArgs):
-        return cls(args)
