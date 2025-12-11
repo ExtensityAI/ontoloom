@@ -1,0 +1,932 @@
+<?xml version='1.0' encoding='utf-8'?>
+<gexf xmlns="http://www.gexf.net/1.2draft" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.gexf.net/1.2draft http://www.gexf.net/1.2draft/gexf.xsd" version="1.2">
+  <meta lastmodifieddate="2025-12-11">
+    <creator>NetworkX 3.6.1</creator>
+  </meta>
+  <graph defaultedgevariant="directed" mode="static" name="">
+    <attributes mode="static" class="edge">
+      <attribute id="3" title="relation" variant="string" />
+      <attribute id="4" title="networkx_key" variant="long" />
+      <attribute id="5" title="characteristics" variant="string" />
+      <attribute id="6" title="description" variant="string" />
+      <attribute id="7" title="constraints" variant="string" />
+    </attributes>
+    <attributes mode="static" class="node">
+      <attribute id="0" title="variant" variant="string" />
+      <attribute id="1" title="description" variant="string" />
+      <attribute id="2" title="constraints" variant="string" />
+    </attributes>
+    <nodes>
+      <node id="BioEntity" label="BioEntity">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Top‑level abstract class for all entities in the biographical ontology." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Person" label="Person">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A human individual whose life and work are described." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="CreativeWork" label="CreativeWork">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Any work produced by a person (e.g., book, music composition, patent)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Book" label="Book">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A written publication authored or co‑authored by a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="MusicComposition" label="MusicComposition">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A musical piece created by a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Patent" label="Patent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="An invention protected by a patent granted to a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Award" label="Award">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A recognition or honor bestowed on a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="SourceDocument" label="SourceDocument">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Document that provides evidence for biographical statements." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="PrimarySource" label="PrimarySource">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Original source document (e.g., birth certificate)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="SecondarySource" label="SecondarySource">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Derived source such as a biography or scholarly article." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Identifier" label="Identifier">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A persistent identifier associated with a person (e.g., ORCID, ISNI)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Location" label="Location">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Geographic place relevant to a person's life events." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="PrivacyConsent" label="PrivacyConsent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Record of consent and privacy restrictions for a living person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="ReliabilityRating" label="ReliabilityRating">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Assessment of the credibility of a source document." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="EducationalInstitution" label="EducationalInstitution">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Institution where a person obtained education or degrees." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Position" label="Position">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A job or role held by a person within an organization." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Organization" label="Organization">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Any formal group, club, or community to which a person may belong." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Language" label="Language">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Human language spoken or written by a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="NameVariant" label="NameVariant">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Alternative name representation (alias, transliteration, honorific)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="GenderIdentity" label="GenderIdentity">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Self‑identified gender of a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Pronoun" label="Pronoun">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Personal pronoun(s) used by a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="SexAtBirth" label="SexAtBirth">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Sex assigned to a person at birth." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="CulturalHeritage" label="CulturalHeritage">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Ethnic, racial, or cultural background of a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="SocioEconomicBackground" label="SocioEconomicBackground">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Social and economic context of a person's family (e.g., parents' occupation)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Event" label="Event">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Any notable life event associated with a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="BirthEvent" label="BirthEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing a person’s birth." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="DeathEvent" label="DeathEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing a person’s death." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="MarriageEvent" label="MarriageEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing a marriage or civil partnership." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="MigrationEvent" label="MigrationEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing relocation or migration of a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="HealthEvent" label="HealthEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing a significant health incident." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="MilitaryServiceEvent" label="MilitaryServiceEvent">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Event representing military service." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="DigitalArtifact" label="DigitalArtifact">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Digital material linked to a person (e.g., blog post, podcast)." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="VisualMedia" label="VisualMedia">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Image or video associated with a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="AudioMedia" label="AudioMedia">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Audio recording associated with a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="VideoMedia" label="VideoMedia">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="Video recording associated with a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Nationality" label="Nationality">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A legal affiliation of a person to a nation, representing a national identity that may change over time." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Citizenship" label="Citizenship">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A legal status granting a person rights and obligations in a particular country, distinct from nationality." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Country" label="Country">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A sovereign state, used as the geographic entity for nationality, citizenship, and residence locations." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="DNAAncestrySegment" label="DNAAncestrySegment">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A genomic segment that provides evidence of ancestral origins, linked to a person’s documented lineage." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="ArchivalCollection" label="ArchivalCollection">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A collection of archival materials (e.g., personal papers, photographs) that contain information about a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="LanguageProficiency" label="LanguageProficiency">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A record of a person’s proficiency level in a particular language." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Religion" label="Religion">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A religious affiliation or belief system publicly disclosed by a person." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="ResidencePeriod" label="ResidencePeriod">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="A time‑bounded period during which a person resided at a specific location." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+      <node id="Contribution" label="Contribution">
+        <attvalues>
+          <attvalue for="0" value="class" />
+          <attvalue for="1" value="An activity or work performed by a person in the domains of activism, philanthropy, or public service." />
+          <attvalue for="2" value="-" />
+        </attvalues>
+      </node>
+    </nodes>
+    <edges>
+      <edge source="Person" target="BioEntity" id="0" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="CreativeWork" id="1" label="hasCreativeWork" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasCreativeWork" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a creative work they authored or contributed to." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Award" id="2" label="hasAward" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasAward" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a person with an award they have received." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="SourceDocument" id="3" label="hasSourceDocument" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasSourceDocument" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Connects a person to a source document that provides evidence about them." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Identifier" id="4" label="hasIdentifier" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasIdentifier" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a person with an identifier such as ORCID or passport number." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Location" id="5" label="hasLocation" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasLocation" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a geographic location relevant to an event in their life." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="PrivacyConsent" id="6" label="hasConsent" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasConsent" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a privacy‑consent record." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="EducationalInstitution" id="7" label="attendedInstitution" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="attendedInstitution" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Indicates an educational institution attended by a person." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Position" id="8" label="holdsPosition" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="holdsPosition" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Relates a person to a professional position they have held." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Organization" id="9" label="memberOfOrganization" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="memberOfOrganization" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies an organization to which a person belongs." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Language" id="10" label="speaksLanguage" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="speaksLanguage" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a language they speak." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="NameVariant" id="11" label="hasNameVariant" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasNameVariant" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a person with an alternative name representation." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="GenderIdentity" id="12" label="hasGenderIdentity" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasGenderIdentity" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to their self‑identified gender." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Pronoun" id="13" label="hasPronoun" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasPronoun" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to their preferred pronoun(s)." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="SexAtBirth" id="14" label="hasSexAtBirth" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasSexAtBirth" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to the sex assigned at birth." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="CulturalHeritage" id="15" label="hasCulturalHeritage" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasCulturalHeritage" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a person with their ethnic or cultural background." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="SocioEconomicBackground" id="16" label="hasSocioEconomicBackground" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasSocioEconomicBackground" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to socio‑economic information about their family." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Event" id="17" label="hasEvent" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasEvent" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Connects a person to a life event (birth, marriage, migration, etc.)." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Person" id="18" label="hasParent" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasParent" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies a parent of a person." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Person" id="19" label="hasChild" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasChild" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies a child of a person (inverse of hasParent)." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="1" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Person" id="20" label="hasSibling" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasSibling" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies a sibling relationship between two persons." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="2" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Person" id="21" label="hasSpouse" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasSpouse" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies a spouse or civil partner of a person." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="3" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="DigitalArtifact" id="22" label="hasDigitalArtifact" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasDigitalArtifact" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a digital artifact (blog post, podcast, etc.)." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Nationality" id="23" label="hasNationality" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasNationality" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a nationality they have held." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Citizenship" id="24" label="hasCitizenship" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasCitizenship" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a citizenship they have held." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="DNAAncestrySegment" id="25" label="hasDNAAncestrySegment" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasDNAAncestrySegment" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a DNA ancestry segment that documents lineage information." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="ArchivalCollection" id="26" label="hasArchivalCollection" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasArchivalCollection" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Connects a person to an archival collection that contains their personal materials." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="LanguageProficiency" id="27" label="hasLanguageProficiency" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasLanguageProficiency" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Relates a person to a language proficiency record." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Religion" id="28" label="hasReligion" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasReligion" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to their declared religious affiliation." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="Contribution" id="29" label="hasContribution" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasContribution" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a person with a specific contribution in activism, philanthropy, or public service." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Person" target="ResidencePeriod" id="30" label="hasResidencePeriod" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasResidencePeriod" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a person to a residence period describing where and when they lived." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="CreativeWork" target="BioEntity" id="31" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="CreativeWork" target="Person" id="32" label="hasAuthor" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasAuthor" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Links a creative work to a person who authored it (inverse of hasCreativeWork)." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Book" target="CreativeWork" id="33" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="MusicComposition" target="CreativeWork" id="34" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Patent" target="CreativeWork" id="35" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Award" target="BioEntity" id="36" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SourceDocument" target="BioEntity" id="37" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SourceDocument" target="Person" id="38" label="documentsPerson" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="documentsPerson" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Inverse of hasSourceDocument; links a source document to the person it documents." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SourceDocument" target="ReliabilityRating" id="39" label="hasReliabilityRating" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="hasReliabilityRating" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Assigns a reliability rating to a source document." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="PrimarySource" target="SourceDocument" id="40" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SecondarySource" target="SourceDocument" id="41" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Identifier" target="BioEntity" id="42" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Location" target="BioEntity" id="43" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="PrivacyConsent" target="BioEntity" id="44" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="ReliabilityRating" target="BioEntity" id="45" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="EducationalInstitution" target="BioEntity" id="46" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Position" target="BioEntity" id="47" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Position" target="Organization" id="48" label="positionInOrganization" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="positionInOrganization" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies the organization in which a professional position is held." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Organization" target="BioEntity" id="49" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Language" target="BioEntity" id="50" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="NameVariant" target="BioEntity" id="51" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="GenderIdentity" target="BioEntity" id="52" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Pronoun" target="BioEntity" id="53" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SexAtBirth" target="BioEntity" id="54" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="CulturalHeritage" target="BioEntity" id="55" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="SocioEconomicBackground" target="BioEntity" id="56" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Event" target="BioEntity" id="57" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="BirthEvent" target="Event" id="58" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="DeathEvent" target="Event" id="59" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="MarriageEvent" target="Event" id="60" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="MigrationEvent" target="Event" id="61" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="HealthEvent" target="Event" id="62" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="MilitaryServiceEvent" target="Event" id="63" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="DigitalArtifact" target="BioEntity" id="64" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="VisualMedia" target="DigitalArtifact" id="65" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="AudioMedia" target="DigitalArtifact" id="66" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="VideoMedia" target="DigitalArtifact" id="67" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Nationality" target="BioEntity" id="68" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Nationality" target="Country" id="69" label="nationalityCountry" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="nationalityCountry" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a nationality with the corresponding country." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Citizenship" target="BioEntity" id="70" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Citizenship" target="Country" id="71" label="citizenshipCountry" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="citizenshipCountry" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Associates a citizenship with the corresponding country." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Country" target="Location" id="72" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="DNAAncestrySegment" target="BioEntity" id="73" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="ArchivalCollection" target="BioEntity" id="74" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="LanguageProficiency" target="BioEntity" id="75" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="LanguageProficiency" target="Language" id="76" label="languageProficiencyLanguage" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="languageProficiencyLanguage" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies the language for which the proficiency record applies." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Religion" target="BioEntity" id="77" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="ResidencePeriod" target="Event" id="78" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="ResidencePeriod" target="Location" id="79" label="residenceLocation" variant="object_property">
+        <attvalues>
+          <attvalue for="3" value="residenceLocation" />
+          <attvalue for="5" value="-" />
+          <attvalue for="6" value="Specifies the location associated with a residence period." />
+          <attvalue for="7" value="-" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+      <edge source="Contribution" target="BioEntity" id="80" variant="hierarchy">
+        <attvalues>
+          <attvalue for="3" value="is-a" />
+          <attvalue for="4" value="0" />
+        </attvalues>
+      </edge>
+    </edges>
+  </graph>
+</gexf>
