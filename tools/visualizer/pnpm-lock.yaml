@@ -11,9 +11,24 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.17
         version: 4.1.17(vite@7.2.7(@types/node@24.10.3)(jiti@2.6.1)(lightningcss@1.30.2))
+      graphology:
+        specifier: ^0.26.0
+        version: 0.26.0(graphology-types@0.24.8)
+      graphology-graphml:
+        specifier: ^0.5.2
+        version: 0.5.2(graphology-types@0.24.8)
+      graphology-layout-forceatlas2:
+        specifier: ^0.10.1
+        version: 0.10.1(graphology-types@0.24.8)
+      sigma:
+        specifier: ^3.0.2
+        version: 3.0.2(graphology-types@0.24.8)
       tailwindcss:
         specifier: ^4.1.17
         version: 4.1.17
+      zod:
+        specifier: ^4.2.0
+        version: 4.2.0
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^6.2.1
@@ -443,6 +458,10 @@ packages:
   '@types/node@24.10.3':
     resolution: {integrity: sha512-gqkrWUsS8hcm0r44yn7/xZeV1ERva/nLgrLxFRUGb7aoNMIJfZJ3AC261zDQuOAKC7MiXai1WCpYc48jAHoShQ==}
 
+  '@xmldom/xmldom@0.8.11':
+    resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
+    engines: {node: '>=10.0.0'}
+
   acorn@8.15.0:
     resolution: {integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==}
     engines: {node: '>=0.4.0'}
@@ -499,6 +518,10 @@ packages:
   esrap@2.2.1:
     resolution: {integrity: sha512-GiYWG34AN/4CUyaWAgunGt0Rxvr1PTMlGC0vvEov/uOQYWne2bpN03Um+k8jT+q3op33mKouP2zeJ6OlM+qeUg==}
 
+  events@3.3.0:
+    resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
+    engines: {node: '>=0.8.x'}
+
   fdir@6.5.0:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
@@ -515,6 +538,32 @@ packages:
 
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
+
+  graphology-graphml@0.5.2:
+    resolution: {integrity: sha512-Z9m3amTxszia2dYdtdHJI9gHcbw2gSyCTWRmgsj2dAXMj8VwcoEEWnFPYykqMFw1sIuoQviZueadyE3H02wKOQ==}
+
+  graphology-layout-forceatlas2@0.10.1:
+    resolution: {integrity: sha512-ogzBeF1FvWzjkikrIFwxhlZXvD2+wlY54lqhsrWprcdPjopM2J9HoMweUmIgwaTvY4bUYVimpSsOdvDv1gPRFQ==}
+    peerDependencies:
+      graphology-types: '>=0.19.0'
+
+  graphology-operators@1.6.1:
+    resolution: {integrity: sha512-ZKGcaN+6L5hv0VelrDgkZ2IQL1c7nrqkTRiHDwBCjmbkS56vWh/iQNDnvd/c9YIpoygtEK0mgGOr/m4i7BOYrw==}
+    peerDependencies:
+      graphology-types: '>=0.20.0'
+
+  graphology-types@0.24.8:
+    resolution: {integrity: sha512-hDRKYXa8TsoZHjgEaysSRyPdT6uB78Ci8WnjgbStlQysz7xR52PInxNsmnB7IBOM1BhikxkNyCVEFgmPKnpx3Q==}
+
+  graphology-utils@2.5.2:
+    resolution: {integrity: sha512-ckHg8MXrXJkOARk56ZaSCM1g1Wihe2d6iTmz1enGOz4W/l831MBCKSayeFQfowgF8wd+PQ4rlch/56Vs/VZLDQ==}
+    peerDependencies:
+      graphology-types: '>=0.23.0'
+
+  graphology@0.26.0:
+    resolution: {integrity: sha512-8SSImzgUUYC89Z042s+0r/vMibY7GX/Emz4LDO5e7jYXhuoWfHISPFJYjpRLUSJGq6UQ6xlenvX1p/hJdfXuXg==}
+    peerDependencies:
+      graphology-types: '>=0.24.0'
 
   is-reference@3.0.3:
     resolution: {integrity: sha512-ixkJoqQvAP88E6wLydLGGqCJsrFUnqoH6HnaczB8XmDH1oaWU+xxdptvikTgaEhtZ53Ky6YXiBuUI2WXLMCwjw==}
@@ -640,6 +689,9 @@ packages:
     resolution: {integrity: sha512-xal3CZX1Xlo/k4ApwCFrHVACi9fBqJ7V+mwhBsuf/1IOKbBy098Fex+Wa/5QMubw09pSZ/u8EY8PWgevJsXp1A==}
     engines: {node: '>=6'}
 
+  sigma@3.0.2:
+    resolution: {integrity: sha512-/BUbeOwPGruiBOm0YQQ6ZMcLIZ6tf/W+Jcm7dxZyAX0tK3WP9/sq7/NAWBxPIxVahdGjCJoGwej0Gdrv0DxlQQ==}
+
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
     engines: {node: '>=0.10.0'}
@@ -723,8 +775,15 @@ packages:
       vite:
         optional: true
 
+  xml-writer@1.7.0:
+    resolution: {integrity: sha512-elFVMRiV5jb59fbc87zzVa0C01QLBEWP909mRuWqFqrYC5wNTH5QW4AaKMNv7d6zAsuOulkD7wnztZNLQW0Nfg==}
+    engines: {node: '>=0.4.0'}
+
   zimmerframe@1.1.4:
     resolution: {integrity: sha512-B58NGBEoc8Y9MWWCQGl/gq9xBCe4IiKM0a2x7GZdQKOW5Exr8S1W24J6OgM1njK8xCRGvAJIL/MxXHf6SkmQKQ==}
+
+  zod@4.2.0:
+    resolution: {integrity: sha512-Bd5fw9wlIhtqCCxotZgdTOMwGm1a0u75wARVEY9HMs1X17trvA/lMi4+MGK5EUfYkXVTbX8UDiDKW4OgzHVUZw==}
 
 snapshots:
 
@@ -992,6 +1051,8 @@ snapshots:
     dependencies:
       undici-types: 7.16.0
 
+  '@xmldom/xmldom@0.8.11': {}
+
   acorn@8.15.0: {}
 
   aria-query@5.3.2: {}
@@ -1054,6 +1115,8 @@ snapshots:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  events@3.3.0: {}
+
   fdir@6.5.0(picomatch@4.0.3):
     optionalDependencies:
       picomatch: 4.0.3
@@ -1062,6 +1125,36 @@ snapshots:
     optional: true
 
   graceful-fs@4.2.11: {}
+
+  graphology-graphml@0.5.2(graphology-types@0.24.8):
+    dependencies:
+      '@xmldom/xmldom': 0.8.11
+      graphology-operators: 1.6.1(graphology-types@0.24.8)
+      graphology-utils: 2.5.2(graphology-types@0.24.8)
+      xml-writer: 1.7.0
+    transitivePeerDependencies:
+      - graphology-types
+
+  graphology-layout-forceatlas2@0.10.1(graphology-types@0.24.8):
+    dependencies:
+      graphology-types: 0.24.8
+      graphology-utils: 2.5.2(graphology-types@0.24.8)
+
+  graphology-operators@1.6.1(graphology-types@0.24.8):
+    dependencies:
+      graphology-types: 0.24.8
+      graphology-utils: 2.5.2(graphology-types@0.24.8)
+
+  graphology-types@0.24.8: {}
+
+  graphology-utils@2.5.2(graphology-types@0.24.8):
+    dependencies:
+      graphology-types: 0.24.8
+
+  graphology@0.26.0(graphology-types@0.24.8):
+    dependencies:
+      events: 3.3.0
+      graphology-types: 0.24.8
 
   is-reference@3.0.3:
     dependencies:
@@ -1176,6 +1269,13 @@ snapshots:
     dependencies:
       mri: 1.2.0
 
+  sigma@3.0.2(graphology-types@0.24.8):
+    dependencies:
+      events: 3.3.0
+      graphology-utils: 2.5.2(graphology-types@0.24.8)
+    transitivePeerDependencies:
+      - graphology-types
+
   source-map-js@1.2.1: {}
 
   svelte-check@4.3.4(picomatch@4.0.3)(svelte@5.45.8)(typescript@5.9.3):
@@ -1239,4 +1339,8 @@ snapshots:
     optionalDependencies:
       vite: 7.2.7(@types/node@24.10.3)(jiti@2.6.1)(lightningcss@1.30.2)
 
+  xml-writer@1.7.0: {}
+
   zimmerframe@1.1.4: {}
+
+  zod@4.2.0: {}

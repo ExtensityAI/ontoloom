@@ -1,76 +1,56 @@
-import networkx as nx
+from typing import Literal
 
-from ontology_hydra.ontology.models import Ontology
+from pydantic import BaseModel
 
-
-def _normalize_text(value: str | None) -> str:
-    """Ensure GEXF attributes never receive None or empty strings."""
-    return value if value not in (None, "") else "-"
+from ontology_hydra.ontology.models import Class, DataProperty, ObjectProperty, Ontology
 
 
-def _format_characteristics(values: list[str] | None) -> str:
-    """Join characteristic flags into a single string for GEXF export."""
-    return ", ".join(values) if values else "-"
+class ClassExport(BaseModel):
+    data: Class
+
+    parents: list[str]
+    children: list[str]
 
 
-def ontology_to_networkx(ontology: Ontology) -> nx.MultiDiGraph:
-    """Convert an Ontology instance to a NetworkX MultiDiGraph.
+class DataPropertyExport(BaseModel):
+    type: Literal["data"] = "data"
+    data: DataProperty
 
-    Nodes represent ontology classes. Edges include:
-    - ``is-a`` edges from subclass to superclass.
-    - Object property edges from each domain class to each range class, labelled by the property
-      name.
-    """
-    G = nx.MultiDiGraph()
 
-    # add classes as nodes and encode hierarchy edges
-    for cls in ontology.classes.values():
-        description = _normalize_text(cls.description.description if cls.description else None)
-        constraints = _normalize_text(cls.description.constraints if cls.description else None)
+class ObjectPropertyExport(BaseModel):
+    type: Literal["object"] = "object"
+    data: ObjectProperty
 
-        G.add_node(
-            cls.name,
-            type="class",
-            description=description,
-            constraints=constraints,
+
+class OntologyExport(BaseModel):
+    classes: list[ClassExport]
+    properties: list[DataPropertyExport | ObjectPropertyExport]
+
+
+with open("/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology.json") as f:
+    ontology = Ontology.model_validate_json(f.read())
+
+
+export = OntologyExport(
+    classes=[
+        ClassExport(
+            data=cls,
+            parents=[parent.name for parent in ontology.get_ancestors(cls)],
+            children=[child.name for child in ontology.get_descendants(cls)],
         )
+        for cls in ontology.classes.values()
+    ],
+    properties=[
+        DataPropertyExport(data=prop)
+        if isinstance(prop, DataProperty)
+        else ObjectPropertyExport(data=prop)
+        for prop in ontology.properties.values()
+    ],
+)
 
-        if cls.superclass:
-            G.add_edge(
-                cls.name,
-                cls.superclass,
-                relation="is-a",
-                type="hierarchy",
-            )
+with open("/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology_export.json", "w") as f:
+    f.write(export.model_dump_json(indent=2))
 
-    # add object property edges
-    for prop in ontology.object_properties.values():
-        prop_description = _normalize_text(
-            prop.description.description if prop.description else None
-        )
-        prop_constraints = _normalize_text(
-            prop.description.constraints if prop.description else None
-        )
-
-        for domain in prop.domain:
-            for range_ in prop.range:
-                G.add_edge(
-                    domain,
-                    range_,
-                    label=prop.name,
-                    relation=prop.name,
-                    type="object_property",
-                    characteristics=_format_characteristics(prop.characteristics),
-                    description=prop_description,
-                    constraints=prop_constraints,
-                )
-
-    return G
-
-
-if __name__ == "__main__":
-    with open("/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology/final.json") as f:
-        ontology = Ontology.model_validate_json(f.read())
-
-    G = ontology_to_networkx(ontology)
-    nx.write_gexf(G, "/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology/final.gexf")
+print(
+    "Exported ontology to /Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology_export.json"
+)
