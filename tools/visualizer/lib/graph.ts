@@ -1,44 +1,72 @@
 import Graph from "graphology"
-import type { OntologyExport, ClassExport } from "./schema"
+import type { OntologyExport } from "./schema"
 
-const addClassNode = (G: Graph, clazz: ClassExport) => {
-    return G.addNode(clazz.data.name, {
-        label: clazz.data.name,
-        size: 8 + (clazz.children.length)
-    })
-}
-
-const addSuperclassEdge = (G: Graph, clazz: ClassExport) => {
-    if (!clazz.data.superclass) {
-        throw new Error(`Class ${clazz.data.name} has no superclass`)
-    }
-
-    return G.addDirectedEdgeWithKey(
-        `${clazz.data.name}-is-a->${clazz.data.superclass}`,
-        clazz.data.name,
-        clazz.data.superclass,
-        {
-            type: "arrow",
-            label: "is-a",
-            size: 4
-        },
-    )
-}
-
-export const createGraph = (ontology: OntologyExport): Graph => {
+export const createOntologyGraph = (ontology: OntologyExport): Graph => {
     const G = new Graph({
         multi: true,
         type: "mixed",
     })
 
+    const maxParentCount = Math.max(
+        ...ontology.classes.map((c) => c.parents.length),
+        1,
+    )
+
     // add class nodes
-    ontology.classes.forEach((c) => addClassNode(G, c))
+    ontology.classes.forEach((c) =>
+        G.addNode(c.data.name, {
+            label: c.data.name,
+            level: c.parents.length, // level based on depth in hierarchy
+            inverseLevel: maxParentCount - c.parents.length,
+        }),
+    )
 
     // add edges from subclass to superclass
     ontology.classes
         .filter((cls) => cls.data.superclass)
-        .forEach((cls) => addSuperclassEdge(G, cls))
-        
+        .forEach((cls) =>
+            G.addDirectedEdgeWithKey(
+                `${cls.data.name}-is-a->${cls.data.superclass}`,
+                cls.data.name,
+                cls.data.superclass,
+                {
+                    type: "arrow",
+                    tag: "hierarchy",
+                    label: "is a",
+                    size: 2,
+                    weight: 3,
+                    source: cls.data.name,
+                    target: cls.data.superclass,
+                },
+            ),
+        )
+
+    ontology.properties
+        .filter((p) => p.type === "object")
+        .forEach((prop) => {
+            const domainClasses = prop.data.domain
+            const rangeClasses = Array.isArray(prop.data.range)
+                ? prop.data.range
+                : [prop.data.range]
+
+            domainClasses.forEach((domain) => {
+                rangeClasses.forEach((range) => {
+                    G.addDirectedEdgeWithKey(
+                        `${domain}-${prop.data.name}->${range}`,
+                        domain,
+                        range,
+                        {
+                            type: "line",
+                            label: prop.data.name,
+                            size: 1,
+                            weight: 1,
+                            source: domain,
+                            target: range,
+                        },
+                    )
+                })
+            })
+        })
 
     return G
 }

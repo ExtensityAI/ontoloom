@@ -71,6 +71,5 @@ export const ontologyExportSchema = z.object({
     ),
 })
 
-export type ClassExport = z.infer<typeof classExportSchema>
 
 export type OntologyExport = z.infer<typeof ontologyExportSchema>
