@@ -48,8 +48,8 @@ if not output_path.exists():
 
 cache = DirectoryCache(output_path)
 
-ontology = ontopipe(domain, cache=cache, cqs_per_batch=100)  # saves to cache_path / 'ontology.json'
-# use 100 CQs per batch because we use GPT-5 and it produced so much data, else it would take way too long
+ontology = ontopipe(domain, cache=cache, cqs_per_batch=25)  # saves to cache_path / 'ontology.json'
+# use 25 CQs per batch because we use GPT-5.1 and it produced so much data, else it would take way too long
 
 texts = [
     tp.read_text(encoding="utf-8", errors="ignore") for tp in text_paths

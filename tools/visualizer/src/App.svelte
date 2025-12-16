@@ -8,7 +8,9 @@
     import { FileInput } from "lucide-svelte/icons"
     import { tooltip } from "../lib/utils/tooltip"
 
-    const levelColors = [
+    // ─── Constants ───────────────────────────────────────────────────────────────
+
+    const LEVEL_COLORS = [
         "#ec003f", // rose-500 (root)
         "#fd9a00", // amber-500
         "#7ccf00", // lime-500
@@ -18,53 +20,65 @@
         "#8b5cf6", // violet-500
         "#ec4899", // pink-500
         "#64748b", // slate-500
-    ]
+    ] as const
 
-    interface State {
-        selectedNode: string | null
-        relatedNodes: Set<string>
+    const COLORS = {
+        node: {
+            inactive: "#e5e5e5",
+            selected: "#dc2626", // red
+            parent: "#f97316", // orange
+            child: "#22c55e", // green
+        },
+        edge: {
+            hierarchy: {
+                default: "#e5e5e5",
+                active: "#a3a3a3",
+                inactive: "#f5f5f5",
+            },
+            property: {
+                default: "#f87171",
+                active: "#dc2626",
+                inactive: "#fecaca",
+            },
+        },
+    } as const
+
+    const LAYOUT_ITERATIONS = 50_000
+    const BASE_NODE_SIZE = 8
+    const NODE_SIZE_MULTIPLIER = 4
+    const ACTIVE_EDGE_SIZE = 3
+
+    // ─── Types ───────────────────────────────────────────────────────────────────
+
+    interface NodeSelection {
+        node: string | null
+        parents: Set<string>
+        children: Set<string>
         connectedEdges: Set<string>
     }
 
-    let isLoading = $state(false)
-    let error = $state("")
-    let fileName = $state("")
-
-    let container: HTMLDivElement | undefined = $state()
-    let sigma: Sigma | null = $state(null)
-    let graph: Graph | null = $state(null)
-    let viewerState: State = $state({
-        selectedNode: null,
-        relatedNodes: new Set(),
-        connectedEdges: new Set(),
-    })
-
-    const getRelatedNodes = (g: Graph, node: string): Set<string> => {
-        const related = new Set<string>([node])
-        // Get all neighbors (both inbound and outbound)
-        g.forEachNeighbor(node, (neighbor) => related.add(neighbor))
-        return related
+    interface ViewState {
+        hovered: NodeSelection
+        pinned: NodeSelection
     }
 
-    const getConnectedEdges = (g: Graph, node: string): Set<string> => {
-        const edges = new Set<string>()
-        g.forEachEdge(node, (edge) => edges.add(edge))
-        return edges
+    interface RuntimeState {
+        isLoading: boolean
+        error: string
+        fileName: string
+        sigma: Sigma | null
+        graph: Graph | null
     }
 
-    const updateState = (newState: Partial<State>) => {
-        viewerState = { ...viewerState, ...newState }
-        sigma?.refresh()
-    }
+    // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-    onDestroy(() => sigma?.kill())
-
-    function ensurePositions(graph: Graph) {
+    const initializeNodePositions = (graph: Graph): void => {
         let i = 0
         graph.forEachNode((node, attrs) => {
             const x = parseFloat(String(attrs.x ?? ""))
             const y = parseFloat(String(attrs.y ?? ""))
             const angle = (i++ / graph.order) * Math.PI * 2
+
             graph.setNodeAttribute(
                 node,
                 "x",
@@ -77,122 +91,188 @@
             )
         })
     }
-    const load = async (file: File) => {
-        if (isLoading) isLoading = true
-        error = ""
+
+    const emptySelection = (): NodeSelection => ({
+        node: null,
+        parents: new Set(),
+        children: new Set(),
+        connectedEdges: new Set(),
+    })
+
+    const createSelection = (
+        node: string | null,
+        graph: Graph | null,
+    ): NodeSelection => {
+        if (!node || !graph) return emptySelection()
+
+        const attrs = graph.getNodeAttributes(node)
+        return {
+            node,
+            parents: attrs.parents as Set<string>,
+            children: attrs.children as Set<string>,
+            connectedEdges: attrs.edges as Set<string>,
+        }
+    }
+
+    // ─── State ───────────────────────────────────────────────────────────────────
+
+    let container: HTMLDivElement | undefined = $state()
+
+    let runtimeState: RuntimeState = $state({
+        isLoading: false,
+        error: "",
+        fileName: "",
+        sigma: null,
+        graph: null,
+    })
+
+    let viewState: ViewState = $state({
+        hovered: emptySelection(),
+        pinned: emptySelection(),
+    })
+
+    // Active selection: pinned takes priority over hovered
+    const getActiveSelection = (): NodeSelection =>
+        viewState.pinned.node ? viewState.pinned : viewState.hovered
+
+    // ─── Reducers ────────────────────────────────────────────────────────────────
+
+    const nodeReducer = (node: string, data: Record<string, unknown>) => {
+        const active = getActiveSelection()
+        const isSelected = active.node === node
+        const isParent = active.parents.has(node)
+        const isChild = active.children.has(node)
+        const isRelated = isSelected || isParent || isChild
+        const hasSelection = active.node !== null
+
+        let color: string
+        if (isSelected) {
+            color = COLORS.node.selected
+        } else if (isParent) {
+            color = COLORS.node.parent
+        } else if (isChild) {
+            color = COLORS.node.child
+        } else if (hasSelection) {
+            color = COLORS.node.inactive
+        } else {
+            color = LEVEL_COLORS[data.level as number] ?? LEVEL_COLORS.at(-1)!
+        }
+
+        return {
+            ...data,
+            color,
+            size:
+                BASE_NODE_SIZE +
+                (data.inverseLevel as number) * NODE_SIZE_MULTIPLIER,
+            zIndex: isSelected ? 2 : isRelated ? 1 : 0,
+        }
+    }
+
+    const edgeReducer = (edge: string, data: Record<string, unknown>) => {
+        const active = getActiveSelection()
+        const isConnected = active.connectedEdges.has(edge)
+        const hasSelection = active.node !== null
+        const isHierarchy = data.tag === "hierarchy"
+
+        const palette = isHierarchy
+            ? COLORS.edge.hierarchy
+            : COLORS.edge.property
+        const color = hasSelection
+            ? isConnected
+                ? palette.active
+                : palette.inactive
+            : palette.default
+
+        const showLabel =
+            data.source === active.node || data.target === active.node
+
+        return {
+            ...data,
+            color,
+            size: isConnected ? ACTIVE_EDGE_SIZE : (data.size as number),
+            zIndex: isConnected ? 1 : 0,
+            label: showLabel ? (data.label as string) : "",
+        }
+    }
+
+    // ─── Event Handlers ──────────────────────────────────────────────────────────
+
+    const setHovered = (node: string | null) => {
+        viewState.hovered = createSelection(node, runtimeState.graph)
+        runtimeState.sigma?.refresh()
+    }
+
+    const setPinned = (node: string | null) => {
+        // Toggle: if clicking the same node, unpin; otherwise pin the new node
+        const newNode = viewState.pinned.node === node ? null : node
+        viewState.pinned = createSelection(newNode, runtimeState.graph)
+        runtimeState.sigma?.refresh()
+    }
+
+    const clearPinned = () => {
+        if (viewState.pinned.node) {
+            viewState.pinned = emptySelection()
+            runtimeState.sigma?.refresh()
+        }
+    }
+
+    const handleFileLoad = async (file: File) => {
+        runtimeState.isLoading = true
+        runtimeState.error = ""
 
         try {
             const content = await file.text()
-            const G = createOntologyGraph(
-                ontologyExportSchema.parse(JSON.parse(content)),
-            )
+            const parsed = ontologyExportSchema.parse(JSON.parse(content))
+            const graph = createOntologyGraph(parsed)
 
-            // store graph reference for hover logic
-            graph = G
-
-            // compute initial positions
-            ensurePositions(G)
-
-            // run ForceAtlas2 to layout the graph
-            forceAtlas2.assign(G, {
-                iterations: 50000,
-                settings: { ...inferSettings(G) },
+            initializeNodePositions(graph)
+            forceAtlas2.assign(graph, {
+                iterations: LAYOUT_ITERATIONS,
+                settings: inferSettings(graph),
             })
 
-            // destroy previous instance
-            sigma?.kill()
+            // Clean up previous instance
+            runtimeState.sigma?.kill()
 
-            sigma = new Sigma(G, container!, {
+            // Initialize Sigma
+            const sigma = new Sigma(graph, container!, {
                 renderLabels: true,
                 renderEdgeLabels: true,
-                nodeReducer: (node, data) => {
-                    const isSelected = viewerState.selectedNode === node
-                    const isRelated = viewerState.relatedNodes.has(node)
-                    const hasSelection = viewerState.selectedNode !== null
-
-                    let color = levelColors[data.level]
-                    if (hasSelection && !isSelected && !isRelated) {
-                        color = "#e5e5e5" // gray out unrelated nodes
-                    }
-
-                    return {
-                        ...data,
-                        color,
-                        size: 8 + data.inverseLevel * 4,
-                        zIndex: isSelected ? 2 : isRelated ? 1 : 0,
-                    }
-                },
-                edgeReducer: (edge, data) => {
-                    const isConnected = viewerState.connectedEdges.has(edge)
-                    const hasSelection = viewerState.selectedNode !== null
-
-                    let color: string
-                    if (data.tag === "hierarchy") {
-                        color = hasSelection
-                            ? isConnected
-                                ? "#a3a3a3" // darker gray for connected hierarchy
-                                : "#f5f5f5" // lighter gray for unconnected hierarchy
-                            : "#e5e5e5" // default gray
-                    } else {
-                        color = hasSelection
-                            ? isConnected
-                                ? "#dc2626" // darker red for connected props
-                                : "#fecaca" // lighter red for unconnected props
-                            : "#f87171" // default red
-                    }
-
-                    return {
-                        ...data,
-                        color,
-                        size: isConnected ? 3 : data.size,
-                        zIndex: isConnected ? 1 : 0,
-                        label:
-                            data.source === viewerState.selectedNode ||
-                            data.target === viewerState.selectedNode
-                                ? data.label
-                                : "",
-                    }
-                },
+                nodeReducer,
+                edgeReducer,
             })
 
-            sigma.on("enterNode", ({ node }) => {
-                if (graph) {
-                    updateState({
-                        selectedNode: node,
-                        relatedNodes: getRelatedNodes(graph, node),
-                        connectedEdges: getConnectedEdges(graph, node),
-                    })
-                }
-            })
+            sigma.on("enterNode", ({ node }) => setHovered(node))
+            sigma.on("leaveNode", () => setHovered(null))
+            sigma.on("clickNode", ({ node }) => setPinned(node))
+            sigma.on("clickStage", () => clearPinned())
 
-            sigma.on("leaveNode", () => {
-                updateState({
-                    selectedNode: null,
-                    relatedNodes: new Set(),
-                    connectedEdges: new Set(),
-                })
-            })
-
-            fileName = file.name
-            isLoading = false
+            runtimeState.sigma = sigma
+            runtimeState.graph = graph
+            runtimeState.fileName = file.name
         } catch (e) {
             console.error(e)
-            error =
+            runtimeState.error =
                 e instanceof Error
                     ? e.message
                     : typeof e === "string"
                       ? e
                       : "Failed to load file"
         } finally {
-            isLoading = false
+            runtimeState.isLoading = false
         }
     }
 
-    const onInput = (e: Event) => {
+    const handleInputChange = (e: Event) => {
         const input = e.target as HTMLInputElement
-        if (input.files?.[0]) load(input.files[0])
+        const file = input.files?.[0]
+        if (file) handleFileLoad(file)
         input.value = ""
     }
+
+    // ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+    onDestroy(() => runtimeState.sigma?.kill())
 </script>
 
 <main class="relative min-h-screen">
@@ -202,8 +282,8 @@
                 type="file"
                 accept=".json"
                 class="hidden"
-                disabled={isLoading || !container}
-                onchange={onInput}
+                disabled={runtimeState.isLoading || !container}
+                onchange={handleInputChange}
             />
             <FileInput
                 class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
@@ -212,40 +292,39 @@
         <div class="grow"></div>
     </footer>
 
-    <!-- Full-screen graph container -->
     <div class="h-svh w-svw" bind:this={container}></div>
 
-    {#if !sigma}
+    {#if !runtimeState.sigma}
         <div class="absolute inset-0 flex items-stretch">
             <label class="cursor-pointer grow grid place-items-center">
                 <input
                     type="file"
                     accept=".json"
                     class="hidden"
-                    disabled={isLoading || !container}
-                    onchange={onInput}
+                    disabled={runtimeState.isLoading || !container}
+                    onchange={handleInputChange}
                 />
                 <div class="text-center">
                     <FileInput class="size-12 mx-auto text-neutral-400 mb-4" />
                     <p class="text-lg text-neutral-600 mb-2">
-                        Load an ontology-hydra export file to visualize
+                        Load an ontology-hydra export .json file to visualize
                     </p>
-                </div></label
-            >
+                </div>
+            </label>
         </div>
     {/if}
 
-    {#if isLoading}
+    {#if runtimeState.isLoading}
         <div class="absolute inset-0 z-20 grid place-items-center bg-white/80">
             <p class="font-semibold text-slate-800">Loading…</p>
         </div>
     {/if}
 
-    {#if error}
+    {#if runtimeState.error}
         <p
             class="absolute bottom-4 left-4 z-10 rounded-lg px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 shadow-lg"
         >
-            {error}
+            {runtimeState.error}
         </p>
     {/if}
 </main>

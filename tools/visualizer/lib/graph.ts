@@ -1,6 +1,15 @@
 import Graph from "graphology"
 import type { OntologyExport } from "./schema"
 
+export interface NodeAttributes {
+    label: string
+    level: number
+    inverseLevel: number
+    parents: Set<string>
+    children: Set<string>
+    edges: Set<string>
+}
+
 export const createOntologyGraph = (ontology: OntologyExport): Graph => {
     const G = new Graph({
         multi: true,
@@ -16,17 +25,32 @@ export const createOntologyGraph = (ontology: OntologyExport): Graph => {
     ontology.classes.forEach((c) =>
         G.addNode(c.data.name, {
             label: c.data.name,
-            level: c.parents.length, // level based on depth in hierarchy
+            level: c.parents.length,
             inverseLevel: maxParentCount - c.parents.length,
-        }),
+            parents: new Set<string>(),
+            children: new Set<string>(),
+            edges: new Set<string>(),
+        } satisfies NodeAttributes),
     )
+
+    const addEdgeToNodes = (edgeKey: string, source: string, target: string) => {
+        const sourceAttrs = G.getNodeAttributes(source) as NodeAttributes
+        const targetAttrs = G.getNodeAttributes(target) as NodeAttributes
+
+        // source -> target means: target is a parent of source, source is a child of target
+        sourceAttrs.parents.add(target)
+        sourceAttrs.edges.add(edgeKey)
+        targetAttrs.children.add(source)
+        targetAttrs.edges.add(edgeKey)
+    }
 
     // add edges from subclass to superclass
     ontology.classes
         .filter((cls) => cls.data.superclass)
-        .forEach((cls) =>
+        .forEach((cls) => {
+            const edgeKey = `${cls.data.name}-is-a->${cls.data.superclass}`
             G.addDirectedEdgeWithKey(
-                `${cls.data.name}-is-a->${cls.data.superclass}`,
+                edgeKey,
                 cls.data.name,
                 cls.data.superclass,
                 {
@@ -38,8 +62,9 @@ export const createOntologyGraph = (ontology: OntologyExport): Graph => {
                     source: cls.data.name,
                     target: cls.data.superclass,
                 },
-            ),
-        )
+            )
+            addEdgeToNodes(edgeKey, cls.data.name, cls.data.superclass!)
+        })
 
     ontology.properties
         .filter((p) => p.type === "object")
@@ -51,8 +76,9 @@ export const createOntologyGraph = (ontology: OntologyExport): Graph => {
 
             domainClasses.forEach((domain) => {
                 rangeClasses.forEach((range) => {
+                    const edgeKey = `${domain}-${prop.data.name}->${range}`
                     G.addDirectedEdgeWithKey(
-                        `${domain}-${prop.data.name}->${range}`,
+                        edgeKey,
                         domain,
                         range,
                         {
@@ -64,6 +90,7 @@ export const createOntologyGraph = (ontology: OntologyExport): Graph => {
                             target: range,
                         },
                     )
+                    addEdgeToNodes(edgeKey, domain, range)
                 })
             })
         })

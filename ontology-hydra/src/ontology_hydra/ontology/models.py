@@ -47,6 +47,9 @@ class Description(Model):
 
 
 class DataProperty(Model):
+    type: Literal["data"] = Field(
+        "data", description="Set to 'data' to indicate that you are generating a data property."
+    )
     name: str
     description: Description | None = None
 
@@ -57,6 +60,10 @@ class DataProperty(Model):
 
 
 class ObjectProperty(Model):
+    type: Literal["object"] = Field(
+        "object",
+        description="Set to 'object' to indicate that you are generating an object property.",
+    )
     name: str
     description: Description | None = None
 
@@ -100,7 +107,7 @@ class Ontology(Model):
     def get_ancestors(self, cls: Class):
         """Returns the class hierarchy chain starting from the root down to the given class."""
         chain = list[Class]()
-        c = cls
+        c = self.get_superclass(cls)
 
         while c is not None:
             chain.append(c)
@@ -132,6 +139,9 @@ class Ontology(Model):
 
 class ClassModel(Model):
     # TODO add field and type __doc__!!!
+    type: Literal["class"] = Field(
+        "class", description="Set to 'class' to indicate that you are generating a class."
+    )
     name: str
     description: Description | None = None
     superclass: str | None
