@@ -2,9 +2,9 @@
     import { onDestroy } from "svelte"
     import Sigma from "sigma"
     import Graph from "graphology"
-    import { parse as parseGraphML } from "graphology-graphml/browser"
     import forceAtlas2, { inferSettings } from "graphology-layout-forceatlas2"
-    import { ontologyExportSchema, type OntologyExport } from "../lib/schema"
+    import { ontologyExportSchema } from "../lib/schema"
+    import { createGraph } from "../lib/graph"
 
     let isLoading = $state(false)
     let error = $state("")
@@ -33,118 +33,14 @@
             )
         })
     }
-
-    const buildGraphFromExport = (data: OntologyExport) => {
-        const graph = new Graph({ multi: true })
-
-        const ensureNode = (id: string, attrs: Record<string, unknown>) => {
-            if (!graph.hasNode(id)) graph.addNode(id, attrs)
-        }
-
-        const edges = new Set<string>()
-        const addEdge = (
-            source: string,
-            target: string,
-            attrs: Record<string, unknown>,
-        ) => {
-            const key = `${source}->${target}:${attrs.label ?? ""}:${attrs.type ?? ""}`
-            if (edges.has(key)) return
-            edges.add(key)
-            graph.addEdge(source, target, attrs)
-        }
-
-        const classId = (name: string) => `class:${name}`
-        const datatypeId = (name: string) => `datatype:${name}`
-
-        // classes
-        data.classes.forEach(({ data: cls }) => {
-            ensureNode(classId(cls.name), {
-                label: cls.name,
-                type_: "class",
-                color: "#0f172a",
-                size: 10,
-            })
-        })
-
-        // hierarchy edges using children
-        data.classes.forEach(({ data: cls, children }) => {
-            children.forEach((child) => {
-                ensureNode(classId(child), {
-                    label: child,
-                    type_: "class",
-                    color: "#0f172a",
-                    size: 10,
-                })
-                addEdge(classId(cls.name), classId(child), {
-                    label: "inherits",
-                    type_: "hierarchy",
-                    color: "#94a3b8",
-                })
-            })
-        })
-
-        // properties
-        data.properties.forEach((prop) => {
-            if (prop.type === "data") {
-                prop.data.domain.forEach((domain) => {
-                    ensureNode(classId(domain), {
-                        label: domain,
-                        type_: "class",
-                        color: "#0f172a",
-                        size: 10,
-                    })
-                    ensureNode(datatypeId(prop.data.range), {
-                        label: prop.data.range,
-                        type_: "datatype",
-                        color: "#0369a1",
-                        size: 7,
-                    })
-                    addEdge(classId(domain), datatypeId(prop.data.range), {
-                        label: prop.data.name,
-                        type_: "data",
-                        color: "#0ea5e9",
-                    })
-                })
-            } else {
-                prop.data.domain.forEach((domain) => {
-                    prop.data.range.forEach((target) => {
-                        ensureNode(classId(domain), {
-                            label: domain,
-                            type_: "class",
-                            color: "#0f172a",
-                            size: 10,
-                        })
-                        ensureNode(classId(target), {
-                            label: target,
-                            type_: "class",
-                            color: "#0f172a",
-                            size: 10,
-                        })
-                        addEdge(classId(domain), classId(target), {
-                            label: prop.data.name,
-                            type_: "object",
-                            color: "#f97316",
-                        })
-                    })
-                })
-            }
-        })
-
-        return graph
-    }
-
     const load = async (file: File) => {
         isLoading = true
         error = ""
         try {
             const content = await file.text()
-            const lower = file.name.toLowerCase()
-            const G =
-                lower.endsWith(".json") || lower.endsWith(".jsonc")
-                    ? buildGraphFromExport(
-                          ontologyExportSchema.parse(JSON.parse(content)),
-                      )
-                    : parseGraphML(Graph, content)
+            const G = createGraph(
+                ontologyExportSchema.parse(JSON.parse(content)),
+            )
 
             // compute initial positions
             ensurePositions(G)
@@ -161,13 +57,6 @@
             sigma = new Sigma(G, container!, {
                 renderLabels: true,
                 renderEdgeLabels: true,
-
-                nodeReducer: (node, data) => ({
-                    ...data,
-                }),
-                edgeReducer: (edge, data) => ({
-                    ...data,
-                }),
             })
 
             fileName = file.name

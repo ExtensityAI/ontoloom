@@ -22,7 +22,6 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.1.17",
     "graphology": "^0.26.0",
-    "graphology-graphml": "^0.5.2",
     "graphology-layout-forceatlas2": "^0.10.1",
     "sigma": "^3.0.2",
     "tailwindcss": "^4.1.17",
