@@ -1,109 +1,33 @@
 <script lang="ts">
     import { onDestroy } from "svelte"
     import Sigma from "sigma"
-    import Graph from "graphology"
     import FA2Layout from "graphology-layout-forceatlas2/worker"
     import { inferSettings } from "graphology-layout-forceatlas2"
     import {
-        FileInput,
+        FileInput as FileInputIcon,
         SquareIcon,
         LoaderCircleIcon,
     } from "lucide-svelte/icons"
-    import { tooltip } from "./lib/utils/tooltip"
+    import { tooltip } from "./lib/ui/tooltip"
     import { ontologySchema } from "./lib/graph/schema"
     import {
         createOntologyGraph,
         initializeNodePositions,
     } from "./lib/graph/parser"
-
-    // ─── Constants ───────────────────────────────────────────────────────────────
-
-    const LEVEL_COLORS = [
-        "#ec003f", // rose-500 (root)
-        "#fd9a00", // amber-500
-        "#7ccf00", // lime-500
-        "#22c55e", // green-500
-        "#14b8a6", // teal-500
-        "#3b82f6", // blue-500
-        "#8b5cf6", // violet-500
-        "#ec4899", // pink-500
-        "#64748b", // slate-500
-    ] as const
-
-    const COLORS = {
-        node: {
-            inactive: "#e5e5e5",
-            selected: "#dc2626", // red
-            parent: "#f97316", // orange
-            child: "#22c55e", // green
-        },
-        edge: {
-            hierarchy: {
-                default: "#e5e5e5",
-                active: "#a3a3a3",
-                inactive: "#f5f5f5",
-            },
-            property: {
-                default: "#f87171",
-                active: "#dc2626",
-                inactive: "#fecaca",
-            },
-        },
-    } as const
-
-    const BASE_NODE_SIZE = 8
-    const NODE_SIZE_MULTIPLIER = 4
-    const ACTIVE_EDGE_SIZE = 3
-
-    // ─── Types ───────────────────────────────────────────────────────────────────
-
-    interface NodeSelection {
-        node: string | null
-        parents: Set<string>
-        children: Set<string>
-        connectedEdges: Set<string>
-    }
-
-    interface ViewState {
-        hovered: NodeSelection
-        pinned: NodeSelection
-    }
-
-    interface RuntimeState {
-        isLoading: boolean
-        isLayoutRunning: boolean
-        error: string
-        fileName: string
-        sigma: Sigma | null
-        graph: Graph | null
-        layout: FA2Layout | null
-    }
-
-    // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-    const emptySelection = (): NodeSelection => ({
-        node: null,
-        parents: new Set(),
-        children: new Set(),
-        connectedEdges: new Set(),
-    })
-
-    const createSelection = (
-        node: string | null,
-        graph: Graph | null,
-    ): NodeSelection => {
-        if (!node || !graph) return emptySelection()
-
-        const attrs = graph.getNodeAttributes(node)
-        return {
-            node,
-            parents: attrs.parents as Set<string>,
-            children: attrs.children as Set<string>,
-            connectedEdges: attrs.edges as Set<string>,
-        }
-    }
+    import {
+        createEdgeReducer,
+        createNodeReducer,
+    } from "./lib/visualizer/reducers"
+    import {
+        createSelection,
+        emptySelection,
+        getActiveSelection as getActiveSelectionFromState,
+    } from "./lib/visualizer/selection"
+    import type { RuntimeState, ViewState } from "./lib/visualizer/types"
 
     // ─── State ───────────────────────────────────────────────────────────────────
+
+    const FILE_ACCEPT = ".json"
 
     let container: HTMLDivElement | undefined = $state()
 
@@ -122,88 +46,35 @@
         pinned: emptySelection(),
     })
 
+    const isFileInputDisabled = $derived(runtimeState.isLoading || !container)
+
     // Active selection: pinned takes priority over hovered
-    const getActiveSelection = (): NodeSelection =>
-        viewState.pinned.node ? viewState.pinned : viewState.hovered
-
-    // ─── Reducers ────────────────────────────────────────────────────────────────
-
-    const nodeReducer = (node: string, data: Record<string, unknown>) => {
-        const active = getActiveSelection()
-        const isSelected = active.node === node
-        const isParent = active.parents.has(node)
-        const isChild = active.children.has(node)
-        const isRelated = isSelected || isParent || isChild
-        const hasSelection = active.node !== null
-
-        let color: string
-        if (isSelected) {
-            color = COLORS.node.selected
-        } else if (isParent) {
-            color = COLORS.node.parent
-        } else if (isChild) {
-            color = COLORS.node.child
-        } else if (hasSelection) {
-            color = COLORS.node.inactive
-        } else {
-            color = LEVEL_COLORS[data.level as number] ?? LEVEL_COLORS.at(-1)!
-        }
-
-        return {
-            ...data,
-            color,
-            size:
-                BASE_NODE_SIZE +
-                (data.inverseLevel as number) * NODE_SIZE_MULTIPLIER,
-            zIndex: isSelected ? 2 : isRelated ? 1 : 0,
-        }
-    }
-
-    const edgeReducer = (edge: string, data: Record<string, unknown>) => {
-        const active = getActiveSelection()
-        const isConnected = active.connectedEdges.has(edge)
-        const hasSelection = active.node !== null
-        const isHierarchy = data.tag === "hierarchy"
-
-        const palette = isHierarchy
-            ? COLORS.edge.hierarchy
-            : COLORS.edge.property
-        const color = hasSelection
-            ? isConnected
-                ? palette.active
-                : palette.inactive
-            : palette.default
-
-        const showLabel =
-            data.source === active.node || data.target === active.node
-
-        return {
-            ...data,
-            color,
-            size: isConnected ? ACTIVE_EDGE_SIZE : (data.size as number),
-            zIndex: isConnected ? 1 : 0,
-            label: showLabel ? (data.label as string) : "",
-        }
-    }
+    const getActiveSelection = () => getActiveSelectionFromState(viewState)
+    const nodeReducer = createNodeReducer(getActiveSelection)
+    const edgeReducer = createEdgeReducer(getActiveSelection)
 
     // ─── Event Handlers ──────────────────────────────────────────────────────────
 
+    const refreshSigma = () => {
+        runtimeState.sigma?.refresh()
+    }
+
     const setHovered = (node: string | null) => {
         viewState.hovered = createSelection(node, runtimeState.graph)
-        runtimeState.sigma?.refresh()
+        refreshSigma()
     }
 
     const setPinned = (node: string | null) => {
         // Toggle: if clicking the same node, unpin; otherwise pin the new node
         const newNode = viewState.pinned.node === node ? null : node
         viewState.pinned = createSelection(newNode, runtimeState.graph)
-        runtimeState.sigma?.refresh()
+        refreshSigma()
     }
 
     const clearPinned = () => {
         if (viewState.pinned.node) {
             viewState.pinned = emptySelection()
-            runtimeState.sigma?.refresh()
+            refreshSigma()
         }
     }
 
@@ -302,12 +173,11 @@
         <label class="cursor-pointer p-1" use:tooltip={"Load ontology file"}>
             <input
                 type="file"
-                accept=".json"
-                class="hidden"
-                disabled={runtimeState.isLoading || !container}
+                accept={FILE_ACCEPT}
+                disabled={isFileInputDisabled}
                 onchange={handleInputChange}
             />
-            <FileInput
+            <FileInputIcon
                 class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
             />
         </label>
@@ -335,13 +205,14 @@
                 <label class="cursor-pointer grow grid place-items-center">
                     <input
                         type="file"
-                        accept=".json"
+                        hidden
                         class="hidden"
-                        disabled={runtimeState.isLoading || !container}
+                        accept={FILE_ACCEPT}
+                        disabled={isFileInputDisabled}
                         onchange={handleInputChange}
                     />
                     <div class="text-center">
-                        <FileInput
+                        <FileInputIcon
                             class="size-12 mx-auto text-neutral-400 mb-4"
                         />
                         <p class="text-lg text-neutral-600">

@@ -1,26 +1,7 @@
 import Graph from "graphology"
 import type { Ontology, Class } from "./schema"
-
-export interface NodeAttributes {
-    label: string
-    level: number
-    inverseLevel: number
-    parents: Set<string>
-    children: Set<string>
-    edges: Set<string>
-    x?: number
-    y?: number
-}
-
-export interface EdgeAttributes {
-    type: string
-    tag?: string
-    label: string
-    size: number
-    weight: number
-    source: string
-    target: string
-}
+import type { EdgeAttributes, NodeAttributes } from "./types"
+import { type HydraGraph } from "./types"
 
 /**
  * Compute hierarchy depth for each class by traversing superclass chain
@@ -51,8 +32,8 @@ const computeClassLevels = (
     return levels
 }
 
-export const createOntologyGraph = (ontology: Ontology): Graph => {
-    const G = new Graph({
+export const createOntologyGraph = (ontology: Ontology) => {
+    const G: HydraGraph = new Graph<NodeAttributes, EdgeAttributes>({
         multi: true,
         type: "mixed",
     })
@@ -70,7 +51,7 @@ export const createOntologyGraph = (ontology: Ontology): Graph => {
             parents: new Set<string>(),
             children: new Set<string>(),
             edges: new Set<string>(),
-        } satisfies NodeAttributes)
+        } )
     })
 
     const addEdgeToNodes = (edgeKey: string, source: string, target: string) => {
@@ -97,7 +78,7 @@ export const createOntologyGraph = (ontology: Ontology): Graph => {
                 weight: 3,
                 source: name,
                 target: cls.superclass!,
-            } satisfies EdgeAttributes)
+            })
             addEdgeToNodes(edgeKey, name, cls.superclass!)
         })
 
@@ -116,7 +97,7 @@ export const createOntologyGraph = (ontology: Ontology): Graph => {
                     weight: 1,
                     source: domain,
                     target: range,
-                } satisfies EdgeAttributes)
+                })
                 addEdgeToNodes(edgeKey, domain, range)
             })
         })
