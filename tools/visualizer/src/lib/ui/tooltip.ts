@@ -1,6 +1,6 @@
 import type { Action } from "svelte/action"
 
-const DELAY = 500 // ms
+const DELAY = 250 // ms
 
 export const tooltip: Action<HTMLElement, string> = (node, text) => {
 	let tip: HTMLElement | null = null

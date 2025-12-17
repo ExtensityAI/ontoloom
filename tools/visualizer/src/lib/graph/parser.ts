@@ -40,93 +40,77 @@ export const createOntologyGraph = (ontology: Ontology) => {
 
     const classLevels = computeClassLevels(ontology.classes)
     const maxLevel = Math.max(...classLevels.values(), 0)
+    const order = Object.keys(ontology.classes).length
 
     // Add class nodes
-    Object.entries(ontology.classes).forEach(([name, cls]) => {
+    Object.entries(ontology.classes).forEach(([name, cls], i) => {
+        const angle = (i / order) * Math.PI * 2
         const level = classLevels.get(name) ?? 0
+
         G.addNode(name, {
             label: name,
             level,
             inverseLevel: maxLevel - level,
-            parents: new Set<string>(),
+            parents: [],
             children: new Set<string>(),
             edges: new Set<string>(),
+
+            x: Math.cos(angle) * 100,
+            y: Math.sin(angle) * 100,
         })
     })
 
-    const addEdgeToNodes = (edgeKey: string, source: string, target: string) => {
-        const sourceAttrs = G.getNodeAttributes(source)
-        const targetAttrs = G.getNodeAttributes(target)
 
-        // source -> target means: target is a parent of source, source is a child of target
-        sourceAttrs.parents.add(target)
-        sourceAttrs.edges.add(edgeKey)
-        targetAttrs.children.add(source)
-        targetAttrs.edges.add(edgeKey)
-    }
 
     // Add hierarchy edges (subclass -> superclass)
     Object.entries(ontology.classes)
         .filter(([, cls]) => cls.superclass)
         .forEach(([name, cls]) => {
             const edgeKey = `${name}-is-a->${cls.superclass}`
+
             G.addDirectedEdgeWithKey(edgeKey, name, cls.superclass!, {
                 type: "arrow",
                 tag: "hierarchy",
-                label: "is a",
+                label: "isA",
                 size: 2,
                 weight: 3,
                 source: name,
                 target: cls.superclass!,
             })
-            addEdgeToNodes(edgeKey, name, cls.superclass!)
+
+            // Update children set
+            G.getNodeAttributes(cls.superclass!).children.add(name)
         })
 
     // Add object property edges (domain -> range)
     Object.entries(ontology.objectProperties).forEach(([propName, prop]) => {
         prop.domain.forEach((domain) => {
             prop.range.forEach((range) => {
-                // Skip if nodes don't exist
-                if (!G.hasNode(domain) || !G.hasNode(range)) return
-
                 const edgeKey = `${domain}-${propName}->${range}`
+
                 G.addDirectedEdgeWithKey(edgeKey, domain, range, {
                     type: "line",
+                    tag: "property",
                     label: propName,
                     size: 1,
                     weight: 1,
                     source: domain,
                     target: range,
                 })
-                addEdgeToNodes(edgeKey, domain, range)
             })
         })
     })
 
-    return G
-}
+    // add parent chains to node attributes
+    Object.entries(ontology.classes).forEach(([name, cls]) => {
+        const attrs = G.getNodeAttributes(name)
+        let current = cls
 
-/**
- * Initialize node positions in a circle layout before force simulation
- */
-export const initializeNodePositions = (graph: Graph): void => {
-    let i = 0
-    const order = graph.order
-
-    graph.forEachNode((node, attrs) => {
-        const x = parseFloat(String(attrs.x ?? ""))
-        const y = parseFloat(String(attrs.y ?? ""))
-        const angle = (i++ / order) * Math.PI * 2
-
-        graph.setNodeAttribute(
-            node,
-            "x",
-            Number.isFinite(x) ? x : Math.cos(angle) * 100,
-        )
-        graph.setNodeAttribute(
-            node,
-            "y",
-            Number.isFinite(y) ? y : Math.sin(angle) * 100,
-        )
+        while (current.superclass) {
+            attrs.parents.push(current.superclass)
+            current = ontology.classes[current.superclass]
+        }
     })
+
+    return G
 }

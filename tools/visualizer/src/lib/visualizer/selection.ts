@@ -1,24 +1,22 @@
-import type { HydraGraph } from "../graph/types"
-import type { NodeSelection } from "./types"
+import type { HydraGraph, NodeAttributes } from "../graph/types"
 
-export const emptySelection = (): NodeSelection => ({
-    node: null,
-    parents: new Set(),
-    children: new Set(),
-    connectedEdges: new Set(),
-})
+export interface NodeSelection {
+    node: string
+    attrs: NodeAttributes
+    parents: ReadonlySet<string>
+    children: ReadonlySet<string>
+}
 
 export const createSelection = (
-    node: string | null,
-    graph: HydraGraph | null,
+    node: string,
+    graph: HydraGraph,
 ): NodeSelection => {
-    if (!node || !graph || !graph.hasNode(node)) return emptySelection()
-
     const attrs = graph.getNodeAttributes(node)
+
     return {
         node,
-        parents: attrs.parents,
+        attrs,
+        parents: new Set(attrs.parents),
         children: attrs.children,
-        connectedEdges: attrs.edges,
     }
 }

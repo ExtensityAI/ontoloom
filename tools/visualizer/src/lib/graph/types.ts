@@ -5,7 +5,7 @@ export interface NodeAttributes {
     label: string
     level: number
     inverseLevel: number
-    parents: Set<string>
+    parents: Array<string>
     children: Set<string>
     edges: Set<string>
     x?: number
@@ -14,7 +14,7 @@ export interface NodeAttributes {
 
 export interface EdgeAttributes {
     type: string
-    tag?: string
+    tag: "hierarchy" | "property"
     label: string
     size: number
     weight: number

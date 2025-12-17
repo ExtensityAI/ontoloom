@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onDestroy } from "svelte"
+    import { onDestroy, tick } from "svelte"
     import Sigma from "sigma"
     import FA2Layout from "graphology-layout-forceatlas2/worker"
     import {
@@ -9,10 +9,7 @@
     } from "lucide-svelte/icons"
     import { tooltip } from "./lib/ui/tooltip"
     import { ontologySchema } from "./lib/graph/schema"
-    import {
-        createOntologyGraph,
-        initializeNodePositions,
-    } from "./lib/graph/parser"
+    import { createOntologyGraph } from "./lib/graph/parser"
     import {
         createEdgeReducer,
         createNodeReducer,
@@ -28,7 +25,6 @@
     let runtimeState: RuntimeState = $state({
         isLoading: false,
         isLayoutRunning: false,
-        error: "",
         fileName: "",
         sigma: null,
         graph: null,
@@ -43,10 +39,14 @@
     const isFileInputDisabled = $derived(runtimeState.isLoading || !container)
 
     const hoveredSelection = $derived(
-        createSelection(viewState.hoveredNode, runtimeState.graph),
+        viewState.hoveredNode && runtimeState.graph
+            ? createSelection(viewState.hoveredNode, runtimeState.graph)
+            : null,
     )
     const pinnedSelection = $derived(
-        createSelection(viewState.pinnedNode, runtimeState.graph),
+        viewState.pinnedNode && runtimeState.graph
+            ? createSelection(viewState.pinnedNode, runtimeState.graph)
+            : null,
     )
     const activeSelection = $derived(
         viewState.pinnedNode ? pinnedSelection : hoveredSelection,
@@ -57,7 +57,12 @@
 
     // ─── Event Handlers ──────────────────────────────────────────────────────────
 
-    const refreshSigma = () => {
+    let refreshQueued = false
+    const refreshSigma = async () => {
+        if (refreshQueued) return
+        refreshQueued = true
+        await tick()
+        refreshQueued = false
         runtimeState.sigma?.refresh()
     }
 
@@ -71,13 +76,6 @@
         const newNode = viewState.pinnedNode === node ? null : node
         viewState.pinnedNode = newNode
         refreshSigma()
-    }
-
-    const clearPinned = () => {
-        if (viewState.pinnedNode) {
-            viewState.pinnedNode = null
-            refreshSigma()
-        }
     }
 
     // ─── Layout Control ──────────────────────────────────────────────────────────
@@ -103,16 +101,12 @@
         if (runtimeState.isLoading || !container) return
 
         runtimeState.isLoading = true
-        runtimeState.error = ""
         runtimeState.fileName = file.name
 
         try {
             const content = await file.text()
             const parsed = ontologySchema.parse(JSON.parse(content))
             const graph = createOntologyGraph(parsed)
-
-            // Initialize positions before layout
-            initializeNodePositions(graph)
 
             // Clean up previous instances
             destroySigma()
@@ -121,6 +115,7 @@
             const sigma = new Sigma(graph, container, {
                 renderLabels: true,
                 renderEdgeLabels: true,
+                zIndex: true,
                 nodeReducer,
                 edgeReducer,
             })
@@ -128,7 +123,7 @@
             sigma.on("enterNode", ({ node }) => setHovered(node))
             sigma.on("leaveNode", () => setHovered(null))
             sigma.on("clickNode", ({ node }) => setPinned(node))
-            sigma.on("clickStage", () => clearPinned())
+            sigma.on("clickStage", () => setPinned(null))
 
             runtimeState.sigma = sigma
             runtimeState.graph = graph
@@ -150,12 +145,6 @@
             }, 10_000)
         } catch (e) {
             console.error(e)
-            runtimeState.error =
-                e instanceof Error
-                    ? e.message
-                    : typeof e === "string"
-                      ? e
-                      : "Failed to load file"
         } finally {
             runtimeState.isLoading = false
         }
@@ -177,7 +166,7 @@
 
 <main class="relative min-h-screen">
     <footer
-        class="absolute bottom-0 left-0 right-0 z-40 p-2 flex group hover:bg-white/50 hover:backdrop-blur-md transition hover:border-t-neutral-200 border-t border-t-transparent"
+        class="absolute bottom-0 left-0 right-0 z-40 p-2 flex group hover:bg-white/50 hover:backdrop-blur-md transition hover:border-t-neutral-200 border-t border-t-transparent items-center"
     >
         <label class="cursor-pointer p-1" use:tooltip={"Load ontology file"}>
             <input
@@ -206,6 +195,11 @@
         {/if}
 
         <div class="grow"></div>
+        {#if activeSelection}
+            <div class="text-sm text-neutral-700">
+                {activeSelection.attrs.label}
+            </div>
+        {/if}
     </footer>
 
     <div class="h-svh w-svw" bind:this={container}></div>
@@ -245,13 +239,5 @@
                 </div>
             {/if}
         </div>
-    {/if}
-
-    {#if runtimeState.error}
-        <p
-            class="absolute bottom-4 left-4 z-10 rounded-lg px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-200 shadow-lg"
-        >
-            {runtimeState.error}
-        </p>
     {/if}
 </main>
