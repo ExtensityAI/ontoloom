@@ -219,15 +219,17 @@
             />
         </label>
 
-        <button
-            class="cursor-pointer p-1"
-            use:tooltip={"Search for node"}
-            onclick={openSearch}
-        >
-            <SearchIcon
-                class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
-            />
-        </button>
+        {#if runtimeState.sigma}
+            <button
+                class="cursor-pointer p-1"
+                use:tooltip={"[ / ] Search for node"}
+                onclick={openSearch}
+            >
+                <SearchIcon
+                    class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
+                />
+            </button>
+        {/if}
 
         {#if runtimeState.isLayoutRunning}
             <button

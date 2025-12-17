@@ -14,12 +14,14 @@
     let options: string[] = $state([])
 
     const onKeyDown = (e: KeyboardEvent) => {
-        if (!searchInput) return
-
         if (e.key === "Enter" && options.length > 0) {
             onSelect(options[0])
             return
         }
+    }
+
+    const onInput = () => {
+        if (!searchInput) return
 
         const query = searchInput.value.toLowerCase().trim()
 
@@ -45,6 +47,7 @@
         type="text"
         placeholder="Search for node..."
         class="px-4 py-2 rounded-lg w-full"
+        oninput={onInput}
         onkeydown={onKeyDown}
     />
 
