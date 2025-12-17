@@ -1,12 +1,20 @@
 <script lang="ts">
-    import { onDestroy, tick } from "svelte"
+    import { onDestroy } from "svelte"
     import Sigma from "sigma"
     import Graph from "graphology"
-    import forceAtlas2, { inferSettings } from "graphology-layout-forceatlas2"
-    import { ontologyExportSchema } from "../lib/schema"
-    import { createOntologyGraph } from "../lib/graph"
-    import { FileInput, RotateCwIcon } from "lucide-svelte/icons"
-    import { tooltip } from "../lib/utils/tooltip"
+    import FA2Layout from "graphology-layout-forceatlas2/worker"
+    import { inferSettings } from "graphology-layout-forceatlas2"
+    import {
+        FileInput,
+        SquareIcon,
+        LoaderCircleIcon,
+    } from "lucide-svelte/icons"
+    import { tooltip } from "./lib/utils/tooltip"
+    import { ontologySchema } from "./lib/graph/schema"
+    import {
+        createOntologyGraph,
+        initializeNodePositions,
+    } from "./lib/graph/parser"
 
     // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -43,7 +51,6 @@
         },
     } as const
 
-    const LAYOUT_ITERATIONS = 5_000
     const BASE_NODE_SIZE = 8
     const NODE_SIZE_MULTIPLIER = 4
     const ACTIVE_EDGE_SIZE = 3
@@ -64,33 +71,15 @@
 
     interface RuntimeState {
         isLoading: boolean
+        isLayoutRunning: boolean
         error: string
         fileName: string
         sigma: Sigma | null
         graph: Graph | null
+        layout: FA2Layout | null
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-    const initializeNodePositions = (graph: Graph): void => {
-        let i = 0
-        graph.forEachNode((node, attrs) => {
-            const x = parseFloat(String(attrs.x ?? ""))
-            const y = parseFloat(String(attrs.y ?? ""))
-            const angle = (i++ / graph.order) * Math.PI * 2
-
-            graph.setNodeAttribute(
-                node,
-                "x",
-                Number.isFinite(x) ? x : Math.cos(angle) * 100,
-            )
-            graph.setNodeAttribute(
-                node,
-                "y",
-                Number.isFinite(y) ? y : Math.sin(angle) * 100,
-            )
-        })
-    }
 
     const emptySelection = (): NodeSelection => ({
         node: null,
@@ -120,10 +109,12 @@
 
     let runtimeState: RuntimeState = $state({
         isLoading: false,
+        isLayoutRunning: false,
         error: "",
         fileName: "",
         sigma: null,
         graph: null,
+        layout: null,
     })
 
     let viewState: ViewState = $state({
@@ -216,6 +207,19 @@
         }
     }
 
+    // ─── Layout Control ──────────────────────────────────────────────────────────
+
+    const stopLayout = () => {
+        if (runtimeState.layout) {
+            runtimeState.layout.stop()
+            runtimeState.layout.kill()
+            runtimeState.layout = null
+            runtimeState.isLayoutRunning = false
+        }
+    }
+
+    // ─── File Loading with Live Layout ───────────────────────────────────────────
+
     const handleFileLoad = async (file: File) => {
         if (runtimeState.isLoading) return
 
@@ -223,24 +227,19 @@
         runtimeState.error = ""
         runtimeState.fileName = file.name
 
-        // Yield to let the loading indicator render before blocking work
-        await tick()
-
         try {
             const content = await file.text()
-            const parsed = ontologyExportSchema.parse(JSON.parse(content))
+            const parsed = ontologySchema.parse(JSON.parse(content))
             const graph = createOntologyGraph(parsed)
 
+            // Initialize positions before layout
             initializeNodePositions(graph)
-            forceAtlas2.assign(graph, {
-                iterations: LAYOUT_ITERATIONS,
-                settings: inferSettings(graph),
-            })
 
-            // Clean up previous instance
+            // Clean up previous instances
+            stopLayout()
             runtimeState.sigma?.kill()
 
-            // Initialize Sigma
+            // Initialize Sigma immediately — graph appears right away
             const sigma = new Sigma(graph, container!, {
                 renderLabels: true,
                 renderEdgeLabels: true,
@@ -255,6 +254,21 @@
 
             runtimeState.sigma = sigma
             runtimeState.graph = graph
+
+            // Start live force-directed layout in web worker
+            const layout = new FA2Layout(graph, {
+                settings: inferSettings(graph),
+            })
+            layout.start()
+            runtimeState.layout = layout
+            runtimeState.isLayoutRunning = true
+
+            // Auto-stop after 10 seconds (usually converged by then)
+            setTimeout(() => {
+                if (runtimeState.layout === layout) {
+                    stopLayout()
+                }
+            }, 10_000)
         } catch (e) {
             console.error(e)
             runtimeState.error =
@@ -277,7 +291,10 @@
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-    onDestroy(() => runtimeState.sigma?.kill())
+    onDestroy(() => {
+        stopLayout()
+        runtimeState.sigma?.kill()
+    })
 </script>
 
 <main class="relative min-h-screen">
@@ -294,6 +311,19 @@
                 class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
             />
         </label>
+
+        {#if runtimeState.isLayoutRunning}
+            <button
+                class="cursor-pointer p-1"
+                use:tooltip={"Stop layout"}
+                onclick={stopLayout}
+            >
+                <SquareIcon
+                    class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
+                />
+            </button>
+        {/if}
+
         <div class="grow"></div>
     </footer>
 
@@ -323,7 +353,7 @@
             {:else}
                 <div class="grow grid place-items-center">
                     <div>
-                        <RotateCwIcon
+                        <LoaderCircleIcon
                             class="size-12 mx-auto text-neutral-400 mb-4 animate-spin"
                         />
                         <p class="text-lg text-neutral-600">

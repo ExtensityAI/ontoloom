@@ -21,13 +21,13 @@ const dataTypeSchema = z.enum([
 ])
 
 const descriptionSchema = z.object({
-    description: z.string().nullish(),
-    constraints: z.string().nullish(),
+    description: z.string().nullable(),
+    constraints: z.string().nullable(),
 })
 
 const dataPropertySchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullish(),
+    description: descriptionSchema.nullable(),
     characteristics: z.array(characteristicSchema),
     domain: z.array(z.string()),
     range: dataTypeSchema,
@@ -35,7 +35,7 @@ const dataPropertySchema = z.object({
 
 const objectPropertySchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullish(),
+    description: descriptionSchema.nullable(),
     characteristics: z.array(characteristicSchema),
     domain: z.array(z.string()),
     range: z.array(z.string()),
@@ -43,33 +43,18 @@ const objectPropertySchema = z.object({
 
 const classSchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullish(),
+    description: descriptionSchema.nullable(),
     own_properties: z.array(z.string()),
     superclass: z.string().nullable(),
 })
 
-const classExportSchema = z.object({
-    data: classSchema,
-    parents: z.array(z.string()),
-    children: z.array(z.string()),
+export const ontologySchema = z.object({
+    classes: z.record(z.string(), classSchema),
+    objectProperties: z.record(z.string(), objectPropertySchema),
+    dataProperties: z.record(z.string(), dataPropertySchema),
 })
 
-const dataPropertyExportSchema = z.object({
-    type: z.literal('data'),
-    data: dataPropertySchema,
-})
-
-const objectPropertyExportSchema = z.object({
-    type: z.literal('object'),
-    data: objectPropertySchema,
-})
-
-export const ontologyExportSchema = z.object({
-    classes: z.array(classExportSchema),
-    properties: z.array(
-        z.discriminatedUnion('type', [dataPropertyExportSchema, objectPropertyExportSchema]),
-    ),
-})
-
-
-export type OntologyExport = z.infer<typeof ontologyExportSchema>
+export type Class = z.infer<typeof classSchema>
+export type DataProperty = z.infer<typeof dataPropertySchema>
+export type ObjectProperty = z.infer<typeof objectPropertySchema>
+export type Ontology = z.infer<typeof ontologySchema>
