@@ -2,7 +2,6 @@
     import { onDestroy } from "svelte"
     import Sigma from "sigma"
     import FA2Layout from "graphology-layout-forceatlas2/worker"
-    import { inferSettings } from "graphology-layout-forceatlas2"
     import {
         FileInput as FileInputIcon,
         SquareIcon,
@@ -18,18 +17,13 @@
         createEdgeReducer,
         createNodeReducer,
     } from "./lib/visualizer/reducers"
-    import {
-        createSelection,
-        emptySelection,
-        getActiveSelection as getActiveSelectionFromState,
-    } from "./lib/visualizer/selection"
+    import { createSelection } from "./lib/visualizer/selection"
     import type { RuntimeState, ViewState } from "./lib/visualizer/types"
+    import { inferSettings } from "graphology-layout-forceatlas2"
 
     // ─── State ───────────────────────────────────────────────────────────────────
 
-    const FILE_ACCEPT = ".json"
-
-    let container: HTMLDivElement | undefined = $state()
+    let container: HTMLDivElement | null = $state(null)
 
     let runtimeState: RuntimeState = $state({
         isLoading: false,
@@ -42,16 +36,24 @@
     })
 
     let viewState: ViewState = $state({
-        hovered: emptySelection(),
-        pinned: emptySelection(),
+        hoveredNode: null,
+        pinnedNode: null,
     })
 
     const isFileInputDisabled = $derived(runtimeState.isLoading || !container)
 
-    // Active selection: pinned takes priority over hovered
-    const getActiveSelection = () => getActiveSelectionFromState(viewState)
-    const nodeReducer = createNodeReducer(getActiveSelection)
-    const edgeReducer = createEdgeReducer(getActiveSelection)
+    const hoveredSelection = $derived(
+        createSelection(viewState.hoveredNode, runtimeState.graph),
+    )
+    const pinnedSelection = $derived(
+        createSelection(viewState.pinnedNode, runtimeState.graph),
+    )
+    const activeSelection = $derived(
+        viewState.pinnedNode ? pinnedSelection : hoveredSelection,
+    )
+
+    const nodeReducer = createNodeReducer(() => activeSelection)
+    const edgeReducer = createEdgeReducer(() => activeSelection)
 
     // ─── Event Handlers ──────────────────────────────────────────────────────────
 
@@ -60,20 +62,20 @@
     }
 
     const setHovered = (node: string | null) => {
-        viewState.hovered = createSelection(node, runtimeState.graph)
+        viewState.hoveredNode = node
         refreshSigma()
     }
 
     const setPinned = (node: string | null) => {
         // Toggle: if clicking the same node, unpin; otherwise pin the new node
-        const newNode = viewState.pinned.node === node ? null : node
-        viewState.pinned = createSelection(newNode, runtimeState.graph)
+        const newNode = viewState.pinnedNode === node ? null : node
+        viewState.pinnedNode = newNode
         refreshSigma()
     }
 
     const clearPinned = () => {
-        if (viewState.pinned.node) {
-            viewState.pinned = emptySelection()
+        if (viewState.pinnedNode) {
+            viewState.pinnedNode = null
             refreshSigma()
         }
     }
@@ -81,18 +83,24 @@
     // ─── Layout Control ──────────────────────────────────────────────────────────
 
     const stopLayout = () => {
-        if (runtimeState.layout) {
-            runtimeState.layout.stop()
-            runtimeState.layout.kill()
-            runtimeState.layout = null
-            runtimeState.isLayoutRunning = false
-        }
+        runtimeState.layout?.stop()
+        runtimeState.layout?.kill()
+        runtimeState.layout = null
+        runtimeState.isLayoutRunning = false
+    }
+
+    const destroySigma = () => {
+        stopLayout()
+
+        runtimeState.sigma?.kill()
+        runtimeState.sigma = null
+        runtimeState.graph = null
     }
 
     // ─── File Loading with Live Layout ───────────────────────────────────────────
 
     const handleFileLoad = async (file: File) => {
-        if (runtimeState.isLoading) return
+        if (runtimeState.isLoading || !container) return
 
         runtimeState.isLoading = true
         runtimeState.error = ""
@@ -107,11 +115,10 @@
             initializeNodePositions(graph)
 
             // Clean up previous instances
-            stopLayout()
-            runtimeState.sigma?.kill()
+            destroySigma()
 
             // Initialize Sigma immediately — graph appears right away
-            const sigma = new Sigma(graph, container!, {
+            const sigma = new Sigma(graph, container, {
                 renderLabels: true,
                 renderEdgeLabels: true,
                 nodeReducer,
@@ -129,6 +136,7 @@
             // Start live force-directed layout in web worker
             const layout = new FA2Layout(graph, {
                 settings: inferSettings(graph),
+                getEdgeWeight: "weight",
             })
             layout.start()
             runtimeState.layout = layout
@@ -163,17 +171,20 @@
     // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
     onDestroy(() => {
-        stopLayout()
-        runtimeState.sigma?.kill()
+        destroySigma()
     })
 </script>
 
 <main class="relative min-h-screen">
-    <footer class="absolute bottom-0 left-0 right-0 z-100 p-2 flex group">
+    <footer
+        class="absolute bottom-0 left-0 right-0 z-40 p-2 flex group hover:bg-white/50 hover:backdrop-blur-md transition hover:border-t-neutral-200 border-t border-t-transparent"
+    >
         <label class="cursor-pointer p-1" use:tooltip={"Load ontology file"}>
             <input
                 type="file"
-                accept={FILE_ACCEPT}
+                hidden
+                class="hidden"
+                accept={".json"}
                 disabled={isFileInputDisabled}
                 onchange={handleInputChange}
             />
@@ -207,7 +218,7 @@
                         type="file"
                         hidden
                         class="hidden"
-                        accept={FILE_ACCEPT}
+                        accept=".json"
                         disabled={isFileInputDisabled}
                         onchange={handleInputChange}
                     />

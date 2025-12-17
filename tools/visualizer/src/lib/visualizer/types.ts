@@ -9,8 +9,8 @@ export interface NodeSelection {
 }
 
 export interface ViewState {
-    hovered: NodeSelection
-    pinned: NodeSelection
+    hoveredNode: string | null
+    pinnedNode: string | null
 }
 
 export interface RuntimeState {

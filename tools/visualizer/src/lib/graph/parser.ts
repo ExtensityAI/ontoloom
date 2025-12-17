@@ -51,12 +51,12 @@ export const createOntologyGraph = (ontology: Ontology) => {
             parents: new Set<string>(),
             children: new Set<string>(),
             edges: new Set<string>(),
-        } )
+        })
     })
 
     const addEdgeToNodes = (edgeKey: string, source: string, target: string) => {
-        const sourceAttrs = G.getNodeAttributes(source) as NodeAttributes
-        const targetAttrs = G.getNodeAttributes(target) as NodeAttributes
+        const sourceAttrs = G.getNodeAttributes(source)
+        const targetAttrs = G.getNodeAttributes(target)
 
         // source -> target means: target is a parent of source, source is a child of target
         sourceAttrs.parents.add(target)

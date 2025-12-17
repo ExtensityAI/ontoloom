@@ -1,5 +1,5 @@
-import type Graph from "graphology"
-import type { NodeSelection, ViewState } from "./types"
+import type { HydraGraph } from "../graph/types"
+import type { NodeSelection } from "./types"
 
 export const emptySelection = (): NodeSelection => ({
     node: null,
@@ -10,18 +10,15 @@ export const emptySelection = (): NodeSelection => ({
 
 export const createSelection = (
     node: string | null,
-    graph: Graph | null,
+    graph: HydraGraph | null,
 ): NodeSelection => {
-    if (!node || !graph) return emptySelection()
+    if (!node || !graph || !graph.hasNode(node)) return emptySelection()
 
     const attrs = graph.getNodeAttributes(node)
     return {
         node,
-        parents: attrs.parents as Set<string>,
-        children: attrs.children as Set<string>,
-        connectedEdges: attrs.edges as Set<string>,
+        parents: attrs.parents,
+        children: attrs.children,
+        connectedEdges: attrs.edges,
     }
 }
-
-export const getActiveSelection = (viewState: ViewState): NodeSelection =>
-    viewState.pinned.node ? viewState.pinned : viewState.hovered
