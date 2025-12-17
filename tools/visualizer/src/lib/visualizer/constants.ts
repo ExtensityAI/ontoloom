@@ -8,27 +8,17 @@ export const COLORS = {
             child: "#fda4af", // rose-300
         },
         levels: [
-        "#f43f5e", // rose-500 (root)
-        "#f59e0b", // amber-500
-        "#84cc16", // lime-500
-        "#22c55e", // green-500
-        "#14b8a6", // teal-500
-        "#3b82f6", // blue-500
-        "#8b5cf6", // violet-500
-        "#ec4899", // pink-500
-        "#64748b", // slate-500
+            "#f43f5e", // rose-500 (root)
+            "#f59e0b", // amber-500
+            "#84cc16", // lime-500
+            "#22c55e", // green-500
+            "#14b8a6", // teal-500
+            "#3b82f6", // blue-500
+            "#8b5cf6", // violet-500
+            "#ec4899", // pink-500
+            "#64748b", // slate-500
     ]
 
-    },
-    edge: {
-        hierarchy: {
-            default: "#d6d3d1", // stone-300
-            active: "#a3a3a3", // stone-400
-        },
-        property: {
-            default: "#d6d3d1", // stone-300
-            active: "#a3a3a3", // stone-400
-        },
     },
 } as const
 

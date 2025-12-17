@@ -28,12 +28,11 @@ const getBaseNodeData = (data: NodeAttributes): Partial<NodeDisplayData> => ({
 })
 
 const getBaseEdgeData = (data: EdgeAttributes): Partial<EdgeDisplayData> => {
-    const isHierarchy = data.tag === "hierarchy"
-    const palette = isHierarchy ? COLORS.edge.hierarchy : COLORS.edge.property
+    const color = COLORS.inactive
 
     return {
         type: "arrow",
-        color: palette.default,
+        color: color,
         size: data.size,
         zIndex: 0,
         label: "",
@@ -61,13 +60,55 @@ export const createNodeReducer =
         if (!active) return base
 
         const rel = getNodeRelation(node, active)
-        const color = rel === "unrelated" ? COLORS.inactive : COLORS.node.focus[rel]
 
-        // don't show labels for unrelated nodes
-        const label = rel === "unrelated" ? "" : data.label
+        if(rel === "unrelated") return {
+            ...base,
+            color: COLORS.inactive,
+            label: ""
+        }
 
-        return { ...base, color, label }
+        return { ...base, color: COLORS.node.focus[rel], label: data.label, zIndex: 1, forceLabel: true }
     }
+
+const reduceHierarchyEdge = (
+    edge: string,
+    data: EdgeAttributes,
+    active: NodeSelection,
+    base: Partial<EdgeDisplayData>,
+) => {
+
+    const { source, target } = data
+    const node = active.node
+
+    let color;
+
+    if(source === node) {
+        // node to parent
+        color = COLORS.node.focus.selected
+    } else if(target === node) {
+        // child to node
+        color = COLORS.node.focus.child
+    } else if(active.parents.has(source)) {
+        // parent to parent, we do not track child to child
+        color = COLORS.node.focus.parent
+    } else {
+        // unrelated
+        return base
+    }
+
+    return {
+        ...base,
+        color,
+        size: ACTIVE_EDGE_SIZE,
+        zIndex: 1,
+        label: "isA",
+        forceLabel: true
+    }
+
+    
+
+
+}
 
 export const createEdgeReducer =
     (getActiveSelection: SelectionGetter) =>
@@ -77,22 +118,8 @@ export const createEdgeReducer =
 
         if (!active) return base
 
-        const palette = COLORS.edge[data.tag]
-
         if(data.label === "isA") {
-            // hierarchy edge
-            if (
-                active.node === data.source ||
-                active.node === data.target ||
-                active.parents.has(data.source) ||
-                active.children.has(data.target)
-            ) {
-                return {
-                    ...base,
-                    color: COLORS.node.focus.selected,
-                    size: ACTIVE_EDGE_SIZE,
-                }
-            }
+            return reduceHierarchyEdge(edge, data, active, base)
         }
 
         return {

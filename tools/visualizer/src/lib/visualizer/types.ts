@@ -6,6 +6,7 @@ import type { HydraSigma, HydraGraph, NodeAttributes } from "../graph/types"
 export interface ViewState {
     hoveredNode: string | null
     pinnedNode: string | null
+    searchVisible: boolean
 }
 
 

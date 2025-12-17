@@ -6,6 +6,7 @@
         FileInput as FileInputIcon,
         SquareIcon,
         LoaderCircleIcon,
+        SearchIcon,
     } from "lucide-svelte/icons"
     import { tooltip } from "./lib/ui/tooltip"
     import { ontologySchema } from "./lib/graph/schema"
@@ -17,10 +18,13 @@
     import { createSelection } from "./lib/visualizer/selection"
     import type { RuntimeState, ViewState } from "./lib/visualizer/types"
     import { inferSettings } from "graphology-layout-forceatlas2"
+    import NodeSearch from "./lib/ui/NodeSearch.svelte"
+    import { scale } from "svelte/transition"
 
     // ─── State ───────────────────────────────────────────────────────────────────
 
     let container: HTMLDivElement | null = $state(null)
+    let searchInput: HTMLInputElement | null = $state(null)
 
     let runtimeState: RuntimeState = $state({
         isLoading: false,
@@ -34,6 +38,7 @@
     let viewState: ViewState = $state({
         hoveredNode: null,
         pinnedNode: null,
+        searchVisible: false,
     })
 
     const isFileInputDisabled = $derived(runtimeState.isLoading || !container)
@@ -150,11 +155,27 @@
         }
     }
 
-    const handleInputChange = (e: Event) => {
+    const handleFileInputChange = (e: Event) => {
         const input = e.target as HTMLInputElement
         const file = input.files?.[0]
         if (file) handleFileLoad(file)
         input.value = ""
+    }
+
+    const handleNodeSelect = (nodeId: string) => {
+        if (!runtimeState.sigma) return
+
+        viewState.searchVisible = false
+        setPinned(nodeId)
+    }
+
+    const openSearch = () => {
+        if (!runtimeState.sigma) return
+
+        viewState.searchVisible = true
+        setTimeout(() => {
+            searchInput?.focus()
+        }, 10)
     }
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -162,6 +183,22 @@
     onDestroy(() => {
         destroySigma()
     })
+
+    // ─── Keyboard Shortcuts ─────────────────────────────────────────────────────
+
+    const handleKeyboardShortcut = async (e: KeyboardEvent) => {
+        if (!runtimeState.sigma) return
+
+        if (e.key === "/") {
+            e.preventDefault()
+            openSearch()
+        } else if (e.key === "Escape") {
+            if (viewState.searchVisible) {
+                viewState.searchVisible = false
+                e.preventDefault()
+            }
+        }
+    }
 </script>
 
 <main class="relative min-h-screen">
@@ -175,12 +212,22 @@
                 class="hidden"
                 accept={".json"}
                 disabled={isFileInputDisabled}
-                onchange={handleInputChange}
+                onchange={handleFileInputChange}
             />
             <FileInputIcon
                 class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
             />
         </label>
+
+        <button
+            class="cursor-pointer p-1"
+            use:tooltip={"Search for node"}
+            onclick={openSearch}
+        >
+            <SearchIcon
+                class="size-6 text-neutral-300 group-hover:text-neutral-600 hover:text-neutral-900 transition active:scale-95"
+            />
+        </button>
 
         {#if runtimeState.isLayoutRunning}
             <button
@@ -214,7 +261,7 @@
                         class="hidden"
                         accept=".json"
                         disabled={isFileInputDisabled}
-                        onchange={handleInputChange}
+                        onchange={handleFileInputChange}
                     />
                     <div class="text-center">
                         <FileInputIcon
@@ -240,4 +287,20 @@
             {/if}
         </div>
     {/if}
+
+    {#if viewState.searchVisible}
+        <!-- search action bar -->
+        <div
+            class="absolute top-96 left-1/2 -translate-x-1/2 z-50"
+            transition:scale={{ duration: 50 }}
+        >
+            <NodeSearch
+                bind:searchInput
+                onSelect={handleNodeSelect}
+                graph={runtimeState.graph!}
+            />
+        </div>
+    {/if}
 </main>
+
+<svelte:window onkeydown={handleKeyboardShortcut} />
