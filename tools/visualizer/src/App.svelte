@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { onDestroy } from "svelte"
+    import { onDestroy, tick } from "svelte"
     import Sigma from "sigma"
     import Graph from "graphology"
     import forceAtlas2, { inferSettings } from "graphology-layout-forceatlas2"
     import { ontologyExportSchema } from "../lib/schema"
     import { createOntologyGraph } from "../lib/graph"
-    import { FileInput } from "lucide-svelte/icons"
+    import { FileInput, RotateCwIcon } from "lucide-svelte/icons"
     import { tooltip } from "../lib/utils/tooltip"
 
     // ─── Constants ───────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@
         },
     } as const
 
-    const LAYOUT_ITERATIONS = 50_000
+    const LAYOUT_ITERATIONS = 5_000
     const BASE_NODE_SIZE = 8
     const NODE_SIZE_MULTIPLIER = 4
     const ACTIVE_EDGE_SIZE = 3
@@ -217,8 +217,14 @@
     }
 
     const handleFileLoad = async (file: File) => {
+        if (runtimeState.isLoading) return
+
         runtimeState.isLoading = true
         runtimeState.error = ""
+        runtimeState.fileName = file.name
+
+        // Yield to let the loading indicator render before blocking work
+        await tick()
 
         try {
             const content = await file.text()
@@ -249,7 +255,6 @@
 
             runtimeState.sigma = sigma
             runtimeState.graph = graph
-            runtimeState.fileName = file.name
         } catch (e) {
             console.error(e)
             runtimeState.error =
@@ -296,27 +301,37 @@
 
     {#if !runtimeState.sigma}
         <div class="absolute inset-0 flex items-stretch">
-            <label class="cursor-pointer grow grid place-items-center">
-                <input
-                    type="file"
-                    accept=".json"
-                    class="hidden"
-                    disabled={runtimeState.isLoading || !container}
-                    onchange={handleInputChange}
-                />
-                <div class="text-center">
-                    <FileInput class="size-12 mx-auto text-neutral-400 mb-4" />
-                    <p class="text-lg text-neutral-600 mb-2">
-                        Load an ontology-hydra export .json file to visualize
-                    </p>
+            {#if !runtimeState.isLoading}
+                <label class="cursor-pointer grow grid place-items-center">
+                    <input
+                        type="file"
+                        accept=".json"
+                        class="hidden"
+                        disabled={runtimeState.isLoading || !container}
+                        onchange={handleInputChange}
+                    />
+                    <div class="text-center">
+                        <FileInput
+                            class="size-12 mx-auto text-neutral-400 mb-4"
+                        />
+                        <p class="text-lg text-neutral-600">
+                            Load an ontology-hydra export .json file to
+                            visualize
+                        </p>
+                    </div>
+                </label>
+            {:else}
+                <div class="grow grid place-items-center">
+                    <div>
+                        <RotateCwIcon
+                            class="size-12 mx-auto text-neutral-400 mb-4 animate-spin"
+                        />
+                        <p class="text-lg text-neutral-600">
+                            Loading {runtimeState.fileName}…
+                        </p>
+                    </div>
                 </div>
-            </label>
-        </div>
-    {/if}
-
-    {#if runtimeState.isLoading}
-        <div class="absolute inset-0 z-20 grid place-items-center bg-white/80">
-            <p class="font-semibold text-slate-800">Loading…</p>
+            {/if}
         </div>
     {/if}
 

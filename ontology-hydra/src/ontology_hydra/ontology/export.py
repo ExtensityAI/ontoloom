@@ -27,7 +27,7 @@ class OntologyExport(BaseModel):
     properties: list[DataPropertyExport | ObjectPropertyExport]
 
 
-with open("/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology/partial.json") as f:
+with open("/Users/adrian/Desktop/Projects/ontology-hydra/test/out/ontology.json") as f:
     ontology = Ontology.model_validate_json(f.read())
 
 
