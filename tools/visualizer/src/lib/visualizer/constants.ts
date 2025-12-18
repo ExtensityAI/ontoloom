@@ -1,11 +1,11 @@
 
 export const COLORS = {
-    inactive: "#e7e5e4", // stone-200
+    inactive: "#f5f5f5", // neutral-100
     node: {
         focus: {
-            selected: "#e11d48", // rose-600
+            selected: "#f43f5e", // rose-500
             parent: "#4c0519", // rose-950
-            child: "#fda4af", // rose-300
+            child: "#fecdd3", // rose-200
         },
         levels: [
             "#f43f5e", // rose-500 (root)
@@ -22,6 +22,6 @@ export const COLORS = {
     },
 } as const
 
-export const BASE_NODE_SIZE = 8
-export const NODE_SIZE_MULTIPLIER = 4
+export const BASE_NODE_SIZE = 6
+export const NODE_SIZE_MULTIPLIER = 2
 export const ACTIVE_EDGE_SIZE = 3

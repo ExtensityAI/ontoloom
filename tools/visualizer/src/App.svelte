@@ -24,7 +24,8 @@
     // ─── State ───────────────────────────────────────────────────────────────────
 
     let container: HTMLDivElement | null = $state(null)
-    let searchInput: HTMLInputElement | null = $state(null)
+    let layoutAutoStopTimeout: ReturnType<typeof setTimeout> | undefined =
+        undefined
 
     let runtimeState: RuntimeState = $state({
         isLoading: false,
@@ -86,6 +87,11 @@
     // ─── Layout Control ──────────────────────────────────────────────────────────
 
     const stopLayout = () => {
+        if (layoutAutoStopTimeout) {
+            clearTimeout(layoutAutoStopTimeout)
+            layoutAutoStopTimeout = undefined
+        }
+
         runtimeState.layout?.stop()
         runtimeState.layout?.kill()
         runtimeState.layout = null
@@ -134,8 +140,13 @@
             runtimeState.graph = graph
 
             // Start live force-directed layout in web worker
+            const settings = inferSettings(graph)
+
             const layout = new FA2Layout(graph, {
-                settings: inferSettings(graph),
+                settings: {
+                    ...settings,
+                    adjustSizes: true,
+                },
                 getEdgeWeight: "weight",
             })
             layout.start()
@@ -143,7 +154,8 @@
             runtimeState.isLayoutRunning = true
 
             // Auto-stop after 10 seconds (usually converged by then)
-            setTimeout(() => {
+            if (layoutAutoStopTimeout) clearTimeout(layoutAutoStopTimeout)
+            layoutAutoStopTimeout = setTimeout(() => {
                 if (runtimeState.layout === layout) {
                     stopLayout()
                 }
@@ -163,8 +175,6 @@
     }
 
     const handleNodeSelect = (nodeId: string) => {
-        if (!runtimeState.sigma) return
-
         viewState.searchVisible = false
         setPinned(nodeId)
     }
@@ -173,9 +183,6 @@
         if (!runtimeState.sigma) return
 
         viewState.searchVisible = true
-        setTimeout(() => {
-            searchInput?.focus()
-        }, 10)
     }
 
     // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -194,14 +201,19 @@
             openSearch()
         } else if (e.key === "Escape") {
             if (viewState.searchVisible) {
-                viewState.searchVisible = false
                 e.preventDefault()
+
+                viewState.searchVisible = false
+            } else if (activeSelection) {
+                e.preventDefault()
+
+                setPinned(null)
             }
         }
     }
 </script>
 
-<main class="relative min-h-screen">
+<main class="relative h-svh w-svw overflow-hidden">
     <footer
         class="absolute bottom-0 left-0 right-0 z-40 p-2 flex group hover:bg-white/50 hover:backdrop-blur-md transition hover:border-t-neutral-200 border-t border-t-transparent items-center"
     >
@@ -290,14 +302,14 @@
         </div>
     {/if}
 
+    <!-- dialogs and modals -->
     {#if viewState.searchVisible}
         <!-- search action bar -->
         <div
-            class="absolute top-96 left-1/2 -translate-x-1/2 z-50"
+            class="absolute top-1/4 left-1/2 -translate-x-1/2 z-50"
             transition:scale={{ duration: 50 }}
         >
             <NodeSearch
-                bind:searchInput
                 onSelect={handleNodeSelect}
                 graph={runtimeState.graph!}
             />

@@ -73,7 +73,7 @@ export const createOntologyGraph = (ontology: Ontology) => {
                 tag: "hierarchy",
                 label: "isA",
                 size: 2,
-                weight: 3,
+                weight: 5,
                 source: name,
                 target: cls.superclass!,
             })
