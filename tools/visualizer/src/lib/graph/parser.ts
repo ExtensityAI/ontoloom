@@ -38,13 +38,15 @@ export const createOntologyGraph = (ontology: Ontology) => {
         type: "mixed",
     })
 
+    const n = Object.entries(ontology.classes).length
+    const bound = n * Math.log(n)
+
     const classLevels = computeClassLevels(ontology.classes)
     const maxLevel = Math.max(...classLevels.values(), 0)
     const order = Object.keys(ontology.classes).length
 
     // Add class nodes
     Object.entries(ontology.classes).forEach(([name, cls], i) => {
-        const angle = (i / order) * Math.PI * 2
         const level = classLevels.get(name) ?? 0
 
         G.addNode(name, {
@@ -55,8 +57,8 @@ export const createOntologyGraph = (ontology: Ontology) => {
             children: new Set<string>(),
             edges: new Set<string>(),
 
-            x: Math.cos(angle) * 100,
-            y: Math.sin(angle) * 100,
+            x: bound * (Math.random() - 0.5),
+            y: bound * (Math.random() - 0.5),
         })
     })
 

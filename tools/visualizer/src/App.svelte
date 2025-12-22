@@ -196,10 +196,20 @@
     const handleKeyboardShortcut = async (e: KeyboardEvent) => {
         if (!runtimeState.sigma) return
 
-        if (e.key === "/") {
-            e.preventDefault()
-            openSearch()
-        } else if (e.key === "Escape") {
+        if (
+            !(e.target instanceof HTMLInputElement) &&
+            !(e.target instanceof HTMLTextAreaElement)
+        ) {
+            // make sure some shortcuts ONLY run if we do not focus some input/textarea element
+
+            if (e.key === "/") {
+                e.preventDefault()
+                openSearch()
+                return
+            }
+        }
+
+        if (e.key === "Escape") {
             if (viewState.searchVisible) {
                 e.preventDefault()
 
