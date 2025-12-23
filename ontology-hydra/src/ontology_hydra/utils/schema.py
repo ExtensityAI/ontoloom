@@ -1,6 +1,8 @@
 import json
-from enum import StrEnum
-from typing import Annotated, Literal, NewType
+from enum import Enum, StrEnum
+from inspect import getdoc
+from types import NoneType, UnionType
+from typing import Annotated, Literal, NewType, Union, get_args, get_origin
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from symai.strategy import LLMDataModel
@@ -95,39 +97,221 @@ class EnumTypeSchema(TypeSchema):
 class Schema(ClassTypeSchema):
     types: dict[TypeName, ClassTypeSchema | EnumTypeSchema]
 
+    def format(self):
+        # TODO: consider renaming to something more appropriate
+        return format_schema(self)
+
 
 class Model(LLMDataModel):
     model_config = ConfigDict(strict=True)
 
 
-def _compact_text(text: str) -> str:
+# --- Schema generation helpers ----------------------
+
+
+def _description_from_doc(obj: object) -> str | None:
+    doc = getdoc(obj)
+    return doc or None
+
+
+def _description_from_model_schema(model_type: type[BaseModel]) -> str | None:
+    schema = model_type.model_json_schema()
+    description = schema.get("description")
+    if isinstance(description, str) and description:
+        return description
+    return None
+
+
+def _unwrap_annotated(annotation: object) -> object:
+    while get_origin(annotation) is Annotated:
+        args = get_args(annotation)
+        if not args:
+            return annotation
+        annotation = args[0]
+    return annotation
+
+
+def _flatten_union(expressions: list[TypeExpression]) -> list[TypeExpression]:
+    flattened: list[TypeExpression] = []
+    for expr in expressions:
+        if isinstance(expr, UnionExpression):
+            flattened.extend(expr.any_of)
+        else:
+            flattened.append(expr)
+    return flattened
+
+
+def _literal_to_expression(values: tuple[object, ...]) -> TypeExpression:
+    non_none = [value for value in values if value is not None]
+    if not non_none:
+        msg = "Literal[None] is not supported for schema generation."
+        raise ValueError(msg)
+    literals = [LiteralExpression(value=value) for value in non_none]
+    expr: TypeExpression
+    expr = literals[0] if len(literals) == 1 else UnionExpression(any_of=literals)
+    if len(non_none) != len(values):
+        return OptionalExpression(value=expr)
+    return expr
+
+
+def _ensure_enum_schema(
+    enum_type: type[Enum],
+    types: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
+    seen_enums: set[type[Enum]],
+):
+    if enum_type in seen_enums:
+        return
+    seen_enums.add(enum_type)
+    types[TypeName(enum_type.__name__)] = EnumTypeSchema(
+        description=_description_from_doc(enum_type),
+        values=[EnumValue(str(member.value)) for member in enum_type],
+    )
+
+
+def _collect_model_properties(
+    model_type: type[BaseModel],
+    types: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
+    seen_models: set[type[BaseModel]],
+    seen_enums: set[type[Enum]],
+) -> dict[PropertyName, PropertySchema]:
+    properties: dict[PropertyName, PropertySchema] = {}
+    for name, field_info in model_type.model_fields.items():
+        annotation = field_info.annotation
+        if annotation is None:
+            msg = f"Missing type annotation for {model_type.__name__}.{name}"
+            raise TypeError(msg)
+        type_expr = _type_to_expression(annotation, types, seen_models, seen_enums)
+        properties[PropertyName(name)] = PropertySchema(
+            description=field_info.description,
+            type=type_expr,
+        )
+    return properties
+
+
+def _ensure_class_schema(
+    model_type: type[BaseModel],
+    types: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
+    seen_models: set[type[BaseModel]],
+    seen_enums: set[type[Enum]],
+):
+    if model_type in seen_models:
+        return
+    seen_models.add(model_type)
+    properties = _collect_model_properties(model_type, types, seen_models, seen_enums)
+    types[TypeName(model_type.__name__)] = ClassTypeSchema(
+        description=_description_from_model_schema(model_type),
+        properties=properties,
+    )
+
+
+def _type_to_expression(
+    annotation: object,
+    types: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
+    seen_models: set[type[BaseModel]],
+    seen_enums: set[type[Enum]],
+) -> TypeExpression:
+    annotation = _unwrap_annotated(annotation)
+    origin = get_origin(annotation)
+
+    if origin is Literal:
+        return _literal_to_expression(get_args(annotation))
+
+    if origin in (UnionType, Union):
+        args = get_args(annotation)
+        non_none = [arg for arg in args if arg is not NoneType]
+        expressions = [_type_to_expression(arg, types, seen_models, seen_enums) for arg in non_none]
+        expressions = _flatten_union(expressions)
+        if not expressions:
+            msg = "Union annotations must include at least one non-None type."
+            raise TypeError(msg)
+        if len(expressions) == 1:
+            union_expr: TypeExpression = expressions[0]
+        else:
+            union_expr = UnionExpression(any_of=expressions)
+        if len(non_none) != len(args):
+            return OptionalExpression(value=union_expr)
+        return union_expr
+
+    if origin is list:
+        args = get_args(annotation)
+        if not args:
+            msg = "List annotations must include an item type."
+            raise TypeError(msg)
+        return ListExpression(items=_type_to_expression(args[0], types, seen_models, seen_enums))
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        _ensure_class_schema(annotation, types, seen_models, seen_enums)
+        return RefExpression(name=TypeName(annotation.__name__))
+
+    if isinstance(annotation, type) and issubclass(annotation, Enum):
+        _ensure_enum_schema(annotation, types, seen_enums)
+        return RefExpression(name=TypeName(annotation.__name__))
+
+    if annotation is str:
+        return PrimitiveExpression(dtype=DataType.STRING)
+    if annotation is bool:
+        return PrimitiveExpression(dtype=DataType.BOOLEAN)
+    if annotation is int:
+        return PrimitiveExpression(dtype=DataType.INT)
+    if annotation is float:
+        return PrimitiveExpression(dtype=DataType.FLOAT)
+
+    msg = f"Unsupported annotation for schema generation: {annotation!r}"
+    raise TypeError(msg)
+
+
+def schema_from_model(model_type: type[BaseModel]) -> Schema:
+    if not issubclass(model_type, BaseModel):
+        msg = "schema_from_model expects a Pydantic BaseModel subclass."
+        raise TypeError(msg)
+
+    types: dict[TypeName, ClassTypeSchema | EnumTypeSchema] = {}
+    seen_models: set[type[BaseModel]] = set()
+    seen_enums: set[type[Enum]] = set()
+    properties = _collect_model_properties(model_type, types, seen_models, seen_enums)
+
+    return Schema(
+        description=_description_from_model_schema(model_type),
+        properties=properties,
+        types=types,
+    )
+
+
+# --- Text formatting helpers -------------------------
+def _compact_text(text: str):
     return " ".join(text.split())
 
 
-def _format_literal(value: str | int | float | bool | None) -> str:
+def _with_description(line: str, description: str | None):
+    if not description:
+        return line
+    return f"{line}  # {_compact_text(description)}"
+
+
+def _format_literal(value: str | int | float | bool | None):
     return json.dumps(value, ensure_ascii=True)
 
 
-def _paranthesized(value: str):
-    return f"({value})"
+def _wrap_in_parens(text: str):
+    return f"({text})"
 
 
-def _unwrap_optional(expr: TypeExpression) -> tuple[bool, TypeExpression]:
-    if isinstance(expr, OptionalExpression):
-        return True, expr.value
+# --- Type formatting helpers ------------------------
 
-    return False, expr
+
+def _wrap_if_union(expr: TypeExpression, text: str):
+    return _wrap_in_parens(text) if isinstance(expr, UnionExpression) else text
+
+
+def _format_optional_text(inner_text: str, inner_expr: TypeExpression):
+    wrapped = _wrap_if_union(inner_expr, inner_text)
+    return f"optional[{wrapped}]"
 
 
 def _format_type_inline(expr: TypeExpression, enum_names: set[str]) -> str:
     if isinstance(expr, OptionalExpression):
         inner = _format_type_inline(expr.value, enum_names)
-
-        if isinstance(expr.value, UnionExpression):
-            # TODO: consider omitting ()
-            inner = _paranthesized(inner)
-
-        return f"optional[{inner}]"
+        return _format_optional_text(inner, expr.value)
 
     if isinstance(expr, PrimitiveExpression):
         return expr.dtype.value
@@ -143,8 +327,7 @@ def _format_type_inline(expr: TypeExpression, enum_names: set[str]) -> str:
 
     if isinstance(expr, ListExpression):
         items = _format_type_inline(expr.items, enum_names)
-        if isinstance(expr.items, UnionExpression):
-            items = _paranthesized(items)
+        items = _wrap_if_union(expr.items, items)
         return f"list[{items}]"
 
     if isinstance(expr, UnionExpression):
@@ -154,34 +337,48 @@ def _format_type_inline(expr: TypeExpression, enum_names: set[str]) -> str:
     raise TypeError(msg)
 
 
-def _format_property_type(expr: TypeExpression, enum_names: set[str]) -> str:
-    optional, base_expr = _unwrap_optional(expr)
-    type_text = _format_type_inline(base_expr, enum_names)
-
-    if optional:
-        if isinstance(base_expr, UnionExpression):
-            type_text = _paranthesized(type_text)
-        type_text = f"optional[{type_text}]"
-
-    return type_text
+# -- Schema rendering helpers -------------------------------------
 
 
 def _format_properties(
     properties: dict[PropertyName, PropertySchema],
     indent: str,
     enum_names: set[str],
-) -> list[str]:
+):
     lines: list[str] = []
     for name, prop in sorted(properties.items(), key=lambda item: str(item[0])):
-        type_text = _format_property_type(prop.type, enum_names)
-        line = f"{indent}{name}: {type_text}"
-        if prop.description:
-            line = f"{line}  # {_compact_text(prop.description)}"
+        type_text = _format_type_inline(prop.type, enum_names)
+        line = _with_description(f"{indent}{name}: {type_text}", prop.description)
         lines.append(line)
     return lines
 
 
-def format_schema(schema: Schema) -> str:
+def _format_enum_values(values: list[EnumValue]):
+    return " | ".join(_format_literal(str(value)) for value in values)
+
+
+def _format_type_block(
+    name: TypeName,
+    type_schema: ClassTypeSchema | EnumTypeSchema,
+    enum_names: set[str],
+):
+    if isinstance(type_schema, EnumTypeSchema):
+        values_text = _format_enum_values(type_schema.values)
+        line = _with_description(f"  {name}: {values_text}", type_schema.description)
+        return [line]
+
+    if isinstance(type_schema, ClassTypeSchema):
+        line = _with_description(f"  {name}:", type_schema.description)
+        return [
+            line,
+            *_format_properties(type_schema.properties, indent="    ", enum_names=enum_names),
+        ]
+
+    msg = f"Unknown type schema: {type_schema}"
+    raise ValueError(msg)
+
+
+def format_schema(schema: Schema):
     lines = ["[[SCHEMA]] (use exact field names)"]
 
     if schema.description:
@@ -202,234 +399,11 @@ def format_schema(schema: Schema) -> str:
         lines.append("Types:")
 
         ordered_types = sorted(schema.types.items(), key=lambda item: str(item[0]))
-
         for index, (name, type_schema) in enumerate(ordered_types):
-            if isinstance(type_schema, EnumTypeSchema):
-                # format enum
-                values = [_format_literal(str(value)) for value in type_schema.values]
-                values_text = " | ".join(values)
-                line = f"  {name}: {values_text}"
-
-                if type_schema.description:
-                    line = f"{line}  # {_compact_text(type_schema.description)}"
-
-                lines.append(line)
-
-            elif isinstance(type_schema, ClassTypeSchema):
-                # format class type
-                line = f"  {name}:"
-
-                if type_schema.description:
-                    line = f"{line}  # {_compact_text(type_schema.description)}"
-
-                lines.append(line)
-                lines.extend(
-                    _format_properties(type_schema.properties, indent="    ", enum_names=enum_names)
-                )
-            else:
-                msg = f"Unknown type schema: {type_schema}"
-                raise ValueError(msg)
+            lines.extend(_format_type_block(name, type_schema, enum_names))
 
             if index < len(ordered_types) - 1:
                 # add blank line between types
                 lines.append("")
 
-    while lines and lines[-1] == "":
-        lines.pop()
-
     return "\n".join(lines)
-
-
-EXAMPLE_SCHEMA = Schema(
-    description="Example schema exercising ref, union, list, primitive, and literal types.",
-    properties={
-        PropertyName("id"): PropertySchema(
-            description="Stable document identifier.",
-            type=PrimitiveExpression(dtype=DataType.STRING),
-        ),
-        PropertyName("status"): PropertySchema(
-            type=RefExpression(name=TypeName("Status")),
-        ),
-        PropertyName("owner"): PropertySchema(
-            type=RefExpression(name=TypeName("User")),
-        ),
-        PropertyName("contributors"): PropertySchema(
-            type=OptionalExpression(
-                value=ListExpression(items=RefExpression(name=TypeName("User")))
-            ),
-        ),
-        PropertyName("labels"): PropertySchema(
-            type=OptionalExpression(
-                value=ListExpression(items=PrimitiveExpression(dtype=DataType.STRING))
-            ),
-        ),
-        PropertyName("visibility"): PropertySchema(
-            type=RefExpression(name=TypeName("Visibility")),
-        ),
-        PropertyName("metadata"): PropertySchema(
-            type=OptionalExpression(value=RefExpression(name=TypeName("Metadata"))),
-        ),
-        PropertyName("attachments"): PropertySchema(
-            type=ListExpression(items=RefExpression(name=TypeName("Attachment"))),
-        ),
-    },
-    types={
-        TypeName("Status"): EnumTypeSchema(
-            description="Workflow state for a document.",
-            values=[
-                EnumValue("draft"),
-                EnumValue("review"),
-                EnumValue("published"),
-            ],
-        ),
-        TypeName("Visibility"): EnumTypeSchema(
-            description="Access level for the document.",
-            values=[
-                EnumValue("public"),
-                EnumValue("internal"),
-                EnumValue("private"),
-            ],
-        ),
-        TypeName("MediaType"): EnumTypeSchema(
-            description="MIME types supported for attachments.",
-            values=[
-                EnumValue("text/plain"),
-                EnumValue("application/json"),
-                EnumValue("image/png"),
-            ],
-        ),
-        TypeName("Role"): EnumTypeSchema(
-            description="Account role used for access control.",
-            values=[
-                EnumValue("admin"),
-                EnumValue("editor"),
-                EnumValue("viewer"),
-            ],
-        ),
-        TypeName("User"): ClassTypeSchema(
-            description="Account holder with role assignments.",
-            properties={
-                PropertyName("user_id"): PropertySchema(
-                    type=PrimitiveExpression(dtype=DataType.STRING),
-                ),
-                PropertyName("email"): PropertySchema(
-                    type=PrimitiveExpression(dtype=DataType.STRING),
-                ),
-                PropertyName("roles"): PropertySchema(
-                    type=OptionalExpression(
-                        value=ListExpression(items=RefExpression(name=TypeName("Role")))
-                    ),
-                ),
-            },
-        ),
-        TypeName("Metadata"): ClassTypeSchema(
-            description="Structured metadata with mixed literals and primitives.",
-            properties={
-                PropertyName("version"): PropertySchema(
-                    type=UnionExpression(
-                        any_of=[
-                            PrimitiveExpression(dtype=DataType.INT),
-                            LiteralExpression(value="v1"),
-                            LiteralExpression(value="v2"),
-                        ]
-                    ),
-                ),
-                PropertyName("checksum"): PropertySchema(
-                    type=OptionalExpression(value=PrimitiveExpression(dtype=DataType.STRING)),
-                ),
-            },
-        ),
-        TypeName("Attachment"): ClassTypeSchema(
-            description="Binary or textual attachments for a document.",
-            properties={
-                PropertyName("filename"): PropertySchema(
-                    type=PrimitiveExpression(dtype=DataType.STRING),
-                ),
-                PropertyName("size_bytes"): PropertySchema(
-                    type=PrimitiveExpression(dtype=DataType.INT),
-                ),
-                PropertyName("content"): PropertySchema(
-                    type=OptionalExpression(
-                        value=UnionExpression(
-                            any_of=[
-                                PrimitiveExpression(dtype=DataType.STRING),
-                                ListExpression(items=PrimitiveExpression(dtype=DataType.INT)),
-                            ]
-                        )
-                    ),
-                ),
-                PropertyName("media_type"): PropertySchema(
-                    type=RefExpression(name=TypeName("MediaType")),
-                ),
-            },
-        ),
-    },
-)
-
-
-# Example Pydantic models derived from EXAMPLE_SCHEMA.
-class Status(StrEnum):
-    DRAFT = "draft"
-    REVIEW = "review"
-    PUBLISHED = "published"
-
-
-class Visibility(StrEnum):
-    PUBLIC = "public"
-    INTERNAL = "internal"
-    PRIVATE = "private"
-
-
-class MediaType(StrEnum):
-    TEXT_PLAIN = "text/plain"
-    APPLICATION_JSON = "application/json"
-    IMAGE_PNG = "image/png"
-
-
-class Role(StrEnum):
-    ADMIN = "admin"
-    EDITOR = "editor"
-    VIEWER = "viewer"
-
-
-class UserModel(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    user_id: str
-    email: str
-    roles: list[Role] | None = None
-
-
-class MetadataModel(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    version: int | Literal["v1", "v2"]
-    checksum: str | None = None
-
-
-class AttachmentModel(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    filename: str
-    size_bytes: int
-    content: str | list[int] | None = None
-    media_type: MediaType
-
-
-class ExampleRootModel(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    id: str
-    status: Status
-    owner: UserModel
-    contributors: list[UserModel] | None = None
-    labels: list[str] | None = None
-    visibility: Visibility
-    metadata: MetadataModel | None = None
-    attachments: list[AttachmentModel]
-
-
-print(EXAMPLE_SCHEMA.model_dump_json(exclude_none=True))
-
-print("\n\n\n\nvs\n\n\n\n\n")
-print(format_schema(EXAMPLE_SCHEMA))
