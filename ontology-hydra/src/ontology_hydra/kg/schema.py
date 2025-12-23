@@ -9,6 +9,7 @@ from ontology_hydra.ontology.models import (
     DataProperty,
     DataType,
     Description,
+    IntersectionOf,
     ObjectProperty,
     Ontology,
 )
@@ -24,13 +25,13 @@ class DynamicPartialKnowledgeGraph(LLMDataModel):
 
 
 _data_type_to_python: dict[DataType, type] = {
-    "string": str,
-    "int": int,
-    "float": float,
-    "boolean": bool,
-    "datetime": datetime,
-    "date": date,
-    "time": time,
+    DataType.STRING: str,
+    DataType.INT: int,
+    DataType.FLOAT: float,
+    DataType.BOOLEAN: bool,
+    DataType.DATETIME: datetime,
+    DataType.DATE: date,
+    DataType.TIME: time,
 }
 
 # TODO auto-provide format information for datetime, date, and time types in the schema
@@ -68,7 +69,13 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
     # TODO for date, time and datetime, add format information
 
     if isinstance(prop, ObjectProperty):
-        # TODO prop_range = ", ".join(prop.range)
+        prop_range = ", ".join(
+            "intersectionOf(" + ", ".join(expr.intersectionOf) + ")"
+            if isinstance(expr, IntersectionOf)
+            else str(expr)
+            for expr in prop.range
+        )
+        range_hint = prop_range if prop_range else "unspecified"
 
         return (
             list[str]
@@ -77,7 +84,10 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
             # TODO respect functionality
             Field(
                 None,
-                description=f"Provide a list of entity names ONLY OF the specified range ({range}). {_generate_description(prop.description)}",
+                description=(
+                    "Provide a list of entity names ONLY OF the specified range "
+                    f"({range_hint}). {_generate_description(prop.description)}"
+                ),
             ),
         )
 
@@ -117,7 +127,7 @@ def generate_kg_schema(ontology: Ontology):
     classes = [
         _generate_class_schema(ontology, cls)
         for cls in ontology.classes.values()
-        if cls.superclass is not None
+        if cls.subClassOf
     ]
 
     # create a union type out of the classes

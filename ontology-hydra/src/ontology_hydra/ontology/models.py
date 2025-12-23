@@ -1,151 +1,155 @@
-from typing import Literal
+from enum import StrEnum
+from typing import NewType
 
-from pydantic import ConfigDict, Field
-from symai.strategy import LLMDataModel
+from pydantic import Field
 
-Characteristic = Literal[
-    "functional",
-    "inverseFunctional",
-    "transitive",
-    "symmetric",
-    "asymmetric",
-    "reflexive",
-    "irreflexive",
-]
+from ontology_hydra.utils.schema import Model
 
-DataType = Literal[
-    "string",
-    "int",
-    "float",
-    "boolean",
-    "datetime",
-    "date",
-    "time",
-]
+# define custom types for names to enhance static type checking
+ClassName = NewType("ClassName", str)
+PropertyName = NewType("PropertyName", str)
 
 
-class Model(LLMDataModel):
-    model_config = ConfigDict(
-        frozen=True  # model is immutable by default
-    )
+def is_none(v):
+    return v is None
 
 
 class Description(Model):
-    """Represents the description of an ontology element."""
-
     description: str | None = Field(
-        default=None,
-        description="Textual description of how to use this element. Keep this concise and only provide relevant information!",
+        None, description="Short human-readable definition for the term.", exclude_if=is_none
     )
     constraints: str | None = Field(
-        default=None,
-        description="Constraints or rules that must be followed when using this element.",
+        None, description="Optional constraints or modeling notes.", exclude_if=is_none
     )
 
-    def __hash__(self):
-        return hash((self.description, self.constraints))
+
+class DataType(StrEnum):
+    STRING = "string"
+    INT = "int"
+    FLOAT = "float"
+    BOOLEAN = "boolean"
+    DATETIME = "datetime"
+    DATE = "date"
+    TIME = "time"
 
 
-class DataProperty(Model):
-    type: Literal["data"] = Field(
-        "data", description="Set to 'data' to indicate that you are generating a data property."
+class IntersectionOf(Model):
+    intersectionOf: list[ClassName] = Field(
+        ..., description="A class expression defined as an intersection of classes."
     )
-    name: str
-    description: Description | None = None
-
-    characteristics: list[Characteristic] = Field(default_factory=list)
-
-    domain: list[str] = Field(default_factory=list)
-    range: DataType
 
 
-class ObjectProperty(Model):
-    type: Literal["object"] = Field(
-        "object",
-        description="Set to 'object' to indicate that you are generating an object property.",
-    )
-    name: str
-    description: Description | None = None
-
-    characteristics: list[Characteristic] = Field(default_factory=list)
-
-    domain: list[str] = Field(default_factory=list)
-    range: list[str] = Field(default_factory=list)
+ClassExpression = ClassName | IntersectionOf
 
 
 class Class(Model):
-    name: str
-    description: Description | None = None
-    own_properties: list[str]
+    name: ClassName = Field(..., description="Unique class identifier (PascalCase).")
+    description: Description | None = Field(
+        None,
+        description="Definition and constraints for the class.",
+        exclude_if=lambda v: is_none(v) or (v.description is None and v.constraints is None),
+    )
+    subClassOf: list[ClassName] = Field(
+        default_factory=list,
+        description="Superclasses for rdfs:subClassOf (supports multiple inheritance).",
+    )
+    equivalentClass: list[ClassExpression] = Field(
+        default_factory=list,
+        description="Class expressions equivalent to this class (owl:equivalentClass).",
+    )
 
-    superclass: str | None
+
+class DataProperty(Model):
+    name: PropertyName = Field(..., description="Data property name (camelCase).")
+    description: Description | None = Field(
+        None, description="Definition and constraints for the data property."
+    )
+    subPropertyOf: list[PropertyName] = Field(
+        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
+    )
+    domain: list[ClassExpression] = Field(
+        default_factory=list,
+        description="Domain classes or intersections (rdfs:domain).",
+    )
+    range: DataType = Field(..., description="Literal datatype range (rdfs:range).")
+
+
+class ObjectProperty(Model):
+    name: PropertyName = Field(..., description="Object property name (camelCase).")
+    description: Description | None = Field(
+        None, description="Definition and constraints for the object property."
+    )
+    subPropertyOf: list[PropertyName] = Field(
+        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
+    )
+    domain: list[ClassExpression] = Field(
+        default_factory=list,
+        description="Domain classes or intersections (rdfs:domain).",
+    )
+    range: list[ClassExpression] = Field(
+        default_factory=list,
+        description="Range classes or intersections (rdfs:range).",
+    )
+    inverseOf: PropertyName | None = Field(
+        None, description="Inverse object property (owl:inverseOf)."
+    )
 
 
 class Ontology(Model):
-    classes: dict[str, Class] = Field(default_factory=dict)
-    object_properties: dict[str, ObjectProperty] = Field(default_factory=dict)
-    data_properties: dict[str, DataProperty] = Field(default_factory=dict)
-
-    @property
-    def properties(self):
-        """Returns a combined dictionary of all object and data properties."""
-        return dict[str, DataProperty | ObjectProperty](
-            **self.object_properties, **self.data_properties
-        )
-
-    @property
-    def root(
-        self,
-    ):  # TODO enforce a root in the first iteration of ontology generator, then we can ensure that this is never None
-        """Returns the root class of the ontology, which is the class without a superclass."""
-        return next((cls for cls in self.classes.values() if cls.superclass is None), None)
-
-    def get_superclass(self, cls: Class):
-        """Returns the super class of the given class, or None if it is the root."""
-        return self.classes[cls.superclass] if cls.superclass is not None else None
-
-    def get_ancestors(self, cls: Class):
-        """Returns the class hierarchy chain starting from the root down to the given class."""
-        chain = list[Class]()
-        c = self.get_superclass(cls)
-
-        while c is not None:
-            chain.append(c)
-            c = self.get_superclass(c)
-
-        return chain
-
-    def get_descendants(self, cls: Class):
-        """Returns all descendant classes of the given class."""
-        return [c for c in self.classes.values() if c.superclass == cls.name]
-
-    def get_properties(self, cls: Class, include_inherited: bool = True):
-        """Returns all properties associated with a class, optionally including inherited properties."""
-
-        all_props = self.properties
-        chain = self.get_ancestors(cls) if include_inherited else [cls]
-
-        props = dict[str, DataProperty | ObjectProperty]()
-
-        for c in chain:
-            props.update({prop_name: all_props[prop_name] for prop_name in c.own_properties})
-
-        return props
-
-    def resolve_class_names(self, class_names: list[str]):
-        """Resolves the given class names to class instances."""
-        return [self.classes[cn] for cn in class_names]
-
-
-class ClassModel(Model):
-    # TODO add field and type __doc__!!!
-    type: Literal["class"] = Field(
-        "class", description="Set to 'class' to indicate that you are generating a class."
+    classes: dict[ClassName, Class] = Field(
+        default_factory=dict, description="Class definitions keyed by class name."
     )
-    name: str
-    description: Description | None = None
-    superclass: str | None
+    dataProperties: dict[PropertyName, DataProperty] = Field(
+        default_factory=dict, description="Datatype properties keyed by property name."
+    )
+    objectProperties: dict[PropertyName, ObjectProperty] = Field(
+        default_factory=dict, description="Object properties keyed by property name."
+    )
+
+    def clone(self):
+        # serialize to str and back to get a deep clone. TODO: exchange for something faster
+        return Ontology.model_validate_json(self.model_dump_json())
+
+    def get_properties(self, cls: Class):
+        class_names = {cls.name}
+        queue = list(cls.subClassOf)
+        while queue:
+            parent = queue.pop()
+            if parent in class_names:
+                continue
+            class_names.add(parent)
+            parent_cls = self.classes.get(parent)
+            if parent_cls is not None:
+                queue.extend(parent_cls.subClassOf)
+
+        def _matches(expr: ClassExpression) -> bool:
+            if isinstance(expr, IntersectionOf):
+                return all(name in class_names for name in expr.intersectionOf)
+            return expr in class_names
+
+        properties: dict[PropertyName, DataProperty | ObjectProperty] = {}
+        for name, prop in self.dataProperties.items():
+            if any(_matches(expr) for expr in prop.domain):
+                properties[name] = prop
+        for name, prop in self.objectProperties.items():
+            if any(_matches(expr) for expr in prop.domain):
+                properties[name] = prop
+        return properties
 
 
-# TODO make object and data properties models too, i.e. decouple their inter class from the generated ones like with class model
-Concept = ClassModel | ObjectProperty | DataProperty
+_THING = Class(
+    name=ClassName("Thing"),
+    description=Description(description="Root class for all entities.", constraints=None),
+)
+_LABEL = DataProperty(
+    name=PropertyName("label"),
+    description=Description(description="Human-readable label.", constraints=None),
+    domain=[_THING.name],
+    range=DataType.STRING,
+)
+
+BASE_ONTOLOGY = Ontology(
+    classes={_THING.name: _THING},
+    dataProperties={_LABEL.name: _LABEL},
+    objectProperties={},
+)

@@ -42,9 +42,9 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
             "max_delay": 15,
             "jitter": 0.1,
             "backoff": 2,
-            "graceful": False,
+            "graceful": True,
         },
-        accumulate_errors=False,
+        accumulate_errors=True,
     )
     class Extractor(Expression):
         def __init__(self, ontology: Ontology, kg: PartialKnowledgeGraphType, *args, **kwargs):  # pyright: ignore[reportInvalidTypeForm] use dynamic type here
@@ -116,6 +116,8 @@ def generate_kg(
                 texts=texts[j : j + batch_size],
                 kg=kg,
             )
+
+            print(input_data.model_dump_json())
 
             # TODO annotate output with chunk information!
 

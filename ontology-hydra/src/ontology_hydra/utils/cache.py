@@ -1,6 +1,5 @@
 import shutil
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 from threading import RLock
 
@@ -17,15 +16,15 @@ class Cache(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def write(self, key: CacheKey, value: str):
+    def write(self, key: CacheKey, value: str) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def delete(self, *keys: CacheKey):
+    def delete(self, *keys: CacheKey) -> None:
         raise NotImplementedError
 
     @abstractmethod
-    def clear(self):
+    def clear(self) -> None:
         raise NotImplementedError
 
 
@@ -40,34 +39,32 @@ class DirectoryCache(Cache):
         self._encoding = encoding
         self._lock = RLock()  # allows same thread to acquire multiple times
 
-    def _get_cache_file_path(self, key: CacheKey):
+    def get_path(self, key: CacheKey):
         return self._path / Path(*map(str, key))
 
-    def exists(self, key: CacheKey) -> bool:
+    def exists(self, key: CacheKey):
         with self._lock:
-            return self._get_cache_file_path(key).exists()
+            return self.get_path(key).exists()
 
-    def read(self, key: CacheKey) -> str | None:
+    def read(self, key: CacheKey):
         with self._lock:
             return (
-                self._get_cache_file_path(key).read_text(encoding=self._encoding)
-                if self.exists(key)
-                else None
+                self.get_path(key).read_text(encoding=self._encoding) if self.exists(key) else None
             )
 
     def write(self, key: CacheKey, value: str):
         with self._lock:
-            path = self._get_cache_file_path(key)
+            path = self.get_path(key)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(value, encoding=self._encoding)
 
     def delete(self, *keys: CacheKey):
         with self._lock:
             for key in keys:
-                path = self._get_cache_file_path(key)
+                if not self.exists(key):
+                    continue
 
-                if self.exists(key):
-                    path.unlink()
+                self.get_path(key).unlink()
 
     def clear(self):
         with self._lock:
