@@ -3,7 +3,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from ontology_hydra.utils.schema import (
+from ontology_hydra.utils.schema import schema_from_model
+from ontology_hydra.utils.schema.formatting import format_schema
+from ontology_hydra.utils.schema.types import (
     ClassTypeSchema,
     DataType,
     EnumTypeSchema,
@@ -18,15 +20,12 @@ from ontology_hydra.utils.schema import (
     Schema,
     TypeName,
     UnionExpression,
-    format_schema,
-    schema_from_model,
 )
 
 EXAMPLE_SCHEMA = Schema(
-    description="Example schema exercising ref, union, list, primitive, and literal types.",
+    name="ExampleRoot",
     properties={
         PropertyName("id"): PropertySchema(
-            description="Stable document identifier.",
             type=PrimitiveExpression(dtype=DataType.STRING),
         ),
         PropertyName("status"): PropertySchema(
@@ -57,7 +56,6 @@ EXAMPLE_SCHEMA = Schema(
     },
     types={
         TypeName("Status"): EnumTypeSchema(
-            description="Workflow state for a document.",
             values=[
                 EnumValue("draft"),
                 EnumValue("review"),
@@ -65,7 +63,6 @@ EXAMPLE_SCHEMA = Schema(
             ],
         ),
         TypeName("Visibility"): EnumTypeSchema(
-            description="Access level for the document.",
             values=[
                 EnumValue("public"),
                 EnumValue("internal"),
@@ -73,7 +70,6 @@ EXAMPLE_SCHEMA = Schema(
             ],
         ),
         TypeName("MediaType"): EnumTypeSchema(
-            description="MIME types supported for attachments.",
             values=[
                 EnumValue("text/plain"),
                 EnumValue("application/json"),
@@ -81,7 +77,6 @@ EXAMPLE_SCHEMA = Schema(
             ],
         ),
         TypeName("Role"): EnumTypeSchema(
-            description="Account role used for access control.",
             values=[
                 EnumValue("admin"),
                 EnumValue("editor"),
@@ -89,7 +84,6 @@ EXAMPLE_SCHEMA = Schema(
             ],
         ),
         TypeName("User"): ClassTypeSchema(
-            description="Account holder with role assignments.",
             properties={
                 PropertyName("user_id"): PropertySchema(
                     type=PrimitiveExpression(dtype=DataType.STRING),
@@ -105,7 +99,6 @@ EXAMPLE_SCHEMA = Schema(
             },
         ),
         TypeName("Metadata"): ClassTypeSchema(
-            description="Structured metadata with mixed literals and primitives.",
             properties={
                 PropertyName("version"): PropertySchema(
                     type=UnionExpression(
@@ -122,7 +115,6 @@ EXAMPLE_SCHEMA = Schema(
             },
         ),
         TypeName("Attachment"): ClassTypeSchema(
-            description="Binary or textual attachments for a document.",
             properties={
                 PropertyName("filename"): PropertySchema(
                     type=PrimitiveExpression(dtype=DataType.STRING),
@@ -174,7 +166,7 @@ class Role(StrEnum):
     VIEWER = "viewer"
 
 
-class UserModel(BaseModel):
+class User(BaseModel):
     model_config = ConfigDict(strict=True)
 
     user_id: str
@@ -182,14 +174,14 @@ class UserModel(BaseModel):
     roles: list[Role] | None = None
 
 
-class MetadataModel(BaseModel):
+class Metadata(BaseModel):
     model_config = ConfigDict(strict=True)
 
     version: int | Literal["v1", "v2"]
     checksum: str | None = None
 
 
-class AttachmentModel(BaseModel):
+class Attachment(BaseModel):
     model_config = ConfigDict(strict=True)
 
     filename: str
@@ -198,23 +190,26 @@ class AttachmentModel(BaseModel):
     media_type: MediaType
 
 
-class ExampleRootModel(BaseModel):
+class ExampleRoot(BaseModel):
     model_config = ConfigDict(strict=True)
 
     id: str
     status: Status
-    owner: UserModel
-    contributors: list[UserModel] | None = None
+    owner: User
+    contributors: list[User] | None = None
     labels: list[str] | None = None
     visibility: Visibility
-    metadata: MetadataModel | None = None
-    attachments: list[AttachmentModel]
+    metadata: Metadata | None = None
+    attachments: list[Attachment]
 
 
+print(format_schema(schema_from_model(ExampleRoot)))
 print("\n\n\n\nvs\n\n\n\n\n")
 print(format_schema(EXAMPLE_SCHEMA))
 
-test_schema = schema_from_model(ExampleRootModel)
+print(format_schema(EXAMPLE_SCHEMA) == format_schema(schema_from_model(ExampleRoot)))
+
+test_schema = schema_from_model(ExampleRoot)
 
 print(test_schema.model_dump_json(exclude_none=True))
 print(EXAMPLE_SCHEMA.model_dump_json(exclude_none=True))

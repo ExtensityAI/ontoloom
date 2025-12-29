@@ -3,7 +3,7 @@ name = "ontology-hydra"
 version = "0.1.0"
 description = "An advanced tool for generating, visualizing, and evaluating domain-specific knowledge graphs and ontologies."
 readme = "README.md"
-requires-python = ">=3.12.0,<3.13"
+requires-python = ">=3.12.0"
 authors = [{ name = "ExtensityAI" }]
 keywords = ["ontology", "knowledge graph", "domain modeling"]
 classifiers = [
