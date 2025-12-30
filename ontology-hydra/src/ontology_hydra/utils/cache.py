@@ -1,7 +1,9 @@
-import shutil
+import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import RLock
+
+_CK_STR_PATTERN = re.compile(r"^[a-zA-Z0-9_=\-\[\]]+$")
 
 CacheKey = tuple[str | int | bool, ...]
 
@@ -28,8 +30,8 @@ class Cache(ABC):
         raise NotImplementedError
 
 
-class DirectoryCache(Cache):
-    """Thread-safe cache that stores values in a directory structure. Keys segments are mapped to directory names; the last one denotes the file name."""
+class FileCache(Cache):
+    """Thread-safe cache that stores values as files in a directory. Keys are mapped to file names."""
 
     def __init__(self, path: Path, encoding: str = "utf-8"):
         if not path.exists():
@@ -40,7 +42,23 @@ class DirectoryCache(Cache):
         self._lock = RLock()  # allows same thread to acquire multiple times
 
     def get_path(self, key: CacheKey):
-        return self._path / Path(*map(str, key))
+        name = []
+
+        if len(key) == 0 or not isinstance(key[0], str):
+            msg = f"Invalid cache key: '{key}'. Either empty or first element not a str!"
+            raise KeyError(msg)
+
+        for segment in key:
+            if isinstance(segment, (int, bool)):
+                name.append(f"[{segment}]")
+            else:
+                if not _CK_STR_PATTERN.match(segment):
+                    msg = f"Invalid cache key segment: '{segment}' of key '{key}'. Did not match pattern: '{_CK_STR_PATTERN.pattern}'"
+                    raise KeyError(msg)
+
+                name.extend([".", segment])
+
+        return self._path / "".join(name)
 
     def exists(self, key: CacheKey):
         with self._lock:
@@ -54,9 +72,7 @@ class DirectoryCache(Cache):
 
     def write(self, key: CacheKey, value: str):
         with self._lock:
-            path = self.get_path(key)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(value, encoding=self._encoding)
+            self.get_path(key).write_text(value, encoding=self._encoding)
 
     def delete(self, *keys: CacheKey):
         with self._lock:
@@ -68,5 +84,9 @@ class DirectoryCache(Cache):
 
     def clear(self):
         with self._lock:
-            shutil.rmtree(self._path)
-            self._path.mkdir(parents=True, exist_ok=True)
+            for file in self._path.glob("*"):
+                if file.is_dir():
+                    # ignore dir (not created by this cache?)
+                    continue
+
+                file.unlink()

@@ -129,6 +129,7 @@ def _register_class_type(
         properties = {
             PropertyName(name): _generate_property_schema(field, type_schemas, seen_models)
             for name, field in model_type.model_fields.items()
+            if name != "section_header"  # exclude LLMDataModel default section_header prop
         }
     finally:
         seen_models.remove(model_type)
@@ -175,14 +176,17 @@ def _type_expression(
         return OptionalExpression(value=combined) if has_none else combined
 
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        # field is a pydantic model
         _register_class_type(annotation, type_schemas, seen_models)
         return RefExpression(name=TypeName(annotation.__name__))
 
     if isinstance(annotation, type) and issubclass(annotation, Enum):
+        # field is an enum
         _register_enum_type(annotation, type_schemas)
         return RefExpression(name=TypeName(annotation.__name__))
 
-    if dtype := _map_to_datatype(annotation):
+    if (dtype := _map_to_datatype(annotation)) is not None:
+        # field is just a primitive data type
         return PrimitiveExpression(dtype=dtype)
 
     msg = f"Unsupported annotation: {annotation!r}"
@@ -215,6 +219,7 @@ def schema_from_model(model_type: type[BaseModel]) -> Schema:
     properties = {
         PropertyName(name): _generate_property_schema(field, type_schemas, seen_models)
         for name, field in model_type.model_fields.items()
+        if name != "section_header"  # exclude LLMDataModel default section_header property
     }
 
     return Schema(

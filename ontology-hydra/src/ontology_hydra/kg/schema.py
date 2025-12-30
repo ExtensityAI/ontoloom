@@ -70,7 +70,7 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
 
     if isinstance(prop, ObjectProperty):
         prop_range = ", ".join(
-            "intersectionOf(" + ", ".join(expr.intersectionOf) + ")"
+            "intersectionOf(" + ", ".join(expr.intersection_of) + ")"
             if isinstance(expr, IntersectionOf)
             else str(expr)
             for expr in prop.range
@@ -127,7 +127,7 @@ def generate_kg_schema(ontology: Ontology):
     classes = [
         _generate_class_schema(ontology, cls)
         for cls in ontology.classes.values()
-        if cls.subClassOf
+        if cls.sub_class_of
     ]
 
     # create a union type out of the classes

@@ -128,7 +128,7 @@ def format_schema(schema: Schema):
     lines = ["[[SCHEMA]] (use exact field names)"]
 
     if schema.description:
-        lines.append(f"Description: {_compact_text(schema.description)}")
+        lines.extend("# ".join(schema.description.splitlines()))
 
     lines.append("")
     lines.append(f"{schema.name}:")
