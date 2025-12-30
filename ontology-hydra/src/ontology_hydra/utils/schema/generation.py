@@ -8,6 +8,7 @@ from pydantic.fields import FieldInfo
 from ontology_hydra.utils.schema.types import (
     ClassTypeSchema,
     DataType,
+    DictExpression,
     EnumTypeSchema,
     EnumValue,
     ListExpression,
@@ -162,6 +163,15 @@ def _type_expression(
             msg = "List types must include exactly one item type."
             raise TypeError(msg)
         return ListExpression(items=_type_expression(args[0], type_schemas, seen_models))
+
+    if origin in {dict}:
+        args = get_args(annotation)
+        if len(args) != 2:
+            msg = "Dict types must include exactly one key type and one value type."
+            raise TypeError(msg)
+        key_expr = _type_expression(args[0], type_schemas, seen_models)
+        value_expr = _type_expression(args[1], type_schemas, seen_models)
+        return DictExpression(key=key_expr, value=value_expr)
 
     if origin in {
         Union,

@@ -35,6 +35,12 @@ class ListExpression(_Model):
     items: "TypeExpression"
 
 
+class DictExpression(_Model):
+    kind: Literal["dict"] = "dict"
+    key: "TypeExpression"
+    value: "TypeExpression"
+
+
 class DataType(StrEnum):
     STRING = "string"
     BOOLEAN = "boolean"
@@ -63,6 +69,7 @@ TypeExpression = Annotated[
     | RefExpression
     | UnionExpression
     | ListExpression
+    | DictExpression
     | OptionalExpression,
     Field(discriminator="kind"),
 ]

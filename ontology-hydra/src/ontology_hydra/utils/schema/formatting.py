@@ -2,6 +2,7 @@ import json
 
 from ontology_hydra.utils.schema.types import (
     ClassTypeSchema,
+    DictExpression,
     EnumTypeSchema,
     EnumValue,
     ListExpression,
@@ -70,6 +71,11 @@ def _format_type_inline(expr: TypeExpression, enum_names: set[str]) -> str:
         case ListExpression():
             inner = _wrap_if_union(expr.items, _format_type_inline(expr.items, enum_names))
             return f"list[{inner}]"
+
+        case DictExpression():
+            key_text = _wrap_if_union(expr.key, _format_type_inline(expr.key, enum_names))
+            value_text = _wrap_if_union(expr.value, _format_type_inline(expr.value, enum_names))
+            return f"dict[{key_text}, {value_text}]"
 
         case UnionExpression():
             parts = [_format_type_inline(item, enum_names) for item in expr.any_of]
