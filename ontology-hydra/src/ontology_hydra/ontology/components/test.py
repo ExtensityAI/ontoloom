@@ -1,3 +1,4 @@
+from pydantic import Field
 from symai import Expression
 from symai.strategy import contract
 
@@ -6,7 +7,7 @@ from ontology_hydra.utils.schema.llm import DataModel
 
 
 class Proposal(DataModel):
-    text: str = ""
+    text: str = Field(..., description="Text of your proposal", min_length=10)
 
 
 @contract(post_remedy=False, accumulate_errors=True, verbose=True)

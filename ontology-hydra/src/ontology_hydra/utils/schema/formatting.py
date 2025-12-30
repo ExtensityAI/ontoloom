@@ -131,13 +131,15 @@ def _format_type_block(
 
 
 def format_schema(schema: Schema):
-    lines = ["[[SCHEMA]] (use exact field names)"]
+    lines = []
 
     if schema.description:
         lines.extend("# ".join(schema.description.splitlines()))
 
-    lines.append("")
-    lines.append(f"{schema.name}:")
+    if len(lines) > 0:
+        lines.append("")
+
+    lines.append(f"JSON Schema ({schema.name}):")
 
     enum_names = {str(name) for name, t in schema.types.items() if isinstance(t, EnumTypeSchema)}
 
