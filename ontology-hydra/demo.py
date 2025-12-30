@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING, cast
 import tiktoken
 from chonkie.chunker.token import TokenChunker
 
+from ontology_hydra.ontology.components.test import Proposal, Test
+from ontology_hydra.ontology.models import BASE_ONTOLOGY
+
 if TYPE_CHECKING:
     from chonkie.types import Chunk
 
@@ -75,3 +78,8 @@ chunks_by_text = cast(
 
 for chunks, text in zip(chunks_by_text, texts, strict=True):
     print(len(chunks), "chunks for", len(text), "chars of text")
+    for chunk in chunks:
+        t = cast("Test", Test(intent, chunk))
+        proposal: Proposal = t(BASE_ONTOLOGY)
+        print(proposal)
+        exit(0)
