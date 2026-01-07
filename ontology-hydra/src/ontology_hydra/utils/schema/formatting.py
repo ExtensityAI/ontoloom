@@ -134,7 +134,7 @@ def format_schema(schema: Schema):
     lines = []
 
     if schema.description:
-        lines.extend("# ".join(schema.description.splitlines()))
+        lines.extend(f"# {ln}" for ln in schema.description.splitlines())
 
     if len(lines) > 0:
         lines.append("")
