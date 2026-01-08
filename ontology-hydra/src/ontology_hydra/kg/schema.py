@@ -44,7 +44,7 @@ def _generate_description(description: Description | None):
         return "No description provided."
 
     return (
-        f"{description.description or 'No description provided.'}\n"
+        f"{description.definition or 'No description provided.'}\n"
         f"(Constraints: {description.constraints or 'None'})\n"
     )
 
@@ -70,7 +70,7 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
 
     if isinstance(prop, ObjectProperty):
         prop_range = ", ".join(
-            "intersectionOf(" + ", ".join(expr.intersection_of) + ")"
+            "intersectionOf(" + ", ".join(expr.classes) + ")"
             if isinstance(expr, IntersectionOf)
             else str(expr)
             for expr in prop.range

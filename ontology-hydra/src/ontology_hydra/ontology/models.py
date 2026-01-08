@@ -17,9 +17,7 @@ def is_none(v):
 
 
 class Description(DataModel):
-    description: str | None = Field(
-        None, description="Short human-readable definition for the term.", exclude_if=is_none
-    )
+    definition: str = Field(..., description="Short human-readable definition.")
     constraints: str | None = Field(
         None, description="Optional constraints or modeling notes.", exclude_if=is_none
     )
@@ -36,9 +34,9 @@ class DataType(StrEnum):
 
 
 class IntersectionOf(DataModel):
-    intersection_of: list[ClassName] = Field(
-        ..., description="A class expression defined as an intersection of classes."
-    )
+    """An intersection of multiple classes."""
+
+    classes: list[ClassName] = Field(..., description="The list of classes to intersect.")
 
 
 ClassExpression = ClassName | IntersectionOf
@@ -46,10 +44,9 @@ ClassExpression = ClassName | IntersectionOf
 
 class Class(DataModel):
     name: ClassName = Field(..., description="Unique class identifier (PascalCase).")
-    description: Description | None = Field(
-        None,
+    description: Description = Field(
+        default=...,
         description="Definition and constraints for the class.",
-        exclude_if=lambda v: is_none(v) or (v.description is None and v.constraints is None),
     )
     sub_class_of: list[ClassName] = Field(
         default_factory=list,
@@ -65,8 +62,8 @@ class Class(DataModel):
 
 class DataProperty(DataModel):
     name: PropertyName = Field(..., description="Data property name (camelCase).")
-    description: Description | None = Field(
-        None, description="Definition and constraints for the data property."
+    description: Description = Field(
+        ..., description="Definition and constraints for the data property."
     )
     #    sub_property_of: list[PropertyName] = Field(
     #        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
@@ -80,8 +77,8 @@ class DataProperty(DataModel):
 
 class ObjectProperty(DataModel):
     name: PropertyName = Field(..., description="Object property name (camelCase).")
-    description: Description | None = Field(
-        None, description="Definition and constraints for the object property."
+    description: Description = Field(
+        ..., description="Definition and constraints for the object property."
     )
     #    sub_property_of: list[PropertyName] = Field(
     #        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
@@ -119,11 +116,11 @@ class Ontology(DataModel):
 
 _THING = Class(
     name=ClassName("Thing"),
-    description=Description(description="Root class for all entities.", constraints=None),
+    description=Description(definition="Root class for all entities.", constraints=None),
 )
 _LABEL = DataProperty(
     name=PropertyName("label"),
-    description=Description(description="Human-readable label.", constraints=None),
+    description=Description(definition="Human-readable label.", constraints=None),
     domain=[_THING.name],
     range=DataType.STRING,
 )
