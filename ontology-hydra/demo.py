@@ -82,8 +82,9 @@ chunks_by_text = cast(
 for chunks, text in zip(chunks_by_text, texts, strict=True):
     print(len(chunks), "chunks for", len(text), "chars of text")
     for chunk in chunks:
-        plan = generate_plan(intent, chunk.text, BASE_ONTOLOGY)
+        plan = generate_plan(intent, BASE_ONTOLOGY)
         ops, review = implement_plan(plan, intent, BASE_ONTOLOGY)
+
         print(review.text)
         print(ops.model_dump_json(indent=2))
         exit(0)

@@ -41,6 +41,7 @@ class Review(DataModel):
 
 def review_ops(plan: str, ops: OperationSequence, ontology: Ontology):
     """Reviews whether a sequence of operations implements the given plan when applied to the ontology."""
+    # TODO: !! this review also should test for side-effects, e.g. look at the actual ontology diff and see if the diff is what is intended in the plan!
 
     # use raw prompting to get a raw review and nothing else.
     # TODO: consider contract - why not?
