@@ -19,8 +19,8 @@ Analyze the gap between the current ontology and what's needed to represent the 
 Write prose, not tables or bullet lists. Be specific and grounded in the data."""
 
 
-def generate_plan(intent: str, data: str, ontology: Ontology):
-    """Generates a plan that, when implemented and executed, changes the ontology to better fit user intent and sample data."""
+def draft_plan(intent: str, data: str, ontology: Ontology):
+    """Drafts a plan that, when implemented and executed, changes the ontology to better fit user intent and sample data."""
 
     # if this does not work, well enough (low-quality plans), we may want to try to add in more steps to reiterate on the plan and provide more guidance maybe?
 

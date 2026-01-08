@@ -10,7 +10,7 @@ def implement_plan(
     plan: str,
     intent: str,
     ontology: Ontology,
-    max_attempts: int = 3,
+    max_attempts: int = 5,
 ) -> tuple[OperationSequence, Review]:
     """Draft and review operations, retrying with feedback on rejection."""
 
