@@ -8,7 +8,6 @@ from chonkie.chunker.token import TokenChunker
 
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
 from ontology_hydra.ontology.components.planning.pipeline import generate_plan
-from ontology_hydra.ontology.components.test import Proposal, Test
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
 
 if TYPE_CHECKING:
@@ -79,17 +78,15 @@ chunks_by_text = cast(
     "list[list[Chunk]]", chunker(texts)
 )  # returns a list of chunks per input text
 
+plan = generate_plan(intent, BASE_ONTOLOGY)
+ops, review = implement_plan(plan, intent, BASE_ONTOLOGY)
+
+print(review.text)
+print(ops.model_dump_json(indent=2))
+
+exit(0)
+
 for chunks, text in zip(chunks_by_text, texts, strict=True):
     print(len(chunks), "chunks for", len(text), "chars of text")
     for chunk in chunks:
-        plan = generate_plan(intent, BASE_ONTOLOGY)
-        ops, review = implement_plan(plan, intent, BASE_ONTOLOGY)
-
-        print(review.text)
-        print(ops.model_dump_json(indent=2))
-        exit(0)
-        t = cast("Test", Test(intent, chunk))
-        proposal: Proposal = t(BASE_ONTOLOGY)
-
-        print(proposal)
-        exit(0)
+        pass

@@ -1,6 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
+
 - Source code lives in `src/ontology_hydra/`, with domain logic under `ontology/`, KG tooling under
   `kg/`, and shared utilities under `utils/`.
 - Prompts and higher-level orchestration live in `src/ontology_hydra/prompts.py`.
@@ -8,6 +9,7 @@
   pipeline together.
 
 ## Build, Test, and Development Commands
+
 - Install dependencies with your preferred tool from `pyproject.toml` (Python >= 3.12).
 - Build a package artifact with `uv build` to exercise the build backend (`uv_build`).
 - Run the demo pipeline with:
@@ -15,20 +17,21 @@
 - Lint with `ruff check src demo.py --config ruff.toml` to keep style and quality consistent.
 
 ## Coding Style & Naming Conventions
+
 - Python style: 4-space indentation, 100-char line length, double quotes (see `ruff.toml`).
 - Module and function names are `snake_case`; classes use `PascalCase`.
 - Keep imports grouped: standard library, third-party, then local.
-
-## Testing Guidelines
-- There is no `tests/` directory or test runner wired up yet.
-- If you add tests, place them under `tests/` and follow `test_*.py` naming.
-- Document any new test command you introduce (e.g., `pytest -q`) in this file.
+- Do not add return type hints if they can be inferred from the code (Pylance handles inference).
+- when writing exceptions, always assign the message to a variable `msg` first and then instantiate the exception from that
+- instead of writing `x: set[str] = set()` always write `x = set[str]()` (same for `list` and `dict`)
 
 ## Commit & Pull Request Guidelines
+
 - Commit messages follow Conventional Commits (examples from history: `feat(ontology): ...`,
   `chore: ...`).
 - PRs should describe the change, reference related issues, and call out behavior or schema impacts.
 
 ## Configuration & Dependencies
+
 - Dependencies and metadata are defined in `pyproject.toml`; linting config is in `ruff.toml`.
 - Keep new dependencies minimal and update `pyproject.toml` when you add any.

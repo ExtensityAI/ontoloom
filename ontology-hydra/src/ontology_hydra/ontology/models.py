@@ -110,7 +110,7 @@ class Ontology(DataModel):
     )
 
     def clone(self):
-        # serialize to str and back to get a deep clone. TODO: exchange for something faster
+        # serialize to str and back to get a deep clone. TODO: exchange for something faster? or maybe use deep clone by pydantic?
         return Ontology.model_validate_json(self.model_dump_json())
 
 

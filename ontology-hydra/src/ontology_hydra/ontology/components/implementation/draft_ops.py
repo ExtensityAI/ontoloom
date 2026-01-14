@@ -5,7 +5,7 @@ from symai import Expression
 from symai.strategy import contract
 
 from ontology_hydra.ontology.models import Ontology
-from ontology_hydra.ontology.operations.ops import Operation
+from ontology_hydra.ontology.revision.operations.ops import Operation
 from ontology_hydra.utils.schema.llm import DataModel
 
 

@@ -170,12 +170,7 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-# TensorBoard runs
 
-artifacts/.DS_Store
-.DS_Store
-
-experiment.ipynb
 symai.config.json
 
 temp/

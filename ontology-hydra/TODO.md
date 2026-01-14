@@ -1,7 +1,7 @@
 # TODO
 
 ## Pending
-- No pending tasks.
+- Implement execute_ops to apply operation sequences and report problems.
 
 ## Completed
 - Create AGENTS.md contributor guide.

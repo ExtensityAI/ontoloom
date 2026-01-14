@@ -2,9 +2,9 @@ from symai import Expression
 
 from ontology_hydra.ontology.components.implementation.draft_ops import OperationSequence
 from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.ontology.revision.diff import diff_ontology, format_diff
+from ontology_hydra.ontology.revision.executor import execute_ops
 from ontology_hydra.utils.schema.llm import DataModel
-
-# TODO: if this is not flexible enough, add some sort of state-machine where information can pass between drafter and reviewer and all that, but for now keep it simple?
 
 _ACCEPTED = "ACCEPTED"
 _REJECTED = "REJECTED"
@@ -13,13 +13,19 @@ _prompt = f"""You are an ontology engineer reviewing whether a proposed sequence
 
 <plan>{{plan}}</plan>
 <ops>{{ops}}</ops>
-<ontology>{{ontology}}</ontology>
+<diff>{{diff}}</diff>
 
-Analyze whether the operations faithfully implement the plan when applied to the current ontology. For each aspect of the plan, verify:
+The diff shows the actual changes that would be applied to the ontology:
+  + means added
+  - means removed
+  ~ means modified
+
+Analyze whether the operations faithfully implement the plan. For each aspect of the plan, verify:
 - Coverage: Does the operation sequence address all changes described in the plan?
 - Correctness: Are class names, property names, domains, ranges, and hierarchies accurate?
 - Consistency: Do the operations maintain ontology coherence (no dangling references, valid inheritance)?
 - Completeness: Are there missing operations the plan implies but aren't present?
+- Side effects: Does the diff show any unintended changes not specified in the plan?
 
 Describe any discrepancies you find in a short paragraph for each issue:
 - State what the plan specifies vs. what the operations do
@@ -36,17 +42,15 @@ class Review(DataModel):
     text: str
 
 
-# TODO: provide the reviewer with the NEW ontology AFTER execution of ops
-
-
 def review_ops(plan: str, ops: OperationSequence, ontology: Ontology):
     """Reviews whether a sequence of operations implements the given plan when applied to the ontology."""
-    # TODO: !! this review also should test for side-effects, e.g. look at the actual ontology diff and see if the diff is what is intended in the plan!
+    # execute operations to get the resulting ontology
+    new_ontology = execute_ops(ontology, ops.ops)
+    diff = diff_ontology(ontology, new_ontology)
+    diff_text = format_diff(diff)
 
-    # use raw prompting to get a raw review and nothing else.
-    # TODO: consider contract - why not?
     review: str = Expression.prompt(
-        _prompt.format(plan=plan, ops=ops.model_dump_json(), ontology=ontology.model_dump_json())
+        _prompt.format(plan=plan, ops=ops.model_dump_json(), diff=diff_text)
     ).value.strip()
 
     # as a safety net, we also accept bold formatted verdicts
