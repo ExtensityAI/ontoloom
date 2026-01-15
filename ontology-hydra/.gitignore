@@ -176,3 +176,4 @@ symai.config.json
 temp/
 
 .ruff-cache/
+.hydra/

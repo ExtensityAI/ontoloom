@@ -1,14 +1,17 @@
 from argparse import ArgumentParser
+from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 import tiktoken
 from chonkie.chunker.token import TokenChunker
+from tqdm import tqdm
 
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
 from ontology_hydra.ontology.components.planning.pipeline import generate_plan
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
+from ontology_hydra.utils.cache import DirectoryCache
 
 if TYPE_CHECKING:
     from chonkie.types import Chunk
@@ -78,11 +81,25 @@ chunks_by_text = cast(
     "list[list[Chunk]]", chunker(texts)
 )  # returns a list of chunks per input text
 
-plan = generate_plan(intent, BASE_ONTOLOGY)
-ops, review = implement_plan(plan, intent, BASE_ONTOLOGY)
+now = datetime.now()
 
-print(review.text)
-print(ops.model_dump_json(indent=2))
+cache = DirectoryCache(Path(".hydra/cache") / now.strftime("%Y%m%d") / now.strftime("%H%M%S"))
+print("Cache path:", cache.path)
+
+ontology = BASE_ONTOLOGY
+
+for i in tqdm(range(50)):
+    plan = generate_plan(intent, ontology)
+    cache.write((i, "plan.md"), plan)
+
+    ops, review, ontology = implement_plan(plan, intent, ontology)
+    cache.write((i, "ops.json"), ops.model_dump_json(indent=4))
+    cache.write(
+        (i, "review.md"),
+        f"{review.text}\n\n---\n\nVerdict: **{'ACCEPT' if review.accepted else 'REJECT'}**",
+    )
+    cache.write((i, "ontology.json"), ontology.model_dump_json(indent=2))
+
 
 exit(0)
 

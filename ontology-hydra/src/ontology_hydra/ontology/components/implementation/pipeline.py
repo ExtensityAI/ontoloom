@@ -3,6 +3,7 @@ from ontology_hydra.ontology.components.implementation.draft_ops import (
 )
 from ontology_hydra.ontology.components.implementation.review_ops import review_ops
 from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.ontology.revision.executor import execute_ops
 
 
 def implement_plan(
@@ -11,8 +12,10 @@ def implement_plan(
     ontology: Ontology,
     max_attempts: int = 5,
 ):
-    """Draft and review operations, retrying with feedback on rejection."""
+    """Draft and review operations, retrying with feedback on rejection.
 
+    Returns (ops, review, new_ontology) on success.
+    """
     assert max_attempts > 0, "Need to allow at least one attempt"
 
     feedback = None
@@ -24,7 +27,8 @@ def implement_plan(
         review = review_ops(plan, ops, ontology)
 
         if review.accepted:
-            return ops, review
+            new_ontology = execute_ops(ontology, ops.ops)
+            return ops, review, new_ontology
 
         feedback = review.text
 

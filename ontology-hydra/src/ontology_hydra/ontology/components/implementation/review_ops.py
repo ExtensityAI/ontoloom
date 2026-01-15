@@ -11,9 +11,12 @@ _REJECTED = "REJECTED"
 
 _prompt = f"""You are an ontology engineer reviewing whether a proposed sequence of operations correctly implements a plan.
 
+<current_ontology>{{ontology}}</current_ontology>
 <plan>{{plan}}</plan>
 <ops>{{ops}}</ops>
 <diff>{{diff}}</diff>
+
+The current_ontology shows the existing state before the operations are applied. Note that properties with domain on a parent class (e.g. Thing) are inherited by all subclasses.
 
 The diff shows the actual changes that would be applied to the ontology:
   + means added
@@ -25,6 +28,7 @@ Analyze whether the operations faithfully implement the plan. For each aspect of
 - Correctness: Are class names, property names, domains, ranges, and hierarchies accurate?
 - Consistency: Do the operations maintain ontology coherence (no dangling references, valid inheritance)?
 - Completeness: Are there missing operations the plan implies but aren't present?
+- Redundancy: Do any new properties duplicate functionality already available via inheritance?
 - Side effects: Does the diff show any unintended changes not specified in the plan?
 
 Describe any discrepancies you find in a short paragraph for each issue:
@@ -50,7 +54,12 @@ def review_ops(plan: str, ops: OperationSequence, ontology: Ontology):
     diff_text = format_diff(diff)
 
     review: str = Expression.prompt(
-        _prompt.format(plan=plan, ops=ops.model_dump_json(), diff=diff_text)
+        _prompt.format(
+            ontology=ontology.model_dump_json(),
+            plan=plan,
+            ops=ops.model_dump_json(),
+            diff=diff_text,
+        )
     ).value.strip()
 
     # as a safety net, we also accept bold formatted verdicts

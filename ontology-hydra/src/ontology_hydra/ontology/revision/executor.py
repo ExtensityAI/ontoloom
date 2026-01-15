@@ -2,6 +2,8 @@
 
 # TODO: for property updates: assuming a new class is added to domain/range, should we check if the class is already part of the domain/range and should we make this an error? if no, maybe a warning? not sure
 
+# TODO: do a cleanup of this class. simplify, etc. (but first consider first TODO maybe)
+
 from functools import singledispatch
 
 from ontology_hydra.ontology.models import (

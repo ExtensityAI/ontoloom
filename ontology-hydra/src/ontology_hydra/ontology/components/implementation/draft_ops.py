@@ -5,6 +5,7 @@ from symai import Expression
 from symai.strategy import contract
 
 from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.ontology.revision.executor import OperationFailed, execute_ops
 from ontology_hydra.ontology.revision.operations.ops import Operation
 from ontology_hydra.utils.schema.llm import DataModel
 
@@ -19,7 +20,14 @@ class OperationSequence(DataModel):
     )
 
 
-# TODO: catch errors early, try to run the ops (and raise if there are errors)
+class DraftExecutionError(Exception):
+    """Raised when drafted operations fail to execute."""
+
+    def __init__(self, cause: OperationFailed):
+        self.cause = cause
+        super().__init__(
+            f"Operation {cause.index} ({cause.operation.op}) failed: {cause}"
+        )
 
 
 _prompt = """You are an ontology engineer translating a natural language plan into a sequence of ontology operations.
@@ -82,7 +90,12 @@ class DraftOps(Expression):
 
 def draft_ops(plan: str, intent: str, ontology: Ontology, feedback: str | None = None):
     drafter = cast("DraftOps", DraftOps(plan, intent, ontology, feedback))
+    ops: OperationSequence = drafter(_Input(ontology=ontology))
 
-    x: OperationSequence = drafter(_Input(ontology=ontology))
+    # validate by executing - raises DraftExecutionError if ops are invalid
+    try:
+        execute_ops(ontology, ops.ops)
+    except OperationFailed as e:
+        raise DraftExecutionError(e) from e
 
-    return x
+    return ops

@@ -1,9 +1,6 @@
-import re
 from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import RLock
-
-_CK_STR_PATTERN = re.compile(r"^[a-zA-Z0-9_=\-\[\]]+$")
 
 CacheKey = tuple[str | int | bool, ...]
 
@@ -25,13 +22,9 @@ class Cache(ABC):
     def delete(self, *keys: CacheKey) -> None:
         raise NotImplementedError
 
-    @abstractmethod
-    def clear(self) -> None:
-        raise NotImplementedError
 
-
-class FileCache(Cache):
-    """Thread-safe cache that stores values as files in a directory. Keys are mapped to file names."""
+class DirectoryCache(Cache):
+    """Thread-safe cache that stores values in a directory structure. Keys are mapped to paths."""
 
     def __init__(self, path: Path, encoding: str = "utf-8"):
         if not path.exists():
@@ -41,38 +34,28 @@ class FileCache(Cache):
         self._encoding = encoding
         self._lock = RLock()  # allows same thread to acquire multiple times
 
-    def get_path(self, key: CacheKey):
-        name = []
+    @property
+    def path(self):
+        return self._path
 
-        if len(key) == 0 or not isinstance(key[0], str):
-            msg = f"Invalid cache key: '{key}'. Either empty or first element not a str!"
-            raise KeyError(msg)
-
-        for segment in key:
-            if isinstance(segment, (int, bool)):
-                name.append(f"[{segment}]")
-            else:
-                if not _CK_STR_PATTERN.match(segment):
-                    msg = f"Invalid cache key segment: '{segment}' of key '{key}'. Did not match pattern: '{_CK_STR_PATTERN.pattern}'"
-                    raise KeyError(msg)
-
-                name.extend([".", segment])
-
-        return self._path / "".join(name)
+    def _get_path(self, key: CacheKey):
+        return Path(self._path, *map(str, key))
 
     def exists(self, key: CacheKey):
         with self._lock:
-            return self.get_path(key).exists()
+            return self._get_path(key).exists()
 
     def read(self, key: CacheKey):
         with self._lock:
             return (
-                self.get_path(key).read_text(encoding=self._encoding) if self.exists(key) else None
+                self._get_path(key).read_text(encoding=self._encoding) if self.exists(key) else None
             )
 
     def write(self, key: CacheKey, value: str):
         with self._lock:
-            self.get_path(key).write_text(value, encoding=self._encoding)
+            p = self._get_path(key)
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(value, encoding=self._encoding)
 
     def delete(self, *keys: CacheKey):
         with self._lock:
@@ -80,13 +63,4 @@ class FileCache(Cache):
                 if not self.exists(key):
                     continue
 
-                self.get_path(key).unlink()
-
-    def clear(self):
-        with self._lock:
-            for file in self._path.glob("*"):
-                if file.is_dir():
-                    # ignore dir (not created by this cache?)
-                    continue
-
-                file.unlink()
+                self._get_path(key).unlink()
