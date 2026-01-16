@@ -25,9 +25,7 @@ class DraftExecutionError(Exception):
 
     def __init__(self, cause: OperationFailed):
         self.cause = cause
-        super().__init__(
-            f"Operation {cause.index} ({cause.operation.op}) failed: {cause}"
-        )
+        super().__init__(f"Operation {cause.index} ({cause.operation.op}) failed: {cause}")
 
 
 _prompt = """You are an ontology engineer translating a natural language plan into a sequence of ontology operations.
@@ -52,7 +50,7 @@ Address these issues in your new attempt.
 </previous_attempt_feedback>"""
 
 
-@contract(accumulate_errors=True)
+@contract(accumulate_errors=True, post_remedy=True)
 class DraftOps(Expression):
     def __init__(
         self,
@@ -76,6 +74,12 @@ class DraftOps(Expression):
 
         return self.contract_result
 
+    def post(self, ops: OperationSequence):
+        # execute ops to see if they can be implemented. this raises in case of a problem
+        execute_ops(self._ontology, ops.ops)
+
+        return True
+
     @property
     def prompt(self):  # pyright: ignore[reportIncompatibleMethodOverride] # override is correct
         feedback_section = (
@@ -91,11 +95,4 @@ class DraftOps(Expression):
 def draft_ops(plan: str, intent: str, ontology: Ontology, feedback: str | None = None):
     drafter = cast("DraftOps", DraftOps(plan, intent, ontology, feedback))
     ops: OperationSequence = drafter(_Input(ontology=ontology))
-
-    # validate by executing - raises DraftExecutionError if ops are invalid
-    try:
-        execute_ops(ontology, ops.ops)
-    except OperationFailed as e:
-        raise DraftExecutionError(e) from e
-
     return ops

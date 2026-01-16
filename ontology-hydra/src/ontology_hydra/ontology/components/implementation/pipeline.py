@@ -1,3 +1,5 @@
+from loguru import logger
+
 from ontology_hydra.ontology.components.implementation.draft_ops import (
     draft_ops,
 )
@@ -18,19 +20,28 @@ def implement_plan(
     """
     assert max_attempts > 0, "Need to allow at least one attempt"
 
+    logger.info("Implementing plan (max {} attempts)", max_attempts)
+
     feedback = None
     ops = None
     review = None
 
-    for _ in range(max_attempts):
+    for attempt in range(max_attempts):
+        logger.info("Attempt {}/{}: drafting operations", attempt + 1, max_attempts)
         ops = draft_ops(plan, intent, ontology, feedback=feedback)
+        logger.debug("Drafted {} operations", len(ops.ops))
+
+        logger.info("Reviewing operations")
         review = review_ops(plan, ops, ontology)
 
         if review.accepted:
+            logger.info("Review accepted, executing {} operations", len(ops.ops))
             new_ontology = execute_ops(ontology, ops.ops)
             return ops, review, new_ontology
 
+        logger.warning("Review rejected (attempt {}/{})", attempt + 1, max_attempts)
         feedback = review.text
 
     msg = f"Could not implement plan after {max_attempts} retries. Last review is:\n{review.text if review else '(unknown)'}"
+    logger.error("Implementation failed: {}", msg)
     raise ValueError(msg)
