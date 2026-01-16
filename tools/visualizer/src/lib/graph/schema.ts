@@ -1,15 +1,5 @@
 import { z } from 'zod'
 
-const characteristicSchema = z.enum([
-    'functional',
-    'inverseFunctional',
-    'transitive',
-    'symmetric',
-    'asymmetric',
-    'reflexive',
-    'irreflexive',
-])
-
 const dataTypeSchema = z.enum([
     'string',
     'int',
@@ -21,37 +11,34 @@ const dataTypeSchema = z.enum([
 ])
 
 const descriptionSchema = z.object({
-    description: z.string().nullable(),
-    constraints: z.string().nullable(),
+    definition: z.string(),
+    constraints: z.string().nullish(),
 })
 
 const dataPropertySchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullable(),
-    characteristics: z.array(characteristicSchema),
+    description: descriptionSchema,
     domain: z.array(z.string()),
     range: dataTypeSchema,
 })
 
 const objectPropertySchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullable(),
-    characteristics: z.array(characteristicSchema),
+    description: descriptionSchema,
     domain: z.array(z.string()),
     range: z.array(z.string()),
 })
 
 const classSchema = z.object({
     name: z.string(),
-    description: descriptionSchema.nullable(),
-    own_properties: z.array(z.string()),
-    superclass: z.string().nullable(),
+    description: descriptionSchema,
+    sub_class_of: z.array(z.string()),
 })
 
 export const ontologySchema = z.object({
     classes: z.record(z.string(), classSchema),
-    objectProperties: z.record(z.string(), objectPropertySchema),
-    dataProperties: z.record(z.string(), dataPropertySchema),
+    object_properties: z.record(z.string(), objectPropertySchema),
+    data_properties: z.record(z.string(), dataPropertySchema),
 })
 
 export type Class = z.infer<typeof classSchema>

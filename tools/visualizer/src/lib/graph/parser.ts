@@ -4,7 +4,8 @@ import type { EdgeAttributes, NodeAttributes } from "./types"
 import { type HydraGraph } from "./types"
 
 /**
- * Compute hierarchy depth for each class by traversing superclass chain
+ * Compute hierarchy depth for each class by traversing superclass chains.
+ * For multiple inheritance, uses max depth from any parent path.
  */
 const computeClassLevels = (
     classes: Record<string, Class>,
@@ -17,13 +18,16 @@ const computeClassLevels = (
 
         visited.add(name)
         const cls = classes[name]
-        if (!cls?.superclass) {
+        if (!cls || cls.sub_class_of.length === 0) {
             levels.set(name, 0)
             return 0
         }
 
-        const parentLevel = getLevel(cls.superclass, visited)
-        const level = parentLevel + 1
+        // Use max depth from all parents for consistent layering
+        const maxParentLevel = Math.max(
+            ...cls.sub_class_of.map((parent) => getLevel(parent, new Set(visited)))
+        )
+        const level = maxParentLevel + 1
         levels.set(name, level)
         return level
     }
@@ -64,28 +68,30 @@ export const createOntologyGraph = (ontology: Ontology) => {
 
 
 
-    // Add hierarchy edges (subclass -> superclass)
+    // Add hierarchy edges (subclass -> superclasses)
     Object.entries(ontology.classes)
-        .filter(([, cls]) => cls.superclass)
+        .filter(([, cls]) => cls.sub_class_of.length > 0)
         .forEach(([name, cls]) => {
-            const edgeKey = `${name}-is-a->${cls.superclass}`
+            cls.sub_class_of.forEach((parent) => {
+                const edgeKey = `${name}-is-a->${parent}`
 
-            G.addDirectedEdgeWithKey(edgeKey, name, cls.superclass!, {
-                type: "arrow",
-                tag: "hierarchy",
-                label: "isA",
-                size: 2,
-                weight: 5,
-                source: name,
-                target: cls.superclass!,
+                G.addDirectedEdgeWithKey(edgeKey, name, parent, {
+                    type: "arrow",
+                    tag: "hierarchy",
+                    label: "isA",
+                    size: 2,
+                    weight: 5,
+                    source: name,
+                    target: parent,
+                })
+
+                // Update children set
+                G.getNodeAttributes(parent).children.add(name)
             })
-
-            // Update children set
-            G.getNodeAttributes(cls.superclass!).children.add(name)
         })
 
     // Add object property edges (domain -> range)
-    Object.entries(ontology.objectProperties).forEach(([propName, prop]) => {
+    Object.entries(ontology.object_properties).forEach(([propName, prop]) => {
         prop.domain.forEach((domain) => {
             prop.range.forEach((range) => {
                 const edgeKey = `${domain}-${propName}->${range}`
@@ -103,14 +109,22 @@ export const createOntologyGraph = (ontology: Ontology) => {
         })
     })
 
-    // add parent chains to node attributes
+    // add parent chains to node attributes (all ancestors via BFS)
     Object.entries(ontology.classes).forEach(([name, cls]) => {
         const attrs = G.getNodeAttributes(name)
-        let current = cls
+        const visited = new Set<string>()
+        const queue = [...cls.sub_class_of]
 
-        while (current.superclass) {
-            attrs.parents.push(current.superclass)
-            current = ontology.classes[current.superclass]
+        while (queue.length > 0) {
+            const parent = queue.shift()!
+            if (visited.has(parent)) continue
+            visited.add(parent)
+            attrs.parents.push(parent)
+
+            const parentCls = ontology.classes[parent]
+            if (parentCls) {
+                queue.push(...parentCls.sub_class_of)
+            }
         }
     })
 
