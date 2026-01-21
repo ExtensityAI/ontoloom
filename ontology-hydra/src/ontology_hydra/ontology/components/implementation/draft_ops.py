@@ -32,6 +32,7 @@ _prompt = """You are an ontology engineer translating a natural language plan in
 
 <intent>{intent}</intent>
 <plan>{plan}</plan>
+<ontology>{ontology}</ontology>
 {feedback_section}
 Generate operations that implement the plan when applied to the current ontology. For each change described in the plan:
 - Choose the appropriate operation type (add_class, add_data_prop, add_object_prop, update_*, delete_*, merge_classes)
@@ -88,6 +89,7 @@ class DraftOps(Expression):
         return _prompt.format(
             plan=self._plan,
             intent=self._intent,
+            ontology=self._ontology.model_dump_json(),
             feedback_section=feedback_section,
         )
 
