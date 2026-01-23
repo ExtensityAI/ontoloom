@@ -1,0 +1,31 @@
+[project]
+name = "hydra-viz"
+version = "0.1.0"
+description = "Web visualization server for ontology-hydra runs"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "ExtensityAI" }]
+keywords = ["ontology", "visualization", "hydra"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "ontology-hydra",
+    "litestar[standard]>=2.0.0",
+    "uvicorn>=0.30.0",
+]
+
+[project.scripts]
+hydra-viz = "hydra_viz.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+ontology-hydra = { path = "../../ontology-hydra", editable = true }
+
+[tool.uv_build]
+# Include static files in the package
+include-data = [{ from = "src/hydra_viz/static", to = "hydra_viz/static" }]

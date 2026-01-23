@@ -1,0 +1,165 @@
+<script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+	import * as echarts from 'echarts';
+	import type { MetricsTimeSeries } from '$lib/api/types';
+	import { getCssVar } from '$lib/utils/theme';
+
+	let {
+		metrics,
+		currentIteration
+	}: {
+		metrics: MetricsTimeSeries | null;
+		currentIteration: number;
+	} = $props();
+
+	let structuralContainer: HTMLDivElement;
+	let growthContainer: HTMLDivElement;
+	let structuralChart: echarts.ECharts | null = null;
+	let growthChart: echarts.ECharts | null = null;
+
+	// Chart theme colors - resolved once on mount
+	let theme = {
+		surface: '#1e293b',
+		edge: '#334155',
+		muted: '#94a3b8',
+		fg: '#e2e8f0',
+		accent: '#f472b6'
+	};
+
+	const initTheme = () => {
+		theme = {
+			surface: getCssVar('--color-surface') || theme.surface,
+			edge: getCssVar('--color-edge') || theme.edge,
+			muted: getCssVar('--color-muted') || theme.muted,
+			fg: getCssVar('--color-fg') || theme.fg,
+			accent: getCssVar('--color-accent') || theme.accent
+		};
+	};
+
+	// Series colors
+	const C = {
+		classes: '#38bdf8',
+		depth: '#22c55e',
+		branching: '#f59e0b',
+		dataProps: '#a78bfa',
+		objectProps: '#f472b6',
+		coverage: '#14b8a6'
+	};
+
+	// Line series helper
+	const line = (name: string, color: string, data: unknown[], opts = {}) => ({
+		name,
+		type: 'line',
+		smooth: true,
+		lineStyle: { color, width: 2 },
+		itemStyle: { color },
+		data,
+		...opts
+	});
+
+	const initCharts = () => {
+		if (!structuralContainer || !growthContainer) return;
+		initTheme();
+		structuralChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' });
+		growthChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' });
+		updateCharts();
+	};
+
+	const updateCharts = () => {
+		if (!metrics || !structuralChart || !growthChart) return;
+
+		const pts = metrics.points;
+		const iterations = pts.map((p) => p.iteration);
+		const axis = { lineStyle: { color: theme.edge } };
+		const label = { color: theme.muted };
+		const tooltip = { trigger: 'axis', backgroundColor: theme.surface, borderColor: theme.edge, textStyle: { color: theme.fg } };
+		const yAxis = (extra = {}) => ({ type: 'value', axisLine: axis, splitLine: { lineStyle: { color: theme.surface } }, axisLabel: label, ...extra });
+
+		structuralChart.setOption({
+			backgroundColor: 'transparent',
+			tooltip,
+			legend: { data: ['Classes', 'Depth', 'Branching'], textStyle: label, top: 0 },
+			grid: { left: 50, right: 20, top: 40, bottom: 30 },
+			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
+			yAxis: [yAxis(), yAxis({ splitLine: { show: false } })],
+			series: [
+				line('Classes', C.classes, pts.map((p) => p.metrics.class_count), {
+					markLine: currentIteration >= 0
+						? { silent: true, data: [{ xAxis: currentIteration }], lineStyle: { color: theme.accent, type: 'dashed' } }
+						: undefined
+				}),
+				line('Depth', C.depth, pts.map((p) => p.metrics.max_depth), { yAxisIndex: 1 }),
+				line('Branching', C.branching, pts.map((p) => p.metrics.avg_branching_factor.toFixed(2)), { yAxisIndex: 1 })
+			]
+		});
+
+		growthChart.setOption({
+			backgroundColor: 'transparent',
+			tooltip,
+			legend: { data: ['Data Props', 'Object Props', 'Coverage'], textStyle: label, top: 0 },
+			grid: { left: 50, right: 50, top: 40, bottom: 30 },
+			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
+			yAxis: [yAxis(), yAxis({ max: 100, splitLine: { show: false }, axisLabel: { ...label, formatter: '{value}%' } })],
+			series: [
+				line('Data Props', C.dataProps, pts.map((p) => p.metrics.data_property_count), { areaStyle: { opacity: 0.3 } }),
+				line('Object Props', C.objectProps, pts.map((p) => p.metrics.object_property_count), { areaStyle: { opacity: 0.3 } }),
+				line('Coverage', C.coverage, pts.map((p) => (p.metrics.property_coverage * 100).toFixed(1)), { yAxisIndex: 1 })
+			]
+		});
+	};
+
+	const handleResize = () => {
+		structuralChart?.resize();
+		growthChart?.resize();
+	};
+
+	onMount(() => {
+		initCharts();
+		window.addEventListener('resize', handleResize);
+	});
+
+	onDestroy(() => {
+		window.removeEventListener('resize', handleResize);
+		structuralChart?.dispose();
+		growthChart?.dispose();
+	});
+
+	$effect(() => {
+		if (metrics && structuralChart && growthChart) {
+			updateCharts();
+		}
+	});
+
+	// Update mark line when currentIteration changes
+	$effect(() => {
+		if (structuralChart && currentIteration >= 0) {
+			structuralChart.setOption({
+				series: [
+					{
+						markLine: {
+							silent: true,
+							data: [{ xAxis: currentIteration }],
+							lineStyle: { color: theme.accent, type: 'dashed' }
+						}
+					}
+				]
+			});
+		}
+	});
+</script>
+
+<div class="space-y-4">
+	<div class="bg-surface rounded-lg border border-edge p-4">
+		<h3 class="text-sm font-semibold text-muted mb-3">Structural Metrics</h3>
+		<div bind:this={structuralContainer} class="h-48"></div>
+	</div>
+
+	<div class="bg-surface rounded-lg border border-edge p-4">
+		<h3 class="text-sm font-semibold text-muted mb-3">Growth Trajectory</h3>
+		<div bind:this={growthContainer} class="h-48"></div>
+	</div>
+
+	{#if !metrics}
+		<div class="text-center py-8 text-faint">No metrics data available</div>
+	{/if}
+</div>
