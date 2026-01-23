@@ -1,10 +1,17 @@
-# TODO: in the beginning, we simply execute operations sequentially. If one fails, we immediately raise an error. LATER, we might want to build some execution graph with dependencies, which would immediately show that, f.e. an update and a delete operation of the same class are invalid, and we can see which operations are actually erroneous (node does not exist), and which operations are just blocked (e.g. adding a domain class to a property after the class was created, but creation args are wrong so create failed. In this case, adding the domain class is not in itself an error.) In this way, we could propagate more errors immediately, likely speeding up execution (and precision?)
+# TODO: in the beginning, we simply execute operations sequentially. If one fails, we immediately
+# raise an error. LATER, we might want to build some execution graph with dependencies, which would
+# immediately show that, f.e. an update and a delete operation of the same class are invalid, and we
+# can see which operations are actually erroneous (node does not exist), and which operations are
+# just blocked (e.g. adding a domain class to a property after the class was created, but creation
+# args are wrong so create failed. In this case, adding the domain class is not in itself an error.)
+# In this way, we could propagate more errors immediately, likely speeding up execution (and
+# precision?)
 
-# TODO: for property updates: assuming a new class is added to domain/range, should we check if the class is already part of the domain/range and should we make this an error? if no, maybe a warning? not sure
+# TODO: for property updates: assuming a new class is added to domain/range, should we check if the
+# class is already part of the domain/range and should we make this an error? if no, maybe a
+# warning? not sure
 
-# TODO: do a cleanup of this class. simplify, etc. (but first consider first TODO maybe)
-
-from functools import singledispatch
+"""Executor for ontology revision operations using pattern matching."""
 
 from ontology_hydra.ontology.models import (
     Class,
@@ -20,26 +27,18 @@ from ontology_hydra.ontology.revision.helpers import (
     replace_class_refs,
     validate_classes_exist,
 )
-from ontology_hydra.ontology.revision.operations.add_class import AddClassOperation
-from ontology_hydra.ontology.revision.operations.add_data_property import AddDataPropertyOperation
-from ontology_hydra.ontology.revision.operations.add_object_property import (
-    AddObjectPropertyOperation,
-)
-from ontology_hydra.ontology.revision.operations.delete_class import DeleteClassOperation
-from ontology_hydra.ontology.revision.operations.delete_data_property import (
-    DeleteDataPropertyOperation,
-)
-from ontology_hydra.ontology.revision.operations.delete_object_property import (
-    DeleteObjectPropertyOperation,
-)
-from ontology_hydra.ontology.revision.operations.merge_classes import MergeClassesOperation
-from ontology_hydra.ontology.revision.operations.ops import Operation
-from ontology_hydra.ontology.revision.operations.update_class import UpdateClassOperation
-from ontology_hydra.ontology.revision.operations.update_data_property import (
-    UpdateDataPropertyOperation,
-)
-from ontology_hydra.ontology.revision.operations.update_object_property import (
-    UpdateObjectPropertyOperation,
+from ontology_hydra.ontology.revision.operations import (
+    AddClass,
+    AddDataProperty,
+    AddObjectProperty,
+    DeleteClass,
+    DeleteDataProperty,
+    DeleteObjectProperty,
+    MergeClasses,
+    Operation,
+    UpdateClass,
+    UpdateDataProperty,
+    UpdateObjectProperty,
 )
 
 
@@ -53,14 +52,32 @@ class OperationFailed(Exception):
         self.__cause__ = cause
 
 
-@singledispatch
 def execute_op(op: Operation, ontology: Ontology) -> Ontology:
-    msg = f"No handler for {type(op).__name__}"
-    raise NotImplementedError(msg)
+    """Execute a single operation on the ontology."""
+    match op:
+        case AddClass():
+            return _add_class(op, ontology)
+        case UpdateClass():
+            return _update_class(op, ontology)
+        case DeleteClass():
+            return _delete_class(op, ontology)
+        case MergeClasses():
+            return _merge_classes(op, ontology)
+        case AddDataProperty():
+            return _add_data_property(op, ontology)
+        case UpdateDataProperty():
+            return _update_data_property(op, ontology)
+        case DeleteDataProperty():
+            return _delete_data_property(op, ontology)
+        case AddObjectProperty():
+            return _add_object_property(op, ontology)
+        case UpdateObjectProperty():
+            return _update_object_property(op, ontology)
+        case DeleteObjectProperty():
+            return _delete_object_property(op, ontology)
 
 
-@execute_op.register
-def _(op: AddClassOperation, ontology: Ontology):
+def _add_class(op: AddClass, ontology: Ontology) -> Ontology:
     """Add a new class to the ontology."""
     if op.name in ontology.classes:
         msg = f"Class '{op.name}' already exists"
@@ -85,45 +102,7 @@ def _(op: AddClassOperation, ontology: Ontology):
     return ontology
 
 
-@execute_op.register
-def _(op: AddDataPropertyOperation, ontology: Ontology):
-    """Add a new data property to the ontology."""
-    if op.name in ontology.data_properties:
-        msg = f"Data property '{op.name}' already exists"
-        raise ValueError(msg)
-
-    validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
-
-    ontology.data_properties[op.name] = DataProperty(
-        name=op.name,
-        description=op.description,
-        domain=op.domain,
-        range=op.range,
-    )
-    return ontology
-
-
-@execute_op.register
-def _(op: AddObjectPropertyOperation, ontology: Ontology):
-    """Add a new object property to the ontology."""
-    if op.name in ontology.object_properties:
-        msg = f"Object property '{op.name}' already exists"
-        raise ValueError(msg)
-
-    validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
-    validate_classes_exist(ontology, get_classes_in_expressions(op.range), "Range")
-
-    ontology.object_properties[op.name] = ObjectProperty(
-        name=op.name,
-        description=op.description,
-        domain=op.domain,
-        range=op.range,
-    )
-    return ontology
-
-
-@execute_op.register
-def _(op: UpdateClassOperation, ontology: Ontology):
+def _update_class(op: UpdateClass, ontology: Ontology) -> Ontology:
     """Update an existing class in the ontology."""
     if op.name not in ontology.classes:
         msg = f"Class '{op.name}' does not exist"
@@ -160,71 +139,7 @@ def _(op: UpdateClassOperation, ontology: Ontology):
     return ontology
 
 
-@execute_op.register
-def _(op: UpdateDataPropertyOperation, ontology: Ontology):
-    """Update an existing data property."""
-    if op.name not in ontology.data_properties:
-        msg = f"Data property '{op.name}' does not exist"
-        raise KeyError(msg)
-
-    prop = ontology.data_properties[op.name]
-
-    if op.description is not None:
-        prop.description = op.description
-
-    if op.domain is not None:
-        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
-        prop.domain = op.domain
-
-    if op.range is not None:
-        prop.range = op.range
-
-    if op.new_name is not None and op.new_name != op.name:
-        if op.new_name in ontology.data_properties:
-            msg = f"Cannot rename: data property '{op.new_name}' already exists"
-            raise ValueError(msg)
-
-        del ontology.data_properties[op.name]
-        prop.name = op.new_name
-        ontology.data_properties[op.new_name] = prop
-
-    return ontology
-
-
-@execute_op.register
-def _(op: UpdateObjectPropertyOperation, ontology: Ontology):
-    """Update an existing object property."""
-    if op.name not in ontology.object_properties:
-        msg = f"Object property '{op.name}' does not exist"
-        raise KeyError(msg)
-
-    prop = ontology.object_properties[op.name]
-
-    if op.description is not None:
-        prop.description = op.description
-
-    if op.domain is not None:
-        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
-        prop.domain = op.domain
-
-    if op.range is not None:
-        validate_classes_exist(ontology, get_classes_in_expressions(op.range), "Range")
-        prop.range = op.range
-
-    if op.new_name is not None and op.new_name != op.name:
-        if op.new_name in ontology.object_properties:
-            msg = f"Cannot rename: object property '{op.new_name}' already exists"
-            raise ValueError(msg)
-
-        del ontology.object_properties[op.name]
-        prop.name = op.new_name
-        ontology.object_properties[op.new_name] = prop
-
-    return ontology
-
-
-@execute_op.register
-def _(op: DeleteClassOperation, ontology: Ontology):
+def _delete_class(op: DeleteClass, ontology: Ontology) -> Ontology:
     """Delete a class from the ontology."""
     if op.name not in ontology.classes:
         msg = f"Class '{op.name}' does not exist"
@@ -255,30 +170,7 @@ def _(op: DeleteClassOperation, ontology: Ontology):
     return ontology
 
 
-@execute_op.register
-def _(op: DeleteDataPropertyOperation, ontology: Ontology):
-    """Delete a data property from the ontology."""
-    if op.name not in ontology.data_properties:
-        msg = f"Data property '{op.name}' does not exist"
-        raise KeyError(msg)
-
-    del ontology.data_properties[op.name]
-    return ontology
-
-
-@execute_op.register
-def _(op: DeleteObjectPropertyOperation, ontology: Ontology):
-    """Delete an object property from the ontology."""
-    if op.name not in ontology.object_properties:
-        msg = f"Object property '{op.name}' does not exist"
-        raise KeyError(msg)
-
-    del ontology.object_properties[op.name]
-    return ontology
-
-
-@execute_op.register
-def _(op: MergeClassesOperation, ontology: Ontology):
+def _merge_classes(op: MergeClasses, ontology: Ontology) -> Ontology:
     """Merge multiple classes into a single target class."""
     for source in op.source_classes:
         if source not in ontology.classes:
@@ -286,7 +178,7 @@ def _(op: MergeClassesOperation, ontology: Ontology):
             raise KeyError(msg)
 
     # Collect all superclasses from source classes
-    all_superclasses: set[ClassName] = set()
+    all_superclasses = set[ClassName]()
     for source in op.source_classes:
         all_superclasses.update(ontology.classes[source].sub_class_of)
 
@@ -319,7 +211,124 @@ def _(op: MergeClassesOperation, ontology: Ontology):
     return ontology
 
 
-def execute_ops(ontology: Ontology, ops: list[Operation]):
+def _add_data_property(op: AddDataProperty, ontology: Ontology) -> Ontology:
+    """Add a new data property to the ontology."""
+    if op.name in ontology.data_properties:
+        msg = f"Data property '{op.name}' already exists"
+        raise ValueError(msg)
+
+    validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+
+    ontology.data_properties[op.name] = DataProperty(
+        name=op.name,
+        description=op.description,
+        domain=op.domain,
+        range=op.range,
+    )
+    return ontology
+
+
+def _update_data_property(op: UpdateDataProperty, ontology: Ontology) -> Ontology:
+    """Update an existing data property."""
+    if op.name not in ontology.data_properties:
+        msg = f"Data property '{op.name}' does not exist"
+        raise KeyError(msg)
+
+    prop = ontology.data_properties[op.name]
+
+    if op.description is not None:
+        prop.description = op.description
+
+    if op.domain is not None:
+        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+        prop.domain = op.domain
+
+    if op.range is not None:
+        prop.range = op.range
+
+    if op.new_name is not None and op.new_name != op.name:
+        if op.new_name in ontology.data_properties:
+            msg = f"Cannot rename: data property '{op.new_name}' already exists"
+            raise ValueError(msg)
+
+        del ontology.data_properties[op.name]
+        prop.name = op.new_name
+        ontology.data_properties[op.new_name] = prop
+
+    return ontology
+
+
+def _delete_data_property(op: DeleteDataProperty, ontology: Ontology) -> Ontology:
+    """Delete a data property from the ontology."""
+    if op.name not in ontology.data_properties:
+        msg = f"Data property '{op.name}' does not exist"
+        raise KeyError(msg)
+
+    del ontology.data_properties[op.name]
+    return ontology
+
+
+def _add_object_property(op: AddObjectProperty, ontology: Ontology) -> Ontology:
+    """Add a new object property to the ontology."""
+    if op.name in ontology.object_properties:
+        msg = f"Object property '{op.name}' already exists"
+        raise ValueError(msg)
+
+    validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+    validate_classes_exist(ontology, get_classes_in_expressions(op.range), "Range")
+
+    ontology.object_properties[op.name] = ObjectProperty(
+        name=op.name,
+        description=op.description,
+        domain=op.domain,
+        range=op.range,
+    )
+    return ontology
+
+
+def _update_object_property(op: UpdateObjectProperty, ontology: Ontology) -> Ontology:
+    """Update an existing object property."""
+    if op.name not in ontology.object_properties:
+        msg = f"Object property '{op.name}' does not exist"
+        raise KeyError(msg)
+
+    prop = ontology.object_properties[op.name]
+
+    if op.description is not None:
+        prop.description = op.description
+
+    if op.domain is not None:
+        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+        prop.domain = op.domain
+
+    if op.range is not None:
+        validate_classes_exist(ontology, get_classes_in_expressions(op.range), "Range")
+        prop.range = op.range
+
+    if op.new_name is not None and op.new_name != op.name:
+        if op.new_name in ontology.object_properties:
+            msg = f"Cannot rename: object property '{op.new_name}' already exists"
+            raise ValueError(msg)
+
+        del ontology.object_properties[op.name]
+        prop.name = op.new_name
+        ontology.object_properties[op.new_name] = prop
+
+    return ontology
+
+
+def _delete_object_property(op: DeleteObjectProperty, ontology: Ontology) -> Ontology:
+    """Delete an object property from the ontology."""
+    if op.name not in ontology.object_properties:
+        msg = f"Object property '{op.name}' does not exist"
+        raise KeyError(msg)
+
+    del ontology.object_properties[op.name]
+    return ontology
+
+
+def execute_ops(ontology: Ontology, ops: list[Operation]) -> Ontology:
+    """Execute a sequence of operations on the ontology."""
     ontology = ontology.clone()
 
     for i, op in enumerate(ops):

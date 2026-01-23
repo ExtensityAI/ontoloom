@@ -92,6 +92,44 @@ class OntologyDiff(DataModel):
     def is_empty(self):
         return not (self.classes or self.data_properties or self.object_properties)
 
+    # Convenience properties for extracting names by change type
+
+    @property
+    def classes_added(self) -> list[ClassName]:
+        return [c.cls.name for c in self.classes if isinstance(c, ClassAdded)]
+
+    @property
+    def classes_modified(self) -> list[ClassName]:
+        return [c.name for c in self.classes if isinstance(c, ClassModified)]
+
+    @property
+    def classes_removed(self) -> list[ClassName]:
+        return [c.name for c in self.classes if isinstance(c, ClassRemoved)]
+
+    @property
+    def data_properties_added(self) -> list[PropertyName]:
+        return [p.prop.name for p in self.data_properties if isinstance(p, DataPropertyAdded)]
+
+    @property
+    def data_properties_modified(self) -> list[PropertyName]:
+        return [p.name for p in self.data_properties if isinstance(p, DataPropertyModified)]
+
+    @property
+    def data_properties_removed(self) -> list[PropertyName]:
+        return [p.name for p in self.data_properties if isinstance(p, DataPropertyRemoved)]
+
+    @property
+    def object_properties_added(self) -> list[PropertyName]:
+        return [p.prop.name for p in self.object_properties if isinstance(p, ObjectPropertyAdded)]
+
+    @property
+    def object_properties_modified(self) -> list[PropertyName]:
+        return [p.name for p in self.object_properties if isinstance(p, ObjectPropertyModified)]
+
+    @property
+    def object_properties_removed(self) -> list[PropertyName]:
+        return [p.name for p in self.object_properties if isinstance(p, ObjectPropertyRemoved)]
+
 
 # -----------------------------------------------------------------------------
 # Diff computation

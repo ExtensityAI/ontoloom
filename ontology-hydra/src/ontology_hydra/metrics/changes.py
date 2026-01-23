@@ -6,20 +6,8 @@ from collections.abc import Sequence
 from pydantic import BaseModel, Field, computed_field
 
 from ontology_hydra.ontology.models import ClassName, Ontology, PropertyName
-from ontology_hydra.ontology.revision.diff import (
-    ClassAdded,
-    ClassModified,
-    ClassRemoved,
-    DataPropertyAdded,
-    DataPropertyModified,
-    DataPropertyRemoved,
-    ObjectPropertyAdded,
-    ObjectPropertyModified,
-    ObjectPropertyRemoved,
-    OntologyDiff,
-    diff_ontology,
-)
-from ontology_hydra.ontology.revision.operations.ops import Operation
+from ontology_hydra.ontology.revision.diff import OntologyDiff, diff_ontology
+from ontology_hydra.ontology.revision.operations import Operation
 
 
 class OperationCounts(BaseModel):
@@ -276,81 +264,9 @@ def compute_change_metrics(
         retry_count: Number of retries needed to get valid operations
         validation_failures: Number of validation failures encountered
     """
-    # Count operations
-    op_counts = count_operations(operations)
-
-    # Compute diff to get actual changes
     diff = diff_ontology(old_ontology, new_ontology)
-
-    # Extract entities by change type
-    classes_added: list[ClassName] = []
-    classes_modified: list[ClassName] = []
-    classes_removed: list[ClassName] = []
-
-    for change in diff.classes:
-        if isinstance(change, ClassAdded):
-            classes_added.append(change.cls.name)
-        elif isinstance(change, ClassModified):
-            classes_modified.append(change.name)
-        elif isinstance(change, ClassRemoved):
-            classes_removed.append(change.name)
-
-    data_props_added: list[PropertyName] = []
-    data_props_modified: list[PropertyName] = []
-    data_props_removed: list[PropertyName] = []
-
-    for change in diff.data_properties:
-        if isinstance(change, DataPropertyAdded):
-            data_props_added.append(change.prop.name)
-        elif isinstance(change, DataPropertyModified):
-            data_props_modified.append(change.name)
-        elif isinstance(change, DataPropertyRemoved):
-            data_props_removed.append(change.name)
-
-    obj_props_added: list[PropertyName] = []
-    obj_props_modified: list[PropertyName] = []
-    obj_props_removed: list[PropertyName] = []
-
-    for change in diff.object_properties:
-        if isinstance(change, ObjectPropertyAdded):
-            obj_props_added.append(change.prop.name)
-        elif isinstance(change, ObjectPropertyModified):
-            obj_props_modified.append(change.name)
-        elif isinstance(change, ObjectPropertyRemoved):
-            obj_props_removed.append(change.name)
-
-    # Compute unique entities touched
-    unique_classes = set(classes_added) | set(classes_modified) | set(classes_removed)
-    unique_props = (
-        set(data_props_added)
-        | set(data_props_modified)
-        | set(data_props_removed)
-        | set(obj_props_added)
-        | set(obj_props_modified)
-        | set(obj_props_removed)
-    )
-
-    # Compute scatter score based on classes in the new ontology
-    # Use classes that exist in the new ontology for distance calculation
-    existing_touched = unique_classes & set(new_ontology.classes.keys())
-    scatter = _compute_scatter_score(new_ontology, existing_touched)
-
-    return ChangeMetrics(
-        operation_counts=op_counts,
-        classes_added=classes_added,
-        classes_modified=classes_modified,
-        classes_removed=classes_removed,
-        data_properties_added=data_props_added,
-        data_properties_modified=data_props_modified,
-        data_properties_removed=data_props_removed,
-        object_properties_added=obj_props_added,
-        object_properties_modified=obj_props_modified,
-        object_properties_removed=obj_props_removed,
-        unique_classes_touched=len(unique_classes),
-        unique_properties_touched=len(unique_props),
-        scatter_score=scatter,
-        retry_count=retry_count,
-        validation_failures=validation_failures,
+    return compute_change_metrics_from_diff(
+        diff, new_ontology, operations, retry_count, validation_failures
     )
 
 
@@ -366,55 +282,19 @@ def compute_change_metrics_from_diff(
 
     Useful when you already have the diff computed and don't want to recompute.
     """
-    # Count operations if provided
     op_counts = count_operations(operations) if operations else OperationCounts()
 
-    # Extract entities by change type
-    classes_added: list[ClassName] = []
-    classes_modified: list[ClassName] = []
-    classes_removed: list[ClassName] = []
-
-    for change in diff.classes:
-        if isinstance(change, ClassAdded):
-            classes_added.append(change.cls.name)
-        elif isinstance(change, ClassModified):
-            classes_modified.append(change.name)
-        elif isinstance(change, ClassRemoved):
-            classes_removed.append(change.name)
-
-    data_props_added: list[PropertyName] = []
-    data_props_modified: list[PropertyName] = []
-    data_props_removed: list[PropertyName] = []
-
-    for change in diff.data_properties:
-        if isinstance(change, DataPropertyAdded):
-            data_props_added.append(change.prop.name)
-        elif isinstance(change, DataPropertyModified):
-            data_props_modified.append(change.name)
-        elif isinstance(change, DataPropertyRemoved):
-            data_props_removed.append(change.name)
-
-    obj_props_added: list[PropertyName] = []
-    obj_props_modified: list[PropertyName] = []
-    obj_props_removed: list[PropertyName] = []
-
-    for change in diff.object_properties:
-        if isinstance(change, ObjectPropertyAdded):
-            obj_props_added.append(change.prop.name)
-        elif isinstance(change, ObjectPropertyModified):
-            obj_props_modified.append(change.name)
-        elif isinstance(change, ObjectPropertyRemoved):
-            obj_props_removed.append(change.name)
-
     # Compute unique entities touched
-    unique_classes = set(classes_added) | set(classes_modified) | set(classes_removed)
+    unique_classes = (
+        set(diff.classes_added) | set(diff.classes_modified) | set(diff.classes_removed)
+    )
     unique_props = (
-        set(data_props_added)
-        | set(data_props_modified)
-        | set(data_props_removed)
-        | set(obj_props_added)
-        | set(obj_props_modified)
-        | set(obj_props_removed)
+        set(diff.data_properties_added)
+        | set(diff.data_properties_modified)
+        | set(diff.data_properties_removed)
+        | set(diff.object_properties_added)
+        | set(diff.object_properties_modified)
+        | set(diff.object_properties_removed)
     )
 
     # Compute scatter score
@@ -423,15 +303,15 @@ def compute_change_metrics_from_diff(
 
     return ChangeMetrics(
         operation_counts=op_counts,
-        classes_added=classes_added,
-        classes_modified=classes_modified,
-        classes_removed=classes_removed,
-        data_properties_added=data_props_added,
-        data_properties_modified=data_props_modified,
-        data_properties_removed=data_props_removed,
-        object_properties_added=obj_props_added,
-        object_properties_modified=obj_props_modified,
-        object_properties_removed=obj_props_removed,
+        classes_added=diff.classes_added,
+        classes_modified=diff.classes_modified,
+        classes_removed=diff.classes_removed,
+        data_properties_added=diff.data_properties_added,
+        data_properties_modified=diff.data_properties_modified,
+        data_properties_removed=diff.data_properties_removed,
+        object_properties_added=diff.object_properties_added,
+        object_properties_modified=diff.object_properties_modified,
+        object_properties_removed=diff.object_properties_removed,
         unique_classes_touched=len(unique_classes),
         unique_properties_touched=len(unique_props),
         scatter_score=scatter,

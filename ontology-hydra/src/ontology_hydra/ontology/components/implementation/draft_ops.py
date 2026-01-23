@@ -6,7 +6,7 @@ from symai.strategy import contract
 
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import OperationFailed, execute_ops
-from ontology_hydra.ontology.revision.operations.ops import Operation
+from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.utils.schema.llm import DataModel
 
 

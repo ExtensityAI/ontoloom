@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -12,6 +13,7 @@ from ontology_hydra.cli.logging import configure_logging
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
 from ontology_hydra.ontology.components.planning.pipeline import generate_plan
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
+from ontology_hydra.ontology.run import VALID_RUN_NAME_PATTERN, RunMetadata
 from ontology_hydra.utils.cache import DirectoryCache
 
 # Initialize logging
@@ -24,7 +26,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True, slots=True)
 class Args:
     intent: str
-    output_path: Path
+    output_dir_path: Path
+    name: str
     input_paths: list[Path]
 
 
@@ -47,30 +50,42 @@ def _parse_args():
 
     parser.add_argument(
         "-o",
-        "--output",
+        "--output-dir",
         type=Path,
         required=True,
         help="Path to output directory",
     )
 
+    default_name = "run_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    parser.add_argument("--name", type=str, default=default_name, help="Run name (default:)")
+
     raw = parser.parse_args()
     args = Args(
-        intent=raw.intent, output_path=Path(raw.output), input_paths=[Path(p) for p in raw.input]
+        intent=raw.intent,
+        output_dir_path=Path(raw.output_dir),
+        name=raw.name,
+        input_paths=[Path(p) for p in raw.input],
     )
 
     # ---- validate args ---------------------
+    if not VALID_RUN_NAME_PATTERN.match(args.name):
+        parser.error("Invalid run name!")
+
+    if (args.output_dir_path / args.name).exists():
+        parser.error(f"A run with name {args.output_dir_path / args.name} already exists!")
+
     for path in args.input_paths:
         if not path.exists():
-            msg = f"Input path '{path}' does not exist!"
-            raise ValueError(msg)
+            parser.error(f"Input path '{path}' does not exist!")
 
         if path.is_dir():
-            msg = f"Input path '{path}' points to a directory but must point to a file!"
-            raise ValueError(msg)
+            parser.error(f"Input path '{path}' points to a directory but must point to a file!")
 
-    if not args.output_path.is_dir():
-        msg = f"Output path '{args.output_path}' either does not exist or is not a directory"
-        raise ValueError(msg)
+    if not args.output_dir_path.is_dir():
+        parser.error(
+            f"Output path '{args.output_dir_path}' either does not exist or is not a directory"
+        )
 
     return args
 
@@ -78,6 +93,19 @@ def _parse_args():
 def main():
     args = _parse_args()
     logger.info("Input files: {}", [str(p) for p in args.input_paths])
+
+    run_dir = args.output_dir_path / args.name
+    run_dir.mkdir()
+
+    meta = RunMetadata(
+        name=args.name,
+        intent=args.intent,
+        input_files=[p.name for p in args.input_paths],
+        created_at=datetime.now(),
+        n_iterations=0,
+    )
+
+    (run_dir / "run.json").write_text(meta.model_dump_json(indent=4))
 
     # --- read and chunk inputs -----------------
 
@@ -92,7 +120,7 @@ def main():
         "list[list[Chunk]]", chunker(texts, show_progress_bar=False)
     )  # returns a list of chunks per input text
 
-    cache = DirectoryCache(args.output_path / "cache")
+    cache = DirectoryCache(run_dir / "cache")
     logger.info("Cache path: {}", cache.path)
 
     ontology = BASE_ONTOLOGY
@@ -117,6 +145,8 @@ def main():
             len(ontology.classes),
             len(ontology.data_properties) + len(ontology.object_properties),
         )
+        meta.n_iterations = i + 1
+        (run_dir / "run.json").write_text(meta.model_dump_json(indent=4))
 
     exit(0)
 

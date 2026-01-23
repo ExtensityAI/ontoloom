@@ -5,12 +5,8 @@ from statistics import mean
 
 from pydantic import BaseModel
 
-from ontology_hydra.ontology.models import (
-    ClassExpression,
-    ClassName,
-    IntersectionOf,
-    Ontology,
-)
+from ontology_hydra.ontology.models import ClassName, Ontology
+from ontology_hydra.ontology.revision.helpers import get_classes_in_expressions
 
 
 class StructuralMetrics(BaseModel):
@@ -68,21 +64,6 @@ class StructuralMetrics(BaseModel):
                 f"Quality: {self.classes_with_empty_definition} classes with empty definitions"
             )
         return "\n".join(lines)
-
-
-def _get_classes_from_expression(expr: ClassExpression) -> set[ClassName]:
-    """Extract class names from a class expression."""
-    if isinstance(expr, IntersectionOf):
-        return set(expr.classes)
-    return {expr}
-
-
-def _get_classes_from_expressions(exprs: list[ClassExpression]) -> set[ClassName]:
-    """Extract all class names from a list of class expressions."""
-    result: set[ClassName] = set()
-    for expr in exprs:
-        result.update(_get_classes_from_expression(expr))
-    return result
 
 
 def _compute_depths(ontology: Ontology) -> dict[ClassName, int]:
@@ -149,8 +130,8 @@ def _find_orphan_classes(ontology: Ontology) -> set[ClassName]:
     referenced: set[ClassName] = set()
 
     for prop in ontology.object_properties.values():
-        referenced.update(_get_classes_from_expressions(prop.domain))
-        referenced.update(_get_classes_from_expressions(prop.range))
+        referenced.update(get_classes_in_expressions(prop.domain))
+        referenced.update(get_classes_in_expressions(prop.range))
 
     # Thing is not considered orphan
     thing = ClassName("Thing")
@@ -164,7 +145,7 @@ def _find_classes_with_data_properties(ontology: Ontology) -> set[ClassName]:
     classes_with_props: set[ClassName] = set()
 
     for prop in ontology.data_properties.values():
-        classes_with_props.update(_get_classes_from_expressions(prop.domain))
+        classes_with_props.update(get_classes_in_expressions(prop.domain))
 
     return classes_with_props
 
@@ -175,12 +156,12 @@ def _count_thing_domain_properties(ontology: Ontology) -> int:
     count = 0
 
     for prop in ontology.data_properties.values():
-        domain_classes = _get_classes_from_expressions(prop.domain)
+        domain_classes = get_classes_in_expressions(prop.domain)
         if domain_classes == {thing}:
             count += 1
 
     for prop in ontology.object_properties.values():
-        domain_classes = _get_classes_from_expressions(prop.domain)
+        domain_classes = get_classes_in_expressions(prop.domain)
         if domain_classes == {thing}:
             count += 1
 
