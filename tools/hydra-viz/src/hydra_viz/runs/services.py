@@ -25,8 +25,6 @@ OPS_FILE = "ops.json"
 PLAN_FILE = "plan.md"
 REVIEW_FILE = "review.md"
 
-_ALLOWED_CACHE_FILES = frozenset({ONTOLOGY_FILE, OPS_FILE, PLAN_FILE, REVIEW_FILE})
-
 
 def _validate_run_name(name: str) -> None:
     if not name or not VALID_RUN_NAME_PATTERN.match(name):

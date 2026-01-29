@@ -44,8 +44,6 @@ class MetricsTimeSeries(BaseModel):
 
 
 class Run(BaseModel):
-    """Runtime model — dir is discovered, metadata loaded from dir/run.json."""
-
     dir: Path = Field(exclude=True)
     metadata: RunMetadata
 

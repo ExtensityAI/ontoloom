@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from threading import RLock
 
-CacheKey = tuple[str | int | bool, ...]
+CacheKey = str | tuple[str | int | bool, ...]
 
 
 class Cache(ABC):
@@ -39,6 +39,9 @@ class DirectoryCache(Cache):
         return self._path
 
     def _get_path(self, key: CacheKey):
+        if isinstance(key, str):
+            return Path(self._path, key)
+
         return Path(self._path, *map(str, key))
 
     def exists(self, key: CacheKey):

@@ -21,7 +21,7 @@
 			<li class="border-t border-neutral-800 py-4 first:border-t-0">
 				<a class="group block" href={`/runs/${run.metadata.name}`}
 					><div>
-						<div class="text-lg transition group-hover:text-lime-300">{run.metadata.name}</div>
+						<div class="text-lg transition group-hover:text-emerald-300">{run.metadata.name}</div>
 						<time datetime={run.metadata.created_at} class="font-mono text-xs text-neutral-600">
 							{formatDateTimeFull(run.metadata.created_at)}
 						</time>

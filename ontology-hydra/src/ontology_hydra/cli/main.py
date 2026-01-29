@@ -97,6 +97,9 @@ def main():
     run_dir = args.output_dir_path / args.name
     run_dir.mkdir()
 
+    cache = DirectoryCache(run_dir)
+    logger.info("Cache path: {}", cache.path)
+
     meta = RunMetadata(
         name=args.name,
         intent=args.intent,
@@ -105,7 +108,7 @@ def main():
         n_iterations=0,
     )
 
-    (run_dir / "run.json").write_text(meta.model_dump_json(indent=4))
+    cache.write("run.json", meta.model_dump_json(indent=4))
 
     # --- read and chunk inputs -----------------
 
@@ -119,9 +122,6 @@ def main():
     chunks_by_text = cast(
         "list[list[Chunk]]", chunker(texts, show_progress_bar=False)
     )  # returns a list of chunks per input text
-
-    cache = DirectoryCache(run_dir / "cache")
-    logger.info("Cache path: {}", cache.path)
 
     ontology = BASE_ONTOLOGY
 
@@ -146,7 +146,7 @@ def main():
             len(ontology.data_properties) + len(ontology.object_properties),
         )
         meta.n_iterations = i + 1
-        (run_dir / "run.json").write_text(meta.model_dump_json(indent=4))
+        cache.write("run.json", meta.model_dump_json(indent=4))
 
     exit(0)
 
