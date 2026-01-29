@@ -17,24 +17,16 @@
 	let structuralChart: echarts.ECharts | null = null;
 	let growthChart: echarts.ECharts | null = null;
 
-	// Chart theme colors - resolved once on mount
-	let theme = {
-		surface: '#1e293b',
-		edge: '#334155',
-		muted: '#94a3b8',
-		fg: '#e2e8f0',
-		accent: '#f472b6'
+	// Chart theme colors
+	const theme = {
+		surface: '#171717',
+		edge: '#262626',
+		muted: '#737373',
+		fg: '#e5e5e5',
+		accent: '#a3a3a3'
 	};
 
-	const initTheme = () => {
-		theme = {
-			surface: getCssVar('--color-surface') || theme.surface,
-			edge: getCssVar('--color-edge') || theme.edge,
-			muted: getCssVar('--color-muted') || theme.muted,
-			fg: getCssVar('--color-fg') || theme.fg,
-			accent: getCssVar('--color-accent') || theme.accent
-		};
-	};
+	const initTheme = () => {};
 
 	// Series colors
 	const C = {
@@ -148,18 +140,18 @@
 	});
 </script>
 
-<div class="space-y-4">
-	<div class="bg-surface rounded-lg border border-edge p-4">
-		<h3 class="text-sm font-semibold text-muted mb-3">Structural Metrics</h3>
+<div class="space-y-8">
+	<div>
+		<h3 class="mb-4 text-sm font-medium text-muted">Structure</h3>
 		<div bind:this={structuralContainer} class="h-48"></div>
 	</div>
 
-	<div class="bg-surface rounded-lg border border-edge p-4">
-		<h3 class="text-sm font-semibold text-muted mb-3">Growth Trajectory</h3>
+	<div>
+		<h3 class="mb-4 text-sm font-medium text-muted">Properties</h3>
 		<div bind:this={growthContainer} class="h-48"></div>
 	</div>
 
 	{#if !metrics}
-		<div class="text-center py-8 text-faint">No metrics data available</div>
+		<p class="text-sm text-muted">No metrics data available</p>
 	{/if}
 </div>

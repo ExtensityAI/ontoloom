@@ -258,7 +258,7 @@
 	<!-- Selection info -->
 	{#if activeSelection}
 		<div
-			class="absolute bottom-3 left-3 bg-surface/90 backdrop-blur-sm rounded-lg border border-edge p-3 max-w-sm {showLegend ? 'right-48' : 'right-3'}"
+			class="absolute bottom-3 left-3 max-w-sm rounded-lg border border-edge bg-surface p-3 {showLegend ? 'right-48' : 'right-3'}"
 		>
 			<div class="flex items-start justify-between gap-4">
 				<div>
@@ -283,14 +283,14 @@
 
 	<!-- Empty state -->
 	{#if !ontology}
-		<div class="absolute inset-0 flex items-center justify-center text-faint bg-bg/80 backdrop-blur-sm">
+		<div class="absolute inset-0 flex items-center justify-center bg-bg/80 text-faint">
 			No ontology data available
 		</div>
 	{/if}
 
 	<!-- Keyboard shortcuts hint -->
 	{#if ontology && !showSearch && !activeSelection}
-		<div class="absolute bottom-3 left-3 text-xs text-faint/50">
+		<div class="absolute bottom-3 left-3 text-sm text-faint/50">
 			Press <kbd class="px-1 py-0.5 bg-surface rounded text-faint">F</kbd> to search ·
 			<kbd class="px-1 py-0.5 bg-surface rounded text-faint">L</kbd> legend
 		</div>

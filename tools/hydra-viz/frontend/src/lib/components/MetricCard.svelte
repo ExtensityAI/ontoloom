@@ -47,7 +47,7 @@
 		</div>
 		{#if previousValue !== undefined && trend !== 'neutral'}
 			<div
-				class="flex items-center text-xs {isPositive ? 'text-ok' : isPositive === false ? 'text-err' : 'text-muted'}"
+				class="flex items-center text-sm {isPositive ? 'text-ok' : isPositive === false ? 'text-err' : 'text-muted'}"
 			>
 				{#if trend === 'up'}
 					<TrendingUpIcon class="w-3 h-3" />

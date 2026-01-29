@@ -29,7 +29,7 @@
 </script>
 
 {#if hasChanges}
-	<div class="flex items-center gap-4 bg-surface rounded-lg px-4 py-2 border border-edge text-sm">
+	<div class="flex items-center gap-4 rounded-lg border border-edge bg-surface px-4 py-2 text-sm">
 		<span class="text-muted">
 			Changes from iteration {previousIteration} → {currentIteration}:
 		</span>
@@ -40,7 +40,7 @@
 					<PlusIcon class="w-4 h-4" />
 					<span>{totalAdded}</span>
 					{#if counts.classes.added > 0}
-						<span class="text-xs text-muted">
+						<span class="text-sm text-muted">
 							({counts.classes.added} class{counts.classes.added !== 1 ? 'es' : ''})
 						</span>
 					{/if}
@@ -52,7 +52,7 @@
 					<MinusIcon class="w-4 h-4" />
 					<span>{totalRemoved}</span>
 					{#if counts.classes.removed > 0}
-						<span class="text-xs text-muted">
+						<span class="text-sm text-muted">
 							({counts.classes.removed} class{counts.classes.removed !== 1 ? 'es' : ''})
 						</span>
 					{/if}
@@ -64,7 +64,7 @@
 					<PencilIcon class="w-4 h-4" />
 					<span>{totalModified}</span>
 					{#if counts.classes.modified > 0}
-						<span class="text-xs text-muted">
+						<span class="text-sm text-muted">
 							({counts.classes.modified} class{counts.classes.modified !== 1 ? 'es' : ''})
 						</span>
 					{/if}
@@ -73,7 +73,7 @@
 		</div>
 
 		<!-- Detailed breakdown on hover -->
-		<div class="ml-auto text-xs text-faint">
+		<div class="ml-auto text-sm text-faint">
 			{#if counts.dataProperties.total > 0}
 				<span>{counts.dataProperties.total} data prop{counts.dataProperties.total !== 1 ? 's' : ''}</span>
 			{/if}

@@ -1,1 +1,36 @@
-@import 'tailwindcss';
+@import "tailwindcss";
+
+@theme {
+  /* Background colors */
+  --color-bg: var(--color-stone-950);
+  --color-surface: var(--color-stone-900);
+  --color-hover: var(--color-stone-800);
+
+  /* Text colors */
+  --color-fg: var(--color-stone-100);
+  --color-muted: var(--color-stone-400);
+  --color-faint: var(--color-stone-500);
+
+  /* Border */
+  --color-edge: var(--color-stone-800);
+
+  /* Semantic colors */
+  --color-accent: var(--color-sky-400);
+  --color-ok: var(--color-emerald-400);
+  --color-warn: var(--color-amber-400);
+  --color-err: var(--color-red-400);
+  --color-info: var(--color-blue-400);
+
+  /* Fonts */
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+
+  /* Level colors for graph depth */
+  --color-lvl0: var(--color-cyan-800);
+  --color-lvl1: var(--color-cyan-700);
+  --color-lvl2: var(--color-cyan-600);
+  --color-lvl3: var(--color-cyan-500);
+  --color-lvl4: var(--color-cyan-400);
+  --color-lvl5: var(--color-cyan-300);
+}
