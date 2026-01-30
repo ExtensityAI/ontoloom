@@ -1,46 +1,22 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
-	import * as echarts from 'echarts';
-	import type { MetricsTimeSeries } from '$lib/api/types';
-	import { getCssVar } from '$lib/utils/theme';
+	import { onMount, onDestroy } from 'svelte'
+	import * as echarts from 'echarts'
+	import type { MetricsTimeSeries } from '$lib/api/types'
+	import { getChartTheme } from '$lib/utils/theme'
 
 	let {
 		metrics,
 		currentIteration
 	}: {
-		metrics: MetricsTimeSeries | null;
-		currentIteration: number;
-	} = $props();
+		metrics: MetricsTimeSeries | null
+		currentIteration: number
+	} = $props()
 
-	let structuralContainer: HTMLDivElement;
-	let growthContainer: HTMLDivElement;
-	let structuralChart: echarts.ECharts | null = null;
-	let growthChart: echarts.ECharts | null = null;
+	let structuralContainer: HTMLDivElement
+	let growthContainer: HTMLDivElement
+	let structuralChart: echarts.ECharts | null = null
+	let growthChart: echarts.ECharts | null = null
 
-	const css = (name: string, fallback?: string) => {
-		const value = getCssVar(name);
-		if (value) return value;
-		return fallback ? getCssVar(fallback) : '';
-	};
-
-	const getTheme = () => ({
-		surface: css('--color-surface', '--color-slate-900'),
-		edge: css('--color-edge', '--color-slate-800'),
-		muted: css('--color-muted', '--color-slate-400'),
-		fg: css('--color-fg', '--color-slate-50'),
-		accent: css('--color-accent', '--color-sky-400')
-	});
-
-	const getSeriesColors = () => ({
-		classes: css('--color-accent', '--color-sky-400'),
-		depth: css('--color-ok', '--color-emerald-400'),
-		branching: css('--color-warn', '--color-amber-400'),
-		dataProps: css('--color-info', '--color-blue-400'),
-		objectProps: css('--color-err', '--color-red-400'),
-		coverage: css('--color-ok', '--color-emerald-400')
-	});
-
-	// Line series helper
 	const line = (name: string, color: string, data: unknown[], opts = {}) => ({
 		name,
 		type: 'line',
@@ -49,26 +25,36 @@
 		itemStyle: { color },
 		data,
 		...opts
-	});
+	})
 
 	const initCharts = () => {
-		if (!structuralContainer || !growthContainer) return;
-		structuralChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' });
-		growthChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' });
-		updateCharts();
-	};
+		if (!structuralContainer || !growthContainer) return
+		structuralChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' })
+		growthChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' })
+		updateCharts()
+	}
 
 	const updateCharts = () => {
-		if (!metrics || !structuralChart || !growthChart) return;
+		if (!metrics || !structuralChart || !growthChart) return
 
-		const theme = getTheme();
-		const C = getSeriesColors();
-		const pts = metrics.points;
-		const iterations = pts.map((p) => p.iteration);
-		const axis = { lineStyle: { color: theme.edge } };
-		const label = { color: theme.muted };
-		const tooltip = { trigger: 'axis', backgroundColor: theme.surface, borderColor: theme.edge, textStyle: { color: theme.fg } };
-		const yAxis = (extra = {}) => ({ type: 'value', axisLine: axis, splitLine: { lineStyle: { color: theme.surface } }, axisLabel: label, ...extra });
+		const theme = getChartTheme()
+		const pts = metrics.points
+		const iterations = pts.map((p) => p.iteration)
+		const axis = { lineStyle: { color: theme.edge } }
+		const label = { color: theme.muted }
+		const tooltip = {
+			trigger: 'axis',
+			backgroundColor: theme.surface,
+			borderColor: theme.edge,
+			textStyle: { color: theme.fg }
+		}
+		const yAxis = (extra = {}) => ({
+			type: 'value',
+			axisLine: axis,
+			splitLine: { lineStyle: { color: theme.surface } },
+			axisLabel: label,
+			...extra
+		})
 
 		structuralChart.setOption({
 			backgroundColor: 'transparent',
@@ -78,15 +64,25 @@
 			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
 			yAxis: [yAxis(), yAxis({ splitLine: { show: false } })],
 			series: [
-				line('Classes', C.classes, pts.map((p) => p.metrics.class_count), {
-					markLine: currentIteration >= 0
-						? { silent: true, data: [{ xAxis: currentIteration }], lineStyle: { color: theme.accent, type: 'dashed' } }
-						: undefined
+				line('Classes', theme.accent, pts.map((p) => p.metrics.class_count), {
+					markLine:
+						currentIteration >= 0
+							? {
+									silent: true,
+									data: [{ xAxis: currentIteration }],
+									lineStyle: { color: theme.accent, type: 'dashed' }
+								}
+							: undefined
 				}),
-				line('Depth', C.depth, pts.map((p) => p.metrics.max_depth), { yAxisIndex: 1 }),
-				line('Branching', C.branching, pts.map((p) => p.metrics.avg_branching_factor.toFixed(2)), { yAxisIndex: 1 })
+				line('Depth', theme.ok, pts.map((p) => p.metrics.max_depth), { yAxisIndex: 1 }),
+				line(
+					'Branching',
+					theme.warn,
+					pts.map((p) => p.metrics.avg_branching_factor.toFixed(2)),
+					{ yAxisIndex: 1 }
+				)
 			]
-		});
+		})
 
 		growthChart.setOption({
 			backgroundColor: 'transparent',
@@ -94,41 +90,56 @@
 			legend: { data: ['Data Props', 'Object Props', 'Coverage'], textStyle: label, top: 0 },
 			grid: { left: 50, right: 50, top: 40, bottom: 30 },
 			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
-			yAxis: [yAxis(), yAxis({ max: 100, splitLine: { show: false }, axisLabel: { ...label, formatter: '{value}%' } })],
+			yAxis: [
+				yAxis(),
+				yAxis({
+					max: 100,
+					splitLine: { show: false },
+					axisLabel: { ...label, formatter: '{value}%' }
+				})
+			],
 			series: [
-				line('Data Props', C.dataProps, pts.map((p) => p.metrics.data_property_count), { areaStyle: { opacity: 0.3 } }),
-				line('Object Props', C.objectProps, pts.map((p) => p.metrics.object_property_count), { areaStyle: { opacity: 0.3 } }),
-				line('Coverage', C.coverage, pts.map((p) => (p.metrics.property_coverage * 100).toFixed(1)), { yAxisIndex: 1 })
+				line('Data Props', theme.info, pts.map((p) => p.metrics.data_property_count), {
+					areaStyle: { opacity: 0.3 }
+				}),
+				line('Object Props', theme.err, pts.map((p) => p.metrics.object_property_count), {
+					areaStyle: { opacity: 0.3 }
+				}),
+				line(
+					'Coverage',
+					theme.ok,
+					pts.map((p) => (p.metrics.property_coverage * 100).toFixed(1)),
+					{ yAxisIndex: 1 }
+				)
 			]
-		});
-	};
+		})
+	}
 
 	const handleResize = () => {
-		structuralChart?.resize();
-		growthChart?.resize();
-	};
+		structuralChart?.resize()
+		growthChart?.resize()
+	}
 
 	onMount(() => {
-		initCharts();
-		window.addEventListener('resize', handleResize);
-	});
+		initCharts()
+		window.addEventListener('resize', handleResize)
+	})
 
 	onDestroy(() => {
-		window.removeEventListener('resize', handleResize);
-		structuralChart?.dispose();
-		growthChart?.dispose();
-	});
+		window.removeEventListener('resize', handleResize)
+		structuralChart?.dispose()
+		growthChart?.dispose()
+	})
 
 	$effect(() => {
 		if (metrics && structuralChart && growthChart) {
-			updateCharts();
+			updateCharts()
 		}
-	});
+	})
 
-	// Update mark line when currentIteration changes
 	$effect(() => {
 		if (structuralChart && currentIteration >= 0) {
-			const theme = getTheme();
+			const theme = getChartTheme()
 			structuralChart.setOption({
 				series: [
 					{
@@ -139,9 +150,9 @@
 						}
 					}
 				]
-			});
+			})
 		}
-	});
+	})
 </script>
 
 <div class="space-y-8">

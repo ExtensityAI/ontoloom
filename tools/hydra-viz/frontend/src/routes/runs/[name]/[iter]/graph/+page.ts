@@ -1,13 +1,6 @@
-import type { Crumb } from "$lib/components/layout/Breadcrumbs.svelte"
-import type { PageLoad } from "./$types"
+import { getIterationSubpageCrumbs } from '$lib/utils/navigation'
+import type { PageLoad } from './$types'
 
 export const load: PageLoad = ({ params }) => {
-  const basePath = `/runs/${encodeURIComponent(params.name)}`
-  const breadcrumbs: Crumb[] = [
-    { label: "runs", href: "/" },
-    { label: params.name, href: basePath },
-    { label: params.iter, href: `${basePath}/${params.iter}` },
-    { label: "graph" }
-  ]
-  return { breadcrumbs }
+	return { breadcrumbs: getIterationSubpageCrumbs(params.name, params.iter, 'graph') }
 }

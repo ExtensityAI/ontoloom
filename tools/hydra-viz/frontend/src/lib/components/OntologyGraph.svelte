@@ -2,10 +2,9 @@
   import type { Ontology } from "$lib/api/types"
   import { createOntologyGraph } from "$lib/graph/parser"
   import type { HydraGraph, HydraSigma } from "$lib/graph/types"
-  import { getCssVar } from "$lib/utils/theme"
+  import { getVisualizerTheme } from "$lib/utils/theme"
   import { createEdgeReducer, createNodeReducer } from "$lib/visualizer/reducers"
   import { createSelection, type NodeSelection } from "$lib/visualizer/selection"
-  import { XIcon } from "@lucide/svelte"
   import forceAtlas2 from "graphology-layout-forceatlas2"
   import ForceAtlas2Layout from "graphology-layout-forceatlas2/worker"
   import { Sigma } from "sigma"
@@ -19,7 +18,7 @@
   let sigma: HydraSigma | null = $state(null)
   let graph: HydraGraph | null = $state(null)
   let activeSelection: NodeSelection | null = $state(null)
-  let layout = $state(null)
+  let layout: InstanceType<typeof ForceAtlas2Layout> | null = $state(null)
 
   const getActiveSelection = () => activeSelection
 
@@ -62,11 +61,14 @@
         graph = newGraph
 
         const layoutSettings = forceAtlas2.inferSettings(newGraph)
-        const newLayout = new ForceAtlas2Layout(newGraph, { settings: layoutSettings })
+        const newLayout = new ForceAtlas2Layout(newGraph, {
+          settings: layoutSettings,
+          backgroundIterations: 1
+        })
         newLayout.start()
         layout = newLayout
 
-        const labelColor = getCssVar("--color-fg") || "#f5f5f4"
+        const theme = getVisualizerTheme()
 
         const newSigma = new Sigma(newGraph, container, {
           nodeReducer: createNodeReducer(getActiveSelection),
@@ -75,7 +77,7 @@
           renderLabels: true,
           labelFont: "system-ui, sans-serif",
           labelSize: 12,
-          labelColor: { color: labelColor },
+          labelColor: { color: theme.label },
           defaultEdgeType: "arrow"
         })
 

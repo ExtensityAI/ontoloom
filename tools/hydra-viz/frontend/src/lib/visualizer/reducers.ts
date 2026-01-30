@@ -29,7 +29,7 @@ const getBaseNodeData = (data: NodeAttributes): Partial<NodeDisplayData> => ({
 
 const getBaseEdgeData = (data: EdgeAttributes): Partial<EdgeDisplayData> => ({
     type: "arrow",
-    color: getThemeColors().inactive,
+    color: getThemeColors().edge,
     size: data.size,
     zIndex: 0,
     label: "",
@@ -98,5 +98,5 @@ export const createEdgeReducer =
         if (!active) return base
         if (data.label === "isA") return reduceHierarchyEdge(data, active, base)
 
-        return { ...base, color: getThemeColors().inactive }
+        return { ...base, color: getThemeColors().edge }
     }
