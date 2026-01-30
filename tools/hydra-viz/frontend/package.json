@@ -40,8 +40,13 @@
 		"@lucide/svelte": "^0.562.0",
 		"echarts": "^5.6.0",
 		"graphology": "^0.26.0",
-		"graphology-layout-forceatlas2": "^0.10.1",
+		"rehype-sanitize": "^6.0.0",
+		"rehype-stringify": "^10.0.1",
+		"remark-gfm": "^4.0.1",
+		"remark-parse": "^11.0.0",
+		"remark-rehype": "^11.1.2",
 		"sigma": "^3.0.2",
+		"unified": "^11.0.5",
 		"zod": "^4.3.6"
 	}
 }

@@ -23,15 +23,13 @@
   }
 </script>
 
-<div class="space-y-8">
-  <h1 class="text-lg font-semibold text-fg">Iteration {data.iterNum} Metrics</h1>
-
+<div class="mx-auto w-full max-w-6xl space-y-8 px-4 py-8">
   {#if m}
     <!-- Primary metrics -->
     <section>
       <h2 class="mb-4 text-sm font-medium text-muted">Overview</h2>
       <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-2xl font-semibold text-fg">{m.class_count}</div>
           <div class="mt-1 flex items-center gap-2 text-sm">
             <span class="text-muted">classes</span>
@@ -41,7 +39,7 @@
           </div>
         </div>
 
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-2xl font-semibold text-fg">{m.max_depth}</div>
           <div class="mt-1 flex items-center gap-2 text-sm">
             <span class="text-muted">max depth</span>
@@ -51,7 +49,7 @@
           </div>
         </div>
 
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-2xl font-semibold text-fg">{Math.round(m.property_coverage * 100)}%</div>
           <div class="mt-1 text-sm text-muted">coverage</div>
         </div>
@@ -62,7 +60,7 @@
     <section>
       <h2 class="mb-4 text-sm font-medium text-muted">Properties</h2>
       <div class="grid grid-cols-2 gap-4">
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-2xl font-semibold text-fg">{m.data_property_count}</div>
           <div class="mt-1 flex items-center gap-2 text-sm">
             <span class="text-muted">data properties</span>
@@ -72,7 +70,7 @@
           </div>
         </div>
 
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-2xl font-semibold text-fg">{m.object_property_count}</div>
           <div class="mt-1 flex items-center gap-2 text-sm">
             <span class="text-muted">object properties</span>
@@ -88,15 +86,15 @@
     <section>
       <h2 class="mb-4 text-sm font-medium text-muted">Hierarchy</h2>
       <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-xl font-semibold text-fg">{m.root_class_count}</div>
           <div class="mt-1 text-sm text-muted">roots</div>
         </div>
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-xl font-semibold text-fg">{m.leaf_class_count}</div>
           <div class="mt-1 text-sm text-muted">leaves</div>
         </div>
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-xl font-semibold text-fg">{m.orphan_class_count}</div>
           <div class="mt-1 flex items-center gap-2 text-sm">
             <span class="text-muted">orphans</span>
@@ -105,14 +103,14 @@
             {/if}
           </div>
         </div>
-        <div class="rounded-lg border border-edge p-4">
+        <div class="border border-edge p-4">
           <div class="text-xl font-semibold text-fg">{m.avg_branching_factor.toFixed(1)}</div>
           <div class="mt-1 text-sm text-muted">avg branching</div>
         </div>
       </div>
     </section>
   {:else}
-    <div class="rounded-lg border border-edge p-8 text-center text-muted">
+    <div class="border border-edge p-8 text-center text-muted">
       No metrics available for this iteration
     </div>
   {/if}

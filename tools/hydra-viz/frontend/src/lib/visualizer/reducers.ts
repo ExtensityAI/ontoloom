@@ -7,68 +7,29 @@ import {
 import type { EdgeAttributes, NodeAttributes } from "../graph/types"
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
 import type { NodeSelection } from "./selection"
-import type { OntologyDiff } from "$lib/utils/diff"
 
 type SelectionGetter = () => NodeSelection | null
-type DiffGetter = () => OntologyDiff | undefined
-
-// Get colors (always returns valid colors object)
-const colors = () => getThemeColors()
 
 const resolveNodeSize = (inverseLevel: number) =>
     BASE_NODE_SIZE + inverseLevel * NODE_SIZE_MULTIPLIER
 
 const resolveLevelColor = (level: number): string => {
-    const c = colors()
+    const c = getThemeColors()
     return c.node.levels[level] ?? c.node.levels[c.node.levels.length - 1]
 }
 
-type DiffStatus = "added" | "removed" | "modified" | "unchanged"
-
-const getNodeDiffStatus = (node: string, diff: OntologyDiff | undefined): DiffStatus => {
-    if (!diff) return "unchanged"
-    if (diff.classes.added.includes(node)) return "added"
-    if (diff.classes.removed.includes(node)) return "removed"
-    if (diff.classes.modified.includes(node)) return "modified"
-    return "unchanged"
-}
-
-const getBaseNodeData = (data: NodeAttributes, diffStatus: DiffStatus): Partial<NodeDisplayData> => {
-    const c = colors()
-    const baseColor = resolveLevelColor(data.level)
-
-    // Apply diff styling - use color directly since Sigma doesn't support borders
-    let color = baseColor
-    let size = resolveNodeSize(data.inverseLevel)
-
-    switch (diffStatus) {
-        case "added":
-            color = c.diff.added
-            size = size * 1.3 // Slightly larger
-            break
-        case "removed":
-            color = c.diff.removed
-            size = size * 0.8 // Slightly smaller
-            break
-        case "modified":
-            color = c.diff.modified
-            size = size * 1.2
-            break
-    }
-
-    return {
-        color,
-        size,
-        zIndex: diffStatus !== "unchanged" ? 1 : 0,
-        label: data.label,
-        x: data.x,
-        y: data.y,
-    }
-}
+const getBaseNodeData = (data: NodeAttributes): Partial<NodeDisplayData> => ({
+    color: resolveLevelColor(data.level),
+    size: resolveNodeSize(data.inverseLevel),
+    zIndex: 0,
+    label: data.label,
+    x: data.x,
+    y: data.y,
+})
 
 const getBaseEdgeData = (data: EdgeAttributes): Partial<EdgeDisplayData> => ({
     type: "arrow",
-    color: colors().inactive,
+    color: getThemeColors().inactive,
     size: data.size,
     zIndex: 0,
     label: "",
@@ -76,10 +37,7 @@ const getBaseEdgeData = (data: EdgeAttributes): Partial<EdgeDisplayData> => ({
 
 type NodeRelation = "unrelated" | "selected" | "parent" | "child"
 
-const getNodeRelation = (
-    node: string,
-    active: NodeSelection,
-): NodeRelation => {
+const getNodeRelation = (node: string, active: NodeSelection): NodeRelation => {
     if (active.node === node) return "selected"
     if (active.parents.has(node)) return "parent"
     if (active.children.has(node)) return "child"
@@ -87,26 +45,17 @@ const getNodeRelation = (
 }
 
 export const createNodeReducer =
-    (getActiveSelection: SelectionGetter, getDiff?: DiffGetter) =>
+    (getActiveSelection: SelectionGetter) =>
     (node: string, data: NodeAttributes) => {
         const active = getActiveSelection()
-        const diff = getDiff?.()
-        const diffStatus = getNodeDiffStatus(node, diff)
-        const base = getBaseNodeData(data, diffStatus)
+        const base = getBaseNodeData(data)
 
         if (!active) return base
 
         const rel = getNodeRelation(node, active)
-        const c = colors()
+        const c = getThemeColors()
 
         if (rel === "unrelated") {
-            // For diff nodes, keep their color visible even when unrelated
-            if (diffStatus !== "unchanged") {
-                return {
-                    ...base,
-                    label: data.label,
-                }
-            }
             return {
                 ...base,
                 color: c.inactive,
@@ -128,7 +77,7 @@ const reduceHierarchyEdge = (
     active: NodeSelection,
     base: Partial<EdgeDisplayData>,
 ) => {
-    const c = colors()
+    const c = getThemeColors()
     const { source, target } = data
 
     let color
@@ -141,7 +90,7 @@ const reduceHierarchyEdge = (
 }
 
 export const createEdgeReducer =
-    (getActiveSelection: SelectionGetter, _getDiff?: DiffGetter) =>
+    (getActiveSelection: SelectionGetter) =>
     (_edge: string, data: EdgeAttributes) => {
         const active = getActiveSelection()
         const base = getBaseEdgeData(data)
@@ -149,5 +98,5 @@ export const createEdgeReducer =
         if (!active) return base
         if (data.label === "isA") return reduceHierarchyEdge(data, active, base)
 
-        return { ...base, color: colors().inactive }
+        return { ...base, color: getThemeColors().inactive }
     }

@@ -17,26 +17,28 @@
 	let structuralChart: echarts.ECharts | null = null;
 	let growthChart: echarts.ECharts | null = null;
 
-	// Chart theme colors
-	const theme = {
-		surface: '#171717',
-		edge: '#262626',
-		muted: '#737373',
-		fg: '#e5e5e5',
-		accent: '#a3a3a3'
+	const css = (name: string, fallback?: string) => {
+		const value = getCssVar(name);
+		if (value) return value;
+		return fallback ? getCssVar(fallback) : '';
 	};
 
-	const initTheme = () => {};
+	const getTheme = () => ({
+		surface: css('--color-surface', '--color-slate-900'),
+		edge: css('--color-edge', '--color-slate-800'),
+		muted: css('--color-muted', '--color-slate-400'),
+		fg: css('--color-fg', '--color-slate-50'),
+		accent: css('--color-accent', '--color-sky-400')
+	});
 
-	// Series colors
-	const C = {
-		classes: '#38bdf8',
-		depth: '#22c55e',
-		branching: '#f59e0b',
-		dataProps: '#a78bfa',
-		objectProps: '#f472b6',
-		coverage: '#14b8a6'
-	};
+	const getSeriesColors = () => ({
+		classes: css('--color-accent', '--color-sky-400'),
+		depth: css('--color-ok', '--color-emerald-400'),
+		branching: css('--color-warn', '--color-amber-400'),
+		dataProps: css('--color-info', '--color-blue-400'),
+		objectProps: css('--color-err', '--color-red-400'),
+		coverage: css('--color-ok', '--color-emerald-400')
+	});
 
 	// Line series helper
 	const line = (name: string, color: string, data: unknown[], opts = {}) => ({
@@ -51,7 +53,6 @@
 
 	const initCharts = () => {
 		if (!structuralContainer || !growthContainer) return;
-		initTheme();
 		structuralChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' });
 		growthChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' });
 		updateCharts();
@@ -60,6 +61,8 @@
 	const updateCharts = () => {
 		if (!metrics || !structuralChart || !growthChart) return;
 
+		const theme = getTheme();
+		const C = getSeriesColors();
 		const pts = metrics.points;
 		const iterations = pts.map((p) => p.iteration);
 		const axis = { lineStyle: { color: theme.edge } };
@@ -125,6 +128,7 @@
 	// Update mark line when currentIteration changes
 	$effect(() => {
 		if (structuralChart && currentIteration >= 0) {
+			const theme = getTheme();
 			structuralChart.setOption({
 				series: [
 					{

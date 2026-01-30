@@ -11,9 +11,7 @@
   <title>ontology-hydra Visualizer</title>
 </svelte:head>
 
-<div class="flex min-h-svh flex-col">
-  <div class="flex flex-1 flex-col">
-    {@render children()}
-  </div>
+<div class="flex min-h-svh flex-col bg-bg text-fg">
+  <div class="flex grow flex-col">{@render children()}</div>
   <Footer />
 </div>

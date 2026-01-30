@@ -14,7 +14,7 @@
   })
 </script>
 
-<div class="space-y-6">
+<div class="mx-auto w-full max-w-6xl space-y-6 px-4 py-8">
   {#if run?.metadata.intent}
     <p class="text-muted">{run.metadata.intent}</p>
   {/if}

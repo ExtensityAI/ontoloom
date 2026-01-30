@@ -79,7 +79,7 @@ def get_run_by_name(dir_path: Path, name: str):
 
 def _cache_path(run: Run, iteration: int, filename: str) -> Path:
     """Build path to a cache file for a specific iteration."""
-    return run.dir / "cache" / str(iteration) / filename
+    return run.dir / str(iteration) / filename
 
 
 def _load_ontology(run: Run, iteration: int) -> Ontology | None:

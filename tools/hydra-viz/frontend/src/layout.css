@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme {
   /* Background colors */
@@ -20,6 +21,15 @@
   --color-warn: var(--color-amber-400);
   --color-err: var(--color-red-400);
   --color-info: var(--color-blue-400);
+
+  /* Focus and diff colors */
+  --color-focus-inactive: var(--color-muted);
+  --color-focus-selected: var(--color-accent);
+  --color-focus-parent: var(--color-info);
+  --color-focus-child: var(--color-warn);
+  --color-diff-added: var(--color-ok);
+  --color-diff-removed: var(--color-err);
+  --color-diff-modified: var(--color-warn);
 
   /* Fonts */
   --font-mono:

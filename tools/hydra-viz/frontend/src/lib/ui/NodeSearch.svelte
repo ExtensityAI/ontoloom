@@ -69,23 +69,23 @@
 	});
 </script>
 
-<div class="bg-surface/90 backdrop-blur-md border border-edge rounded-lg w-80 shadow-lg">
+<div class="w-80 border border-edge bg-surface">
 	<input
 		bind:this={input}
 		bind:value={query}
 		type="text"
 		placeholder="Search for node..."
-		class="px-4 py-2 rounded-t-lg w-full bg-transparent placeholder-faint border-b border-edge focus:outline-none focus:ring-1 focus:ring-accent"
+		class="w-full border-b border-edge bg-transparent px-4 py-2 placeholder-faint focus:outline-none focus:ring-1 focus:ring-accent"
 		onkeydown={onKeyDown}
 	/>
 
-	<div class="max-h-72 overflow-y-auto rounded-b-lg" bind:this={listElement}>
+	<div class="max-h-72 overflow-y-auto" bind:this={listElement}>
 		{#each results as option, i}
 			<button
 				type="button"
-				class="px-4 py-2 cursor-pointer block w-full text-left text-sm text-muted hover:bg-hover {activeIndex ===
+				class="block w-full cursor-pointer px-4 py-2 text-left text-sm text-muted hover:bg-fg hover:text-bg {activeIndex ===
 				i
-					? 'bg-hover text-fg font-medium'
+					? 'bg-fg text-bg font-medium'
 					: ''}"
 				onclick={() => onSelect(option)}
 				onmouseenter={() => (activeIndex = i)}

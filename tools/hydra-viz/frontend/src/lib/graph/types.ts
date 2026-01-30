@@ -7,7 +7,6 @@ export interface NodeAttributes {
 	inverseLevel: number;
 	parents: Array<string>;
 	children: Set<string>;
-	edges: Set<string>;
 	x?: number;
 	y?: number;
 }

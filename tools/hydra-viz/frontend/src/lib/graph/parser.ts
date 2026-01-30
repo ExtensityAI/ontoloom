@@ -152,7 +152,6 @@ export const createOntologyGraph = (ontology: Ontology) => {
 			inverseLevel: maxLevel - level,
 			parents: [],
 			children: new Set<string>(),
-			edges: new Set<string>(),
 			x: 0,
 			y: 0
 		});

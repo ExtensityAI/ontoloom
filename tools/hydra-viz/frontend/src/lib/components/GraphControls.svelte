@@ -5,23 +5,28 @@
 		MaximizeIcon,
 		TypeIcon,
 		DownloadIcon,
-		GitBranchIcon
+		InfoIcon,
+		SearchIcon
 	} from '@lucide/svelte';
 	import type { HydraSigma } from '$lib/graph/types';
 
 	let {
 		sigma,
 		showLabels = true,
-		showPropertyEdges = true,
+		showLegend,
+		showSearch,
 		onToggleLabels,
-		onTogglePropertyEdges,
+		onToggleLegend,
+		onToggleSearch,
 		onDownloadPng
 	}: {
 		sigma: HydraSigma | null;
 		showLabels?: boolean;
-		showPropertyEdges?: boolean;
+		showLegend?: boolean;
+		showSearch?: boolean;
 		onToggleLabels?: () => void;
-		onTogglePropertyEdges?: () => void;
+		onToggleLegend?: () => void;
+		onToggleSearch?: () => void;
 		onDownloadPng?: () => void;
 	} = $props();
 
@@ -52,11 +57,11 @@
 	};
 </script>
 
-<div class="flex flex-col gap-1 bg-surface/80 backdrop-blur-sm rounded-lg border border-edge p-1.5">
+<div class="flex flex-col gap-1 border border-edge bg-surface p-1.5">
 	<button
 		type="button"
 		onclick={zoomIn}
-		class="p-1.5 rounded hover:bg-hover transition-colors"
+		class="p-1.5 hover:bg-hover transition-colors"
 		title="Zoom in"
 	>
 		<ZoomInIcon class="w-4 h-4" />
@@ -65,7 +70,7 @@
 	<button
 		type="button"
 		onclick={zoomOut}
-		class="p-1.5 rounded hover:bg-hover transition-colors"
+		class="p-1.5 hover:bg-hover transition-colors"
 		title="Zoom out"
 	>
 		<ZoomOutIcon class="w-4 h-4" />
@@ -74,7 +79,7 @@
 	<button
 		type="button"
 		onclick={fitToScreen}
-		class="p-1.5 rounded hover:bg-hover transition-colors"
+		class="p-1.5 hover:bg-hover transition-colors"
 		title="Fit to screen"
 	>
 		<MaximizeIcon class="w-4 h-4" />
@@ -86,21 +91,32 @@
 		<button
 			type="button"
 			onclick={onToggleLabels}
-			class="p-1.5 rounded hover:bg-hover transition-colors {showLabels ? 'text-accent' : 'text-muted'}"
+			class="p-1.5 hover:bg-hover transition-colors {showLabels ? 'text-accent' : 'text-muted'}"
 			title="Toggle labels"
 		>
 			<TypeIcon class="w-4 h-4" />
 		</button>
 	{/if}
 
-	{#if onTogglePropertyEdges}
+	{#if onToggleLegend}
 		<button
 			type="button"
-			onclick={onTogglePropertyEdges}
-			class="p-1.5 rounded hover:bg-hover transition-colors {showPropertyEdges ? 'text-accent' : 'text-muted'}"
-			title="Toggle property edges"
+			onclick={onToggleLegend}
+			class="p-1.5 hover:bg-hover transition-colors {showLegend ? 'text-accent' : 'text-muted'}"
+			title="Toggle legend"
 		>
-			<GitBranchIcon class="w-4 h-4" />
+			<InfoIcon class="w-4 h-4" />
+		</button>
+	{/if}
+
+	{#if onToggleSearch}
+		<button
+			type="button"
+			onclick={onToggleSearch}
+			class="p-1.5 hover:bg-hover transition-colors {showSearch ? 'text-accent' : 'text-muted'}"
+			title="Search nodes"
+		>
+			<SearchIcon class="w-4 h-4" />
 		</button>
 	{/if}
 
@@ -109,7 +125,7 @@
 		<button
 			type="button"
 			onclick={onDownloadPng}
-			class="p-1.5 rounded hover:bg-hover transition-colors"
+			class="p-1.5 hover:bg-hover transition-colors"
 			title="Download as PNG"
 		>
 			<DownloadIcon class="w-4 h-4" />
