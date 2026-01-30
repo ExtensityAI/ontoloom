@@ -9,7 +9,7 @@
   const { run }: { run: RunDetail } = $props()
   const maxIter = $derived(run.iterations.length - 1)
   const paramIter = $derived(Number(page.params.iter))
-  const iter = $derived(paramIter || maxIter)
+  const iter = $derived(Number.isNaN(paramIter) ? maxIter : paramIter)
 
   const path = $derived(`/runs/${encodeURIComponent(run.metadata.name)}`)
   // TODO: when moving through iters, stay on page!

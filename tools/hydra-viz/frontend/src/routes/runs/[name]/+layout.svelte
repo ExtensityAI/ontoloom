@@ -8,10 +8,8 @@
   const run = $derived(data.run)
 </script>
 
-<div class="flex flex-1 flex-col">
-  <RunHeader {run} />
+<RunHeader {run} />
 
-  <main class="flex flex-1 flex-col">
-    {@render children()}
-  </main>
-</div>
+<main class="flex flex-1 flex-col">
+  {@render children()}
+</main>

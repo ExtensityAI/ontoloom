@@ -89,30 +89,7 @@
   })
 </script>
 
-<div bind:this={container} class="h-screen w-screen"></div>
-
-{#if activeSelection}
-  <div class="absolute bottom-3 left-3 border border-edge bg-surface p-3">
-    <div class="flex items-start gap-4">
-      <div>
-        <div class="font-semibold text-accent">{activeSelection.node}</div>
-        <div class="mt-1 text-sm text-muted">
-          Level {activeSelection.attrs.level} ·
-          {activeSelection.parents.size} ancestors ·
-          {activeSelection.children.size} children
-        </div>
-      </div>
-      <button
-        type="button"
-        onclick={clearSelection}
-        class="shrink-0 p-1 transition-colors hover:bg-hover"
-        title="Clear selection"
-      >
-        <XIcon class="h-4 w-4" />
-      </button>
-    </div>
-  </div>
-{/if}
+<div class="absolute inset-0" bind:this={container}></div>
 
 {#if !ontology}
   <div class="absolute inset-0 flex items-center justify-center text-faint">
