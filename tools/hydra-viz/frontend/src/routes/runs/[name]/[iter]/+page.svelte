@@ -1,5 +1,5 @@
 <script lang="ts">
-	import MetricCard from '$lib/components/MetricCard.svelte'
+	import MetricCard from '$lib/components/metrics/MetricCard.svelte'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()

@@ -1,4 +1,4 @@
-import type { HydraGraph, NodeAttributes } from "../graph/types"
+import type { HydraGraph, NodeAttributes } from './types'
 
 export interface NodeSelection {
     node: string

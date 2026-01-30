@@ -1,10 +1,10 @@
 <script lang="ts">
-	import MarkdownSection from '$lib/components/MarkdownSection.svelte'
+	import MarkdownSection from '$lib/components/ui/MarkdownSection.svelte'
 	import {
 		groupOperations,
 		getOperationDisplayName,
 		getOperationBadgeClass
-	} from '$lib/utils/operations'
+	} from '$lib/components/runs/operations'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()

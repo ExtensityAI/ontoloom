@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte'
 	import * as echarts from 'echarts'
 	import type { MetricsTimeSeries } from '$lib/api/types'
-	import { getChartTheme } from '$lib/utils/theme'
+	import { getChartTheme } from './theme'
 
 	let {
 		metrics,

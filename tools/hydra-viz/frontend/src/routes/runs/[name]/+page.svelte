@@ -1,5 +1,5 @@
 <script lang="ts">
-  import MetricsCharts from "$lib/components/MetricsCharts.svelte"
+  import MetricsCharts from "$lib/components/metrics/MetricsCharts.svelte"
   import { formatDateTimeFull } from "$lib/utils/date"
   import type { LayoutData } from "./$types"
 

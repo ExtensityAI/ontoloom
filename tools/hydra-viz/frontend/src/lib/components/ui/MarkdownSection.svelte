@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Markdown from '$lib/components/Markdown.svelte'
+	import Markdown from './Markdown.svelte'
 
 	let {
 		title,
