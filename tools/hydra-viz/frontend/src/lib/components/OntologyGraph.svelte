@@ -6,6 +6,8 @@
   import { createEdgeReducer, createNodeReducer } from "$lib/visualizer/reducers"
   import { createSelection, type NodeSelection } from "$lib/visualizer/selection"
   import { XIcon } from "@lucide/svelte"
+  import forceAtlas2 from "graphology-layout-forceatlas2"
+  import ForceAtlas2Layout from "graphology-layout-forceatlas2/worker"
   import { Sigma } from "sigma"
   import { onDestroy, untrack } from "svelte"
 
@@ -17,6 +19,7 @@
   let sigma: HydraSigma | null = $state(null)
   let graph: HydraGraph | null = $state(null)
   let activeSelection: NodeSelection | null = $state(null)
+  let layout = $state(null)
 
   const getActiveSelection = () => activeSelection
 
@@ -31,7 +34,14 @@
     sigma?.refresh()
   }
 
+  const stopLayout = () => {
+    layout?.stop()
+    layout?.kill()
+    layout = null
+  }
+
   const cleanup = () => {
+    stopLayout()
     sigma?.kill()
     sigma = null
     graph = null
@@ -50,6 +60,11 @@
 
         const newGraph = createOntologyGraph(currentOntology)
         graph = newGraph
+
+        const layoutSettings = forceAtlas2.inferSettings(newGraph)
+        const newLayout = new ForceAtlas2Layout(newGraph, { settings: layoutSettings })
+        newLayout.start()
+        layout = newLayout
 
         const labelColor = getCssVar("--color-fg") || "#f5f5f4"
 
