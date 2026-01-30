@@ -14,7 +14,6 @@
 
   const hasPrev = $derived(current > 0)
   const hasNext = $derived(current < max)
-  const link = "text-faint transition-colors hover:text-fg"
 
   const navigate = (value: number) => {
     const clamped = Math.max(0, Math.min(max, value))
@@ -25,13 +24,13 @@
     if (e.key === "Enter") {
       e.preventDefault()
       const value = parseInt((e.currentTarget as HTMLInputElement).value)
-      if (!isNaN(value)) navigate(value)
+      navigate(value)
     }
   }
 
   const onBlur = (e: FocusEvent) => {
     const value = parseInt((e.currentTarget as HTMLInputElement).value)
-    if (!isNaN(value)) navigate(value)
+    navigate(value)
   }
 </script>
 
@@ -39,7 +38,9 @@
   <span class="px-2 py-1 text-faint">iter</span>
 
   {#if hasPrev}
-    <a href={getHref(current - 1)} class="px-1.5 py-1 {link}"><ChevronLeft size={16} /></a>
+    <a href={getHref(current - 1)} class="px-1.5 py-1 text-faint transition-colors hover:text-fg"
+      ><ChevronLeft size={16} /></a
+    >
   {:else}
     <span class="px-1.5 py-1 text-faint/30"><ChevronLeft size={16} /></span>
   {/if}
@@ -50,7 +51,7 @@
       min="0"
       {max}
       value={current}
-      class="w-6 bg-transparent text-center text-fg [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      class="w-6 [appearance:textfield] bg-transparent text-center text-fg [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       onkeydown={onKeyDown}
       onblur={onBlur}
     />
@@ -58,7 +59,9 @@
   </div>
 
   {#if hasNext}
-    <a href={getHref(current + 1)} class="px-1.5 py-1 {link}"><ChevronRight size={16} /></a>
+    <a href={getHref(current + 1)} class="px-1.5 py-1 text-faint transition-colors hover:text-fg"
+      ><ChevronRight size={16} /></a
+    >
   {:else}
     <span class="px-1.5 py-1 text-faint/30"><ChevronRight size={16} /></span>
   {/if}

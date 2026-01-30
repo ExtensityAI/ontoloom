@@ -1,5 +1,5 @@
 <script lang="ts">
-  import RunHeader from "$lib/components/layout/RunHeader.svelte"
+  import RunHeader from "$lib/components/runs/RunHeader.svelte"
   import type { Snippet } from "svelte"
   import type { LayoutData } from "./$types"
 

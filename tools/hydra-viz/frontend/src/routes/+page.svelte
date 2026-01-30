@@ -1,6 +1,4 @@
 <script lang="ts">
-  import Breadcrumbs from "$lib/components/layout/Breadcrumbs.svelte"
-  import Header from "$lib/components/layout/Header.svelte"
   import { formatDateTimeFull } from "$lib/utils/date"
   import type { PageData } from "./$types"
 
@@ -17,10 +15,6 @@
 
   const link = "text-faint hover:text-fg transition-colors"
 </script>
-
-<Header>
-  <Breadcrumbs crumbs={[{ label: "runs" }]} />
-</Header>
 
 <main class="flex-1 overflow-auto px-4 py-8">
   <div class="mx-auto w-full max-w-3xl">
