@@ -17,22 +17,21 @@
 </script>
 
 <main class="flex-1 overflow-auto px-4 py-8">
-  <div class="mx-auto w-full max-w-3xl">
+  <div class="mx-auto w-full max-w-4xl">
     {#if runCount === 0}
       <p class="text-muted">No runs found</p>
     {:else}
       <ul class="divide-y divide-edge border border-edge">
         {#each sortedRuns as run}
           <li>
-            <a
-              href={`/runs/${run.metadata.name}`}
-              class="flex items-center justify-between gap-4 px-4 py-2 {link}"
-            >
-              <span class="font-mono">{run.metadata.name}</span>
-              <span class="font-mono text-xs text-faint">
+            <a href={`/runs/${run.metadata.id}`} class="flex items-center gap-8 px-4 py-2 {link}">
+              <div class="font-mono">{run.metadata.id}</div>
+              <div class="grow text-xs">{run.metadata.title}</div>
+
+              <time datetime={run.metadata.created_at} class="font-mono text-xs text-faint">
                 {formatDateTimeFull(run.metadata.created_at)}
-              </span>
-            </a>
+              </time></a
+            >
           </li>
         {/each}
       </ul>

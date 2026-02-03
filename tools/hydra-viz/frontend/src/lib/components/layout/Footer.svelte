@@ -6,10 +6,12 @@
 </script>
 
 <footer></footer>
-<header class="flex items-center gap-2 border-t border-edge px-4 py-3 font-mono text-sm">
+<header
+  class="flex h-12 items-center gap-2 border-t border-t-edge bg-bg/80 px-2 font-mono text-sm text-faint backdrop-blur-lg"
+>
   {@render children?.()}
   <div class="flex-1"></div>
-  <a href="https://extensity.ai">
+  <a href="https://extensity.ai" target="_blank">
     <ExtensityLogo class="h-5 -translate-y-px" />
   </a>
 </header>

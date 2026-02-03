@@ -9,11 +9,12 @@ from chonkie.chunker.token import TokenChunker
 from loguru import logger
 from tqdm import tqdm
 
+from ontology_hydra.cli.components.title import generate_title
 from ontology_hydra.cli.logging import configure_logging
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
 from ontology_hydra.ontology.components.planning.pipeline import generate_plan
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
-from ontology_hydra.ontology.run import VALID_RUN_NAME_PATTERN, RunMetadata
+from ontology_hydra.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
 from ontology_hydra.utils.cache import DirectoryCache
 
 # Initialize logging
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
 class Args:
     intent: str
     output_dir_path: Path
-    name: str
+    id: str
     input_paths: list[Path]
 
 
@@ -56,24 +57,26 @@ def _parse_args():
         help="Path to output directory",
     )
 
-    default_name = "run_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    default_id = "run_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    parser.add_argument("--name", type=str, default=default_name, help="Run name (default:)")
+    parser.add_argument(
+        "--id", type=str, default=default_id, help=f"Run id (default: {default_id})"
+    )
 
     raw = parser.parse_args()
     args = Args(
         intent=raw.intent,
         output_dir_path=Path(raw.output_dir),
-        name=raw.name,
+        id=raw.id,
         input_paths=[Path(p) for p in raw.input],
     )
 
     # ---- validate args ---------------------
-    if not VALID_RUN_NAME_PATTERN.match(args.name):
+    if not VALID_RUN_ID_PATTERN.match(args.id):
         parser.error("Invalid run name!")
 
-    if (args.output_dir_path / args.name).exists():
-        parser.error(f"A run with name {args.output_dir_path / args.name} already exists!")
+    if (args.output_dir_path / args.id).exists():
+        parser.error(f"A run with id {args.output_dir_path / args.id} already exists!")
 
     for path in args.input_paths:
         if not path.exists():
@@ -94,14 +97,17 @@ def main():
     args = _parse_args()
     logger.info("Input files: {}", [str(p) for p in args.input_paths])
 
-    run_dir = args.output_dir_path / args.name
+    run_dir = args.output_dir_path / args.id
     run_dir.mkdir()
 
     cache = DirectoryCache(run_dir)
     logger.info("Cache path: {}", cache.path)
 
+    title = generate_title(args.intent)
+
     meta = RunMetadata(
-        name=args.name,
+        id=args.id,
+        title=title,
         intent=args.intent,
         input_files=[p.name for p in args.input_paths],
         created_at=datetime.now(),

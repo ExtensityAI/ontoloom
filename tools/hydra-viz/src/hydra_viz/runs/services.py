@@ -7,7 +7,7 @@ from ontology_hydra.metrics.structural import (
 )
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.operations import Operation
-from ontology_hydra.ontology.run import VALID_RUN_NAME_PATTERN, RunMetadata
+from ontology_hydra.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
 from pydantic import TypeAdapter
 
 from hydra_viz.runs.models import (
@@ -26,9 +26,9 @@ PLAN_FILE = "plan.md"
 REVIEW_FILE = "review.md"
 
 
-def _validate_run_name(name: str) -> None:
-    if not name or not VALID_RUN_NAME_PATTERN.match(name):
-        raise ValueError("Invalid run name")
+def _validate_run_id(id: str) -> None:
+    if not id or not VALID_RUN_ID_PATTERN.match(id):
+        raise ValueError("Invalid run id")
 
 
 def get_runs_in_dir(dir_path: Path) -> list[Run]:
@@ -52,12 +52,11 @@ def _validate_is_child(parent_path: Path, other_path: Path):
         return False
 
 
-def get_run_by_name(dir_path: Path, name: str):
-    """Load a single run by name with path traversal protection."""
-    # Validate name format
-    _validate_run_name(name)
+def get_run_by_id(dir_path: Path, id: str):
+    """Load a single run by id"""
+    _validate_run_id(id)
 
-    run_path = dir_path / name
+    run_path = dir_path / id
 
     # Check directory exists before resolving (avoid info leak)
     if not run_path.exists():
@@ -149,9 +148,10 @@ def _build_iteration_summary(run: Run, idx: int) -> IterationSummary:
     )
 
 
-def get_run_detail(dir_path: Path, name: str) -> RunDetail | None:
+def get_run_detail(dir_path: Path, id: str) -> RunDetail | None:
     """Load run with iteration summaries."""
-    run = get_run_by_name(dir_path, name)
+    run = get_run_by_id(dir_path, id)
+
     if run is None:
         return None
 
@@ -163,9 +163,9 @@ def get_run_detail(dir_path: Path, name: str) -> RunDetail | None:
     return RunDetail(dir=run.dir, metadata=run.metadata, iterations=iterations)
 
 
-def get_iteration_detail(dir_path: Path, name: str, idx: int) -> IterationDetail | None:
+def get_iteration_detail(dir_path: Path, id: str, idx: int) -> IterationDetail | None:
     """Load full iteration data."""
-    run = get_run_by_name(dir_path, name)
+    run = get_run_by_id(dir_path, id)
     if run is None:
         return None
 
@@ -181,9 +181,9 @@ def get_iteration_detail(dir_path: Path, name: str, idx: int) -> IterationDetail
     )
 
 
-def get_metrics_time_series(dir_path: Path, name: str) -> MetricsTimeSeries | None:
+def get_metrics_time_series(dir_path: Path, id: str) -> MetricsTimeSeries | None:
     """Load metrics for all iterations."""
-    run = get_run_by_name(dir_path, name)
+    run = get_run_by_id(dir_path, id)
     if run is None:
         return None
 
@@ -193,4 +193,4 @@ def get_metrics_time_series(dir_path: Path, name: str) -> MetricsTimeSeries | No
         if (m := _load_metrics(run, idx)) is not None
     ]
 
-    return MetricsTimeSeries(name=name, points=points)
+    return MetricsTimeSeries(name=id, points=points)
