@@ -1,7 +1,5 @@
 """API route handlers for hydra-viz."""
 
-from typing import TypeVar
-
 from litestar import Router, get
 from litestar.exceptions import NotFoundException
 
@@ -14,8 +12,6 @@ from .services import (
     get_run_detail,
     get_runs_in_dir,
 )
-
-T = TypeVar("T")
 
 
 @get("", name="get-runs")

@@ -172,6 +172,7 @@ cython_debug/
 
 symai.config.json
 
-temp/
-.ruff-cache/
+.ruff_cache/
+
+# sample runs and outputs
 .hydra/
