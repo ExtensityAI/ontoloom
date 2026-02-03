@@ -178,4 +178,4 @@ temp/
 .hydra/
 
 # static directory for hydra-viz dev env
-./static/
+static/
