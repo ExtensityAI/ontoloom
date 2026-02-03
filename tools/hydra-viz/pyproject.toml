@@ -3,7 +3,7 @@ name = "hydra-viz"
 version = "0.1.0"
 description = "Web visualization server for ontology-hydra runs"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14,<3.15"
 authors = [{ name = "ExtensityAI" }]
 keywords = ["ontology", "visualization", "hydra"]
 classifiers = [
