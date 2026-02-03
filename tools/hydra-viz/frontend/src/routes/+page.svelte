@@ -12,8 +12,6 @@
     )
   )
   const runCount = $derived(sortedRuns.length)
-
-  const link = "text-faint hover:text-fg transition-colors"
 </script>
 
 <main class="flex-1 overflow-auto px-4 py-8">
@@ -24,11 +22,14 @@
       <ul class="divide-y divide-edge border border-edge">
         {#each sortedRuns as run}
           <li>
-            <a href={`/runs/${run.metadata.id}`} class="flex items-center gap-8 px-4 py-2 {link}">
-              <div class="font-mono">{run.metadata.id}</div>
+            <a
+              href={`/runs/${run.metadata.id}`}
+              class="group flex items-center gap-8 px-4 py-2 text-faint transition hover:bg-surface"
+            >
+              <div class="font-mono transition group-hover:text-fg">{run.metadata.id}</div>
               <div class="grow text-xs">{run.metadata.title}</div>
 
-              <time datetime={run.metadata.created_at} class="font-mono text-xs text-faint">
+              <time datetime={run.metadata.created_at} class="font-mono text-xs">
                 {formatDateTimeFull(run.metadata.created_at)}
               </time></a
             >

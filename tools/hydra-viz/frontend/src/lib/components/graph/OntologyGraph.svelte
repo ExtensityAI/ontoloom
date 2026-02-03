@@ -7,7 +7,7 @@
   import { createOntologyGraph } from "./parser"
   import { createEdgeReducer, createNodeReducer } from "./reducers"
   import { createSelection, type NodeSelection } from "./selection"
-  import { GRAPH_THEME } from "./theme"
+  import { graphTheme } from "./theme"
   import type { HydraGraph, HydraSigma } from "./types"
 
   const CAMERA_ANIMATION_MS = 300
@@ -79,7 +79,7 @@
           renderLabels: true,
           labelFont: "system-ui, sans-serif",
           labelSize: 12,
-          labelColor: { color: GRAPH_THEME.label },
+          labelColor: { color: graphTheme.label },
           defaultEdgeType: "arrow"
         })
 

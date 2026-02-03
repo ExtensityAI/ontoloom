@@ -45,18 +45,29 @@
     <span class="px-1.5 py-1 text-faint/30"><ChevronLeft size={16} /></span>
   {/if}
 
-  <div class="flex items-center border border-edge bg-surface/50 px-2 py-0.5">
+  <label
+    class="inline-flex cursor-text items-center gap-1.5 rounded border border-edge bg-surface/50 px-2
+         py-0.5 font-mono text-sm leading-5 text-fg
+         focus-within:outline-2 focus-within:outline-green-500"
+  >
     <input
       type="number"
       min="0"
       {max}
       value={current}
-      class="w-6 [appearance:textfield] bg-transparent text-center text-fg [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      inputmode="numeric"
+      class="w-[2ch] shrink-0 [appearance:textfield] bg-transparent p-0 text-end
+           tabular-nums outline-none
+           [&::-webkit-inner-spin-button]:appearance-none
+           [&::-webkit-outer-spin-button]:appearance-none"
       onkeydown={onKeyDown}
       onblur={onBlur}
     />
-    <span class="text-faint">/ {max}</span>
-  </div>
+    <span class="leading-5 text-faint select-none">/</span>
+    <span class="w-[2ch] shrink-0 text-start leading-5 text-faint tabular-nums select-none">
+      {max}
+    </span>
+  </label>
 
   {#if hasNext}
     <a href={getHref(current + 1)} class="px-1.5 py-1 text-faint transition-colors hover:text-fg"

@@ -32,7 +32,7 @@
 
   <div class="h-full w-px bg-edge"></div>
 
-  <div class={["flex items-center gap-2 transition", !paramIter && "opacity-50 hover:opacity-100"]}>
+  <div class={"flex items-center gap-2 transition"}>
     <IterationStepper current={iter} max={maxIter} getHref={iterHref} />
 
     <NavItem path={`${path}/${iter}`}>
