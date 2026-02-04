@@ -25,7 +25,3 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 ontology-hydra = { path = "../../ontology-hydra", editable = true }
-
-[tool.uv_build]
-# Include static files in the package
-include-data = [{ from = "src/hydra_viz/static", to = "hydra_viz/static" }]
