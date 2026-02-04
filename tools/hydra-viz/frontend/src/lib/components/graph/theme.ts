@@ -16,16 +16,16 @@ export interface GraphTheme {
   }
 }
 
-const hexify = <T>(value: T): T => {
+const hexifyColors = <T>(value: T): T => {
   if (typeof value === "string") return formatHex(parse(value))! as T
-  if (Array.isArray(value)) return value.map(hexify) as T
+  if (Array.isArray(value)) return value.map(hexifyColors) as T
   if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, hexify(v)])) as T
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, hexifyColors(v)])) as T
   }
   return value
 }
 
-export const graphTheme: GraphTheme = hexify({
+export const graphTheme: GraphTheme = hexifyColors({
   label: colors.stone[100],
   inactive: colors.stone[400],
   edge: colors.stone[800],
@@ -38,8 +38,6 @@ export const graphTheme: GraphTheme = hexify({
     levels: [colors.stone[200], colors.stone[300], colors.stone[400], colors.stone[500]]
   }
 })
-
-console.log(graphTheme)
 
 export const baseNodeSize = 6
 export const nodeSizeMultiplier = 2
