@@ -1,23 +1,14 @@
 """Metrics for measuring ontology quality and evolution."""
 
-from .changes import (
-    ChangeMetrics,
-    OperationCounts,
-    compute_change_metrics,
-    compute_change_metrics_from_diff,
-    count_operations,
-)
-from .structural import (
-    StructuralMetrics,
-    compute_structural_metrics,
-)
+from .iteration import IterationMetrics, OperationCounts, compute_iteration_metrics
+from .models import Metric
+from .ontology import OntologyMetrics, compute_ontology_metrics
 
 __all__ = [
-    "ChangeMetrics",
+    "IterationMetrics",
+    "Metric",
+    "OntologyMetrics",
     "OperationCounts",
-    "StructuralMetrics",
-    "compute_change_metrics",
-    "compute_change_metrics_from_diff",
-    "compute_structural_metrics",
-    "count_operations",
+    "compute_iteration_metrics",
+    "compute_ontology_metrics",
 ]

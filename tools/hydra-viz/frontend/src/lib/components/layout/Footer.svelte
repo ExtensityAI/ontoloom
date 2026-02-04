@@ -5,8 +5,7 @@
   const { children }: { children?: Snippet } = $props()
 </script>
 
-<footer></footer>
-<header
+<footer
   class="flex h-12 items-center gap-2 border-t border-t-edge bg-bg/80 px-2 font-mono text-sm text-faint backdrop-blur-lg"
 >
   {@render children?.()}
@@ -14,4 +13,4 @@
   <a href="https://extensity.ai" target="_blank">
     <ExtensityLogo class="h-5 -translate-y-px" />
   </a>
-</header>
+</footer>

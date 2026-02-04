@@ -63,7 +63,8 @@ def get_run_by_id(dir_path: Path, id: str):
         return None
 
     # ensure run is a child of our fixed path
-    _validate_is_child(dir_path, run_path)
+    if not _validate_is_child(dir_path, run_path):
+        return None
 
     run_json_path = run_path / "run.json"
 
@@ -131,12 +132,10 @@ def _load_text_file(run: Run, iteration: int, filename: str) -> str | None:
 
 def _build_iteration_summary(run: Run, idx: int) -> IterationSummary:
     """Build an iteration summary for a specific iteration index."""
-    cache_dir = run.dir / "cache" / str(idx)
-
-    has_ontology = (cache_dir / ONTOLOGY_FILE).is_file()
-    has_ops = (cache_dir / OPS_FILE).is_file()
-    has_plan = (cache_dir / PLAN_FILE).is_file()
-    has_review = (cache_dir / REVIEW_FILE).is_file()
+    has_ontology = _cache_path(run, idx, ONTOLOGY_FILE).is_file()
+    has_ops = _cache_path(run, idx, OPS_FILE).is_file()
+    has_plan = _cache_path(run, idx, PLAN_FILE).is_file()
+    has_review = _cache_path(run, idx, REVIEW_FILE).is_file()
 
     return IterationSummary(
         index=idx,
@@ -167,6 +166,9 @@ def get_iteration_detail(dir_path: Path, id: str, idx: int) -> IterationDetail |
     """Load full iteration data."""
     run = get_run_by_id(dir_path, id)
     if run is None:
+        return None
+
+    if idx < 0 or idx >= run.metadata.n_iterations:
         return None
 
     ontology = _load_ontology(run, idx)

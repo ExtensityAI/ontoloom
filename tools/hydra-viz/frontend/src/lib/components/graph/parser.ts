@@ -3,10 +3,17 @@ import type { Ontology, OntologyClass, ClassExpression } from '$lib/api/types';
 import type { EdgeAttributes, NodeAttributes } from './types';
 import { type HydraGraph } from './types';
 
-// Layout constants
-const LEVEL_HEIGHT = 120;
-const NODE_SPACING = 100;
-const MIN_HORIZONTAL_GAP = 80;
+export interface LayoutConfig {
+	levelHeight: number;
+	nodeSpacing: number;
+	minHorizontalGap: number;
+}
+
+export const defaultLayoutConfig: LayoutConfig = {
+	levelHeight: 120,
+	nodeSpacing: 100,
+	minHorizontalGap: 80
+};
 
 /**
  * Compute hierarchy depth for each class by traversing superclass chains.
@@ -48,8 +55,11 @@ const computeHierarchicalLayout = (
 	graph: HydraGraph,
 	classes: Record<string, OntologyClass>,
 	classLevels: Map<string, number>,
-	maxLevel: number
+	maxLevel: number,
+	config: LayoutConfig
 ): void => {
+	const { levelHeight, nodeSpacing, minHorizontalGap } = config;
+
 	// Group nodes by level
 	const levelNodes: Map<number, string[]> = new Map();
 	graph.forEachNode((node, attrs) => {
@@ -77,8 +87,8 @@ const computeHierarchicalLayout = (
 
 	// Position nodes level by level
 	levelNodes.forEach((nodes, level) => {
-		const y = level * LEVEL_HEIGHT;
-		const totalWidth = Math.max((nodes.length - 1) * NODE_SPACING, nodes.length * MIN_HORIZONTAL_GAP);
+		const y = level * levelHeight;
+		const totalWidth = Math.max((nodes.length - 1) * nodeSpacing, nodes.length * minHorizontalGap);
 		const startX = -totalWidth / 2;
 
 		nodes.forEach((node, i) => {
@@ -116,10 +126,10 @@ const computeHierarchicalLayout = (
 	// Third pass: spread out roots to avoid overlap
 	const roots = levelNodes.get(0) ?? [];
 	if (roots.length > 1) {
-		const rootWidth = (roots.length - 1) * NODE_SPACING * 1.5;
+		const rootWidth = (roots.length - 1) * nodeSpacing * 1.5;
 		const rootStartX = -rootWidth / 2;
 		roots.forEach((node, i) => {
-			graph.setNodeAttribute(node, 'x', rootStartX + i * NODE_SPACING * 1.5);
+			graph.setNodeAttribute(node, 'x', rootStartX + i * nodeSpacing * 1.5);
 		});
 	}
 };
@@ -133,7 +143,7 @@ const extractClassNames = (expr: string | ClassExpression): string[] => {
 	return expr.intersectionOf ?? [];
 };
 
-export const createOntologyGraph = (ontology: Ontology) => {
+export const createOntologyGraph = (ontology: Ontology, layout: LayoutConfig = defaultLayoutConfig) => {
 	const G: HydraGraph = new Graph<NodeAttributes, EdgeAttributes>({
 		multi: true,
 		type: 'mixed'
@@ -228,7 +238,7 @@ export const createOntologyGraph = (ontology: Ontology) => {
 	});
 
 	// Compute hierarchical layout positions
-	computeHierarchicalLayout(G, ontology.classes, classLevels, maxLevel);
+	computeHierarchicalLayout(G, ontology.classes, classLevels, maxLevel, layout);
 
 	return G;
 };

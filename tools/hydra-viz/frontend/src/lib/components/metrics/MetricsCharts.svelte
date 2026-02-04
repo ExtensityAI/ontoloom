@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte'
 	import * as echarts from 'echarts'
-	import type { MetricsTimeSeries } from '$lib/api/types'
-	import { getChartTheme } from './theme'
+	import type { MetricsTimeSeries, MetricsTimeSeriesPoint } from '$lib/api/types'
+	import { type ChartTheme, getChartTheme } from './theme'
 
 	let {
 		metrics,
@@ -14,8 +13,8 @@
 
 	let structuralContainer: HTMLDivElement
 	let growthContainer: HTMLDivElement
-	let structuralChart: echarts.ECharts | null = null
-	let growthChart: echarts.ECharts | null = null
+	let structuralChart: echarts.ECharts | null = $state(null)
+	let growthChart: echarts.ECharts | null = $state(null)
 
 	const line = (name: string, color: string, data: unknown[], opts = {}) => ({
 		name,
@@ -27,49 +26,37 @@
 		...opts
 	})
 
-	const initCharts = () => {
-		if (!structuralContainer || !growthContainer) return
-		structuralChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' })
-		growthChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' })
-		updateCharts()
-	}
-
-	const updateCharts = () => {
-		if (!metrics || !structuralChart || !growthChart) return
-
-		const theme = getChartTheme()
-		const pts = metrics.points
+	const buildStructuralOption = (
+		theme: ChartTheme,
+		pts: MetricsTimeSeriesPoint[],
+		currentIter: number
+	) => {
 		const iterations = pts.map((p) => p.iteration)
 		const axis = { lineStyle: { color: theme.edge } }
 		const label = { color: theme.muted }
-		const tooltip = {
-			trigger: 'axis',
-			backgroundColor: theme.surface,
-			borderColor: theme.edge,
-			textStyle: { color: theme.fg }
-		}
-		const yAxis = (extra = {}) => ({
-			type: 'value',
-			axisLine: axis,
-			splitLine: { lineStyle: { color: theme.surface } },
-			axisLabel: label,
-			...extra
-		})
 
-		structuralChart.setOption({
+		return {
 			backgroundColor: 'transparent',
-			tooltip,
+			tooltip: {
+				trigger: 'axis',
+				backgroundColor: theme.surface,
+				borderColor: theme.edge,
+				textStyle: { color: theme.fg }
+			},
 			legend: { data: ['Classes', 'Depth', 'Branching'], textStyle: label, top: 0 },
 			grid: { left: 50, right: 20, top: 40, bottom: 30 },
 			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
-			yAxis: [yAxis(), yAxis({ splitLine: { show: false } })],
+			yAxis: [
+				{ type: 'value', axisLine: axis, splitLine: { lineStyle: { color: theme.surface } }, axisLabel: label },
+				{ type: 'value', axisLine: axis, splitLine: { show: false }, axisLabel: label }
+			],
 			series: [
 				line('Classes', theme.accent, pts.map((p) => p.metrics.class_count), {
 					markLine:
-						currentIteration >= 0
+						currentIter >= 0
 							? {
 									silent: true,
-									data: [{ xAxis: currentIteration }],
+									data: [{ xAxis: currentIter }],
 									lineStyle: { color: theme.accent, type: 'dashed' }
 								}
 							: undefined
@@ -82,21 +69,34 @@
 					{ yAxisIndex: 1 }
 				)
 			]
-		})
+		}
+	}
 
-		growthChart.setOption({
+	const buildGrowthOption = (theme: ChartTheme, pts: MetricsTimeSeriesPoint[]) => {
+		const iterations = pts.map((p) => p.iteration)
+		const axis = { lineStyle: { color: theme.edge } }
+		const label = { color: theme.muted }
+
+		return {
 			backgroundColor: 'transparent',
-			tooltip,
+			tooltip: {
+				trigger: 'axis',
+				backgroundColor: theme.surface,
+				borderColor: theme.edge,
+				textStyle: { color: theme.fg }
+			},
 			legend: { data: ['Data Props', 'Object Props', 'Coverage'], textStyle: label, top: 0 },
 			grid: { left: 50, right: 50, top: 40, bottom: 30 },
 			xAxis: { type: 'category', data: iterations, axisLine: axis, axisLabel: label },
 			yAxis: [
-				yAxis(),
-				yAxis({
-					max: 100,
+				{ type: 'value', axisLine: axis, splitLine: { lineStyle: { color: theme.surface } }, axisLabel: label },
+				{
+					type: 'value',
+					axisLine: axis,
 					splitLine: { show: false },
-					axisLabel: { ...label, formatter: '{value}%' }
-				})
+					axisLabel: { ...label, formatter: '{value}%' },
+					max: 100
+				}
 			],
 			series: [
 				line('Data Props', theme.info, pts.map((p) => p.metrics.data_property_count), {
@@ -112,46 +112,39 @@
 					{ yAxisIndex: 1 }
 				)
 			]
-		})
+		}
 	}
 
-	const handleResize = () => {
-		structuralChart?.resize()
-		growthChart?.resize()
-	}
+	// Lifecycle: init and dispose charts when containers are ready
+	$effect(() => {
+		if (!structuralContainer || !growthContainer) return
 
-	onMount(() => {
-		initCharts()
+		const sChart = echarts.init(structuralContainer, undefined, { renderer: 'canvas' })
+		const gChart = echarts.init(growthContainer, undefined, { renderer: 'canvas' })
+		structuralChart = sChart
+		growthChart = gChart
+
+		const handleResize = () => {
+			sChart.resize()
+			gChart.resize()
+		}
 		window.addEventListener('resize', handleResize)
-	})
 
-	onDestroy(() => {
-		window.removeEventListener('resize', handleResize)
-		structuralChart?.dispose()
-		growthChart?.dispose()
-	})
-
-	$effect(() => {
-		if (metrics && structuralChart && growthChart) {
-			updateCharts()
+		return () => {
+			window.removeEventListener('resize', handleResize)
+			sChart.dispose()
+			gChart.dispose()
+			structuralChart = null
+			growthChart = null
 		}
 	})
 
+	// Update chart options when data or iteration changes
 	$effect(() => {
-		if (structuralChart && currentIteration >= 0) {
-			const theme = getChartTheme()
-			structuralChart.setOption({
-				series: [
-					{
-						markLine: {
-							silent: true,
-							data: [{ xAxis: currentIteration }],
-							lineStyle: { color: theme.accent, type: 'dashed' }
-						}
-					}
-				]
-			})
-		}
+		if (!structuralChart || !growthChart || !metrics) return
+		const theme = getChartTheme()
+		structuralChart.setOption(buildStructuralOption(theme, metrics.points, currentIteration))
+		growthChart.setOption(buildGrowthOption(theme, metrics.points))
 	})
 </script>
 

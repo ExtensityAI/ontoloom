@@ -24,7 +24,7 @@ def create_app(path: Path, api_only: bool):
 
         if not static_dir.exists():
             msg = f"Could not start: static directory to serve UI was not found under {static_dir}"
-            raise Exception(msg)
+            raise FileNotFoundError(msg)
 
         static_router = create_static_files_router(
             path="/",

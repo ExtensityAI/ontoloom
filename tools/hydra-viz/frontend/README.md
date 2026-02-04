@@ -1,42 +1,48 @@
-# sv
+# hydra-viz frontend
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Interactive web UI for exploring ontology-hydra runs. Built with SvelteKit 2, Svelte 5, and TypeScript.
 
-## Creating a project
+## Tech Stack
 
-If you're seeing this, you've probably already done this step. Congrats!
+- **Framework**: [SvelteKit](https://svelte.dev/docs/kit) with static adapter
+- **Graph Rendering**: [Sigma.js](https://www.sigmajs.org/) + [Graphology](https://graphology.github.io/) with ForceAtlas2 layout
+- **Charts**: [ECharts](https://echarts.apache.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) v4
+- **Icons**: [Lucide](https://lucide.dev/)
 
-```sh
-# create a new project
-npx sv create my-app
+## Development
+
+Requires [pnpm](https://pnpm.io/) and Node.js.
+
+```bash
+pnpm install
+pnpm dev
 ```
 
-To recreate this project with the same configuration:
+The dev server proxies API requests to the backend. Make sure `hydra-viz` is running on port 8080.
 
-```sh
-# recreate this project
-pnpm dlx sv create --template minimal --types ts --add prettier eslint tailwindcss="plugins:none" sveltekit-adapter="adapter:static" --install pnpm app
-```
+## Pages
 
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+| Route | Description |
+|-------|-------------|
+| `/` | Run listing with titles and timestamps |
+| `/runs/[name]` | Run summary with metrics charts |
+| `/runs/[name]/[iter]` | Iteration dashboard with metric cards and deltas |
+| `/runs/[name]/[iter]/graph` | Interactive ontology graph visualization |
+| `/runs/[name]/[iter]/changes` | Plan, operations, and review for the iteration |
 
 ## Building
 
-To create a production version of your app:
-
-```sh
-npm run build
+```bash
+pnpm build
 ```
 
-You can preview the production build with `npm run preview`.
+Output goes to `build/`. The parent Makefile copies this into the Python package's static directory for bundled distribution.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+## Linting & Formatting
+
+```bash
+pnpm lint       # check with Prettier + ESLint
+pnpm format     # auto-format with Prettier
+pnpm check      # Svelte type checking
+```

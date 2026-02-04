@@ -4,6 +4,7 @@ import colors from "tailwindcss/colors"
 /** Theme colors for the graph visualizer */
 export interface GraphTheme {
   label: string
+  labelHover: string
   inactive: string
   edge: string
   node: {
@@ -25,8 +26,9 @@ const hexifyColors = <T>(value: T): T => {
   return value
 }
 
-export const graphTheme: GraphTheme = hexifyColors({
+export const graphTheme = hexifyColors({
   label: colors.stone[100],
+  labelHover: colors.stone[950],
   inactive: colors.stone[400],
   edge: colors.stone[800],
   node: {
@@ -37,7 +39,7 @@ export const graphTheme: GraphTheme = hexifyColors({
     },
     levels: [colors.stone[200], colors.stone[300], colors.stone[400], colors.stone[500]]
   }
-})
+}) satisfies GraphTheme
 
 export const baseNodeSize = 6
 export const nodeSizeMultiplier = 2

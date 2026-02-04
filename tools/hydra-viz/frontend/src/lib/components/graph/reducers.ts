@@ -4,6 +4,7 @@ import { activeEdgeSize, baseNodeSize, graphTheme, nodeSizeMultiplier } from "./
 import type { EdgeAttributes, NodeAttributes } from "./types"
 
 type SelectionGetter = () => NodeSelection | null
+type HoverGetter = () => string | null
 
 const resolveNodeSize = (inverseLevel: number) => baseNodeSize + inverseLevel * nodeSizeMultiplier
 
@@ -39,29 +40,49 @@ const getNodeRelation = (node: string, active: NodeSelection): NodeRelation => {
 }
 
 export const createNodeReducer =
-  (getActiveSelection: SelectionGetter) => (node: string, data: NodeAttributes) => {
+  (getActiveSelection: SelectionGetter, getHoveredNode: HoverGetter) =>
+  (node: string, data: NodeAttributes) => {
     const active = getActiveSelection()
+    const hovered = getHoveredNode()
     const base = getBaseNodeData(data)
 
-    if (!active) return base
+    if (!active) {
+      if (node === hovered) {
+        return { ...base, labelColor: graphTheme.labelHover, forceLabel: true }
+      }
+      return base
+    }
 
     const rel = getNodeRelation(node, active)
 
     if (rel === "unrelated") {
-      return {
+      const inactiveNode = {
         ...base,
         color: graphTheme.inactive,
         label: ""
       }
+      if (node === hovered) {
+        return {
+          ...inactiveNode,
+          label: data.label,
+          labelColor: graphTheme.labelHover,
+          forceLabel: true
+        }
+      }
+      return inactiveNode
     }
 
-    return {
+    const focusedNode = {
       ...base,
       color: graphTheme.node.focus[rel],
       label: data.label,
       zIndex: 2,
       forceLabel: true
     }
+    if (node === hovered) {
+      return { ...focusedNode, labelColor: graphTheme.labelHover }
+    }
+    return focusedNode
   }
 
 const reduceHierarchyEdge = (

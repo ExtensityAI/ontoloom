@@ -3,6 +3,7 @@
 ## Coding Style & Naming Conventions
 
 - Python style: 4-space indentation, 100-char line length, double quotes (see `ruff.toml`).
+  - **no need to format code yourself!** use `ruff` via `ruff format [FILES]...`
 - Module and function names are `snake_case`; classes use `PascalCase`.
 - Keep imports grouped: standard library, third-party, then local.
 - Do not add return type hints if they can be inferred from the code (Pylance handles inference).
