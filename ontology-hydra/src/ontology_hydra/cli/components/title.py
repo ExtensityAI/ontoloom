@@ -2,6 +2,8 @@ from symai import Expression
 
 _prompt = """Generate a descriptive title for the given text in at most <n>{n}</n> words.
 
+Make it prose only, no formatting or anything else.
+
 <text>{text}</text>"""
 
 

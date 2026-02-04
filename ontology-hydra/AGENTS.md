@@ -1,21 +1,5 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
-
-- Source code lives in `src/ontology_hydra/`, with domain logic under `ontology/`, KG tooling under
-  `kg/`, and shared utilities under `utils/`.
-- Prompts and higher-level orchestration live in `src/ontology_hydra/prompts.py`.
-- `demo.py` is the CLI-style demo entry point; treat it as the canonical example of how to wire the
-  pipeline together.
-
-## Build, Test, and Development Commands
-
-- Install dependencies with your preferred tool from `pyproject.toml` (Python >= 3.12).
-- Build a package artifact with `uv build` to exercise the build backend (`uv_build`).
-- Run the demo pipeline with:
-  `uv run python demo.py "intent text" -i path/to/input.txt -o path/to/output/`
-- Lint with `ruff check src demo.py --config ruff.toml` to keep style and quality consistent.
-
 ## Coding Style & Naming Conventions
 
 - Python style: 4-space indentation, 100-char line length, double quotes (see `ruff.toml`).
