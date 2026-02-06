@@ -25,7 +25,6 @@
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
     monospace;
-
 }
 
 /* prevent layout shift due to scrollbar */

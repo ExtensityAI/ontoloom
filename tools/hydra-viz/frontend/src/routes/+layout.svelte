@@ -26,7 +26,7 @@
       <LineSquiggleIcon class="size-4" /><span>hydra-viz</span>
     </a>
   </HeaderRow>
-  <main class="flex flex-1 flex-col">
+  <main class="relative flex flex-1 flex-col">
     {@render children()}
   </main>
   <Footer />

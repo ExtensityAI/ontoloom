@@ -1,0 +1,3 @@
+- [ ] Add config file (toml or json)
+  - configure API keys and models for each component
+  - other configurations?
