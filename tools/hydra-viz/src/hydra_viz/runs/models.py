@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ontology_hydra.metrics.structural import StructuralMetrics
+from ontology_hydra.metrics import IterationMetrics, OntologyMetrics
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.ontology.run import RunMetadata
@@ -15,7 +15,8 @@ class IterationSummary(BaseModel):
     has_ops: bool
     has_plan: bool
     has_review: bool
-    metrics: StructuralMetrics | None = None
+    ontology_metrics: OntologyMetrics | None = None
+    iteration_metrics: IterationMetrics | None = None
 
 
 class IterationDetail(BaseModel):
@@ -26,14 +27,16 @@ class IterationDetail(BaseModel):
     ops: list[Operation] = []
     plan: str | None = None
     review: str | None = None
-    metrics: StructuralMetrics | None = None
+    ontology_metrics: OntologyMetrics | None = None
+    iteration_metrics: IterationMetrics | None = None
 
 
 class MetricsTimeSeriesPoint(BaseModel):
     """A single point in the metrics time series."""
 
     iteration: int
-    metrics: StructuralMetrics
+    ontology_metrics: OntologyMetrics
+    iteration_metrics: IterationMetrics | None = None
 
 
 class MetricsTimeSeries(BaseModel):

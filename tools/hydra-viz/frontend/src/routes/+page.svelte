@@ -1,22 +1,20 @@
 <script lang="ts">
-  import { formatDateTimeFull } from "$lib/utils/date"
+  import { formatDateTime } from "$lib/utils/date"
   import type { PageData } from "./$types"
 
   let { data }: { data: PageData } = $props()
 
-  const runs = $derived(data.runs)
   const sortedRuns = $derived(
-    runs.toSorted(
+    data.runs.toSorted(
       (a, b) =>
         new Date(b.metadata.created_at).getTime() - new Date(a.metadata.created_at).getTime()
     )
   )
-  const runCount = $derived(sortedRuns.length)
 </script>
 
-<main class="flex-1 overflow-auto px-4 py-8">
+<div class="flex-1 overflow-auto px-4 py-8">
   <div class="mx-auto w-full max-w-4xl">
-    {#if runCount === 0}
+    {#if sortedRuns.length === 0}
       <p class="text-muted">No runs found</p>
     {:else}
       <ul class="divide-y divide-edge border border-edge">
@@ -30,7 +28,7 @@
               <div class="grow text-xs">{run.metadata.title}</div>
 
               <time datetime={run.metadata.created_at} class="font-mono text-xs">
-                {formatDateTimeFull(run.metadata.created_at)}
+                {formatDateTime(run.metadata.created_at)}
               </time></a
             >
           </li>
@@ -38,4 +36,4 @@
       </ul>
     {/if}
   </div>
-</main>
+</div>

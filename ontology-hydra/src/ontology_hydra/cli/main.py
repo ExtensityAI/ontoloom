@@ -2,15 +2,13 @@ from argparse import ArgumentParser
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
 
-import tiktoken
-from chonkie.chunker.token import TokenChunker
 from loguru import logger
 from tqdm import tqdm
 
 from ontology_hydra.cli.components.title import generate_title
 from ontology_hydra.cli.logging import configure_logging
+from ontology_hydra.metrics import compute_iteration_metrics, compute_ontology_metrics
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
 from ontology_hydra.ontology.components.planning.pipeline import generate_plan
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
@@ -19,9 +17,6 @@ from ontology_hydra.utils.cache import DirectoryCache
 
 # Initialize logging
 configure_logging()
-
-if TYPE_CHECKING:
-    from chonkie.types import Chunk
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,24 +111,12 @@ def main():
 
     cache.write("run.json", meta.model_dump_json(indent=4))
 
-    # --- read and chunk inputs -----------------
-
-    texts = [
-        tp.read_text(encoding="utf-8", errors="ignore") for tp in args.input_paths
-    ]  # TODO: add support for other text formats
-
-    encoding = tiktoken.get_encoding("o200k_base")
-    chunker = TokenChunker(chunk_size=1024, chunk_overlap=256, tokenizer=encoding)  # pyright: ignore[reportArgumentType] # tiktoken encoding as argument does work
-
-    chunks_by_text = cast(
-        "list[list[Chunk]]", chunker(texts, show_progress_bar=False)
-    )  # returns a list of chunks per input text
-
     ontology = BASE_ONTOLOGY
 
     for i in tqdm(range(50)):
         logger.info("Iteration {}/50", i + 1)
 
+        old_ontology = ontology.clone()
         plan = generate_plan(args.intent, ontology)
         cache.write((i, "plan.md"), plan)
 
@@ -144,6 +127,16 @@ def main():
             f"{review.text}\n\n---\n\nVerdict: **{'ACCEPT' if review.accepted else 'REJECT'}**",
         )
         cache.write((i, "ontology.json"), ontology.model_dump_json(indent=2))
+        ontology_metrics = compute_ontology_metrics(ontology)
+        iteration_metrics = compute_iteration_metrics(ops.ops, old_ontology, ontology)
+        cache.write(
+            (i, "ontology_metrics.json"),
+            ontology_metrics.model_dump_json(indent=2),
+        )
+        cache.write(
+            (i, "iteration_metrics.json"),
+            iteration_metrics.model_dump_json(indent=2),
+        )
 
         logger.info(
             "Iteration {} complete: {} classes, {} properties",
@@ -153,10 +146,3 @@ def main():
         )
         meta.n_iterations = i + 1
         cache.write("run.json", meta.model_dump_json(indent=4))
-
-    exit(0)
-
-    for chunks, text in zip(chunks_by_text, texts, strict=True):
-        print(len(chunks), "chunks for", len(text), "chars of text")
-        for chunk in chunks:
-            pass

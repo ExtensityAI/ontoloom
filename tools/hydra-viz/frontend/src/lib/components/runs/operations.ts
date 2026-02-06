@@ -9,23 +9,24 @@ export interface GroupedOperations {
 	merges: Operation[]
 }
 
-/** Group operations by their type */
-export const groupOperations = (ops: Operation[]): GroupedOperations => ({
-	adds: ops.filter((op) => op.op.startsWith('add')),
-	updates: ops.filter((op) => op.op.startsWith('update')),
-	deletes: ops.filter((op) => op.op.startsWith('del')),
-	merges: ops.filter((op) => op.op === 'merge_classes')
-})
+export const groupOperations = (ops: Operation[]): GroupedOperations => {
+	const grouped = { adds: [], updates: [], deletes: [], merges: [] } as GroupedOperations
+	for (const op of ops) {
+		if (op.op.startsWith('add')) grouped.adds.push(op)
+		else if (op.op.startsWith('update')) grouped.updates.push(op)
+		else if (op.op.startsWith('del')) grouped.deletes.push(op)
+		else if (op.op === 'merge_classes') grouped.merges.push(op)
+	}
+	return grouped
+}
 
-/** Get the display name for an operation */
-export const getOperationDisplayName = (op: Operation): string => {
+export const displayName = (op: Operation): string => {
 	if ('name' in op) return op.name
 	if ('target_name' in op) return op.target_name
 	return ''
 }
 
-/** Get the CSS class for an operation badge */
-export const getOperationBadgeClass = (op: string): string => {
+export const badgeClass = (op: string): string => {
 	if (op.startsWith('add')) return 'bg-ok/10 text-ok border-ok/20'
 	if (op.startsWith('del')) return 'bg-err/10 text-err border-err/20'
 	if (op.startsWith('update')) return 'bg-warn/10 text-warn border-warn/20'

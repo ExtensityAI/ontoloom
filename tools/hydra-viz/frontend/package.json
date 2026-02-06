@@ -48,7 +48,6 @@
     "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
     "sigma": "^3.0.2",
-    "unified": "^11.0.5",
-    "zod": "^4.3.6"
+    "unified": "^11.0.5"
   }
 }

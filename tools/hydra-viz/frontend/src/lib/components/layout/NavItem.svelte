@@ -4,7 +4,7 @@
 
   const {
     path,
-    class: clazz,
+    class: cls,
     children
   }: { path: string; class?: string; children: Snippet } = $props()
 
@@ -16,7 +16,7 @@
   class={[
     "flex h-full items-center gap-1.5 px-2 transition hover:text-fg",
     active && "text-fg",
-    clazz
+    cls
   ]}
 >
   {@render children()}

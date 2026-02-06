@@ -1,6 +1,7 @@
-import { getIterationSubpageCrumbs } from '$lib/utils/navigation'
+import { fetchIteration } from '$lib/api/client'
 import type { PageLoad } from './$types'
 
-export const load: PageLoad = ({ params }) => {
-	return { breadcrumbs: getIterationSubpageCrumbs(params.name, params.iter, 'graph') }
+export const load: PageLoad = async ({ params, fetch }) => {
+	const iteration = await fetchIteration(params.name, +params.iter, fetch)
+	return { iteration }
 }

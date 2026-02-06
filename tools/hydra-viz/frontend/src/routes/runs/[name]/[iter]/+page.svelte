@@ -1,12 +1,15 @@
 <script lang="ts">
-	import MetricCard from '$lib/components/metrics/MetricCard.svelte'
+	import Histogram from '$lib/components/charts/Histogram.svelte'
+	import MetricCard from '$lib/components/charts/MetricCard.svelte'
+	import { coverage } from '$lib/utils/format'
 	import type { PageData } from './$types'
 
 	let { data }: { data: PageData } = $props()
 
-	const iteration = $derived(data.iteration)
-	const prev = $derived(data.previousIteration?.metrics)
-	const m = $derived(iteration?.metrics)
+	const m = $derived(data.run.iterations[data.iterNum]?.ontology_metrics ?? null)
+	const prev = $derived(
+		data.iterNum > 0 ? data.run.iterations[data.iterNum - 1]?.ontology_metrics ?? null : null
+	)
 </script>
 
 <div class="mx-auto w-full max-w-6xl space-y-8 px-4 py-8">
@@ -15,18 +18,21 @@
 			<h2 class="mb-4 text-sm font-medium text-muted">Overview</h2>
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
 				<MetricCard
-					value={m.class_count}
+					value={m.counts.n_classes}
 					label="classes"
-					current={m.class_count}
-					previous={prev?.class_count}
+					previous={prev?.counts.n_classes}
 				/>
 				<MetricCard
-					value={m.max_depth}
+					value={m.distributions.class_depth.max}
 					label="max depth"
-					current={m.max_depth}
-					previous={prev?.max_depth}
+					previous={prev?.distributions.class_depth.max}
 				/>
-				<MetricCard value="{Math.round(m.property_coverage * 100)}%" label="coverage" />
+				<MetricCard
+					value="{Math.round(coverage(m) * 100)}%"
+					label="coverage"
+					current={coverage(m)}
+					previous={prev ? coverage(prev) : undefined}
+				/>
 			</div>
 		</section>
 
@@ -34,34 +40,25 @@
 			<h2 class="mb-4 text-sm font-medium text-muted">Properties</h2>
 			<div class="grid grid-cols-2 gap-4">
 				<MetricCard
-					value={m.data_property_count}
+					value={m.counts.n_data_properties}
 					label="data properties"
-					current={m.data_property_count}
-					previous={prev?.data_property_count}
+					previous={prev?.counts.n_data_properties}
 				/>
 				<MetricCard
-					value={m.object_property_count}
+					value={m.counts.n_object_properties}
 					label="object properties"
-					current={m.object_property_count}
-					previous={prev?.object_property_count}
+					previous={prev?.counts.n_object_properties}
 				/>
 			</div>
 		</section>
 
-		<section>
-			<h2 class="mb-4 text-sm font-medium text-muted">Hierarchy</h2>
-			<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
-				<MetricCard value={m.root_class_count} label="roots" size="small" />
-				<MetricCard value={m.leaf_class_count} label="leaves" size="small" />
-				<MetricCard
-					value={m.orphan_class_count}
-					label="orphans"
-					current={m.orphan_class_count}
-					previous={prev?.orphan_class_count}
-					invert
-					size="small"
-				/>
-				<MetricCard value={m.avg_branching_factor.toFixed(1)} label="avg branching" size="small" />
+		<section class="space-y-4">
+			<h2 class="text-sm font-medium text-muted">Distributions</h2>
+			<div class="grid gap-4 md:grid-cols-2">
+				<Histogram title="Class Depth" metric={m.distributions.class_depth} />
+				<Histogram title="Subclasses / Class" metric={m.distributions.subclasses_per_class} />
+				<Histogram title="Data Props / Class" metric={m.distributions.data_props_per_class} />
+				<Histogram title="Object Props Out / Class" metric={m.distributions.object_props_out_per_class} />
 			</div>
 		</section>
 	{:else}

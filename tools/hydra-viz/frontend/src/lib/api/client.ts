@@ -1,4 +1,4 @@
-import type { RunSummary, RunDetail, IterationDetail, MetricsTimeSeries } from './types';
+import type { RunSummary, RunDetail, IterationDetail } from './types';
 
 type Fetch = typeof fetch;
 
@@ -27,13 +27,6 @@ export async function fetchIteration(
 ): Promise<IterationDetail> {
 	return fetchJson<IterationDetail>(
 		`${API_BASE}/runs/${encodeURIComponent(name)}/iterations/${idx}`,
-		customFetch
-	);
-}
-
-export async function fetchMetrics(name: string, customFetch?: Fetch): Promise<MetricsTimeSeries> {
-	return fetchJson<MetricsTimeSeries>(
-		`${API_BASE}/runs/${encodeURIComponent(name)}/metrics`,
 		customFetch
 	);
 }

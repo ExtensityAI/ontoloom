@@ -13,11 +13,9 @@
     const maxIter = run.iterations.length - 1
     const paramIter = Number(page.params.iter)
     const iter = Number.isNaN(paramIter) ? maxIter : paramIter
-    const view = page.url.pathname.includes("graph")
-      ? "graph"
-      : page.url.pathname.includes("changes")
-        ? "changes"
-        : ""
+    const segments = page.url.pathname.split("/")
+    const lastSegment = segments[segments.length - 1]
+    const view = lastSegment === "graph" || lastSegment === "changes" ? lastSegment : ""
     const path = getRunPath(run.metadata.id)
     const iterHref = (idx: number) => getIterationPath(run.metadata.id, idx) + "/" + view
     return { maxIter, iter, view, path, iterHref }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import {
-      getOperationBadgeClass,
-      getOperationDisplayName,
+      badgeClass,
+      displayName,
       groupOperations
   } from "$lib/components/runs/operations"
   import MarkdownSection from "$lib/components/ui/MarkdownSection.svelte"
@@ -43,13 +43,11 @@
           {#each iteration.ops as op}
             <li class="flex items-center gap-3 px-4 py-3">
               <span
-                class="shrink-0 border px-2 py-0.5 font-mono text-sm {getOperationBadgeClass(
-                  op.op
-                )}"
+                class="shrink-0 border px-2 py-0.5 font-mono text-sm {badgeClass(op.op)}"
               >
                 {op.op}
               </span>
-              <span class="text-sm text-fg">{getOperationDisplayName(op)}</span>
+              <span class="text-sm text-fg">{displayName(op)}</span>
             </li>
           {/each}
         </ul>

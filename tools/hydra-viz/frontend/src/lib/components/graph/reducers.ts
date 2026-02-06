@@ -1,5 +1,5 @@
 import type { EdgeDisplayData, NodeDisplayData } from "sigma/types"
-import type { NodeSelection } from "./selection"
+import type { NodeSelection } from "./types"
 import { activeEdgeSize, baseNodeSize, graphTheme, nodeSizeMultiplier } from "./theme"
 import type { EdgeAttributes, NodeAttributes } from "./types"
 

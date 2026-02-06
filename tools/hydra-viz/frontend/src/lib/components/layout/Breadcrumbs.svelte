@@ -1,7 +1,29 @@
 <script lang="ts">
-	import type { Crumb } from '$lib/utils/navigation'
+	import { page } from '$app/state'
+	import { getRunPath, getIterationPath } from '$lib/utils/navigation'
 
-	const { crumbs }: { crumbs: Crumb[] } = $props()
+	interface Crumb { label: string; href?: string }
+
+	const crumbs = $derived.by((): Crumb[] => {
+		const { name, iter } = page.params
+		if (!name) return [{ label: 'runs' }]
+		if (!iter) return [{ label: 'runs', href: '/' }, { label: name }]
+
+		const routeParts = (page.route.id ?? '').split('/')
+		const subpage = routeParts.length > 4 ? routeParts[4] : null
+
+		const result: Crumb[] = [
+			{ label: 'runs', href: '/' },
+			{ label: name, href: getRunPath(name) }
+		]
+		if (subpage) {
+			result.push({ label: 'iter ' + iter, href: getIterationPath(name, iter) })
+			result.push({ label: subpage })
+		} else {
+			result.push({ label: 'iter ' + iter })
+		}
+		return result
+	})
 </script>
 
 <nav class="flex items-center">

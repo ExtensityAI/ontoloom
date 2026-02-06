@@ -1,61 +1,63 @@
-// Run metadata from run.json
 export interface RunMetadata {
   id: string
   title: string
   intent: string
   input_files: string[]
-  created_at: string // ISO datetime string
+  created_at: string
   n_iterations: number
 }
 
-// Run summary returned from list endpoint
 export interface RunSummary {
   metadata: RunMetadata
 }
 
-// Structural metrics for an ontology
-export interface StructuralMetrics {
-  // Basic counts
-  class_count: number
-  data_property_count: number
-  object_property_count: number
-
-  // Hierarchy metrics
-  root_class_count: number
-  leaf_class_count: number
-  max_depth: number
-  avg_depth: number
-  avg_branching_factor: number
-
-  // Connectivity metrics
-  orphan_class_count: number
-  classes_with_data_properties: number
-  property_coverage: number
-  relationship_density: number
-
-  // Quality indicators
-  classes_with_empty_definition: number
-  classes_with_constraints: number
-  properties_with_thing_domain: number
+export interface Metric {
+  min: number
+  max: number
+  mean: number
+  median: number
+  stdev: number
+  raw: number[]
 }
 
-// Iteration summary (used in run detail)
+export interface OntologyMetricCounts {
+  n_classes: number
+  n_properties: number
+  n_object_properties: number
+  n_data_properties: number
+  n_root_classes: number
+  n_leaf_classes: number
+  classes_with_no_properties: number
+}
+
+export interface OntologyMetricDistributions {
+  class_depth: Metric
+  subclasses_per_class: Metric
+  superclasses_per_class: Metric
+  data_props_per_class: Metric
+  object_props_out_per_class: Metric
+  object_props_in_per_class: Metric
+  data_prop_domain_arity: Metric
+  object_prop_domain_arity: Metric
+  object_prop_range_arity: Metric
+  intersection_arity: Metric
+}
+
+export interface OntologyMetrics {
+  counts: OntologyMetricCounts
+  distributions: OntologyMetricDistributions
+}
+
 export interface IterationSummary {
   index: number
-  has_ontology: boolean
-  has_ops: boolean
-  has_plan: boolean
-  has_review: boolean
-  metrics: StructuralMetrics | null
+  ontology_metrics: OntologyMetrics | null
 }
 
-// Run detail with iterations list
 export interface RunDetail {
   metadata: RunMetadata
   iterations: IterationSummary[]
 }
 
-// Ontology types
 export interface ClassDescription {
   definition: string
   constraints: string | null
@@ -69,7 +71,6 @@ export interface OntologyClass {
 
 export interface ClassExpression {
   intersectionOf?: string[]
-  // Single class name can just be a string
 }
 
 export interface DataProperty {
@@ -92,7 +93,6 @@ export interface Ontology {
   object_properties: Record<string, ObjectProperty>
 }
 
-// Operation types - discriminated by 'op' field
 export interface AddClassOp {
   op: "add_class"
   name: string
@@ -176,23 +176,11 @@ export type Operation =
   | UpdateObjectPropertyOp
   | DeleteObjectPropertyOp
 
-// Full iteration detail
 export interface IterationDetail {
   index: number
   ontology: Ontology | null
   ops: Operation[]
   plan: string | null
   review: string | null
-  metrics: StructuralMetrics | null
-}
-
-// Metrics time series
-export interface MetricsTimeSeriesPoint {
-  iteration: number
-  metrics: StructuralMetrics
-}
-
-export interface MetricsTimeSeries {
-  name: string
-  points: MetricsTimeSeriesPoint[]
+  ontology_metrics: OntologyMetrics | null
 }

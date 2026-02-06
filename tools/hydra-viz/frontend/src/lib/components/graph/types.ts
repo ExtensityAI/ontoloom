@@ -21,5 +21,12 @@ export interface EdgeAttributes {
 	target: string;
 }
 
+export interface NodeSelection {
+	node: string;
+	attrs: NodeAttributes;
+	parents: ReadonlySet<string>;
+	children: ReadonlySet<string>;
+}
+
 export type HydraGraph = Graph<NodeAttributes, EdgeAttributes>;
 export type HydraSigma = Sigma<NodeAttributes, EdgeAttributes>;

@@ -33,12 +33,6 @@ def _parse_args():
         help="Host to bind to",
     )
 
-    parser.add_argument(
-        "--api",
-        action="store_const",
-        help="Start in API only mode. Does not serve the visualizer ui.",
-    )
-
     args = parser.parse_args()
 
     # Validate runs directory
@@ -55,7 +49,7 @@ def main():
     """Main entry point for the hydra-viz CLI."""
     args = _parse_args()
 
-    app = create_app(args.runs_dir.resolve(), args.api)
+    app = create_app(args.runs_dir.resolve())
 
     uvicorn.run(app, host=args.host, port=args.port)
 

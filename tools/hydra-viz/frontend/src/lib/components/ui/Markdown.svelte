@@ -1,4 +1,4 @@
-<script lang="ts">
+<script module lang="ts">
   import rehypeSanitize from "rehype-sanitize"
   import rehypeStringify from "rehype-stringify"
   import remarkGfm from "remark-gfm"
@@ -6,20 +6,30 @@
   import remarkRehype from "remark-rehype"
   import { unified } from "unified"
 
-  const { content }: { content: string } = $props()
-
   const processor = unified()
     .use(remarkParse)
     .use(remarkGfm)
     .use(remarkRehype)
     .use(rehypeSanitize)
     .use(rehypeStringify)
+</script>
 
-  const html = $derived(processor.processSync(content).toString())
+<script lang="ts">
+  const { content }: { content: string } = $props()
+
+  let html = $state("")
+
+  $effect(() => {
+    processor.process(content).then((result) => {
+      html = result.toString()
+    })
+  })
 </script>
 
 <div class="prose">
-  {@html html}
+  {#if html}
+    {@html html}
+  {/if}
 </div>
 
 <style>

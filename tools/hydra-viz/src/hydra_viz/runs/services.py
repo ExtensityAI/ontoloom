@@ -1,10 +1,7 @@
 import json
 from pathlib import Path
 
-from ontology_hydra.metrics.structural import (
-    StructuralMetrics,
-    compute_structural_metrics,
-)
+from ontology_hydra.metrics import IterationMetrics, OntologyMetrics
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
@@ -24,17 +21,21 @@ ONTOLOGY_FILE = "ontology.json"
 OPS_FILE = "ops.json"
 PLAN_FILE = "plan.md"
 REVIEW_FILE = "review.md"
+ONTOLOGY_METRICS_FILE = "ontology_metrics.json"
+ITERATION_METRICS_FILE = "iteration_metrics.json"
 
 
 def _validate_run_id(id: str) -> None:
     if not id or not VALID_RUN_ID_PATTERN.match(id):
-        raise ValueError("Invalid run id")
+        msg = "Invalid run id"
+        raise ValueError(msg)
 
 
 def get_runs_in_dir(dir_path: Path) -> list[Run]:
     """Get all runs in a directory."""
     if not dir_path.is_dir():
-        raise ValueError("Must be a directory path")
+        msg = "Must be a directory path"
+        raise ValueError(msg)
 
     return [
         Run(dir=p.parent, metadata=RunMetadata.model_validate_json(p.read_text()))
@@ -82,23 +83,31 @@ def _cache_path(run: Run, iteration: int, filename: str) -> Path:
     return run.dir / str(iteration) / filename
 
 
-def _load_ontology(run: Run, iteration: int) -> Ontology | None:
-    """Load ontology JSON for an iteration."""
-    path = _cache_path(run, iteration, ONTOLOGY_FILE)
+def _load_json_model(path: Path, model):
     if not path.is_file():
         return None
     try:
-        return Ontology.model_validate_json(path.read_text())
-    except (json.JSONDecodeError, OSError):
+        return model.model_validate_json(path.read_text())
+    except (json.JSONDecodeError, OSError, ValueError):
         return None
 
 
-def _load_metrics(run: Run, iteration: int) -> StructuralMetrics | None:
-    """Load ontology and compute metrics for an iteration."""
-    ontology = _load_ontology(run, iteration)
-    if ontology is None:
-        return None
-    return compute_structural_metrics(ontology)
+def _load_ontology(run: Run, iteration: int) -> Ontology | None:
+    """Load ontology JSON for an iteration."""
+    path = _cache_path(run, iteration, ONTOLOGY_FILE)
+    return _load_json_model(path, Ontology)
+
+
+def _load_ontology_metrics(run: Run, iteration: int) -> OntologyMetrics | None:
+    """Load cached ontology metrics for an iteration."""
+    path = _cache_path(run, iteration, ONTOLOGY_METRICS_FILE)
+    return _load_json_model(path, OntologyMetrics)
+
+
+def _load_iteration_metrics(run: Run, iteration: int) -> IterationMetrics | None:
+    """Load cached iteration metrics for an iteration."""
+    path = _cache_path(run, iteration, ITERATION_METRICS_FILE)
+    return _load_json_model(path, IterationMetrics)
 
 
 def _load_ops(run: Run, iteration: int) -> list[Operation]:
@@ -143,7 +152,8 @@ def _build_iteration_summary(run: Run, idx: int) -> IterationSummary:
         has_ops=has_ops,
         has_plan=has_plan,
         has_review=has_review,
-        metrics=_load_metrics(run, idx) if has_ontology else None,
+        ontology_metrics=_load_ontology_metrics(run, idx),
+        iteration_metrics=_load_iteration_metrics(run, idx),
     )
 
 
@@ -155,9 +165,7 @@ def get_run_detail(dir_path: Path, id: str) -> RunDetail | None:
         return None
 
     # Build iteration summaries
-    iterations = [
-        _build_iteration_summary(run, idx) for idx in range(run.metadata.n_iterations)
-    ]
+    iterations = [_build_iteration_summary(run, idx) for idx in range(run.metadata.n_iterations)]
 
     return RunDetail(dir=run.dir, metadata=run.metadata, iterations=iterations)
 
@@ -179,7 +187,8 @@ def get_iteration_detail(dir_path: Path, id: str, idx: int) -> IterationDetail |
         ops=_load_ops(run, idx),
         plan=_load_text_file(run, idx, PLAN_FILE),
         review=_load_text_file(run, idx, REVIEW_FILE),
-        metrics=compute_structural_metrics(ontology) if ontology else None,
+        ontology_metrics=_load_ontology_metrics(run, idx),
+        iteration_metrics=_load_iteration_metrics(run, idx),
     )
 
 
@@ -189,10 +198,17 @@ def get_metrics_time_series(dir_path: Path, id: str) -> MetricsTimeSeries | None
     if run is None:
         return None
 
-    points = [
-        MetricsTimeSeriesPoint(iteration=idx, metrics=m)
-        for idx in range(run.metadata.n_iterations)
-        if (m := _load_metrics(run, idx)) is not None
-    ]
+    points = []
+    for idx in range(run.metadata.n_iterations):
+        ontology_metrics = _load_ontology_metrics(run, idx)
+        if ontology_metrics is None:
+            continue
+        points.append(
+            MetricsTimeSeriesPoint(
+                iteration=idx,
+                ontology_metrics=ontology_metrics,
+                iteration_metrics=_load_iteration_metrics(run, idx),
+            )
+        )
 
     return MetricsTimeSeries(name=id, points=points)
