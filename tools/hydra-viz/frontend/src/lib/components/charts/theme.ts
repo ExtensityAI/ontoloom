@@ -11,6 +11,10 @@ export interface ChartTheme {
 	warn: string
 	info: string
 	err: string
+	metricClasses: string
+	metricProperties: string
+	metricCoverage: string
+	metricDepth: string
 }
 
 let cached: ChartTheme | null = null
@@ -26,7 +30,11 @@ export const getChartTheme = (): ChartTheme => {
 		ok: getCssVar('--color-ok'),
 		warn: getCssVar('--color-warn'),
 		info: getCssVar('--color-info'),
-		err: getCssVar('--color-err')
+		err: getCssVar('--color-err'),
+		metricClasses: getCssVar('--color-metric-classes'),
+		metricProperties: getCssVar('--color-metric-properties'),
+		metricCoverage: getCssVar('--color-metric-coverage'),
+		metricDepth: getCssVar('--color-metric-depth')
 	}
 	return cached
 }

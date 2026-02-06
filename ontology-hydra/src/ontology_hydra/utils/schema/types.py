@@ -19,11 +19,11 @@ class RefExpression(_Model):
 
 class UnionExpression(_Model):
     kind: Literal["union"] = "union"
-    any_of: list["TypeExpression"]
+    any_of: list[TypeExpression]
 
     @field_validator("any_of", mode="after")
     @classmethod
-    def _disallow_optional(cls, value: list["TypeExpression"]):
+    def _disallow_optional(cls, value: list[TypeExpression]):
         if any(isinstance(item, OptionalExpression) for item in value):
             msg = "Optional union items are not allowed; make the union optional instead."
             raise ValueError(msg)
@@ -32,13 +32,13 @@ class UnionExpression(_Model):
 
 class ListExpression(_Model):
     kind: Literal["list"] = "list"
-    items: "TypeExpression"
+    items: TypeExpression
 
 
 class DictExpression(_Model):
     kind: Literal["dict"] = "dict"
-    key: "TypeExpression"
-    value: "TypeExpression"
+    key: TypeExpression
+    value: TypeExpression
 
 
 class DataType(StrEnum):
@@ -60,7 +60,7 @@ class LiteralExpression(_Model):
 
 class OptionalExpression(_Model):
     kind: Literal["optional"] = "optional"
-    value: "TypeExpression"
+    value: TypeExpression
 
 
 TypeExpression = Annotated[

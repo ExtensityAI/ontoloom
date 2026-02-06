@@ -5,8 +5,10 @@ from symai import Expression
 from symai.strategy import LLMDataModel, contract
 from tqdm import tqdm
 
+from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.kg.merging import try_merge
 from ontology_hydra.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_schema
+from ontology_hydra.llm.engine import create_component_engine
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.prompts import prompt_registry
 from ontology_hydra.utils.cache import Cache, CacheKey
@@ -89,6 +91,7 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
 
 
 def generate_kg(
+    config: HydraConfig,
     cache: Cache,
     texts: list[str],
     ontology: Ontology | None = None,
@@ -110,23 +113,24 @@ def generate_kg(
 
     extractor = Extractor(ontology, kg)
 
-    for i in range(epochs):
-        for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
-            input_data = Input(
-                texts=texts[j : j + batch_size],
-                kg=kg,
-            )
+    with create_component_engine(config, ComponentName.kg_extractor):
+        for i in range(epochs):
+            for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
+                input_data = Input(
+                    texts=texts[j : j + batch_size],
+                    kg=kg,
+                )
 
-            print(input_data.model_dump_json())
+                logger.debug(f"KG input: {input_data.model_dump_json()}")
 
-            # TODO annotate output with chunk information!
+                # TODO annotate output with chunk information!
 
-            _ = extractor(input=input_data)  # pyright: ignore[reportInvalidTypeForm] once again
+                _ = extractor(input=input_data)  # pyright: ignore[reportInvalidTypeForm] once again
 
-            kg = extractor.kg
+                kg = extractor.kg
 
-            if cache is not None:
-                cache.write(partial_json_ck, kg.model_dump_json(indent=2))
+                if cache is not None:
+                    cache.write(partial_json_ck, kg.model_dump_json(indent=2))
 
     if cache is not None:
         cache.write(("kg", "final.json"), kg.model_dump_json(indent=2, exclude_none=True))

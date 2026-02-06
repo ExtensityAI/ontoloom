@@ -10,10 +10,18 @@
 		content: string | null | undefined
 		color: 'info' | 'warn' | 'ok' | 'err'
 	} = $props()
+
+	const accentClass = {
+		info: 'bg-info',
+		warn: 'bg-warn',
+		ok: 'bg-ok',
+		err: 'bg-err'
+	}[color]
 </script>
 
-<section class="border-l-2 border-{color} pl-4">
-	<h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-{color}">{title}</h2>
+<section class="relative overflow-hidden rounded border border-edge bg-surface/30 p-3">
+	<div class={`absolute inset-x-0 top-0 h-0.5 ${accentClass}`}></div>
+	<h2 class="mb-3 text-sm font-medium text-muted">{title}</h2>
 	<div class="text-sm">
 		{#if content}
 			<Markdown {content} />

@@ -1,6 +1,69 @@
 .DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
 .codex/
 .claude/
 
-# my workspace config
+# Workspace
 ontology-hydra.code-workspace
+
+# Python caches/build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node tooling
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp.*
+.svelte-kit/
+.eslintcache
+coverage/
+.output/
+.vercel/
+.netlify/
+.wrangler/
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# hydra-viz bundled static assets (built via Makefile)
+tools/hydra-viz/src/hydra_viz/static/
+tools/hydra-viz/static/
+tools/hydra-viz/temp/
+
+# Local config
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Project-specific runtime artifacts
+symai.config.json
+config.toml
+.hydra/

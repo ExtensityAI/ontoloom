@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 
 from ontology_hydra.metrics import IterationMetrics, OntologyMetrics
+from ontology_hydra.ontology.components.implementation.draft_ops import OperationSequence
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
-from pydantic import TypeAdapter
 
 from hydra_viz.runs.models import (
     IterationDetail,
@@ -117,13 +117,8 @@ def _load_ops(run: Run, iteration: int) -> list[Operation]:
         return []
 
     try:
-        adapter = TypeAdapter(list[Operation])
-        parsed = json.loads(path.read_text())
-
-        # Handle both formats: {"operations": [...]} or [...]
-        if isinstance(parsed, dict) and "operations" in parsed:
-            return adapter.validate_python(parsed["operations"])
-        return adapter.validate_python(parsed)
+        ops = OperationSequence.model_validate_json(path.read_text())
+        return ops.ops
     except (json.JSONDecodeError, OSError, ValueError):
         return []
 

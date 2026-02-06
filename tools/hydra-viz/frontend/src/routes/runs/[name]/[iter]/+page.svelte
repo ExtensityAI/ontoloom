@@ -1,8 +1,8 @@
 <script lang="ts">
-	import Histogram from '$lib/components/charts/Histogram.svelte'
-	import MetricCard from '$lib/components/charts/MetricCard.svelte'
-	import { coverage } from '$lib/utils/format'
-	import type { PageData } from './$types'
+	import Histogram from "$lib/components/charts/Histogram.svelte"
+	import { computeDelta } from "$lib/utils/delta"
+	import { coverage } from "$lib/utils/format"
+	import type { PageData } from "./$types"
 
 	let { data }: { data: PageData } = $props()
 
@@ -10,6 +10,110 @@
 	const prev = $derived(
 		data.iterNum > 0 ? data.run.iterations[data.iterNum - 1]?.ontology_metrics ?? null : null
 	)
+
+	const buildTile = (
+		label: string,
+		value: string | number,
+		curr: number | undefined,
+		previous: number | undefined,
+		accent: string,
+		suffix = "",
+		digits?: number
+	) => {
+		if (digits === undefined) {
+			const delta = computeDelta(curr, previous)
+			const deltaText = delta.text ? `${delta.text}${suffix}` : "—"
+			return {
+				label,
+				value,
+				accent,
+				deltaText,
+				deltaColor: delta.text ? delta.color : "text-faint"
+			}
+		}
+
+		if (curr === undefined || previous === undefined) {
+			return {
+				label,
+				value,
+				accent,
+				deltaText: "—",
+				deltaColor: "text-faint"
+			}
+		}
+
+		const raw = Number((curr - previous).toFixed(digits))
+		if (raw === 0) {
+			return {
+				label,
+				value,
+				accent,
+				deltaText: "—",
+				deltaColor: "text-faint"
+			}
+		}
+
+		const sign = raw > 0 ? "+" : ""
+		const deltaText = `${sign}${raw.toFixed(digits)}${suffix}`
+		return {
+			label,
+			value,
+			accent,
+			deltaText,
+			deltaColor: raw > 0 ? "text-ok" : "text-err"
+		}
+	}
+
+	const overviewTiles = $derived.by(() => {
+		if (!m) return []
+		const coverageNow = Number((coverage(m) * 100).toFixed(1))
+		const coveragePrev = prev ? Number((coverage(prev) * 100).toFixed(1)) : undefined
+		return [
+			buildTile(
+				"classes",
+				m.counts.n_classes,
+				m.counts.n_classes,
+				prev?.counts.n_classes,
+				"bg-metric-classes"
+			),
+			buildTile(
+				"max depth",
+				m.distributions.class_depth.max,
+				m.distributions.class_depth.max,
+				prev?.distributions.class_depth.max,
+				"bg-metric-depth"
+			),
+			buildTile(
+				"coverage",
+				`${coverageNow}%`,
+				coverageNow,
+				coveragePrev,
+				"bg-metric-coverage",
+				"pp",
+				1
+			)
+		]
+	})
+
+	const propertyTiles = $derived.by(() => {
+		if (!m) return []
+		return [
+			buildTile(
+				"data properties",
+				m.counts.n_data_properties,
+				m.counts.n_data_properties,
+				prev?.counts.n_data_properties,
+				"bg-metric-properties"
+			),
+			buildTile(
+				"object properties",
+				m.counts.n_object_properties,
+				m.counts.n_object_properties,
+				prev?.counts.n_object_properties,
+				"bg-metric-properties"
+			)
+		]
+	})
 </script>
 
 <div class="mx-auto w-full max-w-6xl space-y-8 px-4 py-8">
@@ -17,38 +121,28 @@
 		<section>
 			<h2 class="mb-4 text-sm font-medium text-muted">Overview</h2>
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
-				<MetricCard
-					value={m.counts.n_classes}
-					label="classes"
-					previous={prev?.counts.n_classes}
-				/>
-				<MetricCard
-					value={m.distributions.class_depth.max}
-					label="max depth"
-					previous={prev?.distributions.class_depth.max}
-				/>
-				<MetricCard
-					value="{Math.round(coverage(m) * 100)}%"
-					label="coverage"
-					current={coverage(m)}
-					previous={prev ? coverage(prev) : undefined}
-				/>
+				{#each overviewTiles as tile}
+					<div class="relative overflow-hidden rounded border border-edge bg-surface/30 p-3">
+						<div class={`absolute inset-x-0 top-0 h-0.5 ${tile.accent}`}></div>
+						<div class="text-xs text-muted">{tile.label}</div>
+						<div class="font-mono text-lg">{tile.value}</div>
+						<div class={`text-xs ${tile.deltaColor}`}>Δ {tile.deltaText}</div>
+					</div>
+				{/each}
 			</div>
 		</section>
 
 		<section>
 			<h2 class="mb-4 text-sm font-medium text-muted">Properties</h2>
 			<div class="grid grid-cols-2 gap-4">
-				<MetricCard
-					value={m.counts.n_data_properties}
-					label="data properties"
-					previous={prev?.counts.n_data_properties}
-				/>
-				<MetricCard
-					value={m.counts.n_object_properties}
-					label="object properties"
-					previous={prev?.counts.n_object_properties}
-				/>
+				{#each propertyTiles as tile}
+					<div class="relative overflow-hidden rounded border border-edge bg-surface/30 p-3">
+						<div class={`absolute inset-x-0 top-0 h-0.5 ${tile.accent}`}></div>
+						<div class="text-xs text-muted">{tile.label}</div>
+						<div class="font-mono text-lg">{tile.value}</div>
+						<div class={`text-xs ${tile.deltaColor}`}>Δ {tile.deltaText}</div>
+					</div>
+				{/each}
 			</div>
 		</section>
 

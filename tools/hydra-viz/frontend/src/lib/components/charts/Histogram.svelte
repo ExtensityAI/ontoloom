@@ -56,7 +56,7 @@
 	})
 </script>
 
-<div class="border border-edge p-4">
+<div class="rounded border border-edge bg-surface/30 p-3">
 	<div class="mb-3 flex items-center justify-between">
 		<h3 class="text-sm font-medium text-muted">{title}</h3>
 		{#if metric}

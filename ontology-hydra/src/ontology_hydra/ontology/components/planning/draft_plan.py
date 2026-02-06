@@ -1,5 +1,7 @@
 from symai import Expression
 
+from ontology_hydra.config import ComponentName, HydraConfig
+from ontology_hydra.llm.engine import create_component_engine
 from ontology_hydra.ontology.models import ClassExpression, IntersectionOf, Ontology
 
 # TODO: we want the model to update the ontology where it is most important, so maybe:
@@ -107,14 +109,15 @@ def _format_ontology(ontology: Ontology) -> str:
     return "\n".join(lines)
 
 
-def draft_plan(intent: str, ontology: Ontology):
+def draft_plan(config: HydraConfig, intent: str, ontology: Ontology):
     """Drafts a plan that, when implemented and executed, changes the ontology to better fit user intent."""
 
     # if this does not work, well enough (low-quality plans), we may want to try to add in more steps to reiterate on the plan and provide more guidance maybe?
 
     # use raw prompting instead of structured output because we need flexibility and no data structure
-    plan: str = Expression.prompt(
-        _prompt.format(intent=intent, ontology=_format_ontology(ontology))
-    ).value
+    with create_component_engine(config, ComponentName.planner):
+        plan: str = Expression.prompt(
+            _prompt.format(intent=intent, ontology=_format_ontology(ontology))
+        ).value
 
     return plan

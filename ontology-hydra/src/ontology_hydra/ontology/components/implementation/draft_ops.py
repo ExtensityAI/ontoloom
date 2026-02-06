@@ -4,6 +4,8 @@ from pydantic import Field
 from symai import Expression
 from symai.strategy import contract
 
+from ontology_hydra.config import ComponentName, HydraConfig
+from ontology_hydra.llm.engine import create_component_engine
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import OperationFailed, execute_ops
 from ontology_hydra.ontology.revision.operations import Operation
@@ -94,7 +96,14 @@ class DraftOps(Expression):
         )
 
 
-def draft_ops(plan: str, intent: str, ontology: Ontology, feedback: str | None = None):
+def draft_ops(
+    config: HydraConfig,
+    plan: str,
+    intent: str,
+    ontology: Ontology,
+    feedback: str | None = None,
+):
     drafter = cast("DraftOps", DraftOps(plan, intent, ontology, feedback))
-    ops: OperationSequence = drafter(_Input(ontology=ontology))
+    with create_component_engine(config, ComponentName.draft_ops):
+        ops: OperationSequence = drafter(_Input(ontology=ontology))
     return ops

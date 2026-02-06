@@ -21,6 +21,12 @@
   --color-err: var(--color-red-400);
   --color-info: var(--color-blue-400);
 
+  /* Metric colors */
+  --color-metric-classes: var(--color-accent);
+  --color-metric-properties: var(--color-info);
+  --color-metric-coverage: var(--color-ok);
+  --color-metric-depth: var(--color-warn);
+
   /* Fonts */
   --font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",

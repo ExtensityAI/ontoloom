@@ -1,0 +1,28 @@
+# Ontology-Hydra config (TOML)
+
+[providers.openai]
+api_key = "sk_xxx"
+
+[default]
+provider = "openai"
+model = "gpt-5.2"
+
+[components.planner]
+provider = "openai"
+model = "gpt-5.2"
+
+[components.review_ops]
+provider = "openai"
+model = "gpt-5.2"
+
+[components.kg_extractor]
+provider = "openai"
+model = "gpt-5.2"
+
+[components.draft_ops]
+provider = "openai"
+model = "gpt-5.2"
+
+[components.generate_title]
+provider = "openai"
+model = "gpt-5.2"

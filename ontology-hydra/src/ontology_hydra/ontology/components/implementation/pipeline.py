@@ -1,14 +1,14 @@
 from loguru import logger
 
-from ontology_hydra.ontology.components.implementation.draft_ops import (
-    draft_ops,
-)
+from ontology_hydra.config import HydraConfig
+from ontology_hydra.ontology.components.implementation.draft_ops import draft_ops
 from ontology_hydra.ontology.components.implementation.review_ops import review_ops
 from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import execute_ops
 
 
 def implement_plan(
+    config: HydraConfig,
     plan: str,
     intent: str,
     ontology: Ontology,
@@ -28,11 +28,11 @@ def implement_plan(
 
     for attempt in range(max_attempts):
         logger.info("Attempt {}/{}: drafting operations", attempt + 1, max_attempts)
-        ops = draft_ops(plan, intent, ontology, feedback=feedback)
+        ops = draft_ops(config, plan, intent, ontology, feedback=feedback)
         logger.debug("Drafted {} operations", len(ops.ops))
 
         logger.info("Reviewing operations")
-        review = review_ops(plan, ops, ontology)
+        review = review_ops(config, plan, ops, ontology)
 
         if review.accepted:
             logger.info("Review accepted, executing {} operations", len(ops.ops))
