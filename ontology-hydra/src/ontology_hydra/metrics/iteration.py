@@ -1,10 +1,10 @@
 """Iteration metrics for ontology changes."""
 
-
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
 
 from pydantic import BaseModel, computed_field
 
+from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.diff import diff_ontology
 from ontology_hydra.ontology.revision.operations import (
     AddClass,
@@ -20,14 +20,8 @@ from ontology_hydra.ontology.revision.operations import (
     UpdateObjectProperty,
 )
 
+from .models import Metric
 from .ontology import build_metric, compute_class_value_maps
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-    from ontology_hydra.ontology.models import Ontology
-
-    from .models import Metric
 
 
 class OperationCounts(BaseModel):
@@ -62,7 +56,9 @@ class OperationCounts(BaseModel):
     @computed_field
     @property
     def total(self) -> int:
-        return self.total_add + self.total_update + self.total_delete + self.merge_classes
+        return (
+            self.total_add + self.total_update + self.total_delete + self.merge_classes
+        )
 
     @computed_field
     @property
@@ -243,7 +239,9 @@ def compute_iteration_metrics(  # noqa: C901
     object_props_removed = len(diff.object_properties_removed)
 
     touched_classes = len(
-        set(diff.classes_added) | set(diff.classes_modified) | set(diff.classes_removed),
+        set(diff.classes_added)
+        | set(diff.classes_modified)
+        | set(diff.classes_removed),
     )
     touched_properties = len(
         set(diff.data_properties_added)
@@ -299,9 +297,15 @@ def compute_iteration_metrics(  # noqa: C901
             class_add_ratio=_ratio(classes_added, prev_class_count),
             class_remove_ratio=_ratio(classes_removed, prev_class_count),
             data_property_add_ratio=_ratio(data_props_added, prev_data_property_count),
-            data_property_remove_ratio=_ratio(data_props_removed, prev_data_property_count),
-            object_property_add_ratio=_ratio(object_props_added, prev_object_property_count),
-            object_property_remove_ratio=_ratio(object_props_removed, prev_object_property_count),
+            data_property_remove_ratio=_ratio(
+                data_props_removed, prev_data_property_count
+            ),
+            object_property_add_ratio=_ratio(
+                object_props_added, prev_object_property_count
+            ),
+            object_property_remove_ratio=_ratio(
+                object_props_removed, prev_object_property_count
+            ),
         ),
         updates=IterationMetrics.UpdateCounts(
             class_renames=class_renames,
@@ -319,9 +323,15 @@ def compute_iteration_metrics(  # noqa: C901
         deltas=IterationMetrics.Deltas(
             merge_size=build_metric(merge_sizes),
             depth_delta=build_metric(_delta_values(old_depths, new_depths)),
-            subclasses_delta=build_metric(_delta_values(old_subclasses, new_subclasses)),
-            superclasses_delta=build_metric(_delta_values(old_superclasses, new_superclasses)),
-            data_props_per_class_delta=build_metric(_delta_values(old_data_props, new_data_props)),
+            subclasses_delta=build_metric(
+                _delta_values(old_subclasses, new_subclasses)
+            ),
+            superclasses_delta=build_metric(
+                _delta_values(old_superclasses, new_superclasses)
+            ),
+            data_props_per_class_delta=build_metric(
+                _delta_values(old_data_props, new_data_props)
+            ),
             object_props_out_per_class_delta=build_metric(
                 _delta_values(old_object_out, new_object_out),
             ),

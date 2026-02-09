@@ -1,10 +1,7 @@
 import re
-from typing import TYPE_CHECKING
+from datetime import datetime
 
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from datetime import datetime
 
 VALID_RUN_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.\-]{0,256}$")
 

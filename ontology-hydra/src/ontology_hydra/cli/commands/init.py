@@ -1,11 +1,7 @@
-from typing import TYPE_CHECKING
-
 from loguru import logger
 
+from ontology_hydra.cli.args import InitArgs
 from ontology_hydra.config import init_config
-
-if TYPE_CHECKING:
-    from ontology_hydra.cli.args import InitArgs
 
 
 def init(args: InitArgs):

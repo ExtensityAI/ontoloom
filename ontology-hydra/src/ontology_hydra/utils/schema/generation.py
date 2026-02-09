@@ -1,8 +1,9 @@
 from enum import Enum
 from types import NoneType, UnionType
-from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, get_args, get_origin
+from typing import Annotated, Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 
 from ontology_hydra.utils.schema.types import (
     ClassTypeSchema,
@@ -22,9 +23,6 @@ from ontology_hydra.utils.schema.types import (
     TypeName,
     UnionExpression,
 )
-
-if TYPE_CHECKING:
-    from pydantic.fields import FieldInfo
 
 _PRIMITIVE_TYPES: tuple[tuple[type, DataType], ...] = (
     (bool, DataType.BOOLEAN),
@@ -130,9 +128,12 @@ def _register_class_type(
 
     try:
         properties = {
-            PropertyName(name): _generate_property_schema(field, type_schemas, seen_models)
+            PropertyName(name): _generate_property_schema(
+                field, type_schemas, seen_models
+            )
             for name, field in model_type.model_fields.items()
-            if name != "section_header"  # exclude LLMDataModel default section_header prop
+            if name
+            != "section_header"  # exclude LLMDataModel default section_header prop
         }
     finally:
         seen_models.remove(model_type)
@@ -151,14 +152,18 @@ def _type_expression_from_origin(
 ):
     if origin is Literal:
         literal_values = get_args(annotation)
-        return _combine_union([_literal_value_expression(value) for value in literal_values])
+        return _combine_union(
+            [_literal_value_expression(value) for value in literal_values]
+        )
 
     if origin is list:
         args = get_args(annotation)
         if len(args) != 1:
             msg = "List types must include exactly one item type."
             raise TypeError(msg)
-        return ListExpression(items=_type_expression(args[0], type_schemas, seen_models))
+        return ListExpression(
+            items=_type_expression(args[0], type_schemas, seen_models)
+        )
 
     if origin is dict:
         args = get_args(annotation)
@@ -246,7 +251,8 @@ def schema_from_model(model_type: type[BaseModel]) -> Schema:
     properties = {
         PropertyName(name): _generate_property_schema(field, type_schemas, seen_models)
         for name, field in model_type.model_fields.items()
-        if name != "section_header"  # exclude LLMDataModel default section_header property
+        if name
+        != "section_header"  # exclude LLMDataModel default section_header property
     }
 
     return Schema(

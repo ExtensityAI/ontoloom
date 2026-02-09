@@ -5,7 +5,7 @@ from typing import NewType
 
 from pydantic import Field
 
-from ontology_hydra.utils.schema.llm import DataModel
+from ontology_hydra.utils.schema.models import DataModel
 
 # define custom types for names to enhance static type checking
 ClassName = NewType("ClassName", str)
@@ -19,7 +19,9 @@ def is_none(v):
 class Description(DataModel):
     definition: str = Field(..., description="Short human-readable definition.")
     constraints: str | None = Field(
-        None, description="Optional constraints or modeling notes.", exclude_if=is_none,
+        None,
+        description="Optional constraints or modeling notes.",
+        exclude_if=is_none,
     )
 
 
@@ -36,7 +38,9 @@ class DataType(StrEnum):
 class IntersectionOf(DataModel):
     """An intersection of multiple classes."""
 
-    classes: list[ClassName] = Field(..., description="The list of classes to intersect.")
+    classes: list[ClassName] = Field(
+        ..., description="The list of classes to intersect."
+    )
 
 
 ClassExpression = ClassName | IntersectionOf
@@ -63,7 +67,8 @@ class Class(DataModel):
 class DataProperty(DataModel):
     name: PropertyName = Field(..., description="Data property name (camelCase).")
     description: Description = Field(
-        ..., description="Definition and constraints for the data property.",
+        ...,
+        description="Definition and constraints for the data property.",
     )
     #    sub_property_of: list[PropertyName] = Field(
     #        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
@@ -78,7 +83,8 @@ class DataProperty(DataModel):
 class ObjectProperty(DataModel):
     name: PropertyName = Field(..., description="Object property name (camelCase).")
     description: Description = Field(
-        ..., description="Definition and constraints for the object property.",
+        ...,
+        description="Definition and constraints for the object property.",
     )
     #    sub_property_of: list[PropertyName] = Field(
     #        default_factory=list, description="Superproperties for rdfs:subPropertyOf."
@@ -100,13 +106,16 @@ class ObjectProperty(DataModel):
 
 class Ontology(DataModel):
     classes: dict[ClassName, Class] = Field(
-        default_factory=dict, description="Class definitions keyed by class name.",
+        default_factory=dict,
+        description="Class definitions keyed by class name.",
     )
     data_properties: dict[PropertyName, DataProperty] = Field(
-        default_factory=dict, description="Datatype properties keyed by property name.",
+        default_factory=dict,
+        description="Datatype properties keyed by property name.",
     )
     object_properties: dict[PropertyName, ObjectProperty] = Field(
-        default_factory=dict, description="Object properties keyed by property name.",
+        default_factory=dict,
+        description="Object properties keyed by property name.",
     )
 
     def clone(self):
@@ -116,7 +125,9 @@ class Ontology(DataModel):
 
 _THING = Class(
     name=ClassName("Thing"),
-    description=Description(definition="Root class for all entities.", constraints=None),
+    description=Description(
+        definition="Root class for all entities.", constraints=None
+    ),
 )
 _LABEL = DataProperty(
     name=PropertyName("label"),

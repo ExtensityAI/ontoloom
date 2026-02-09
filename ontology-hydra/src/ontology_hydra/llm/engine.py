@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from symai.components import DynamicEngine
 
-if TYPE_CHECKING:
-    from ontology_hydra.config import ComponentName, HydraConfig
+from ontology_hydra.config import ComponentName, HydraConfig
 
 
 def create_component_engine(config: HydraConfig, name: ComponentName):
@@ -12,4 +11,6 @@ def create_component_engine(config: HydraConfig, name: ComponentName):
     component = config.resolve_component(name)
     provider = config.providers[component.provider]
 
-    return cast("DynamicEngine", DynamicEngine(model=component.model, api_key=provider.api_key))
+    return cast(
+        "DynamicEngine", DynamicEngine(model=component.model, api_key=provider.api_key)
+    )

@@ -51,6 +51,7 @@ class OperationFailedError(Exception):
         self.operation = operation
         self.__cause__ = cause
 
+
 def _add_class(op: AddClass, ontology: Ontology) -> Ontology:
     """Add a new class to the ontology."""
     if op.name in ontology.classes:
@@ -214,7 +215,9 @@ def _update_data_property(op: UpdateDataProperty, ontology: Ontology) -> Ontolog
         prop.description = op.description
 
     if op.domain is not None:
-        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+        validate_classes_exist(
+            ontology, get_classes_in_expressions(op.domain), "Domain"
+        )
         prop.domain = op.domain
 
     if op.range is not None:
@@ -272,7 +275,9 @@ def _update_object_property(op: UpdateObjectProperty, ontology: Ontology) -> Ont
         prop.description = op.description
 
     if op.domain is not None:
-        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
+        validate_classes_exist(
+            ontology, get_classes_in_expressions(op.domain), "Domain"
+        )
         prop.domain = op.domain
 
     if op.range is not None:

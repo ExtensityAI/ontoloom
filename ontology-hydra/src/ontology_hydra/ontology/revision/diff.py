@@ -1,7 +1,8 @@
 """Semantic diff tool for comparing ontologies."""
 
+from collections.abc import Callable
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from ontology_hydra.ontology.models import (
     Class,
@@ -13,10 +14,7 @@ from ontology_hydra.ontology.models import (
     Ontology,
     PropertyName,
 )
-from ontology_hydra.utils.schema.llm import DataModel
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
+from ontology_hydra.utils.schema.models import DataModel
 
 # -----------------------------------------------------------------------------
 # Diff data models
@@ -82,7 +80,9 @@ class ObjectPropertyRemoved(DataModel):
 
 ClassChange = ClassAdded | ClassRemoved | ClassModified
 DataPropertyChange = DataPropertyAdded | DataPropertyRemoved | DataPropertyModified
-ObjectPropertyChange = ObjectPropertyAdded | ObjectPropertyRemoved | ObjectPropertyModified
+ObjectPropertyChange = (
+    ObjectPropertyAdded | ObjectPropertyRemoved | ObjectPropertyModified
+)
 
 
 class OntologyDiff(DataModel):
@@ -110,27 +110,47 @@ class OntologyDiff(DataModel):
 
     @property
     def data_properties_added(self) -> list[PropertyName]:
-        return [p.prop.name for p in self.data_properties if isinstance(p, DataPropertyAdded)]
+        return [
+            p.prop.name
+            for p in self.data_properties
+            if isinstance(p, DataPropertyAdded)
+        ]
 
     @property
     def data_properties_modified(self) -> list[PropertyName]:
-        return [p.name for p in self.data_properties if isinstance(p, DataPropertyModified)]
+        return [
+            p.name for p in self.data_properties if isinstance(p, DataPropertyModified)
+        ]
 
     @property
     def data_properties_removed(self) -> list[PropertyName]:
-        return [p.name for p in self.data_properties if isinstance(p, DataPropertyRemoved)]
+        return [
+            p.name for p in self.data_properties if isinstance(p, DataPropertyRemoved)
+        ]
 
     @property
     def object_properties_added(self) -> list[PropertyName]:
-        return [p.prop.name for p in self.object_properties if isinstance(p, ObjectPropertyAdded)]
+        return [
+            p.prop.name
+            for p in self.object_properties
+            if isinstance(p, ObjectPropertyAdded)
+        ]
 
     @property
     def object_properties_modified(self) -> list[PropertyName]:
-        return [p.name for p in self.object_properties if isinstance(p, ObjectPropertyModified)]
+        return [
+            p.name
+            for p in self.object_properties
+            if isinstance(p, ObjectPropertyModified)
+        ]
 
     @property
     def object_properties_removed(self) -> list[PropertyName]:
-        return [p.name for p in self.object_properties if isinstance(p, ObjectPropertyRemoved)]
+        return [
+            p.name
+            for p in self.object_properties
+            if isinstance(p, ObjectPropertyRemoved)
+        ]
 
 
 # -----------------------------------------------------------------------------
@@ -220,12 +240,18 @@ def _description_changes(old, new):
     """Return formatted lines for definition/constraints changes."""
     lines = list[str]()
     if line := _field_change(
-        "definition", old.description.definition, new.description.definition, quote=True,
+        "definition",
+        old.description.definition,
+        new.description.definition,
+        quote=True,
     ):
         lines.append(line)
 
     if line := _field_change(
-        "constraints", old.description.constraints, new.description.constraints, quote=True,
+        "constraints",
+        old.description.constraints,
+        new.description.constraints,
+        quote=True,
     ):
         lines.append(line)
     return lines
@@ -245,7 +271,9 @@ def _format_class_change(change: ClassChange):
     # ClassModified
     lines = [f"  ~ {change.name}:"]
     lines.extend(_description_changes(change.old, change.new))
-    if line := _field_change("sub_class_of", change.old.sub_class_of, change.new.sub_class_of):
+    if line := _field_change(
+        "sub_class_of", change.old.sub_class_of, change.new.sub_class_of
+    ):
         lines.append(line)
     return lines
 
@@ -265,7 +293,9 @@ def _format_data_property_change(change: DataPropertyChange):
     lines = [f"  ~ {change.name}:"]
     lines.extend(_description_changes(change.old, change.new))
     if line := _field_change(
-        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain),
+        "domain",
+        _format_exprs(change.old.domain),
+        _format_exprs(change.new.domain),
     ):
         lines.append(line)
     if line := _field_change("range", change.old.range, change.new.range):
@@ -288,18 +318,24 @@ def _format_object_property_change(change: ObjectPropertyChange):
     lines = [f"  ~ {change.name}:"]
     lines.extend(_description_changes(change.old, change.new))
     if line := _field_change(
-        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain),
+        "domain",
+        _format_exprs(change.old.domain),
+        _format_exprs(change.new.domain),
     ):
         lines.append(line)
     if line := _field_change(
-        "range", _format_exprs(change.old.range), _format_exprs(change.new.range),
+        "range",
+        _format_exprs(change.old.range),
+        _format_exprs(change.new.range),
     ):
         lines.append(line)
     return lines
 
 
 def _format_section[C](
-    title: str, changes: list[C], formatter: Callable[[C], list[str]],
+    title: str,
+    changes: list[C],
+    formatter: Callable[[C], list[str]],
 ) -> str | None:
     """Format a section of changes, returning None if empty."""
     if not changes:
@@ -318,9 +354,13 @@ def format_diff(diff: OntologyDiff) -> str:
 
     sections = [
         _format_section("Classes", diff.classes, _format_class_change),
-        _format_section("Data Properties", diff.data_properties, _format_data_property_change),
         _format_section(
-            "Object Properties", diff.object_properties, _format_object_property_change,
+            "Data Properties", diff.data_properties, _format_data_property_change
+        ),
+        _format_section(
+            "Object Properties",
+            diff.object_properties,
+            _format_object_property_change,
         ),
     ]
     return "\n\n".join(s for s in sections if s)

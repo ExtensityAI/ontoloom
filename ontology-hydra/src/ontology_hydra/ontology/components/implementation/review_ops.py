@@ -1,16 +1,14 @@
-from typing import TYPE_CHECKING
-
 from symai import Expression
 
 from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
+from ontology_hydra.ontology.components.implementation.draft_ops import (
+    OperationSequence,
+)
+from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.diff import diff_ontology, format_diff
 from ontology_hydra.ontology.revision.executor import execute_ops
-from ontology_hydra.utils.schema.llm import DataModel
-
-if TYPE_CHECKING:
-    from ontology_hydra.ontology.components.implementation.draft_ops import OperationSequence
-    from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.utils.schema.models import DataModel
 
 _ACCEPTED = "ACCEPTED"
 _REJECTED = "REJECTED"
@@ -52,7 +50,9 @@ class Review(DataModel):
     text: str
 
 
-def review_ops(config: HydraConfig, plan: str, ops: OperationSequence, ontology: Ontology):
+def review_ops(
+    config: HydraConfig, plan: str, ops: OperationSequence, ontology: Ontology
+):
     """Reviews whether a sequence of operations implements the given plan when applied to the ontology."""
     # execute operations to get the resulting ontology
     new_ontology = execute_ops(ontology, ops.ops)

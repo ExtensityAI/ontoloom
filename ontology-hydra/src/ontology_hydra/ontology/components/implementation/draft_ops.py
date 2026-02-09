@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from pydantic import Field
 from symai import Expression
@@ -6,12 +6,10 @@ from symai.strategy import contract
 
 from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
-from ontology_hydra.ontology.revision.executor import OperationFailed, execute_ops
-from ontology_hydra.utils.schema.llm import DataModel
-
-if TYPE_CHECKING:
-    from ontology_hydra.ontology.models import Ontology
-    from ontology_hydra.ontology.revision.operations import Operation
+from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.ontology.revision.executor import OperationFailedError, execute_ops
+from ontology_hydra.ontology.revision.operations import Operation
+from ontology_hydra.utils.schema.models import DataModel
 
 
 class _Input(DataModel):
@@ -27,9 +25,11 @@ class OperationSequence(DataModel):
 class DraftExecutionError(Exception):
     """Raised when drafted operations fail to execute."""
 
-    def __init__(self, cause: OperationFailed):
+    def __init__(self, cause: OperationFailedError):
         self.cause = cause
-        super().__init__(f"Operation {cause.index} ({cause.operation.op}) failed: {cause}")
+        super().__init__(
+            f"Operation {cause.index} ({cause.operation.op}) failed: {cause}"
+        )
 
 
 _prompt = """You are an ontology engineer translating a natural language plan into a sequence of ontology operations.

@@ -12,7 +12,7 @@ from ontology_hydra.ontology.models import (
     PropertyName,
     is_none,
 )
-from ontology_hydra.utils.schema.llm import DataModel
+from ontology_hydra.utils.schema.models import DataModel
 
 # ============================================================
 # Class Operations
@@ -141,8 +141,12 @@ class AddObjectProperty(DataModel):
 
     op: Literal["add_object_prop"] = "add_object_prop"
 
-    name: PropertyName = Field(description="Name of the new object property (camelCase)")
-    description: Description = Field(description="Description of the new object property")
+    name: PropertyName = Field(
+        description="Name of the new object property (camelCase)"
+    )
+    description: Description = Field(
+        description="Description of the new object property"
+    )
     domain: list[ClassExpression] = Field(
         default_factory=list,
         description="Domain classes or intersections (rdfs:domain).",

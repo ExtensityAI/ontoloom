@@ -1,21 +1,17 @@
 """API route handlers for hydra-viz."""
 
-from typing import TYPE_CHECKING
-
 from litestar import Router, get
 from litestar.exceptions import NotFoundException
 
+from hydra_viz.context import Context  # noqa: TC001 # impossible
+
+from .models import IterationDetail, MetricsTimeSeries, Run, RunDetail  # noqa: TC001 # impossible
 from .services import (
     get_iteration_detail,
     get_metrics_time_series,
     get_run_detail,
     get_runs_in_dir,
 )
-
-if TYPE_CHECKING:
-    from hydra_viz.context import Context
-
-    from .models import IterationDetail, MetricsTimeSeries, Run, RunDetail
 
 
 @get("", name="get-runs")

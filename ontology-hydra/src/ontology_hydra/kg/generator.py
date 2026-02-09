@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from symai import Expression
 from symai.strategy import LLMDataModel, contract
@@ -9,11 +9,9 @@ from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.kg.merging import try_merge
 from ontology_hydra.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_schema
 from ontology_hydra.llm.engine import create_component_engine
+from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.prompts import prompt_registry
-
-if TYPE_CHECKING:
-    from ontology_hydra.ontology.models import Ontology
-    from ontology_hydra.utils.cache import Cache, CacheKey
+from ontology_hydra.utils.cache import Cache, CacheKey
 
 logger = getLogger("ontology-hydra.kg")
 
@@ -51,7 +49,9 @@ def _create_extractor(partial_knowledge_graph_type: type[DynamicPartialKnowledge
         accumulate_errors=True,
     )
     class Extractor(Expression):
-        def __init__(self, ontology: Ontology, kg: partial_knowledge_graph_type, *args, **kwargs):  # pyright: ignore[reportInvalidTypeForm] use dynamic type here
+        def __init__(
+            self, ontology: Ontology, kg: partial_knowledge_graph_type, *args, **kwargs
+        ):  # pyright: ignore[reportInvalidTypeForm] use dynamic type here
             super().__init__(*args, **kwargs)
             self._ontology = ontology
             self._kg = kg
@@ -72,10 +72,14 @@ def _create_extractor(partial_knowledge_graph_type: type[DynamicPartialKnowledge
 
             # TODO validate that all object properties are related to the correct ontology classes, i.e. no leo hasParent car (if car is not a Person but a Car and leo is a Person)
 
-            success, issues, merged = try_merge(partial_knowledge_graph_type, self._kg, output)
+            success, issues, merged = try_merge(
+                partial_knowledge_graph_type, self._kg, output
+            )
 
             if not success or merged is None:
-                raise ValueError("Some issues occured while merging:" + "\n".join(issues))
+                raise ValueError(
+                    "Some issues occured while merging:" + "\n".join(issues)
+                )
 
             self._kg = merged
 
@@ -117,7 +121,9 @@ def generate_kg(
 
     with create_component_engine(config, ComponentName.kg_extractor):
         for i in range(epochs):
-            for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
+            for j in tqdm(
+                range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"
+            ):
                 input_data = input_model(
                     texts=texts[j : j + batch_size],
                     kg=kg,
@@ -135,7 +141,9 @@ def generate_kg(
                     cache.write(partial_json_ck, kg.model_dump_json(indent=2))
 
     if cache is not None:
-        cache.write(("kg", "final.json"), kg.model_dump_json(indent=2, exclude_none=True))
+        cache.write(
+            ("kg", "final.json"), kg.model_dump_json(indent=2, exclude_none=True)
+        )
         cache.delete(partial_json_ck, partial_html_ck)
 
     return kg
