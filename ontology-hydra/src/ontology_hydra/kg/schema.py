@@ -75,7 +75,7 @@ def _generate_property_field(prop: DataProperty | ObjectProperty):
             else str(expr)
             for expr in prop.range
         )
-        range_hint = prop_range if prop_range else "unspecified"
+        range_hint = prop_range or "unspecified"
 
         return (
             list[str]

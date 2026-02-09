@@ -32,7 +32,7 @@ def _append_description(line: str, description: str | None):
     return f"{line}  # {_compact_text(description)}"
 
 
-def _format_literal(value: str | int | float | bool | None):
+def _format_literal(value: str | float | bool | None):
     # we do not want Python-formatting (e.g. True, False, None), thus format with JSON
     return json.dumps(value, ensure_ascii=True)
 

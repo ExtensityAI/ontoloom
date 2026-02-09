@@ -1,17 +1,21 @@
 """API route handlers for hydra-viz."""
 
+from typing import TYPE_CHECKING
+
 from litestar import Router, get
 from litestar.exceptions import NotFoundException
 
-from hydra_viz.context import Context
-
-from .models import IterationDetail, MetricsTimeSeries, Run, RunDetail
 from .services import (
     get_iteration_detail,
     get_metrics_time_series,
     get_run_detail,
     get_runs_in_dir,
 )
+
+if TYPE_CHECKING:
+    from hydra_viz.context import Context
+
+    from .models import IterationDetail, MetricsTimeSeries, Run, RunDetail
 
 
 @get("", name="get-runs")
@@ -20,35 +24,38 @@ async def list_runs(ctx: Context) -> list[Run]:
     return get_runs_in_dir(ctx.path)
 
 
-@get("/{id:str}", name="get-run")
-async def get_run(ctx: Context, id: str) -> RunDetail:
+@get("/{run_id:str}", name="get-run")
+async def get_run(ctx: Context, run_id: str) -> RunDetail:
     """Get run detail with iterations."""
-    run = get_run_detail(ctx.path, id)
+    run = get_run_detail(ctx.path, run_id)
 
     if run is None:
-        raise NotFoundException(f"Run '{id}' not found!")
+        msg = f"Run '{run_id}' not found!"
+        raise NotFoundException(msg)
 
     return run
 
 
-@get("/{id:str}/iterations/{idx:int}", name="get-iteration")
-async def get_iteration(ctx: Context, id: str, idx: int) -> IterationDetail:
+@get("/{run_id:str}/iterations/{idx:int}", name="get-iteration")
+async def get_iteration(ctx: Context, run_id: str, idx: int) -> IterationDetail:
     """Get iteration detail."""
-    detail = get_iteration_detail(ctx.path, id, idx)
+    detail = get_iteration_detail(ctx.path, run_id, idx)
 
     if detail is None:
-        raise NotFoundException(f"Iteration detail '{id}'.{idx} not found")
+        msg = f"Iteration detail '{run_id}'.{idx} not found"
+        raise NotFoundException(msg)
 
     return detail
 
 
-@get("/{id:str}/metrics", name="get-metrics")
-async def get_metrics(ctx: Context, id: str) -> MetricsTimeSeries:
+@get("/{run_id:str}/metrics", name="get-metrics")
+async def get_metrics(ctx: Context, run_id: str) -> MetricsTimeSeries:
     """Get metrics time series for a run."""
-    metrics = get_metrics_time_series(ctx.path, id)
+    metrics = get_metrics_time_series(ctx.path, run_id)
 
     if metrics is None:
-        raise NotFoundException(f"Metrics not found for run '{id}'")
+        msg = f"Metrics not found for run '{run_id}'"
+        raise NotFoundException(msg)
 
     return metrics
 

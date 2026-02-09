@@ -27,4 +27,4 @@ build-backend = "uv_build"
 ontology-hydra = { path = "../../ontology-hydra", editable = true }
 
 [dependency-groups]
-dev = ["ruff>=0.14.4"]
+dev = ["ruff>=0.15.0,<0.16.0"]

@@ -23,4 +23,4 @@ build-backend = "uv_build"
 symbolicai = { git = "https://github.com/ExtensityAI/symbolicai.git", branch = "dev" }
 
 [dependency-groups]
-dev = ["ruff>=0.14.4"]
+dev = ["ruff>=0.15.0,<0.16.0"]

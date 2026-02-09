@@ -1,10 +1,14 @@
+from typing import TYPE_CHECKING
+
 from loguru import logger
 
-from ontology_hydra.config import HydraConfig
 from ontology_hydra.ontology.components.implementation.draft_ops import draft_ops
 from ontology_hydra.ontology.components.implementation.review_ops import review_ops
-from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import execute_ops
+
+if TYPE_CHECKING:
+    from ontology_hydra.config import HydraConfig
+    from ontology_hydra.ontology.models import Ontology
 
 
 def implement_plan(

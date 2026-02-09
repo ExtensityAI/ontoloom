@@ -1,7 +1,10 @@
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from loguru import logger
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _get_pretty_format(record):

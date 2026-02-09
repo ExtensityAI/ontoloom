@@ -1,12 +1,16 @@
+from typing import TYPE_CHECKING
+
 from symai import Expression
 
 from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
-from ontology_hydra.ontology.components.implementation.draft_ops import OperationSequence
-from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.diff import diff_ontology, format_diff
 from ontology_hydra.ontology.revision.executor import execute_ops
 from ontology_hydra.utils.schema.llm import DataModel
+
+if TYPE_CHECKING:
+    from ontology_hydra.ontology.components.implementation.draft_ops import OperationSequence
+    from ontology_hydra.ontology.models import Ontology
 
 _ACCEPTED = "ACCEPTED"
 _REJECTED = "REJECTED"
@@ -62,13 +66,13 @@ def review_ops(config: HydraConfig, plan: str, ops: OperationSequence, ontology:
                 plan=plan,
                 ops=ops.model_dump_json(),
                 diff=diff_text,
-            )
+            ),
         ).value.strip()
 
     # as a safety net, we also accept bold formatted verdicts
-    if review.endswith(_ACCEPTED) or review.endswith(f"**{_ACCEPTED}**"):
+    if review.endswith((_ACCEPTED, f"**{_ACCEPTED}**")):
         accepted = True
-    elif review.endswith(_REJECTED) or review.endswith(f"**{_REJECTED}**"):
+    elif review.endswith((_REJECTED, f"**{_REJECTED}**")):
         accepted = False
     else:
         msg = "Review did not end with ACCEPTED or REJECTED"

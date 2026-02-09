@@ -42,7 +42,7 @@ from ontology_hydra.ontology.revision.operations import (
 )
 
 
-class OperationFailed(Exception):
+class OperationFailedError(Exception):
     """Raised when executing an operation fails. Includes index and operation context."""
 
     def __init__(self, index: int, operation: Operation, cause: Exception):
@@ -50,32 +50,6 @@ class OperationFailed(Exception):
         self.index = index
         self.operation = operation
         self.__cause__ = cause
-
-
-def execute_op(op: Operation, ontology: Ontology) -> Ontology:
-    """Execute a single operation on the ontology."""
-    match op:
-        case AddClass():
-            return _add_class(op, ontology)
-        case UpdateClass():
-            return _update_class(op, ontology)
-        case DeleteClass():
-            return _delete_class(op, ontology)
-        case MergeClasses():
-            return _merge_classes(op, ontology)
-        case AddDataProperty():
-            return _add_data_property(op, ontology)
-        case UpdateDataProperty():
-            return _update_data_property(op, ontology)
-        case DeleteDataProperty():
-            return _delete_data_property(op, ontology)
-        case AddObjectProperty():
-            return _add_object_property(op, ontology)
-        case UpdateObjectProperty():
-            return _update_object_property(op, ontology)
-        case DeleteObjectProperty():
-            return _delete_object_property(op, ontology)
-
 
 def _add_class(op: AddClass, ontology: Ontology) -> Ontology:
     """Add a new class to the ontology."""
@@ -327,6 +301,25 @@ def _delete_object_property(op: DeleteObjectProperty, ontology: Ontology) -> Ont
     return ontology
 
 
+_OP_HANDLERS = {
+    AddClass: _add_class,
+    UpdateClass: _update_class,
+    DeleteClass: _delete_class,
+    MergeClasses: _merge_classes,
+    AddDataProperty: _add_data_property,
+    UpdateDataProperty: _update_data_property,
+    DeleteDataProperty: _delete_data_property,
+    AddObjectProperty: _add_object_property,
+    UpdateObjectProperty: _update_object_property,
+    DeleteObjectProperty: _delete_object_property,
+}
+
+
+def execute_op(op: Operation, ontology: Ontology) -> Ontology:
+    """Execute a single operation on the ontology."""
+    return _OP_HANDLERS[type(op)](op, ontology)
+
+
 def execute_ops(ontology: Ontology, ops: list[Operation]) -> Ontology:
     """Execute a sequence of operations on the ontology."""
     ontology = ontology.clone()
@@ -335,6 +328,6 @@ def execute_ops(ontology: Ontology, ops: list[Operation]) -> Ontology:
         try:
             ontology = execute_op(op, ontology)
         except (ValueError, KeyError) as e:
-            raise OperationFailed(i, op, e) from e
+            raise OperationFailedError(i, op, e) from e
 
     return ontology

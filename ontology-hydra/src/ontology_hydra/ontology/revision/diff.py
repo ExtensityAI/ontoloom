@@ -1,8 +1,7 @@
 """Semantic diff tool for comparing ontologies."""
 
-from collections.abc import Callable
 from enum import StrEnum
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from ontology_hydra.ontology.models import (
     Class,
@@ -15,6 +14,9 @@ from ontology_hydra.ontology.models import (
     PropertyName,
 )
 from ontology_hydra.utils.schema.llm import DataModel
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # -----------------------------------------------------------------------------
 # Diff data models
@@ -218,12 +220,12 @@ def _description_changes(old, new):
     """Return formatted lines for definition/constraints changes."""
     lines = list[str]()
     if line := _field_change(
-        "definition", old.description.definition, new.description.definition, quote=True
+        "definition", old.description.definition, new.description.definition, quote=True,
     ):
         lines.append(line)
 
     if line := _field_change(
-        "constraints", old.description.constraints, new.description.constraints, quote=True
+        "constraints", old.description.constraints, new.description.constraints, quote=True,
     ):
         lines.append(line)
     return lines
@@ -263,7 +265,7 @@ def _format_data_property_change(change: DataPropertyChange):
     lines = [f"  ~ {change.name}:"]
     lines.extend(_description_changes(change.old, change.new))
     if line := _field_change(
-        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain)
+        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain),
     ):
         lines.append(line)
     if line := _field_change("range", change.old.range, change.new.range):
@@ -286,18 +288,18 @@ def _format_object_property_change(change: ObjectPropertyChange):
     lines = [f"  ~ {change.name}:"]
     lines.extend(_description_changes(change.old, change.new))
     if line := _field_change(
-        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain)
+        "domain", _format_exprs(change.old.domain), _format_exprs(change.new.domain),
     ):
         lines.append(line)
     if line := _field_change(
-        "range", _format_exprs(change.old.range), _format_exprs(change.new.range)
+        "range", _format_exprs(change.old.range), _format_exprs(change.new.range),
     ):
         lines.append(line)
     return lines
 
 
 def _format_section[C](
-    title: str, changes: list[C], formatter: Callable[[C], list[str]]
+    title: str, changes: list[C], formatter: Callable[[C], list[str]],
 ) -> str | None:
     """Format a section of changes, returning None if empty."""
     if not changes:
@@ -318,7 +320,7 @@ def format_diff(diff: OntologyDiff) -> str:
         _format_section("Classes", diff.classes, _format_class_change),
         _format_section("Data Properties", diff.data_properties, _format_data_property_change),
         _format_section(
-            "Object Properties", diff.object_properties, _format_object_property_change
+            "Object Properties", diff.object_properties, _format_object_property_change,
         ),
     ]
     return "\n\n".join(s for s in sections if s)

@@ -1,10 +1,10 @@
 """Iteration metrics for ontology changes."""
 
-from collections.abc import Sequence
+
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, computed_field
 
-from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.diff import diff_ontology
 from ontology_hydra.ontology.revision.operations import (
     AddClass,
@@ -20,8 +20,14 @@ from ontology_hydra.ontology.revision.operations import (
     UpdateObjectProperty,
 )
 
-from .models import Metric
 from .ontology import build_metric, compute_class_value_maps
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from ontology_hydra.ontology.models import Ontology
+
+    from .models import Metric
 
 
 class OperationCounts(BaseModel):
@@ -237,7 +243,7 @@ def compute_iteration_metrics(  # noqa: C901
     object_props_removed = len(diff.object_properties_removed)
 
     touched_classes = len(
-        set(diff.classes_added) | set(diff.classes_modified) | set(diff.classes_removed)
+        set(diff.classes_added) | set(diff.classes_modified) | set(diff.classes_removed),
     )
     touched_properties = len(
         set(diff.data_properties_added)
@@ -245,7 +251,7 @@ def compute_iteration_metrics(  # noqa: C901
         | set(diff.data_properties_removed)
         | set(diff.object_properties_added)
         | set(diff.object_properties_modified)
-        | set(diff.object_properties_removed)
+        | set(diff.object_properties_removed),
     )
 
     prev_class_count = len(old_ontology.classes)
@@ -317,10 +323,10 @@ def compute_iteration_metrics(  # noqa: C901
             superclasses_delta=build_metric(_delta_values(old_superclasses, new_superclasses)),
             data_props_per_class_delta=build_metric(_delta_values(old_data_props, new_data_props)),
             object_props_out_per_class_delta=build_metric(
-                _delta_values(old_object_out, new_object_out)
+                _delta_values(old_object_out, new_object_out),
             ),
             object_props_in_per_class_delta=build_metric(
-                _delta_values(old_object_in, new_object_in)
+                _delta_values(old_object_in, new_object_in),
             ),
         ),
     )

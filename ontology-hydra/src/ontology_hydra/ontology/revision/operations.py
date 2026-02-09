@@ -27,7 +27,7 @@ class AddClass(DataModel):
     name: ClassName = Field(description="Name of the new class")
     description: Description = Field(description="Description of the new class")
     sub_class_of: list[ClassName] = Field(
-        description="Superclasses for rdfs:subClassOf (supports multiple inheritance)."
+        description="Superclasses for rdfs:subClassOf (supports multiple inheritance).",
     )
 
 
@@ -68,10 +68,10 @@ class MergeClasses(DataModel):
     op: Literal["merge_classes"] = "merge_classes"
 
     source_classes: list[ClassName] = Field(
-        description="Names of the classes to merge (will be removed)"
+        description="Names of the classes to merge (will be removed)",
     )
     target_name: ClassName = Field(
-        description="Name of the merged class (can be new or one of the source classes)"
+        description="Name of the merged class (can be new or one of the source classes)",
     )
     description: Description = Field(description="Description for the merged class")
 

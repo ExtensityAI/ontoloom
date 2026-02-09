@@ -26,7 +26,7 @@ def try_merge(
     issues = []
 
     a_dict = cast(
-        "dict[str, DynamicPartialEntity]", {e.name: e for e in a.data}
+        "dict[str, DynamicPartialEntity]", {e.name: e for e in a.data},
     )  # both have data, we might be able to solve linter errors with Protocols
     b_dict = cast("dict[str, DynamicPartialEntity]", {e.name: e for e in b.data})
 

@@ -1,47 +1,25 @@
-exclude = [
+extend-exclude = [
     ".codex",
     ".symai",
-    ".bzr",
-    ".direnv",
-    ".eggs",
-    ".git",
-    ".git-rewrite",
-    ".hg",
     ".ipynb_checkpoints",
-    ".mypy_cache",
-    ".nox",
-    ".pants.d",
-    ".pyenv",
     ".pytest_cache",
-    ".pytype",
-    ".ruff_cache",
-    ".svn",
-    ".tox",
-    ".venv",
     ".vscode",
-    "__pypackages__",
-    "_build",
-    "buck-out",
     "build",
-    "dist",
-    "node_modules",
     "site-packages",
-    "venv",
-    "scripts",
-    "tests",
 ]
+force-exclude = true
 
 line-length = 100
 indent-width = 4
 target-version = "py314"
+required-version = ">=0.15.0,<0.16.0"
 
 [lint]
-# Rules URL: https://docs.astral.sh/ruff/rules
 select = [
-    "F",
     "E4",
     "E7",
     "E9",
+    "F",
     "I",
     "UP",
     "B",
@@ -52,19 +30,37 @@ select = [
     "ISC",
     "RET",
     "RSE",
+    "EM",
     "G",
     "LOG",
     "TC",
     "PTH",
-    "EM",
+    "DTZ",
     "C90",
-    "PLE",
-    "PLC",
-    "PLW",
+    "N",
+    "PIE",
+    "PERF",
+    "BLE",
+    "T20",
+    "ASYNC",
     "RUF",
 ]
+extend-select = [
+    "B912",
+    "RUF039",
+    "RUF047",
+]
+preview = true
+explicit-preview-rules = true
+ignore = [
+    "TC002",
+    "TC003",
+]
+
+logger-objects = ["loguru.logger"]
 
 
+# Rules URL: https://docs.astral.sh/ruff/rules
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
 unfixable = []
@@ -72,8 +68,8 @@ unfixable = []
 # Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-[lint.mccabe]
-max-complexity = 10
+
+mccabe.max-complexity = 10
 
 [format]
 quote-style = "double"

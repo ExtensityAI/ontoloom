@@ -176,16 +176,16 @@ def _object_prop_range_arity(ontology: Ontology):
 def _intersection_arities(ontology: Ontology):
     sizes = []
     for prop in ontology.data_properties.values():
-        for expr in prop.domain:
-            if isinstance(expr, IntersectionOf):
-                sizes.append(len(expr.classes))
+        sizes.extend(
+            len(expr.classes) for expr in prop.domain if isinstance(expr, IntersectionOf)
+        )
     for prop in ontology.object_properties.values():
-        for expr in prop.domain:
-            if isinstance(expr, IntersectionOf):
-                sizes.append(len(expr.classes))
-        for expr in prop.range:
-            if isinstance(expr, IntersectionOf):
-                sizes.append(len(expr.classes))
+        sizes.extend(
+            len(expr.classes) for expr in prop.domain if isinstance(expr, IntersectionOf)
+        )
+        sizes.extend(
+            len(expr.classes) for expr in prop.range if isinstance(expr, IntersectionOf)
+        )
     return sizes
 
 
@@ -211,7 +211,7 @@ def compute_ontology_metrics(ontology: Ontology) -> OntologyMetrics:
     roots = _find_root_classes(ontology)
     leaves = _find_leaf_classes(ontology)
     depths, subclasses, superclasses, data_props, object_out, object_in = compute_class_value_maps(
-        ontology
+        ontology,
     )
 
     classes_with_no_props = sum(

@@ -11,8 +11,7 @@ Make it prose only, no formatting or anything else.
 
 
 def generate_title(config: HydraConfig, intent: str, max_n_words: int = 7):
-    """Generates a short title that describes the given user `intent` in at most `max_n_words`"""
-
+    """Generates a short title that describes the given user `intent` in at most `max_n_words`."""
     with create_component_engine(config, ComponentName.generate_title):
         for _ in range(3):  # at most three retries
             res = Expression.prompt(_prompt.format(text=intent, n=max_n_words)).value

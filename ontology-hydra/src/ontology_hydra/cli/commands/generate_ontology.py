@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from loguru import logger
@@ -39,7 +39,7 @@ def generate_ontology(args: GenerateOntologyArgs):
         title=title,
         intent=args.intent,
         input_files=[p.name for p in args.input_paths],
-        created_at=datetime.now(),
+        created_at=datetime.now(UTC),
         n_iterations=0,
     )
 

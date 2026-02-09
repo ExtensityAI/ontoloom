@@ -44,7 +44,7 @@ def remove_class_from_expressions(exprs: list[ClassExpression], class_name: Clas
         cleaned = remove_class_from_expression(expr, class_name)
         if cleaned is not None:
             result.append(cleaned)
-    return result if result else None
+    return result or None
 
 
 def has_cycle(ontology: Ontology, start: ClassName) -> bool:
@@ -86,7 +86,7 @@ def replace_class_in_expression(expr: ClassExpression, old_name: ClassName, new_
 
 
 def replace_class_in_expressions(
-    exprs: list[ClassExpression], old_name: ClassName, new_name: ClassName
+    exprs: list[ClassExpression], old_name: ClassName, new_name: ClassName,
 ):
     return [replace_class_in_expression(x, old_name, new_name) for x in exprs]
 

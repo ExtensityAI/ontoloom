@@ -11,6 +11,5 @@ def create_component_engine(config: HydraConfig, name: ComponentName):
 
     component = config.resolve_component(name)
     provider = config.providers[component.provider]
-    kwargs = component.kwargs or {}  # TODO: kwargs need to be passed to `the call of the engine!`
 
     return cast("DynamicEngine", DynamicEngine(model=component.model, api_key=provider.api_key))

@@ -1,5 +1,5 @@
 from logging import getLogger
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from symai import Expression
 from symai.strategy import LLMDataModel, contract
@@ -9,9 +9,11 @@ from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.kg.merging import try_merge
 from ontology_hydra.kg.schema import DynamicPartialKnowledgeGraph, generate_kg_schema
 from ontology_hydra.llm.engine import create_component_engine
-from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.prompts import prompt_registry
-from ontology_hydra.utils.cache import Cache, CacheKey
+
+if TYPE_CHECKING:
+    from ontology_hydra.ontology.models import Ontology
+    from ontology_hydra.utils.cache import Cache, CacheKey
 
 logger = getLogger("ontology-hydra.kg")
 
@@ -29,10 +31,10 @@ def is_snake_case(s):
     return all(c.islower() or c.isdigit() or c == "_" for c in s)
 
 
-def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGraph]):
+def _create_extractor(partial_knowledge_graph_type: type[DynamicPartialKnowledgeGraph]):
     class Input(LLMDataModel):
         texts: list[str]
-        kg: PartialKnowledgeGraphType  # pyright: ignore[reportInvalidTypeForm] we use this dynamically defined schema here
+        kg: partial_knowledge_graph_type  # pyright: ignore[reportInvalidTypeForm] we use this dynamically defined schema here
 
     @contract(
         pre_remedy=False,
@@ -49,12 +51,12 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
         accumulate_errors=True,
     )
     class Extractor(Expression):
-        def __init__(self, ontology: Ontology, kg: PartialKnowledgeGraphType, *args, **kwargs):  # pyright: ignore[reportInvalidTypeForm] use dynamic type here
+        def __init__(self, ontology: Ontology, kg: partial_knowledge_graph_type, *args, **kwargs):  # pyright: ignore[reportInvalidTypeForm] use dynamic type here
             super().__init__(*args, **kwargs)
             self._ontology = ontology
             self._kg = kg
 
-        def forward(self, _: Input) -> PartialKnowledgeGraphType:  # pyright: ignore[reportInvalidTypeForm] we again use dynamically defined schema here
+        def forward(self, _: Input) -> partial_knowledge_graph_type:  # pyright: ignore[reportInvalidTypeForm] we again use dynamically defined schema here
             if self.contract_result is None:
                 msg = "Contract failed!"
                 raise ValueError(msg)
@@ -63,14 +65,14 @@ def _create_extractor(PartialKnowledgeGraphType: type[DynamicPartialKnowledgeGra
         def pre(self, _: Input) -> bool:
             return True
 
-        def post(self, output: PartialKnowledgeGraphType) -> bool:  # pyright: ignore[reportInvalidTypeForm] here too
+        def post(self, output: partial_knowledge_graph_type) -> bool:  # pyright: ignore[reportInvalidTypeForm] here too
             # TODO add combination step here (or maybe alternatively in forward? CHECK DOCS! Essentially, in the output, we want to combine all partial entities that have the same name as that simplifies merging)
 
             # combine output values
 
             # TODO validate that all object properties are related to the correct ontology classes, i.e. no leo hasParent car (if car is not a Person but a Car and leo is a Person)
 
-            success, issues, merged = try_merge(PartialKnowledgeGraphType, self._kg, output)
+            success, issues, merged = try_merge(partial_knowledge_graph_type, self._kg, output)
 
             if not success or merged is None:
                 raise ValueError("Some issues occured while merging:" + "\n".join(issues))
@@ -105,23 +107,23 @@ def generate_kg(
         msg = "For now, ontology must be provided to generate a knowledge graph due to update."
         raise NotImplementedError(msg)
 
-    PartialKnowledgeGraph = generate_kg_schema(ontology)
+    partial_knowledge_graph = generate_kg_schema(ontology)
 
-    Input, Extractor = _create_extractor(PartialKnowledgeGraph)
+    input_model, extractor_type = _create_extractor(partial_knowledge_graph)
 
-    kg = PartialKnowledgeGraph(data=[])
+    kg = partial_knowledge_graph(data=[])
 
-    extractor = Extractor(ontology, kg)
+    extractor = extractor_type(ontology, kg)
 
     with create_component_engine(config, ComponentName.kg_extractor):
         for i in range(epochs):
             for j in tqdm(range(0, len(texts), batch_size), desc=f"Epoch {i + 1}/{epochs}"):
-                input_data = Input(
+                input_data = input_model(
                     texts=texts[j : j + batch_size],
                     kg=kg,
                 )
 
-                logger.debug(f"KG input: {input_data.model_dump_json()}")
+                logger.debug("KG input: %s", input_data.model_dump_json())
 
                 # TODO annotate output with chunk information!
 

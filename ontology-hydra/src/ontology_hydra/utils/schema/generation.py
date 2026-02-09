@@ -1,9 +1,8 @@
 from enum import Enum
 from types import NoneType, UnionType
-from typing import Annotated, Any, Literal, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Annotated, Any, Literal, Union, get_args, get_origin
 
 from pydantic import BaseModel
-from pydantic.fields import FieldInfo
 
 from ontology_hydra.utils.schema.types import (
     ClassTypeSchema,
@@ -23,6 +22,9 @@ from ontology_hydra.utils.schema.types import (
     TypeName,
     UnionExpression,
 )
+
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 _PRIMITIVE_TYPES: tuple[tuple[type, DataType], ...] = (
     (bool, DataType.BOOLEAN),
@@ -141,6 +143,45 @@ def _register_class_type(
     )
 
 
+def _type_expression_from_origin(
+    annotation: Any,
+    origin: Any,
+    type_schemas: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
+    seen_models: set[type[BaseModel]],
+):
+    if origin is Literal:
+        literal_values = get_args(annotation)
+        return _combine_union([_literal_value_expression(value) for value in literal_values])
+
+    if origin is list:
+        args = get_args(annotation)
+        if len(args) != 1:
+            msg = "List types must include exactly one item type."
+            raise TypeError(msg)
+        return ListExpression(items=_type_expression(args[0], type_schemas, seen_models))
+
+    if origin is dict:
+        args = get_args(annotation)
+        if len(args) != 2:
+            msg = "Dict types must include exactly one key type and one value type."
+            raise TypeError(msg)
+        key_expr = _type_expression(args[0], type_schemas, seen_models)
+        value_expr = _type_expression(args[1], type_schemas, seen_models)
+        return DictExpression(key=key_expr, value=value_expr)
+
+    if origin in {Union, UnionType}:
+        # need to use deprecated `Union` type here as this seems to be returned by get_origin
+        args = get_args(annotation)
+        non_none = [arg for arg in args if arg is not NoneType]
+        has_none = len(non_none) != len(args)
+        combined = _combine_union(
+            [_type_expression(arg, type_schemas, seen_models) for arg in non_none],
+        )
+        return OptionalExpression(value=combined) if has_none else combined
+
+    return None
+
+
 def _type_expression(
     annotation: Any,
     type_schemas: dict[TypeName, ClassTypeSchema | EnumTypeSchema],
@@ -153,37 +194,13 @@ def _type_expression(
         raise TypeError(msg)
 
     origin = get_origin(annotation)
-    if origin is Literal:
-        literal_values = get_args(annotation)
-        return _combine_union([_literal_value_expression(value) for value in literal_values])
-
-    if origin in {list}:
-        args = get_args(annotation)
-        if len(args) != 1:
-            msg = "List types must include exactly one item type."
-            raise TypeError(msg)
-        return ListExpression(items=_type_expression(args[0], type_schemas, seen_models))
-
-    if origin in {dict}:
-        args = get_args(annotation)
-        if len(args) != 2:
-            msg = "Dict types must include exactly one key type and one value type."
-            raise TypeError(msg)
-        key_expr = _type_expression(args[0], type_schemas, seen_models)
-        value_expr = _type_expression(args[1], type_schemas, seen_models)
-        return DictExpression(key=key_expr, value=value_expr)
-
-    if origin in {
-        Union,
-        UnionType,
-    }:  # need to use deprecated `Union` type here as this seems to be returned by get_origin
-        args = get_args(annotation)
-        non_none = [arg for arg in args if arg is not NoneType]
-        has_none = len(non_none) != len(args)
-        combined = _combine_union(
-            [_type_expression(arg, type_schemas, seen_models) for arg in non_none]
-        )
-        return OptionalExpression(value=combined) if has_none else combined
+    if expression := _type_expression_from_origin(
+        annotation,
+        origin,
+        type_schemas,
+        seen_models,
+    ):
+        return expression
 
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
         # field is a pydantic model

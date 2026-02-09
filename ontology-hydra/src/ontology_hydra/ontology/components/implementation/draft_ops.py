@@ -1,4 +1,4 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from pydantic import Field
 from symai import Expression
@@ -6,10 +6,12 @@ from symai.strategy import contract
 
 from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
-from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import OperationFailed, execute_ops
-from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.utils.schema.llm import DataModel
+
+if TYPE_CHECKING:
+    from ontology_hydra.ontology.models import Ontology
+    from ontology_hydra.ontology.revision.operations import Operation
 
 
 class _Input(DataModel):
@@ -18,7 +20,7 @@ class _Input(DataModel):
 
 class OperationSequence(DataModel):
     ops: list[Operation] = Field(
-        description="The operations that, when applied, implement the plan."
+        description="The operations that, when applied, implement the plan.",
     )
 
 

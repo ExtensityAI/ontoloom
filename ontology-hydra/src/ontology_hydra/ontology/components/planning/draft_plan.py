@@ -77,7 +77,7 @@ def _format_ontology(ontology: Ontology) -> str:
         if constraints:
             lines.append(
                 f"{name}: {description} Constraints: {constraints} Domain: {domain}. "
-                f"Range: {prop.range.value}."
+                f"Range: {prop.range.value}.",
             )
         else:
             lines.append(f"{name}: {description} Domain: {domain}. Range: {prop.range.value}.")
@@ -97,7 +97,7 @@ def _format_ontology(ontology: Ontology) -> str:
         if constraints:
             lines.append(
                 f"{name}: {description} Constraints: {constraints} Domain: {domain}. "
-                f"Range: {range_classes}."
+                f"Range: {range_classes}.",
             )
         else:
             lines.append(f"{name}: {description} Domain: {domain}. Range: {range_classes}.")
@@ -117,7 +117,7 @@ def draft_plan(config: HydraConfig, intent: str, ontology: Ontology):
     # use raw prompting instead of structured output because we need flexibility and no data structure
     with create_component_engine(config, ComponentName.planner):
         plan: str = Expression.prompt(
-            _prompt.format(intent=intent, ontology=_format_ontology(ontology))
+            _prompt.format(intent=intent, ontology=_format_ontology(ontology)),
         ).value
 
     return plan

@@ -9,7 +9,7 @@ prompt_registry = PromptRegistry()
 # Tags
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_class", "OWL CLASS")
 prompt_registry.register_tag(
-    PromptLanguage.ENGLISH, "owl_subclass_relation", "OWL SUBCLASS RELATION"
+    PromptLanguage.ENGLISH, "owl_subclass_relation", "OWL SUBCLASS RELATION",
 )
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_object_property", "OWL OBJECT PROPERTY")
 prompt_registry.register_tag(PromptLanguage.ENGLISH, "owl_data_property", "OWL DATA PROPERTY")
@@ -124,7 +124,7 @@ Analyze competency questions to identify ontological requirements and extract fo
 7. **Avoid Redundant Information Encoding**
    - Use subclass relations to encode inherent categorical distinctions
    - Don't create properties that duplicate information already encoded in the class hierarchy
-   - Example: If you have Article with subclasses ReviewArticle and EmpiricalStudy, 
+   - Example: If you have Article with subclasses ReviewArticle and EmpiricalStudy,
      don't create a redundant "hasArticleType" data property
 
 8. **Follow Minimal Ontological Commitment**

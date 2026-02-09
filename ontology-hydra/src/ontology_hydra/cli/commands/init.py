@@ -15,4 +15,4 @@ def init(args: InitArgs):
         msg = str(exc)
         raise SystemExit(msg) from exc
 
-    logger.info(f"Config template written to {args.config_path}")
+    logger.info("Config template written to {}", args.config_path)

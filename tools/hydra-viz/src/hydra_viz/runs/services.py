@@ -25,8 +25,8 @@ ONTOLOGY_METRICS_FILE = "ontology_metrics.json"
 ITERATION_METRICS_FILE = "iteration_metrics.json"
 
 
-def _validate_run_id(id: str) -> None:
-    if not id or not VALID_RUN_ID_PATTERN.match(id):
+def _validate_run_id(run_id: str) -> None:
+    if not run_id or not VALID_RUN_ID_PATTERN.match(run_id):
         msg = "Invalid run id"
         raise ValueError(msg)
 
@@ -53,11 +53,11 @@ def _validate_is_child(parent_path: Path, other_path: Path):
         return False
 
 
-def get_run_by_id(dir_path: Path, id: str):
+def get_run_by_id(dir_path: Path, run_id: str):
     """Load a single run by id"""
-    _validate_run_id(id)
+    _validate_run_id(run_id)
 
-    run_path = dir_path / id
+    run_path = dir_path / run_id
 
     # Check directory exists before resolving (avoid info leak)
     if not run_path.exists():
@@ -152,9 +152,9 @@ def _build_iteration_summary(run: Run, idx: int) -> IterationSummary:
     )
 
 
-def get_run_detail(dir_path: Path, id: str) -> RunDetail | None:
+def get_run_detail(dir_path: Path, run_id: str) -> RunDetail | None:
     """Load run with iteration summaries."""
-    run = get_run_by_id(dir_path, id)
+    run = get_run_by_id(dir_path, run_id)
 
     if run is None:
         return None
@@ -165,9 +165,9 @@ def get_run_detail(dir_path: Path, id: str) -> RunDetail | None:
     return RunDetail(dir=run.dir, metadata=run.metadata, iterations=iterations)
 
 
-def get_iteration_detail(dir_path: Path, id: str, idx: int) -> IterationDetail | None:
+def get_iteration_detail(dir_path: Path, run_id: str, idx: int) -> IterationDetail | None:
     """Load full iteration data."""
-    run = get_run_by_id(dir_path, id)
+    run = get_run_by_id(dir_path, run_id)
     if run is None:
         return None
 
@@ -187,9 +187,9 @@ def get_iteration_detail(dir_path: Path, id: str, idx: int) -> IterationDetail |
     )
 
 
-def get_metrics_time_series(dir_path: Path, id: str) -> MetricsTimeSeries | None:
+def get_metrics_time_series(dir_path: Path, run_id: str) -> MetricsTimeSeries | None:
     """Load metrics for all iterations."""
-    run = get_run_by_id(dir_path, id)
+    run = get_run_by_id(dir_path, run_id)
     if run is None:
         return None
 
@@ -206,4 +206,4 @@ def get_metrics_time_series(dir_path: Path, id: str) -> MetricsTimeSeries | None
             )
         )
 
-    return MetricsTimeSeries(name=id, points=points)
+    return MetricsTimeSeries(name=run_id, points=points)
