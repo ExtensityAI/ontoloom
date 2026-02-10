@@ -45,17 +45,10 @@ select = [
     "ASYNC",
     "RUF",
 ]
-extend-select = [
-    "B912",
-    "RUF039",
-    "RUF047",
-]
+extend-select = ["B912", "RUF039", "RUF047"]
 preview = true
 explicit-preview-rules = true
-ignore = [
-    "TC002",
-    "TC003",
-]
+ignore = ["TC001", "TC002", "TC003"]
 
 logger-objects = ["loguru.logger"]
 

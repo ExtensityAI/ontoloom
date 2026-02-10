@@ -16,6 +16,7 @@ class ComponentName(StrEnum):
     planner = "planner"
     review_ops = "review_ops"
     generate_title = "generate_title"
+    generate_scope = "generate_scope"
 
 
 class ProviderConfig(_Model):

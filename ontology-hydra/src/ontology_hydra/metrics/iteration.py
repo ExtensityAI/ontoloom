@@ -20,6 +20,7 @@ from ontology_hydra.ontology.revision.operations import (
     UpdateObjectProperty,
 )
 
+from .locality import compute_edit_locality
 from .models import Metric
 from .ontology import build_metric, compute_class_value_maps
 
@@ -147,6 +148,7 @@ class IterationMetrics(BaseModel):
     ratios: Ratios
     updates: UpdateCounts
     deltas: Deltas
+    edit_locality: float | None = None
 
 
 def _ratio(numerator: int, denominator: int) -> float:
@@ -274,8 +276,11 @@ def compute_iteration_metrics(  # noqa: C901
         new_object_in,
     ) = compute_class_value_maps(new_ontology)
 
+    edit_locality = compute_edit_locality(operations, old_ontology, new_ontology)
+
     return IterationMetrics(
         operation_counts=op_counts,
+        edit_locality=edit_locality,
         changes=IterationMetrics.ChangeCounts(
             classes_added=classes_added,
             classes_removed=classes_removed,

@@ -26,6 +26,7 @@
   --color-metric-properties: var(--color-info);
   --color-metric-coverage: var(--color-ok);
   --color-metric-depth: var(--color-warn);
+  --color-metric-locality: var(--color-violet-400);
 
   /* Fonts */
   --font-mono:

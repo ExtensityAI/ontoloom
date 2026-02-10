@@ -48,9 +48,36 @@ export interface OntologyMetrics {
   distributions: OntologyMetricDistributions
 }
 
+export interface OperationCounts {
+  add_class: number
+  add_data_prop: number
+  add_object_prop: number
+  update_class: number
+  update_data_prop: number
+  update_object_prop: number
+  del_class: number
+  del_data_prop: number
+  del_object_prop: number
+  merge_classes: number
+  total_add: number
+  total_update: number
+  total_delete: number
+  total: number
+  add_ratio: number
+  update_ratio: number
+  delete_ratio: number
+  merge_ratio: number
+}
+
+export interface IterationMetrics {
+  operation_counts: OperationCounts
+  edit_locality: number | null
+}
+
 export interface IterationSummary {
   index: number
   ontology_metrics: OntologyMetrics | null
+  iteration_metrics: IterationMetrics | null
 }
 
 export interface RunDetail {

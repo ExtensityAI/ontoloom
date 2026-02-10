@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IterationSummary, OntologyMetrics } from "$lib/api/types"
+  import type { IterationSummary, IterationMetrics, OntologyMetrics } from "$lib/api/types"
   import LineChart from "$lib/components/charts/LineChart.svelte"
   import { formatDateTime } from "$lib/utils/date"
   import { coverage } from "$lib/utils/format"
@@ -47,6 +47,28 @@
       name: "Properties",
       color: "metricProperties" as const,
       data: metricIterations.map((iter) => iter.ontology_metrics.counts.n_properties)
+    }
+  ])
+
+  const localityIterations = $derived(
+    iterations.filter(
+      (
+        i
+      ): i is IterationSummary & {
+        iteration_metrics: NonNullable<IterationSummary["iteration_metrics"]>
+      } => i.iteration_metrics !== null && i.iteration_metrics.edit_locality !== null
+    )
+  )
+
+  const localityLabels = $derived(localityIterations.map((iter) => iter.index))
+
+  const localitySeries = $derived.by(() => [
+    {
+      name: "Edit Locality",
+      color: "metricLocality" as const,
+      data: localityIterations.map(
+        (iter) => Number(((iter.iteration_metrics.edit_locality ?? 0) * 100).toFixed(1))
+      )
     }
   ])
 
@@ -120,6 +142,15 @@
           secondaryAxis={true}
           height={180}
         />
+        {#if localityIterations.length}
+          <LineChart
+            title="Edit Locality"
+            labels={localityLabels}
+            series={localitySeries}
+            percent={true}
+            height={180}
+          />
+        {/if}
       </div>
     </section>
   {/if}

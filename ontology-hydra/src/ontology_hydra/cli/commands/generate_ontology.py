@@ -1,17 +1,27 @@
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from loguru import logger
 from tqdm import tqdm
 
-from ontology_hydra.cli.args import GenerateOntologyArgs
 from ontology_hydra.cli.components.title import generate_title
 from ontology_hydra.config import load_config
 from ontology_hydra.metrics import compute_iteration_metrics, compute_ontology_metrics
 from ontology_hydra.ontology.components.implementation.pipeline import implement_plan
-from ontology_hydra.ontology.components.planning.pipeline import generate_plan
+from ontology_hydra.ontology.components.planning.draft_plan import (
+    format_metrics_summary,
+    generate_scope,
+)
+from ontology_hydra.ontology.components.planning.pipeline import (
+    generate_consolidation_plan,
+    generate_plan,
+)
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
 from ontology_hydra.ontology.run import RunMetadata
 from ontology_hydra.utils.cache import DirectoryCache
+
+if TYPE_CHECKING:
+    from ontology_hydra.cli.args import GenerateOntologyArgs
 
 
 def generate_ontology(args: GenerateOntologyArgs):
@@ -31,6 +41,11 @@ def generate_ontology(args: GenerateOntologyArgs):
 
     title = generate_title(config, args.intent)
 
+    # Generate scope boundary once at the start
+    logger.info("Generating scope boundary from intent")
+    scope = generate_scope(config, args.intent)
+    logger.info("Scope: {}", scope[:120] + "..." if len(scope) > 120 else scope)
+
     meta = RunMetadata(
         id=args.id,
         title=title,
@@ -48,7 +63,32 @@ def generate_ontology(args: GenerateOntologyArgs):
         logger.info("Iteration {}/50", i + 1)
 
         old_ontology = ontology.clone()
-        plan = generate_plan(config, args.intent, ontology)
+
+        # Compute metrics before planning (None for the very first iteration)
+        if i == 0:
+            metrics_summary = None
+        else:
+            ontology_metrics = compute_ontology_metrics(ontology)
+            metrics_summary = format_metrics_summary(ontology_metrics)
+
+        # Route every 5th iteration (after the first) to consolidation
+        if i > 0 and i % 5 == 0:
+            logger.info("Consolidation iteration")
+            plan = generate_consolidation_plan(
+                config,
+                args.intent,
+                ontology,
+                metrics_summary=metrics_summary,
+                scope=scope,
+            )
+        else:
+            plan = generate_plan(
+                config,
+                args.intent,
+                ontology,
+                metrics_summary=metrics_summary,
+                scope=scope,
+            )
         cache.write((i, "plan.md"), plan)
 
         ops, review, ontology = implement_plan(

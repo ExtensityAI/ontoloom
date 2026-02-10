@@ -15,6 +15,7 @@ export interface ChartTheme {
 	metricProperties: string
 	metricCoverage: string
 	metricDepth: string
+	metricLocality: string
 }
 
 let cached: ChartTheme | null = null
@@ -34,7 +35,8 @@ export const getChartTheme = (): ChartTheme => {
 		metricClasses: getCssVar('--color-metric-classes'),
 		metricProperties: getCssVar('--color-metric-properties'),
 		metricCoverage: getCssVar('--color-metric-coverage'),
-		metricDepth: getCssVar('--color-metric-depth')
+		metricDepth: getCssVar('--color-metric-depth'),
+		metricLocality: getCssVar('--color-metric-locality')
 	}
 	return cached
 }

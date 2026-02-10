@@ -13,6 +13,10 @@
 
 """Executor for ontology revision operations using pattern matching."""
 
+import re
+
+from loguru import logger
+
 from ontology_hydra.ontology.models import (
     Class,
     ClassName,
@@ -50,6 +54,53 @@ class OperationFailedError(Exception):
         self.index = index
         self.operation = operation
         self.__cause__ = cause
+
+
+# Property duplication warning helpers
+
+_CAMEL_SPLIT = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)")
+_STOP_WORDS = frozenset({"has", "is", "of", "the", "a", "an", "in", "on", "for", "to", "by"})
+
+
+def _split_camel(name: str) -> set[str]:
+    """Split a camelCase or PascalCase name into a lowercase word set."""
+    words = {w.lower() for w in _CAMEL_SPLIT.findall(name)}
+    return words - _STOP_WORDS
+
+
+def _warn_similar_properties(
+    name: str,
+    domain_classes: set[ClassName],
+    ontology: Ontology,
+    prop_type: str,
+):
+    """Log a warning if a newly added property shares significant word stems with existing properties on overlapping domain classes."""
+    new_words = _split_camel(name)
+    if not new_words:
+        return
+
+    all_props: dict[str, set[ClassName]] = {}
+    for prop in ontology.data_properties.values():
+        if prop.name != name:
+            all_props[prop.name] = get_classes_in_expressions(prop.domain)
+    for prop in ontology.object_properties.values():
+        if prop.name != name:
+            all_props[prop.name] = get_classes_in_expressions(prop.domain)
+
+    for existing_name, existing_domain in all_props.items():
+        if not domain_classes & existing_domain:
+            continue
+        existing_words = _split_camel(existing_name)
+        overlap = new_words & existing_words
+        if overlap and len(overlap) >= len(new_words) * 0.5:
+            logger.warning(
+                "Possible property duplication: new {} property '{}' shares words {} "
+                "with existing property '{}' on overlapping domain classes",
+                prop_type,
+                name,
+                overlap,
+                existing_name,
+            )
 
 
 def _add_class(op: AddClass, ontology: Ontology) -> Ontology:
@@ -200,6 +251,9 @@ def _add_data_property(op: AddDataProperty, ontology: Ontology) -> Ontology:
         domain=op.domain,
         range=op.range,
     )
+    _warn_similar_properties(
+        op.name, get_classes_in_expressions(op.domain), ontology, "data"
+    )
     return ontology
 
 
@@ -259,6 +313,9 @@ def _add_object_property(op: AddObjectProperty, ontology: Ontology) -> Ontology:
         description=op.description,
         domain=op.domain,
         range=op.range,
+    )
+    _warn_similar_properties(
+        op.name, get_classes_in_expressions(op.domain), ontology, "object"
     )
     return ontology
 
