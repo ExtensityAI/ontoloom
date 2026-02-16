@@ -37,7 +37,7 @@ _prompt = """You are an ontology engineer translating a natural language plan in
 <intent>{intent}</intent>
 <plan>{plan}</plan>
 <ontology>{ontology}</ontology>
-{feedback_section}
+
 Generate operations that implement the plan when applied to the current ontology. For each change described in the plan:
 - Choose the appropriate operation type (add_class, add_data_prop, add_object_prop, update_*, delete_*, merge_classes)
 - Use exact names from the ontology for existing entities
@@ -48,12 +48,6 @@ Order operations so dependencies are satisfied: create classes before properties
 
 Return only the operations needed to implement the plan—no more, no less."""
 
-_feedback_template = """<previous_attempt_feedback>
-Your previous attempt was rejected. Here's the review:
-{feedback}
-Address these issues in your new attempt.
-</previous_attempt_feedback>"""
-
 
 @contract(accumulate_errors=True, post_remedy=True)
 class DraftOps(Expression):
@@ -62,7 +56,6 @@ class DraftOps(Expression):
         plan: str,
         intent: str,
         ontology: Ontology,
-        feedback: str | None = None,
         *args,
         **kwargs,
     ):
@@ -70,7 +63,6 @@ class DraftOps(Expression):
         self._plan = plan
         self._intent = intent
         self._ontology = ontology
-        self._feedback = feedback
 
     def forward(self, _: _Input) -> OperationSequence:  # pyright: ignore[reportIncompatibleMethodOverride] # override is correct
         if self.contract_result is None:
@@ -87,14 +79,10 @@ class DraftOps(Expression):
 
     @property
     def prompt(self):  # pyright: ignore[reportIncompatibleMethodOverride] # override is correct
-        feedback_section = (
-            _feedback_template.format(feedback=self._feedback) if self._feedback else ""
-        )
         return _prompt.format(
             plan=self._plan,
             intent=self._intent,
             ontology=self._ontology.model_dump_json(),
-            feedback_section=feedback_section,
         )
 
 
@@ -103,9 +91,8 @@ def draft_ops(
     plan: str,
     intent: str,
     ontology: Ontology,
-    feedback: str | None = None,
 ):
-    drafter = cast("DraftOps", DraftOps(plan, intent, ontology, feedback))
+    drafter = cast("DraftOps", DraftOps(plan, intent, ontology))
     with create_component_engine(config, ComponentName.draft_ops):
         ops: OperationSequence = drafter(_Input(ontology=ontology))
     return ops

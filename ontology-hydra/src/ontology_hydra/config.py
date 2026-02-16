@@ -15,8 +15,8 @@ class ComponentName(StrEnum):
     kg_extractor = "kg_extractor"
     planner = "planner"
     review_ops = "review_ops"
+    revise_ops = "revise_ops"
     generate_title = "generate_title"
-    generate_scope = "generate_scope"
 
 
 class ProviderConfig(_Model):

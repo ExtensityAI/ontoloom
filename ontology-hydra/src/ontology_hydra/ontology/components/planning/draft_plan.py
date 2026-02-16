@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from symai import Expression
@@ -33,14 +35,9 @@ Do NOT create subclasses for:
 
 Ask: "Does this subclass introduce at least one property or constraint that its parent cannot express?" If no, it is an instance, not a class.
 
-## Budget
-
-Each plan should propose **at most 3 new classes and 5 new properties** (data + object combined). If you want to add more, instead consolidate, refine, or delete existing structure first. Fewer, higher-quality additions beat many shallow ones.
-
 ## Current State
 
 <intent>{intent}</intent>
-<scope>{scope}</scope>
 {metrics_block}<ontology>{ontology}</ontology>
 
 ## Planning Process
@@ -135,72 +132,6 @@ Write prose organized under these headings:
 
 Do not use JSON, code blocks, YAML, or XML. Return only the plan text under these headings."""
 
-_scope_prompt = """You are an ontology engineer. Given the following intent for an ontology, generate a concise scope boundary statement.
-
-The scope boundary should:
-1. State what the ontology covers (3-7 key concept areas)
-2. State what the ontology does NOT cover (5-10 out-of-scope areas that might seem related but should be excluded)
-
-Focus especially on excluding operational/transactional concerns (payment, orders, customer management, supply chain, UI) unless they are explicitly part of the intent.
-
-<intent>{intent}</intent>
-
-Write a single paragraph in this format:
-"This ontology covers [in-scope areas]. It does NOT cover [out-of-scope areas]."
-
-Return only the scope paragraph, nothing else."""
-
-_consolidation_prompt = """# Ontology Consolidation — System Prompt
-
-You are an ontology engineer performing a consolidation pass. Your ONLY job is to clean up and tighten the existing ontology. You must NOT add any new classes or properties.
-
-## Current State
-
-<intent>{intent}</intent>
-<scope>{scope}</scope>
-{metrics_block}<ontology>{ontology}</ontology>
-
-## Your Task
-
-Audit the ontology for quality issues and propose ONLY these kinds of changes:
-- **Merge** redundant or overlapping classes/properties
-- **Delete** orphaned classes (no properties, no meaningful role), redundant properties, or out-of-scope concepts
-- **Rename** poorly named classes or properties for clarity
-- **Update descriptions** to be more precise
-
-## What to Look For
-
-1. **Redundant properties** — Multiple properties with the same semantic meaning on the same or overlapping domain classes. Propose merging them into one.
-2. **Instance-as-class errors** — Subclasses that have no distinct properties from their siblings. These are really enum values or instances. Propose collapsing them into a data property on the parent.
-3. **Orphaned classes** — Classes with no properties (neither as domain nor range) and no structurally meaningful subclass relationships. Propose deletion.
-4. **Overlapping concepts** — Two classes that represent essentially the same idea with minor naming differences. Propose merging.
-5. **Domain creep** — Classes that model operational/transactional concerns outside the core intent and scope. Propose deletion.
-6. **Overly broad domains** — Properties whose domain is Thing but should be scoped to specific classes.
-
-## Rules
-
-- Do NOT propose any new classes
-- Do NOT propose any new properties
-- Every proposed change must reference a specific existing class or property by name
-- Prefer fewer, high-impact changes over many trivial ones
-
-## Output Format
-
-Write prose organized under these headings:
-
-**Audit findings** — Problems found, grouped by category (redundancy, instance-as-class, orphaned, domain creep, etc.).
-
-**Extension goal** — One sentence summarizing the cleanup objective.
-
-**Proposed changes** — Each change (merge, deletion, rename, description update) with: what it is, why it is needed, and what it affects.
-
-**Reasoning tests** — At least one check per significant change to verify the cleanup is correct.
-
-**Checklist review** — Confirm that no new classes or properties are being added.
-
-Do not use JSON, code blocks, YAML, or XML. Return only the plan text under these headings."""
-
-
 def format_metrics_summary(metrics: OntologyMetrics) -> str:
     """Format a compact text summary of ontology metrics for the planner prompt."""
     c = metrics.counts
@@ -214,23 +145,12 @@ def format_metrics_summary(metrics: OntologyMetrics) -> str:
     )
 
 
-def generate_scope(config: HydraConfig, intent: str) -> str:
-    """Generate a scope boundary statement from the intent using the LLM."""
-    with create_component_engine(config, ComponentName.generate_scope):
-        scope: str = Expression.prompt(
-            _scope_prompt.format(intent=intent),
-        ).value
-
-    return scope.strip()
-
-
 def draft_plan(
     config: HydraConfig,
     intent: str,
     ontology: Ontology,
     *,
     metrics_summary: str | None = None,
-    scope: str | None = None,
 ):
     """Drafts a plan that, when implemented and executed, changes the ontology to better fit user intent."""
     metrics_block = (
@@ -238,44 +158,12 @@ def draft_plan(
         if metrics_summary
         else ""
     )
-    scope_text = scope or "No scope boundary defined yet."
-
     with create_component_engine(config, ComponentName.planner):
         plan: str = Expression.prompt(
             _prompt.format(
                 intent=intent,
                 ontology=ontology.model_dump_json(),
                 metrics_block=metrics_block,
-                scope=scope_text,
-            ),
-        ).value
-
-    return plan
-
-
-def draft_consolidation_plan(
-    config: HydraConfig,
-    intent: str,
-    ontology: Ontology,
-    *,
-    metrics_summary: str | None = None,
-    scope: str | None = None,
-):
-    """Drafts a consolidation-only plan that merges, deletes, renames, and updates descriptions."""
-    metrics_block = (
-        f"<metrics>\n{metrics_summary}\n</metrics>\n"
-        if metrics_summary
-        else ""
-    )
-    scope_text = scope or "No scope boundary defined yet."
-
-    with create_component_engine(config, ComponentName.planner):
-        plan: str = Expression.prompt(
-            _consolidation_prompt.format(
-                intent=intent,
-                ontology=ontology.model_dump_json(),
-                metrics_block=metrics_block,
-                scope=scope_text,
             ),
         ).value
 

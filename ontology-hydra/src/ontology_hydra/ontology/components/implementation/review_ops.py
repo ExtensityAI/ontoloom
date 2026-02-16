@@ -1,7 +1,11 @@
 from symai import Expression
 
-from ontology_hydra.config import ComponentName
+from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
+from ontology_hydra.ontology.components.implementation.draft_ops import (
+    OperationSequence,
+)
+from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.diff import diff_ontology, format_diff
 from ontology_hydra.ontology.revision.executor import execute_ops
 from ontology_hydra.utils.schema.models import DataModel
@@ -40,9 +44,7 @@ In addition to plan faithfulness, reject the operations if any of the following 
 
 **Property duplication** — Any new property whose meaning semantically overlaps with an existing property on the same or a parent class. Check whether a property with similar name or description already exists. If so, reject unless the plan explicitly justifies why both are needed.
 
-**Budget violations** — The operations must not add more than 3 new classes or 5 new properties (data + object combined) in a single iteration. Count the additions in the diff. If exceeded, reject.
-
-**Domain creep** — Any new class that models operational/transactional concerns (e.g., payment processing, order management, customer accounts, UI state) that fall outside the declared intent. If the intent is about a domain topic, reject classes that drift into business operations.
+**Domain creep** — Any new class that is clearly unrelated to the declared intent. Re-read the intent and reject classes that introduce concepts outside its scope.
 
 Describe any discrepancies you find in a short paragraph for each issue:
 - State what the plan specifies vs. what the operations do

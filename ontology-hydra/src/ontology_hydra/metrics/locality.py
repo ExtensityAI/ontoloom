@@ -34,76 +34,55 @@ def _build_hierarchy_graph(ontology: Ontology) -> nx.Graph:
     return g
 
 
-def _classes_from_class_op(op: Operation) -> set[ClassName]:
-    """Extract affected class names from a class-level operation."""
-    match op:
-        case AddClass():
-            return {op.name, *op.sub_class_of}
-        case UpdateClass():
-            result = {op.name}
-            if op.new_name is not None:
-                result.add(op.new_name)
-            if op.sub_class_of is not None:
-                result.update(op.sub_class_of)
-            return result
-        case DeleteClass():
-            return {op.name}
-        case MergeClasses():
-            return {*op.source_classes, op.target_name}
-    return set()
-
-
-def _classes_from_data_prop_op(op: Operation, old_ontology: Ontology) -> set[ClassName]:
-    """Extract affected class names from a data property operation."""
-    result: set[ClassName] = set()
-    match op:
-        case AddDataProperty():
-            result.update(get_classes_in_expressions(op.domain))
-        case UpdateDataProperty():
-            if op.domain is not None:
-                result.update(get_classes_in_expressions(op.domain))
-            if op.name in old_ontology.data_properties:
-                result.update(get_classes_in_expressions(old_ontology.data_properties[op.name].domain))
-        case DeleteDataProperty():
-            if op.name in old_ontology.data_properties:
-                result.update(get_classes_in_expressions(old_ontology.data_properties[op.name].domain))
-    return result
-
-
-def _classes_from_object_prop_op(op: Operation, old_ontology: Ontology) -> set[ClassName]:
-    """Extract affected class names from an object property operation."""
-    result: set[ClassName] = set()
-    match op:
-        case AddObjectProperty():
-            result.update(get_classes_in_expressions(op.domain))
-            result.update(get_classes_in_expressions(op.range))
-        case UpdateObjectProperty():
-            if op.domain is not None:
-                result.update(get_classes_in_expressions(op.domain))
-            if op.range is not None:
-                result.update(get_classes_in_expressions(op.range))
-            if op.name in old_ontology.object_properties:
-                old_prop = old_ontology.object_properties[op.name]
-                result.update(get_classes_in_expressions(old_prop.domain))
-                result.update(get_classes_in_expressions(old_prop.range))
-        case DeleteObjectProperty():
-            if op.name in old_ontology.object_properties:
-                old_prop = old_ontology.object_properties[op.name]
-                result.update(get_classes_in_expressions(old_prop.domain))
-                result.update(get_classes_in_expressions(old_prop.range))
-    return result
-
-
 def _extract_affected_classes(
     operations: Sequence[Operation],
     old_ontology: Ontology,
 ) -> set[ClassName]:
-    """Extract class names touched by each operation."""
+    """Extract all class names touched by the operations."""
     affected: set[ClassName] = set()
+
     for op in operations:
-        affected |= _classes_from_class_op(op)
-        affected |= _classes_from_data_prop_op(op, old_ontology)
-        affected |= _classes_from_object_prop_op(op, old_ontology)
+        match op:
+            case AddClass():
+                affected.update({op.name, *op.sub_class_of})
+            case UpdateClass():
+                affected.add(op.name)
+                if op.new_name is not None:
+                    affected.add(op.new_name)
+                if op.sub_class_of is not None:
+                    affected.update(op.sub_class_of)
+            case DeleteClass():
+                affected.add(op.name)
+            case MergeClasses():
+                affected.update({*op.source_classes, op.target_name})
+            case AddDataProperty():
+                affected.update(get_classes_in_expressions(op.domain))
+            case UpdateDataProperty():
+                if op.domain is not None:
+                    affected.update(get_classes_in_expressions(op.domain))
+                if op.name in old_ontology.data_properties:
+                    affected.update(get_classes_in_expressions(old_ontology.data_properties[op.name].domain))
+            case DeleteDataProperty():
+                if op.name in old_ontology.data_properties:
+                    affected.update(get_classes_in_expressions(old_ontology.data_properties[op.name].domain))
+            case AddObjectProperty():
+                affected.update(get_classes_in_expressions(op.domain))
+                affected.update(get_classes_in_expressions(op.range))
+            case UpdateObjectProperty():
+                if op.domain is not None:
+                    affected.update(get_classes_in_expressions(op.domain))
+                if op.range is not None:
+                    affected.update(get_classes_in_expressions(op.range))
+                if op.name in old_ontology.object_properties:
+                    old_prop = old_ontology.object_properties[op.name]
+                    affected.update(get_classes_in_expressions(old_prop.domain))
+                    affected.update(get_classes_in_expressions(old_prop.range))
+            case DeleteObjectProperty():
+                if op.name in old_ontology.object_properties:
+                    old_prop = old_ontology.object_properties[op.name]
+                    affected.update(get_classes_in_expressions(old_prop.domain))
+                    affected.update(get_classes_in_expressions(old_prop.range))
+
     return affected
 
 
@@ -123,35 +102,24 @@ def compute_edit_locality(
     affected = _extract_affected_classes(operations, old_ontology)
     graph = _build_hierarchy_graph(new_ontology)
 
-    # Filter to nodes actually present in the new ontology graph
     affected_in_graph = affected & set(graph.nodes)
-    if len(affected_in_graph) == 0:
-        return None
-    if len(affected_in_graph) == 1:
-        return 1.0
+    if len(affected_in_graph) <= 1:
+        return 1.0 if affected_in_graph else None
 
-    # Compute graph diameter (longest shortest path across all connected components)
     if graph.number_of_nodes() < 2:
         return 1.0
 
-    diameter = 0
-    for component in nx.connected_components(graph):
-        if len(component) >= 2:
-            subgraph = graph.subgraph(component)
-            diameter = max(diameter, nx.diameter(subgraph))
+    # Batch-compute all pairwise distances (only reachable pairs are included)
+    all_distances = dict(nx.all_pairs_shortest_path_length(graph))
 
+    diameter = max(d for dists in all_distances.values() for d in dists.values())
     if diameter == 0:
         return 1.0
 
-    # Compute mean pairwise shortest path among affected nodes
-    # Disconnected pairs get diameter distance
-    distances: list[int] = []
-    for a, b in combinations(affected_in_graph, 2):
-        try:
-            d = nx.shortest_path_length(graph, a, b)
-        except nx.NetworkXNoPath:
-            d = diameter
-        distances.append(d)
+    # Mean pairwise distance among affected nodes (disconnected pairs get diameter)
+    distances = [
+        all_distances[a].get(b, diameter)
+        for a, b in combinations(affected_in_graph, 2)
+    ]
 
-    mean_distance = mean(distances)
-    return 1.0 - (mean_distance / diameter)
+    return 1.0 - (mean(distances) / diameter)

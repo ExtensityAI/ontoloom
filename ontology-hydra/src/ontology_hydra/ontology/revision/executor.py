@@ -251,9 +251,7 @@ def _add_data_property(op: AddDataProperty, ontology: Ontology) -> Ontology:
         domain=op.domain,
         range=op.range,
     )
-    _warn_similar_properties(
-        op.name, get_classes_in_expressions(op.domain), ontology, "data"
-    )
+    _warn_similar_properties(op.name, get_classes_in_expressions(op.domain), ontology, "data")
     return ontology
 
 
@@ -269,9 +267,7 @@ def _update_data_property(op: UpdateDataProperty, ontology: Ontology) -> Ontolog
         prop.description = op.description
 
     if op.domain is not None:
-        validate_classes_exist(
-            ontology, get_classes_in_expressions(op.domain), "Domain"
-        )
+        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
         prop.domain = op.domain
 
     if op.range is not None:
@@ -314,9 +310,7 @@ def _add_object_property(op: AddObjectProperty, ontology: Ontology) -> Ontology:
         domain=op.domain,
         range=op.range,
     )
-    _warn_similar_properties(
-        op.name, get_classes_in_expressions(op.domain), ontology, "object"
-    )
+    _warn_similar_properties(op.name, get_classes_in_expressions(op.domain), ontology, "object")
     return ontology
 
 
@@ -332,9 +326,7 @@ def _update_object_property(op: UpdateObjectProperty, ontology: Ontology) -> Ont
         prop.description = op.description
 
     if op.domain is not None:
-        validate_classes_exist(
-            ontology, get_classes_in_expressions(op.domain), "Domain"
-        )
+        validate_classes_exist(ontology, get_classes_in_expressions(op.domain), "Domain")
         prop.domain = op.domain
 
     if op.range is not None:
