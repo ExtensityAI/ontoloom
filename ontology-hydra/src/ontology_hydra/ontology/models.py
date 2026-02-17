@@ -38,9 +38,7 @@ class DataType(StrEnum):
 class IntersectionOf(DataModel):
     """An intersection of multiple classes."""
 
-    classes: list[ClassName] = Field(
-        ..., description="The list of classes to intersect."
-    )
+    classes: list[ClassName] = Field(..., description="The list of classes to intersect.")
 
 
 ClassExpression = ClassName | IntersectionOf
@@ -125,9 +123,7 @@ class Ontology(DataModel):
 
 _THING = Class(
     name=ClassName("Thing"),
-    description=Description(
-        definition="Root class for all entities.", constraints=None
-    ),
+    description=Description(definition="Root class for all entities.", constraints=None),
 )
 _LABEL = DataProperty(
     name=PropertyName("label"),

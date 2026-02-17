@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from loguru import logger
 from tqdm import tqdm
 
+from ontology_hydra.cli.args import GenerateOntologyArgs
 from ontology_hydra.cli.components.title import generate_title
 from ontology_hydra.config import load_config
 from ontology_hydra.metrics import compute_iteration_metrics, compute_ontology_metrics
@@ -15,9 +15,6 @@ from ontology_hydra.ontology.components.planning.pipeline import generate_plan
 from ontology_hydra.ontology.models import BASE_ONTOLOGY
 from ontology_hydra.ontology.run import RunMetadata
 from ontology_hydra.utils.cache import DirectoryCache
-
-if TYPE_CHECKING:
-    from ontology_hydra.cli.args import GenerateOntologyArgs
 
 
 def generate_ontology(args: GenerateOntologyArgs):
@@ -70,9 +67,7 @@ def generate_ontology(args: GenerateOntologyArgs):
         )
         cache.write((i, "plan.md"), plan)
 
-        ops, review, ontology = implement_plan(
-            config, plan, args.intent, ontology, max_attempts=10
-        )
+        ops, review, ontology = implement_plan(config, plan, args.intent, ontology, max_attempts=10)
         cache.write((i, "ops.json"), ops.model_dump_json(indent=4))
         cache.write(
             (i, "review.md"),

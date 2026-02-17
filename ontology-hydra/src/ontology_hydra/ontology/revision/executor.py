@@ -13,10 +13,6 @@
 
 """Executor for ontology revision operations using pattern matching."""
 
-import re
-
-from loguru import logger
-
 from ontology_hydra.ontology.models import (
     Class,
     ClassName,
@@ -54,53 +50,6 @@ class OperationFailedError(Exception):
         self.index = index
         self.operation = operation
         self.__cause__ = cause
-
-
-# Property duplication warning helpers
-
-_CAMEL_SPLIT = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)")
-_STOP_WORDS = frozenset({"has", "is", "of", "the", "a", "an", "in", "on", "for", "to", "by"})
-
-
-def _split_camel(name: str) -> set[str]:
-    """Split a camelCase or PascalCase name into a lowercase word set."""
-    words = {w.lower() for w in _CAMEL_SPLIT.findall(name)}
-    return words - _STOP_WORDS
-
-
-def _warn_similar_properties(
-    name: str,
-    domain_classes: set[ClassName],
-    ontology: Ontology,
-    prop_type: str,
-):
-    """Log a warning if a newly added property shares significant word stems with existing properties on overlapping domain classes."""
-    new_words = _split_camel(name)
-    if not new_words:
-        return
-
-    all_props: dict[str, set[ClassName]] = {}
-    for prop in ontology.data_properties.values():
-        if prop.name != name:
-            all_props[prop.name] = get_classes_in_expressions(prop.domain)
-    for prop in ontology.object_properties.values():
-        if prop.name != name:
-            all_props[prop.name] = get_classes_in_expressions(prop.domain)
-
-    for existing_name, existing_domain in all_props.items():
-        if not domain_classes & existing_domain:
-            continue
-        existing_words = _split_camel(existing_name)
-        overlap = new_words & existing_words
-        if overlap and len(overlap) >= len(new_words) * 0.5:
-            logger.warning(
-                "Possible property duplication: new {} property '{}' shares words {} "
-                "with existing property '{}' on overlapping domain classes",
-                prop_type,
-                name,
-                overlap,
-                existing_name,
-            )
 
 
 def _add_class(op: AddClass, ontology: Ontology) -> Ontology:
@@ -251,7 +200,6 @@ def _add_data_property(op: AddDataProperty, ontology: Ontology) -> Ontology:
         domain=op.domain,
         range=op.range,
     )
-    _warn_similar_properties(op.name, get_classes_in_expressions(op.domain), ontology, "data")
     return ontology
 
 
@@ -310,7 +258,6 @@ def _add_object_property(op: AddObjectProperty, ontology: Ontology) -> Ontology:
         domain=op.domain,
         range=op.range,
     )
-    _warn_similar_properties(op.name, get_classes_in_expressions(op.domain), ontology, "object")
     return ontology
 
 
@@ -355,26 +302,38 @@ def _delete_object_property(op: DeleteObjectProperty, ontology: Ontology) -> Ont
     return ontology
 
 
-_OP_HANDLERS = {
-    AddClass: _add_class,
-    UpdateClass: _update_class,
-    DeleteClass: _delete_class,
-    MergeClasses: _merge_classes,
-    AddDataProperty: _add_data_property,
-    UpdateDataProperty: _update_data_property,
-    DeleteDataProperty: _delete_data_property,
-    AddObjectProperty: _add_object_property,
-    UpdateObjectProperty: _update_object_property,
-    DeleteObjectProperty: _delete_object_property,
-}
-
-
-def execute_op(op: Operation, ontology: Ontology) -> Ontology:
+def execute_op(op: Operation, ontology: Ontology):  # noqa: C901
     """Execute a single operation on the ontology."""
-    return _OP_HANDLERS[type(op)](op, ontology)
+    match op:
+        case AddClass():
+            return _add_class(op, ontology)
+        case UpdateClass():
+            return _update_class(op, ontology)
+        case DeleteClass():
+            return _delete_class(op, ontology)
+
+        case AddDataProperty():
+            return _add_data_property(op, ontology)
+        case UpdateDataProperty():
+            return _update_data_property(op, ontology)
+        case DeleteDataProperty():
+            return _delete_data_property(op, ontology)
+
+        case AddObjectProperty():
+            return _add_object_property(op, ontology)
+        case UpdateObjectProperty():
+            return _update_object_property(op, ontology)
+        case DeleteObjectProperty():
+            return _delete_object_property(op, ontology)
+
+        case MergeClasses():
+            return _merge_classes(op, ontology)
+
+    msg = f"Cannot execute unknown operation: {op}"
+    raise ValueError(msg)
 
 
-def execute_ops(ontology: Ontology, ops: list[Operation]) -> Ontology:
+def execute_ops(ontology: Ontology, ops: list[Operation]):
     """Execute a sequence of operations on the ontology."""
     ontology = ontology.clone()
 

@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from symai import Expression
 
-from ontology_hydra.config import ComponentName
+from ontology_hydra.config import ComponentName, HydraConfig
 from ontology_hydra.llm.engine import create_component_engine
-
-if TYPE_CHECKING:
-    from ontology_hydra.config import HydraConfig
-    from ontology_hydra.metrics.ontology import OntologyMetrics
-    from ontology_hydra.ontology.models import Ontology
+from ontology_hydra.metrics.ontology import OntologyMetrics
+from ontology_hydra.ontology.models import Ontology
 
 MAX_SECTION_ITEMS = 200
 
@@ -132,6 +127,7 @@ Write prose organized under these headings:
 
 Do not use JSON, code blocks, YAML, or XML. Return only the plan text under these headings."""
 
+
 def format_metrics_summary(metrics: OntologyMetrics) -> str:
     """Format a compact text summary of ontology metrics for the planner prompt."""
     c = metrics.counts
@@ -153,11 +149,7 @@ def draft_plan(
     metrics_summary: str | None = None,
 ):
     """Drafts a plan that, when implemented and executed, changes the ontology to better fit user intent."""
-    metrics_block = (
-        f"<metrics>\n{metrics_summary}\n</metrics>\n"
-        if metrics_summary
-        else ""
-    )
+    metrics_block = f"<metrics>\n{metrics_summary}\n</metrics>\n" if metrics_summary else ""
     with create_component_engine(config, ComponentName.planner):
         plan: str = Expression.prompt(
             _prompt.format(

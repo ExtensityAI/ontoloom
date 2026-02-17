@@ -1,15 +1,11 @@
-from typing import TYPE_CHECKING
-
 from loguru import logger
 
+from ontology_hydra.config import HydraConfig
 from ontology_hydra.ontology.components.implementation.draft_ops import draft_ops
 from ontology_hydra.ontology.components.implementation.review_ops import review_ops
 from ontology_hydra.ontology.components.implementation.revise_ops import revise_ops
+from ontology_hydra.ontology.models import Ontology
 from ontology_hydra.ontology.revision.executor import execute_ops
-
-if TYPE_CHECKING:
-    from ontology_hydra.config import HydraConfig
-    from ontology_hydra.ontology.models import Ontology
 
 
 def implement_plan(
@@ -35,6 +31,8 @@ def implement_plan(
             logger.info("Attempt {}/{}: drafting operations", attempt + 1, max_attempts)
             ops = draft_ops(config, plan, intent, ontology)
         else:
+            assert review is not None, "Review guaranteed to be here"
+
             logger.info("Attempt {}/{}: revising operations", attempt + 1, max_attempts)
             ops = revise_ops(config, plan, intent, ontology, ops, feedback=review.text)
         logger.debug("Got {} operations", len(ops.ops))

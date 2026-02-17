@@ -16,7 +16,6 @@ from ontology_hydra.ontology.revision.executor import execute_ops
 from ontology_hydra.ontology.revision.operations import Operation
 from ontology_hydra.utils.schema.models import DataModel
 
-
 # ---------------------------------------------------------------------------
 # Edit action models (discriminated union on "action")
 # ---------------------------------------------------------------------------

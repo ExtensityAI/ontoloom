@@ -51,7 +51,7 @@ Describe any discrepancies you find in a short paragraph for each issue:
 - Explain the impact on the ontology if applied as-is
 - Suggest what correction is needed
 
-Write prose, not tables or bullet lists. Be specific and reference the plan and operations directly.
+Yield a bunch of diagnostics as bullet pointed list. Feel free to write prose there. For the diagnostics, also add comments or improvement recommendations for the implementation, maybe the plan was not ideal.
 
 End your review with exactly '{_ACCEPTED}' or '{_REJECTED}' (plain text, no formatting or punctuation after)."""
 
