@@ -1,6 +1,10 @@
-# Ontology Summarization for the Strategic Agent
+# Ontology Summarization
 
 The main agent sees an abstract summary of the ontology, not the full JSON. This document defines the summary format, compression strategies, and design rationale.
+
+For how the summary fits into the overall architecture, see [ARCHITECTURE.md](ARCHITECTURE.md). The exploration subagent uses summary data when reviewing subtrees — see [EXPLORATION.md](EXPLORATION.md).
+
+---
 
 ## Three-Section Format
 
@@ -52,7 +56,7 @@ Thing
 **Annotations:**
 - `[dp:N, op:N]` — direct data property count, direct object property count (where this class is in the domain)
 - `[+N inherited]` — total inherited property count (from all ancestors). Only shown when > 0 and class is a leaf or near-leaf. Prevents the agent from underestimating leaf class complexity.
-- `<!>` — flag for structural anomaly (no properties, extreme depth, extreme property concentration)
+- `<!>` — flag for structural anomaly. This flag is also a **diagnostic signal source** — the deterministic pass uses it to identify candidates for further investigation (see [CATALOG.md](CATALOG.md)).
 - `... N more leaf classes` — collapsed homogeneous siblings
 - `... N more (depth D)` — collapsed subtree with depth info
 - `ClassName [dp:N, op:N] (K subtypes)` — summary-only node
@@ -91,6 +95,8 @@ LLMs are well-trained on indented structures from Python, YAML, and Markdown. Re
 - Class with 0 direct properties (both data and object)
 - Class with unusually high property count (>2x mean)
 - Subtree with depth >2x average depth
+
+These flags serve double duty: the summary flags them for the main agent's attention, and the deterministic diagnostic pass uses the same conditions to identify candidates for structural checks (see [CATALOG.md](CATALOG.md) § Structural Section).
 
 ---
 
@@ -351,18 +357,14 @@ Driver --[certified]--> Vehicle
 
 ## Implementation Notes
 
-Existing code that can be reused:
-
-- `compute_class_value_maps()` in `metrics/ontology.py` — returns depths, subclass counts, property counts per class
-- `_children_by_parent()` helper — builds the tree structure
-- `format_metrics_summary()` in `draft_plan.py` — produces a one-line stats string (Section A replaces this)
-
-A `summarize_ontology(ontology: Ontology, token_budget: int = 2000) -> str` function would:
-1. Call `compute_class_value_maps()` for per-class data
-2. Build tree using `_children_by_parent()`
+A `summarize_ontology(ontology: Ontology, token_budget: int = 2000) -> str` function:
+1. Build per-class data (depths, subclass counts, property counts)
+2. Build tree using children-by-parent mapping
 3. Render Section A from counts
 4. Render Section B by depth-first tree walk, applying compression based on remaining budget
 5. Render Section C by iterating `object_properties` and formatting arrows
+
+The summary must serialize **deterministically** — same ontology produces the same summary string. Use alphabetical ordering within each hierarchy level. This is critical for KV-cache prefix matching across rounds (see [ARCHITECTURE.md](ARCHITECTURE.md) § Persistence & Serialization).
 
 ---
 

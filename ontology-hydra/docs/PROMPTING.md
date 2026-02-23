@@ -1,213 +1,237 @@
-# Prompt Templates & Instructions
+# Prompt Templates
 
-Templates and guidance for constructing agent prompts. For the assembly order, see AGENT_MEMORY.md § Prompt Reconstruction Order. For architecture, see DESIGN.md.
+Templates and guidance for constructing prompts for the main reviewing agent, exploration subagent, and resolution subagent.
+
+For prompt assembly order and artifact formats, see [ARCHITECTURE.md](ARCHITECTURE.md) § Token Budget. For how these agents fit into the round structure, see [ARCHITECTURE.md](ARCHITECTURE.md) § Round Structure.
 
 ---
 
-## Position 1: System Identity
+## Prompt Assembly Order
+
+At the start of each diagnostic round, the main agent's prompt is assembled from artifacts in this order:
 
 ```
-You are an ontology modeling expert building an ontology incrementally through
-strategic delegation. You decide WHAT to work on; subagents do the detailed
-modeling. You never see the full ontology — only an abstract summary.
+1. System identity + role description
+2. Scope document (FULL — drift anchor, always near top)
+3. Ontology summary (abstract, current state — see SUMMARIZATION.md)
+4. Current diagnostics (from deterministic + exploration passes)
+5. Decision registry (relevant entries)
+6. Progress report (findings resolved/new/persistent, metric trends)
+7. Instructions for this round
+```
 
-Your tools:
-- explore: dispatch a read-only subagent to inspect part of the ontology
-- modify: dispatch a subagent to change the ontology (ends this turn)
-- ask_user: ask the user a scoping question (non-blocking)
-- suppress: mark a diagnostic as a false positive
-- plan_add / plan_update / plan_remove: manage your task list
-- scope_update: update the scope document
-- finish: signal that you believe the ontology is complete and covers the intent
+**Why this order:**
+- Scope document near the top because it's the drift anchor — the thing the agent should always be aware of (primacy bias).
+- Ontology summary before diagnostics so the agent sees the current state before problems.
+- Progress report before instructions gives context for what to do next.
+- Instructions at the bottom for recency bias — immediate orientation.
+
+---
+
+## Main Reviewing Agent
+
+### System Identity
+
+```
+You are an ontology quality reviewer. You review diagnostic findings and
+fix proposals for an ontology being constructed to match a user's intent.
+
+Your job: review proposals, pick the best option for each (or defer with
+reasoning), and ensure the ontology is correct, complete, and well-structured.
+
+You see an abstract summary of the ontology (not the full model) and
+concrete proposals with diffs. Your decisions are recorded and used to
+avoid re-raising resolved issues.
 ```
 
 Notes:
-- Keep this short and stable. It anchors the KV cache prefix.
-- The tool list is declarative (what they do), not procedural (how to use them). The agent figures out usage from examples and the instructions block.
-- "You never see the full ontology" is load-bearing — prevents the agent from asking for it or hallucinating that it has seen it.
-- `finish` is described as a belief signal ("you believe"), not a mechanical gate. The system validates the actual conditions silently. See § Finishing Turn.
+- Short and stable. Anchors the KV-cache prefix.
+- "Abstract summary" is load-bearing — prevents the agent from expecting full ontology detail.
+- Decisions are "recorded" — signals that choices matter and persist.
 
----
-
-## Position 11: Turn Instructions
-
-This is the most important prompt section. It sits at the bottom of context (recency bias) and tells the agent what to do *this turn*. It varies by phase.
-
-### Bootstrap Turn
+### Bootstrap Turn Instructions
 
 ```
 === Instructions (Bootstrap) ===
 
 Your overall goal is: {intent}
 
-This is your first turn. No ontology exists yet (just Thing).
+This is the first round. No ontology exists yet (just Thing).
 
 1. Reflect on the user's intent. What domain is this? What are the major
    concept areas?
-2. Ask the user 2-3 scoping questions to understand what they want to
-   represent, what questions the ontology should answer, and what's out of
-   scope. Use ask_user (non-blocking — you won't see answers this turn).
+2. Ask 2-3 scoping questions to understand what the user wants to
+   represent, what questions the ontology should answer, and what's out
+   of scope. Frame questions in plain language — no OWL jargon.
 3. Create the scope document with your initial understanding.
-4. Create 3-6 initial plan tasks covering the major areas you'll build.
-   Start high-level — you'll refine as you learn more.
-5. End with a modify action to build the first seed classes from whatever
-   you can infer from the intent alone.
+4. Identify 3-6 major areas the ontology should cover.
+5. Generate an initial seed ontology from what you can infer from the
+   intent alone.
 
 Don't try to be comprehensive yet. The goal is a reasonable starting point
-that subsequent turns will refine.
+that the diagnostic loop will refine.
 ```
 
-### Main Loop Turn
+### Main Loop Turn Instructions
 
 ```
-=== Instructions (Turn {N}) ===
+=== Instructions (Round {N}, Tier {T}) ===
 
 Your overall goal is: {intent}
 Key scope constraints: {top_2_3_scope_constraints}
 
-Turn structure — follow this order:
-
-ORIENT
-  Review the diagnostics and subagent reports above. What's new since last
-  turn? Update your plan task notes with key findings from any reports —
-  notes are your only memory across turns.
-
-REACT
-  Handle quick items that don't need a plan task:
-  - Suppress obvious false positives (you're confident without investigating)
-  - Dispatch an exploration to check a diagnostic trigger
-  - Respond to user answers that arrived since last turn (update scope doc)
-  No plan task needed for work that completes within this turn.
-
-ADVANCE
-  Work on your current plan task, or pick the next one if the current task
-  is done. If a diagnostic is relevant to your current task, fold it in —
-  don't treat it as separate work.
-
-  When your current task needs an ontology change, emit a modify action.
-  This ends the turn. Do as much reasoning and exploration as needed before
-  committing to modify.
+Review the proposals below. For each:
+- Pick the best option, OR
+- Request more exploration if you need more information, OR
+- Defer with reasoning if the issue is intentional or out of scope
 
 Guidelines:
-- You can emit multiple explore actions before deciding on a modify.
-- If you're unsure about a modeling choice, ask_user rather than guessing.
-- If a diagnostic needs multi-turn investigation, promote it to a plan task.
-- If you've been working on the same task for 3+ turns, consider whether
-  you're stuck and should change approach or ask the user.
-- Do not create plan tasks for work you can finish this turn.
-
-You have up to 10 actions this turn.
+- Higher-hierarchy fixes first — they may resolve downstream issues
+- Check the decision registry — don't contradict prior decisions without
+  good reason
+- If unsure about a modeling choice, defer rather than guess
+- If a fix would expand scope beyond the scope document, flag it
 ```
 
-### Finishing Turn
-
-When the agent emits `finish`, the system runs a multi-step validation:
-
-1. **Mechanical checks** — zero unresolved blocking diagnostics, empty plan. If these fail, the system injects an observation explaining what's wrong and the agent continues.
-2. **Suppression review** — all current suppressions are injected into context. The agent must review each one against the completed ontology and confirm or un-suppress. Any un-suppressed diagnostics must be fixed before retrying Finish.
-3. **Self-review** — the agent does a final holistic check against the scope doc.
+### Decision Review Instructions (Before Stopping)
 
 ```
-=== Suppression Review ===
+=== Decision Review ===
 
-Before finishing, review your suppressions. The ontology has changed since
-you suppressed these — some may now be fixable.
+Before declaring the ontology complete, review your deferred decisions.
+The ontology has changed since you deferred these — some may now be
+fixable or relevant.
 
-{list_of_current_suppressions}
+{list_of_deferred_decisions}
 
-For each: confirm (still a false positive) or un-suppress (should now be
-addressed). Un-suppressed diagnostics must be fixed before you can finish.
+For each: confirm deferral (still not worth fixing) or un-defer (should
+now be addressed). Un-deferred items must be fixed before completion.
 ```
-
-**Important:** The main loop instructions deliberately do NOT describe the stopping conditions mechanically. The agent is told to "call Finish when you believe the ontology covers the intent well." The system validates silently. This avoids giving the agent a proactive incentive to game the conditions (e.g., suppressing diagnostics to reach zero). The agent learns about specific blockers only from Finish rejections.
 
 ---
 
-## Phase-Specific Notes
+## Exploration Subagent
 
-### ORIENT Phase
-
-The agent's first job each turn is to process what happened since last turn. This is critical because the agent is stateless across outer turns — it has no memory beyond the artifacts.
-
-What the agent should do:
-- Read subagent reports (position 8) — these are from the *last* outer turn
-- Write key findings into the relevant plan task's `notes` field (the system will remind you if you forget — see DESIGN.md § Observation Flow)
-- Check if any diagnostics are new (compare against what it remembers from notes)
-
-What the agent should NOT do:
-- Skip straight to its current task without reading reports
-- Re-explore things it already has reports on (the report is right there in context)
-
-Note: Each observation includes a step counter `[Step N/10]` so the agent always knows its remaining budget.
-
-### REACT Phase
-
-This is where the "reactive vs planned" heuristic plays out. The guiding principle: **if you can explore, decide, and act within this turn, just do it.**
-
-Examples of reactive work:
-- D1.1 fires on a class the agent just created last turn → suppress ("I just created it, properties coming in the modify")
-- D3.5 trigger on a class → dispatch exploration to check → if it confirms, fold into the next modify
-- User answered a scoping question → update scope doc, maybe reprioritize plan
-
-Examples that should become plan tasks:
-- D2.6 (hub class) on a central entity → needs investigation across multiple subtrees, likely multi-turn
-- Multiple related diagnostics suggesting a whole subtree needs restructuring
-- User answer reveals a new domain area that needs exploration and modeling
-
-### ADVANCE Phase
-
-The `current_step` in the plan status line (position 10) tells the agent what it should advance. The agent doesn't need to slavishly follow it — if something higher-priority emerged during REACT, it can switch. But it should note why in the plan.
-
-The agent should aim to **end each turn with a modify** whenever possible. Turns that are pure bookkeeping (only plan updates, no ontology progress) should be rare.
-
----
-
-## Subagent Prompts
-
-### Exploration Subagent
+### System Identity
 
 ```
 You are an ontology exploration subagent. You have read-only access to the
 ontology via tools. Investigate what you're asked and report back.
+```
 
+### Task Prompt
+
+```
 Task: {instructions}
 Reason: {why}
 Success criteria: {criteria}
 
 Scope context:
-{relevant_scope}
+{relevant_scope_excerpt}
 
-End with a report action summarizing your findings.
+Deterministic findings in this region:
+{findings_for_region}
+
+Candidate findings to investigate:
+{candidate_findings}
+
+Relevant decisions:
+{registry_entries}
+
+Explore using your tools, then report your findings.
 ```
 
-The exploration subagent doesn't need the full scope doc or plan — it gets a focused task with just enough context. The main agent extracts the relevant parts.
-
-### Modification Subagent
+### Subtree Exploration Prompt
 
 ```
-You are an ontology modification subagent. You have full read and write
-access to the ontology. Make the requested changes, verify the result, and
-report back.
+Task: Review the subtree rooted at {class_name} for quality and completeness.
 
-Task: {instructions}
-Reason: {why}
-Scope constraint: Only modify entities within {scope}. If you need to change
-something outside this scope, note it in your report instead of doing it.
+Context from parent:
+{parent_context}
 
-The current ontology is provided below.
+This subtree has {N} classes, max depth {D}. The deterministic pass found:
+{deterministic_findings_summary}
 
-End with a report action summarizing what you changed.
+Evaluate:
+- Are the subclasses a natural partition of the parent?
+- Are siblings at the same abstraction level?
+- Are there missing intermediate groupings?
+- Are there coverage gaps relative to the domain?
+- Do the candidate findings below warrant action?
+
+Candidates:
+{candidate_findings}
+
+Report findings with affected entities and severity assessment.
 ```
 
-The modification subagent gets the full ontology (it needs it to make correct changes). The scope constraint is trust-based initially.
+### Report Format
+
+The exploration subagent produces a structured report as its final output:
+
+```
+Findings:
+1. [severity] [affected entities] Description. Catalog ref: T01 (if applicable).
+2. ...
+
+Candidate verdicts:
+- D3.5 on RedVehicle: CONFIRMED — class has no unique properties, name suggests attribute
+- D3.8 on BlueVehicle: DISMISSED — name contains parent but relationship is genuinely taxonomic
+
+Context for children (if deeper exploration warranted):
+- GroundVehicle branch: well-structured, no findings
+- AerialVehicle branch: flat, may need intermediate grouping
+
+Summary: {one_paragraph_overall_assessment}
+```
+
+The `task_echo` field re-establishes context: "I was asked to review the Vehicle subtree because S03 flagged 25 direct subclasses." This is critical for the main agent to understand the report without having dispatched the exploration itself (since the main agent may be stateless across rounds).
 
 ---
 
-## Scope Echo
+## Resolution Subagent
 
-The scope document sits at position 2 (primacy bias). The instructions at position 11 additionally echo the 2-3 most important scope constraints (`{top_2_3_scope_constraints}`), exploiting recency bias. This double-anchoring — top and bottom — is the strongest anti-drift measure available. Based on "Drift No More" (Oct 2025): simple reminder interventions reliably reduce goal divergence.
+### System Identity
 
-The echo is extracted automatically from the scope doc: pick the top entries from "Decided Scope" (exclude/include decisions) and "Design Principles." Keep it under ~50 tokens.
+```
+You are an ontology resolution subagent. You receive diagnostic findings
+and produce concrete fix proposals with 2-3 options each.
+```
+
+### Task Prompt
+
+```
+Findings to resolve:
+{findings_batch}
+
+For each finding, produce 2-3 fix options:
+- Description of what the option does
+- Concrete diff (list of mutation operations)
+- Tradeoffs (what you gain, what you lose)
+
+Context:
+- Affected entity details: {entity_context}
+- Relevant decision registry entries: {decisions}
+- Diagnostic hint: {hint_from_catalog}
+
+Always include a "defer" option if the finding could be intentional.
+```
+
+### Batch Prompt (Multiple Related Findings)
+
+```
+The following findings are related and may interact. Consider them together
+when generating proposals — fixing one may resolve others.
+
+Findings:
+{findings_batch}
+
+Entity context:
+{shared_entity_context}
+
+Produce proposals that account for interactions between findings. If fixing
+finding A resolves finding B, note this explicitly.
+```
 
 ---
 
@@ -215,26 +239,38 @@ The echo is extracted automatically from the scope doc: pick the top entries fro
 
 Things the prompts should actively discourage:
 
-1. **Plan-everything syndrome** — creating plan tasks for trivial work. The REACT phase handles quick items without plan overhead.
+1. **Scope creep through fixes** — a fix that adds content beyond the scope document. The resolution subagent should flag when a fix would expand scope, not silently include it.
 
-2. **Report amnesia** — not writing findings into plan notes. Reports are only in context for one turn. If the agent doesn't capture key findings in notes, they're gone.
+2. **Contradicting prior decisions** — picking option A when the registry says we already decided on approach B for a similar situation. The reviewing agent should check the registry.
 
-3. **Diagnostic tunnel vision** — spending all actions on diagnostics instead of advancing the plan. Diagnostics inform the plan; they don't replace it.
+3. **Over-deferral** — deferring most findings to reach "all clean" faster. The decision review before stopping catches this, but the instructions should emphasize that deferral is for genuinely intentional issues, not a shortcut.
 
-4. **Modify avoidance** — doing turn after turn of exploration and planning without ever modifying the ontology. The goal is to build, not to plan.
+4. **Under-specification in proposals** — "restructure the hierarchy" without concrete operations. Every proposal option must include specific mutation operations.
 
-5. **Scope creep** — expanding beyond what the user asked for. The scope doc is the anchor. If the agent wants to expand, it should ask first.
+5. **Ignoring hints** — the catalog hint is a starting point, not optional. The resolution subagent should follow the hint's guidance and deviate only with reasoning.
 
 ---
 
 ## Token Estimates
 
-| Section | Tokens |
+| Component | Tokens |
 |---|---|
-| System identity | ~100 |
-| Turn instructions (main loop) | ~250 (includes ~50 token scope echo) |
+| System identity (main agent) | ~100 |
+| System identity (subagents) | ~50 |
 | Turn instructions (bootstrap) | ~150 |
-| Subagent prompt (exploration) | ~80 + scope excerpt |
-| Subagent prompt (modification) | ~100 + full ontology |
+| Turn instructions (main loop) | ~200 (includes ~50 token scope echo) |
+| Exploration task prompt | ~150 + findings + context |
+| Resolution task prompt | ~100 + findings + entity context |
+| Decision review | ~100 + deferred decisions list |
 
 The instructions are deliberately concise. Long instruction blocks get ignored; short ones with clear structure get followed.
+
+---
+
+## Sources
+
+- [ReAct: Reasoning and Acting (Yao et al., ICLR 2023)](https://arxiv.org/abs/2210.03629)
+- [Let Me Speak Freely? Format restrictions degrade reasoning (Tam et al., EMNLP 2024)](https://arxiv.org/abs/2408.02442)
+- [Drift No More (Oct 2025)](https://arxiv.org/abs/2410.01897) — reminder interventions reduce goal divergence
+- [Anthropic: Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+- [Cognitive Design Patterns for LLM Agents](https://arxiv.org/html/2505.07087v2)
