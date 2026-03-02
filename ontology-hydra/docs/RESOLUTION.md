@@ -49,7 +49,7 @@ Each option's `diff` is a concrete list of mutation operations (see § Mutation 
 
 Each diagnostic in the catalog includes a **hint** — guidance for investigating or fixing the issue. Hints range from short ("rename to PascalCase") to detailed procedures. The resolution subagent reads the hint and uses it as a starting point for generating proposals.
 
-This makes diagnostics extensible: adding a new check with a richer hint is equivalent to adding a new "skill" — no code changes needed beyond the detection logic. See [CATALOG.md](CATALOG.md) for the full hint for each diagnostic.
+This makes diagnostics extensible: adding a new check with a richer hint is equivalent to adding a new "skill" — no code changes needed beyond the detection logic. See [CATALOG.md](CATALOG.md) for the full hint for each diagnostic. Where a diagnostic maps to an established ontology design pattern, the hint references the pattern template — see [PATTERNS.md](PATTERNS.md).
 
 ### Dispatch Context
 
@@ -65,64 +65,74 @@ When delegating to a resolution subagent, the system provides:
 
 ## Batching Strategy
 
-To reduce LLM calls, findings are batched by category:
+Findings are batched per-subtree and per-category within the subtree. Batch size: 3–8 findings — enough for the subagent to see interactions, small enough for the main agent to review coherently.
 
 | Batch | Findings | Rationale |
 |---|---|---|
 | SubClassOf pair review | T01, T02, T03, T04, T10, T13 | All examine parent-child relationships |
 | Sibling group review | T07, T09, T11, T14, T15 | All examine sibling sets |
-| Property review | P05, P09, P16, N07 | All examine property modeling |
-| Expansion review | S05, S08, T12, coverage gaps | All produce additive fixes |
-| Naming batch | N01–N11 | Mechanical, can be batched aggressively |
+| Property review | P01–P18, DT01–DT06 | All examine property modeling |
+| Expansion review | S05, S08, T12, M01–M10, coverage gaps | All produce additive fixes |
+| Naming batch | N01–N11, CC01–CC04 | Mechanical, can be batched aggressively |
 
-Within each batch, the subagent sees all findings in the batch simultaneously and can produce proposals that account for interactions (e.g., fixing T01 on one entity may resolve T13 on a sibling).
+Within each batch, the subagent sees all findings in the batch simultaneously and can produce proposals that account for interactions (e.g., fixing T01 on one entity may resolve T13 on a sibling). Coherent proposals that span taxonomy and property changes (e.g., reclassifying a class and updating its properties in one proposal) are encouraged when the changes form a natural unit of work.
 
 ---
 
 ## Fix Ordering
 
-Findings are resolved in order of **structural blast radius, top-down.** A fix at the root can cascade across the entire ontology. A naming fix at a leaf affects nothing.
+Findings are resolved in three **phases**. Phase boundaries are hard gates; ordering within a phase is a heuristic default based on blast radius.
 
-### Tier 1 — Top-Level Structure (fix first)
+The original design used four tiers (structure → taxonomy → properties → naming) with a strict unidirectional dependency chain. This was revised after literature review showed the taxonomy-to-property dependency is **bidirectional** — property analysis informs taxonomy decisions (OntoClean metaproperties, property signature similarity), not just the reverse. Additionally, moving a class in the hierarchy does not break property references (properties reference classes by name, which survives reparenting). The 3-phase system merges taxonomy and property work, reducing round count and eliminating the need for cross-phase escalation.
 
-Fixes that reshape the class hierarchy. Everything below may need re-evaluation.
+### Phase 1 — Foundation (fix first)
+
+Fixes that reshape the top-level class hierarchy or address scope alignment. Everything below may need re-evaluation.
 
 - **T14:** umbrella classes at top levels
 - **T06:** flat taxonomy
 - **S03:** fan-out hotspots at top levels
 - **S01:** disconnected components (do these classes belong?)
 - **IA01/IA02:** domain mismatch, scope creep (remove before fixing)
+- **ML01:** meta-level contamination
+- **D1.4:** dangling class references
 - Exploration findings about top-level organization
 
-**After tier 1:** Full re-diagnosis. The graph may have changed fundamentally.
+**After Phase 1:** Full re-diagnosis. The graph may have changed fundamentally. Phase 1 → 2 is a **hard gate** — all subtrees must pass before any subtree enters Phase 2.
 
-### Tier 2 — Taxonomy Semantics (fix second)
+### Phase 2 — Modeling (fix second)
 
-Fixes that change what classes *are* — reclassification, splitting, merging. These move entities, change edges, alter graph topology.
+All taxonomy, property, and expansion work. Processes per-subtree, ordered by blast radius within each subtree. Taxonomy and property findings are addressed together, with reclassification changes taking priority.
 
+**Taxonomy semantics:**
 - **T01–T04:** is-a overloading (subClassOf → partOf, hasRole, etc.)
-- **T10:** surface-name taxonomy
 - **T05:** instances as classes (move to ABox)
+- **T07:** miscellaneous/catch-all classes
 - **T09:** polysemous concepts (split)
+- **T10:** surface-name taxonomy
+- **T11:** temporal-atemporal conflation
 - **T13:** abstraction level mixing
+- **T15:** epistemic intrusion
+- **T16:** category vs. class confusion
 
-**After tier 2:** Re-diagnose affected subtrees.
-
-### Tier 3 — Property Structure and Expansion (fix third)
-
-The class hierarchy is now stable. Fix property modeling and fill gaps.
-
+**Property structure:**
 - **P01:** multiple domain/range intersection trap
 - **P03:** missing domain/range
 - **P05:** over-specialized domain/range
 - **P11:** redundant per-class properties
+- **P12:** flat property hierarchy
+- **P13–P18:** inverse checks, sub-property checks, consolidation
+
+**Expansion:**
 - **S05/S08:** empty shells, property deserts (additive fixes)
 - **T12:** granularity mismatch (additive fixes)
-- Coverage gaps from exploration (additive fixes)
+- **M01–M10:** modeling pattern violations
+- **DT01–DT06:** datatype issues
+- Coverage gaps from exploration and document analysis
 
-**After tier 3:** Re-check properties locally.
+**After Phase 2:** Re-diagnose affected subtrees. Per-subtree advancement — clean subtrees proceed independently.
 
-### Tier 4 — Naming and Cosmetics (fix last)
+### Phase 3 — Polish (fix last)
 
 No structural impact. Safe to batch and auto-fix where possible.
 
@@ -130,33 +140,43 @@ No structural impact. Safe to batch and auto-fix where possible.
 - **A01–A07:** documentation, provenance
 - **D01:** redundant subClassOf (cleanup)
 - **CC01–CC04:** cross-cutting concern naming patterns
+- **D3.9:** sparse descriptions
 
-**After tier 4:** No re-diagnosis needed.
+**After Phase 3:** No re-diagnosis needed.
 
-### Ordering Within a Tier
+### Ordering Within Phase 2
 
-**Higher in hierarchy first, then by severity.** A warning at depth 1 before a critical at depth 3. The rationale: a depth-1 fix has larger blast radius and may resolve the depth-3 finding as a side effect.
+Within a subtree, findings are ordered by three criteria:
 
-### Tier Assignment Heuristic
+1. **Blast radius.** Reclassification (T01–T04, T09, T13 — these move classes around) before structural additions (T12, S05 — adding intermediate classes) before property adjustments (P01–P18 — domain/range changes). This is a **heuristic default**, not a hard gate — coherent proposals that span taxonomy and property changes are encouraged when they form a natural unit of work.
+2. **Hierarchy depth.** A warning at depth 1 before a critical at depth 3. A depth-1 fix has larger blast radius and may resolve the depth-3 finding as a side effect.
+3. **Severity.** Within the same blast radius class and depth.
 
-- Does fixing this change the subClassOf graph topology? → Tier 1–2
-- Does it change property structure (domain/range/inverse)? → Tier 3
-- Neither? → Tier 4
+Reversible changes before entangling ones, as before: removals (scope trimming, orphan removal) before additions before deep restructuring.
 
-Some findings span tiers. T08 (missing disjointness) is taxonomy-adjacent but *adds* axioms rather than restructuring — tier 3, not tier 2. S13 (collapsible linear chain) changes structure but is very local — tier 2 but low priority within it. Assign by blast radius of the fix, not by catalog category.
+### Per-Subtree Advancement
+
+Phase 2 processes per-subtree. A subtree whose findings are all resolved can be marked clean while other subtrees continue work. This prevents one problematic branch from blocking progress across the entire ontology.
+
+Phase 1 → 2 is **global** (hard gate). Phase 2 → 3 is effectively global in practice — Phase 3 starts when all subtrees have completed Phase 2, since naming/annotation fixes can't interact with ongoing modeling work in a meaningful way.
+
+### Phase Assignment Heuristic
+
+- Does fixing this change top-level structure or scope alignment? → Phase 1
+- Does it change taxonomy, property structure, or add content? → Phase 2
+- Is it purely cosmetic (naming, annotations, redundancy cleanup)? → Phase 3
 
 ---
 
 ## Re-Diagnosis Scope
 
-Each tier specifies how much of the ontology needs re-diagnosis after fixes are applied:
+Each phase specifies how much of the ontology needs re-diagnosis after fixes are applied:
 
-| Tier | Re-diagnosis scope | Rationale |
+| Phase | Re-diagnosis scope | Rationale |
 |---|---|---|
-| Tier 1 | Full re-diagnosis (all passes) | Graph may have changed fundamentally |
-| Tier 2 | Re-diagnose affected subtrees | Taxonomy changes are subtree-local |
-| Tier 3 | Re-check properties locally | Property changes don't affect hierarchy |
-| Tier 4 | None | Naming changes have no structural impact |
+| Phase 1 | Full re-diagnosis (all passes) | Graph may have changed fundamentally |
+| Phase 2 | Re-diagnose affected subtrees | Modeling changes are subtree-local |
+| Phase 3 | None | Naming/cosmetic changes have no structural impact |
 
 ---
 
@@ -165,17 +185,15 @@ Each tier specifies how much of the ontology needs re-diagnosis after fixes are 
 Some findings have mechanical fixes that don't require LLM judgment. These are applied silently in the auto-fix pass (step 2 of the round), before exploration:
 
 - **N01:** re-case to convention (PascalCase classes, camelCase properties)
-- **N02:** singularize plural class names
-- **P07:** self-inverse → symmetric
-- **P08:** remove redundant inverse on symmetric property
 - **D01:** remove redundant subClassOf (transitive reduction)
-- **D02:** remove redundant subClassOf alongside equivalentClass
 - **N09:** simplify path-containing labels
 - **N11:** swap label/comment when label is longer
 - **A04:** trim whitespace
 - **M09:** replace "is"/"isA" property with OWL primitive
 
 Auto-fixes are reported in the progress report ("12 naming violations auto-fixed") but not routed through the main agent for approval. See [CATALOG.md](CATALOG.md) for the complete list.
+
+**Note:** N02 (singularize plural names) was removed from auto-fix due to unreliable accuracy on domain-specific vocabulary (documented error rates of 15–50% on technical terms). It now uses flag-and-propose via the exploration pass. See [CATALOG.md](CATALOG.md) § N02 for details.
 
 ---
 
@@ -236,13 +254,7 @@ This gives immediate feedback and makes the proposal's impact concrete.
 
 ## Force-Resolution
 
-Every finding must be resolved. No finding is silently ignored. The main agent must:
-
-1. **Pick an option** → decision stored in registry, diff queued for application
-2. **Request more exploration** → exploration subagent investigates further, then resolution retries
-3. **Explicitly defer** → decision stored with reasoning (won't be re-raised unless entities change)
-
-This ensures the decision registry fills up, making each subsequent round smarter. Deferred decisions are reviewed before the system declares the ontology complete (see [ARCHITECTURE.md](ARCHITECTURE.md) § Lifecycle § Phase 3).
+Every finding must be resolved — pick an option, request more exploration, or explicitly defer. No finding is silently ignored. See [ARCHITECTURE.md](ARCHITECTURE.md) § Decision Registry § Force-Resolution for details.
 
 ---
 
@@ -250,4 +262,4 @@ This ensures the decision registry fills up, making each subsequent round smarte
 
 1. **Resolution batching granularity.** One LLM call per finding vs. per category vs. per subtree. Deferred to implementation — will depend on observed cost and quality tradeoffs.
 
-2. **Diff application order.** When multiple proposals in the same tier produce diffs, should they be applied sequentially (checking for conflicts) or merged into one atomic batch? Sequential is safer; batched is faster.
+2. **Diff application order.** When multiple proposals in the same batch produce diffs, should they be applied sequentially (checking for conflicts) or merged into one atomic batch? Sequential is safer; batched is faster.

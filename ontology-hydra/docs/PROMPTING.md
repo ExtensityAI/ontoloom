@@ -1,6 +1,6 @@
 # Prompt Templates
 
-Templates and guidance for constructing prompts for the main reviewing agent, exploration subagent, and resolution subagent.
+Templates and guidance for constructing prompts for the main reviewing agent, exploration subagent, and resolution subagent. **Prompt engineering is the primary performance lever for this system** — subagent prompts deserve as much design attention as the architecture itself (source: Anthropic's multi-agent research found prompt/token usage explains ~80% of performance variance).
 
 For prompt assembly order and artifact formats, see [ARCHITECTURE.md](ARCHITECTURE.md) § Token Budget. For how these agents fit into the round structure, see [ARCHITECTURE.md](ARCHITECTURE.md) § Round Structure.
 
@@ -75,7 +75,7 @@ that the diagnostic loop will refine.
 ### Main Loop Turn Instructions
 
 ```
-=== Instructions (Round {N}, Tier {T}) ===
+=== Instructions (Round {N}, Phase {P}) ===
 
 Your overall goal is: {intent}
 Key scope constraints: {top_2_3_scope_constraints}
@@ -117,6 +117,10 @@ now be addressed). Un-deferred items must be fixed before completion.
 ```
 You are an ontology exploration subagent. You have read-only access to the
 ontology via tools. Investigate what you're asked and report back.
+
+Before each tool call, explain in prose what you're looking for and why.
+Then make the tool call in a <tool_call> block. This makes your exploration
+trace debuggable and prevents wasted tool calls.
 ```
 
 ### Task Prompt
@@ -235,6 +239,20 @@ finding A resolves finding B, note this explicitly.
 
 ---
 
+## Tool Descriptions
+
+Tool descriptions are part of the prompt and deserve the same care as instructions. A bad tool description causes the agent to misuse the tool or avoid it entirely.
+
+Critical tools to get right:
+
+- **`research_document(doc_id, question)`** — the description must convey that this dispatches a subagent, that the question should be specific and domain-grounded (not "tell me about this document"), and that results are cached. A vague description leads to vague questions which produce vague answers.
+- **`get_subtree(root, detail)`** — the description must explain the `detail` parameter and when to use each level. Without this, the explorer always requests full detail, wasting context.
+- **`search_documents(query)`** — the description must clarify this searches the *index summaries*, not full documents. Otherwise the explorer treats it as a full-text search and is confused by incomplete results.
+
+**Principle:** Tool descriptions should include *when to use* and *when not to use*, not just *what it does*.
+
+---
+
 ## Anti-Patterns
 
 Things the prompts should actively discourage:
@@ -248,6 +266,10 @@ Things the prompts should actively discourage:
 4. **Under-specification in proposals** — "restructure the hierarchy" without concrete operations. Every proposal option must include specific mutation operations.
 
 5. **Ignoring hints** — the catalog hint is a starting point, not optional. The resolution subagent should follow the hint's guidance and deviate only with reasoning.
+
+6. **Over-specification / under-specification imbalance** — the main agent prompt being too detailed (it becomes rigid, stops using judgment) while the explorer prompt is too vague (it misses problems because it doesn't know what "good" looks like). Both agents need calibrated guidance: the main agent needs decision-making latitude, the explorer needs enough structure to know what to look for without being a checklist executor.
+
+7. **Context stuffing** — putting everything into each agent's context "just in case." Every piece of context that isn't directly relevant dilutes what is. Be aggressive about filtering what goes into each subagent call: only the relevant decision registry entries, only the deterministic findings for *this* region, only the scope constraints that apply to *this* subtree. The document research subagent pattern exists specifically to avoid this problem for documents — apply the same discipline to all context.
 
 ---
 

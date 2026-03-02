@@ -6,6 +6,17 @@ Things to consider but not part of the initial implementation. Organized by feas
 
 ## Near-Term Extensions
 
+### Post-Generation Iteration
+
+Currently, each generation is a single session. If the user receives the ontology and disagrees with the result, they start a new session with adjusted intent/documents.
+
+A resume capability would allow the user to provide feedback ("this is wrong about X") and re-enter the diagnostic loop with the decision registry intact. This requires:
+- Persisting session state (snapshots, registry, document index) across sessions
+- A "correction" bootstrap that takes the completed ontology + user feedback as input
+- Injecting user feedback as new findings or scope document amendments
+
+**Why deferred:** The per-session model is sufficient for v1. Post-generation iteration adds cross-session persistence complexity. Add when users report that re-running from scratch is too expensive for minor corrections.
+
 ### Model Expansion: Restrictions and Axioms
 
 The current model covers ~55-60% of the diagnostic catalog. Adding support for OWL constructs would unlock the remaining checks:
@@ -83,6 +94,44 @@ When the system is unsure between two modeling approaches:
 
 Expensive (two resolution cycles) but valuable for genuinely ambiguous decisions. Depends on efficient ontology snapshotting (already supported — see [ARCHITECTURE.md](ARCHITECTURE.md) § Persistence).
 
+### Voting for Phase 1 Structural Decisions
+
+For the highest-stakes structural decisions (Phase 1), run 2–3 independent resolution attempts and pick the best. Each attempt sees the same findings but produces proposals independently — differences reveal where the "obvious" answer isn't obvious.
+
+**Why Phase 1 only:** Phase 1 decisions have the largest blast radius (top-level hierarchy, scope alignment) and the Phase 1 round cap is small (3 rounds), so the cost is bounded. Phase 2 processes per-subtree with many more decisions — voting there would be prohibitively expensive.
+
+**When to add:** If practice shows that Phase 1 structural decisions frequently need reversal in later phases, voting is cheaper than reversal. If Phase 1 decisions are generally stable, this isn't worth the cost.
+
+### Document Clustering for Large Document Sets
+
+For extremely large document sets (500+), cluster documents by content similarity and sample representatives from each cluster for bootstrap deep reads. This turns an O(N) bootstrap read cost into O(K) where K is the number of clusters.
+
+**Approach:**
+- Embed document summaries (from the index, which is always built in full)
+- Cluster by embedding similarity
+- Sample 1–2 documents per cluster for bootstrap deep reads, weighted by cluster size and intent relevance
+- During the main loop, the research subagent still accesses any document on demand — clustering only affects bootstrap prioritization
+
+**Why deferred:** The current architecture handles up to ~200 documents fine (index-building is cheap and parallelizable, deep reads are on-demand via research subagent). Clustering adds an embedding model dependency. Add only if the system is actually used with 500+ document sets — at that scale, the use case is closer to corpus analysis than domain document processing.
+
+### Evaluation Harness
+
+Build a small set of reference ontologies (3–5 domains) with known-good structures and known planted defects. Use them to test whether the diagnostic pipeline catches problems and whether fixes actually improve quality.
+
+**Components:**
+- Reference ontologies with annotated defects (e.g., "T01 at Employee→Company", "S03 at Vehicle with 25 children")
+- Expected finding sets for each reference
+- Quality metrics before/after resolution
+- Regression tests: does a new diagnostic or prompt change degrade performance on known cases?
+
+**Not a runtime feature** — a development/testing tool. The equivalent of a test suite for the diagnostic pipeline itself.
+
+### Decision Dependency Graph
+
+Track which decisions cite other decisions as context — e.g., "chose option B for T01 on Employee because of the global decision to model roles as subclasses." When an upstream decision is questioned, all downstream dependents surface automatically, giving blast-radius visibility for any potential reversal.
+
+**Why deferred:** The phase system with intra-phase reversibility ordering and per-subtree advancement (see [RESOLUTION.md](RESOLUTION.md) § Fix Ordering) already reduces the risk of costly reversals. The exploration pass and diagnostic system catch most bad structural decisions within 1–2 rounds before deep entanglement. Add dependency tracking if practice shows that late-discovered bad decisions are a real problem, not just a theoretical one.
+
 ### Loop Detection
 
 Flag when the resolution pass produces fixes that introduce the same problems they're fixing — the classic oscillation pattern.
@@ -116,13 +165,20 @@ Run an OWL reasoner (HermiT, ELK) to find unsatisfiable classes, diff asserted v
 
 Every peer system (NeOn-GPT, LLMs4Life, Ontogenia) includes reasoner validation. The architecture should plan for this even though it's not needed yet.
 
-### Ontology Checkpointing and Rollback
+### Change Strategies for Decision Reversal
 
-Snapshots are already persisted after each round, but automated rollback on diagnostic degradation is not implemented. Consider:
+When a structural decision turns out wrong, the ontology evolution literature (Stojanovic 2004; Flouris 2006; Djedidi & Aufaure 2010) strongly favors **minimal change over rebuilds**. Strategies ranked from cheapest to most expensive:
 
-- "If critical diagnostic count increased after a round, offer a rollback option"
-- "If the KG diff (see above) shows representational regression, auto-rollback"
-- Branching: keep the pre-fix snapshot alive until the next round confirms the fix didn't cause regression
+1. **Atomic change with automatic propagation.** Apply the reversal as a single mutation operation; let the mutation API cascade references. Already supported — this is what the mutation API does.
+2. **Pattern-based resolution.** The reversed decision maps to an ODP (see [PATTERNS.md](PATTERNS.md)); apply the pattern template. Already supported — this is what the resolution pass does with pattern hints.
+3. **Minimal contraction.** Find the smallest set of axioms/assertions to remove or modify to undo the decision's effects. Based on AGM belief revision theory (Flouris et al. 2008). Not yet implemented but bounded in scope.
+4. **Diff-based adaptation with invertible operations.** Track forward/reverse diffs for each round (COnto-Diff, Hartung et al. 2013). Rollback = apply reverse diffs in order. Requires invertible mutation operations — the mutation API partially supports this already via its diff returns.
+5. **Version rollback with selective replay.** Roll back to a checkpoint before the bad decision, then selectively replay only the good decisions made after it. Requires ontology snapshots (already persisted) + decision registry (already tracked). Not yet implemented but the infrastructure exists.
+6. **Full subtree rebuild.** Detach the affected subtree, re-bootstrap it with corrected constraints, reattach. Last resort — expensive and only viable when the subtree has clean boundaries.
+
+**Current state:** Strategies 1–2 are already available through the mutation API and resolution pass. Strategies 3–5 are implementable with existing infrastructure if needed. Strategy 6 is deferred unless practice shows the cheaper strategies are insufficient.
+
+**Snapshots:** Already persisted after each round. Automated rollback on diagnostic regression is not yet implemented but the persistence model supports it.
 
 ### Action Log Compaction
 
