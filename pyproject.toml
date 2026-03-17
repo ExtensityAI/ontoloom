@@ -1,0 +1,5 @@
+[tool.uv.workspace]
+members = ["ontoloom", "packages/*"]
+
+[dependency-groups]
+dev = ["ruff>=0.15.0,<0.16.0"]

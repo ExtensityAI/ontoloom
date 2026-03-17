@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": "ontoloom",
+    },
+    {
+      "path": "packages/mcp",
+    },
+    {
+      "path": "packages/viz",
+    },
+    {
+      "path": "plugins/claude-plugin",
+    },
+  ],
+  "settings": {},
+}
