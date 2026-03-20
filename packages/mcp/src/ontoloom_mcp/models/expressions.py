@@ -1,30 +1,34 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Literal
 
-from pydantic import Field
+from ontoloom.core.ontology.models.literals import DataRange, TypedLiteral
+from pydantic import BaseModel, Field
 
-from ontoloom.core.ontology.models.base import FrozenModel
-from ontoloom.core.ontology.models.literals import IRI, DataRange, TypedLiteral
+from ontoloom_mcp.models.iri import (
+    ClassIRI,
+    DataPropertyIRI,
+    IndividualIRI,
+    ObjectPropertyIRI,
+)
 
 
-class BaseClassExpression(FrozenModel):
-    """Base for all OWL 2 EL class expressions."""
+class BaseClassExpression(BaseModel):
+    """Base for all MCP class expressions (StrIRI variant)."""
 
 
 # -- Named class --
 
 
 class NamedClass(BaseClassExpression):
-    """A named (atomic) class. Wraps a Class entity IRI.
+    """A named (atomic) class.
 
-    Also used for owl:Thing and owl:Nothing:
-        NamedClass(iri=IRI(prefix="owl", local_name="Thing"))
-        NamedClass(iri=IRI(prefix="owl", local_name="Nothing"))
+    NamedClass(iri=":Dog")
+    NamedClass(iri="owl:Thing")
     """
 
     type: Literal["NamedClass"] = "NamedClass"
-    iri: IRI
+    iri: ClassIRI
 
 
 # -- Object property restrictions --
@@ -38,7 +42,7 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     """
 
     type: Literal["ObjectSomeValuesFrom"] = "ObjectSomeValuesFrom"
-    property: IRI
+    property: ObjectPropertyIRI
     filler: ClassExpression
 
 
@@ -49,7 +53,7 @@ class ObjectIntersectionOf(BaseClassExpression):
     """
 
     type: Literal["ObjectIntersectionOf"] = "ObjectIntersectionOf"
-    operands: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    operands: list[ClassExpression] = Field(..., min_length=2)
 
 
 class ObjectOneOf(BaseClassExpression):
@@ -59,7 +63,7 @@ class ObjectOneOf(BaseClassExpression):
     """
 
     type: Literal["ObjectOneOf"] = "ObjectOneOf"
-    individual: IRI
+    individual: IndividualIRI
 
 
 class ObjectHasValue(BaseClassExpression):
@@ -71,8 +75,8 @@ class ObjectHasValue(BaseClassExpression):
     """
 
     type: Literal["ObjectHasValue"] = "ObjectHasValue"
-    property: IRI
-    individual: IRI
+    property: ObjectPropertyIRI
+    individual: IndividualIRI
 
 
 class ObjectHasSelf(BaseClassExpression):
@@ -82,7 +86,7 @@ class ObjectHasSelf(BaseClassExpression):
     """
 
     type: Literal["ObjectHasSelf"] = "ObjectHasSelf"
-    property: IRI
+    property: ObjectPropertyIRI
 
 
 # -- Data property restrictions --
@@ -96,7 +100,7 @@ class DataSomeValuesFrom(BaseClassExpression):
     """
 
     type: Literal["DataSomeValuesFrom"] = "DataSomeValuesFrom"
-    property: IRI
+    property: DataPropertyIRI
     range: DataRange
 
 
@@ -107,23 +111,21 @@ class DataHasValue(BaseClassExpression):
     """
 
     type: Literal["DataHasValue"] = "DataHasValue"
-    property: IRI
+    property: DataPropertyIRI
     value: TypedLiteral
 
 
-ClassExpression = Annotated[
-    (
-        NamedClass
-        | ObjectSomeValuesFrom
-        | ObjectIntersectionOf
-        | ObjectOneOf
-        | ObjectHasValue
-        | ObjectHasSelf
-        | DataSomeValuesFrom
-        | DataHasValue
-    ),
-    Field(discriminator="type"),
-]
+ClassExpression = (
+    ClassIRI
+    | NamedClass
+    | ObjectSomeValuesFrom
+    | ObjectIntersectionOf
+    | ObjectOneOf
+    | ObjectHasValue
+    | ObjectHasSelf
+    | DataSomeValuesFrom
+    | DataHasValue
+)
 
 ObjectSomeValuesFrom.model_rebuild()
 ObjectIntersectionOf.model_rebuild()

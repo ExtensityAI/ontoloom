@@ -4,8 +4,7 @@ from pydantic import Field
 
 from ontoloom.core.ontology.models.base import FrozenModel
 from ontoloom.core.ontology.models.expressions import ClassExpression
-from ontoloom.core.ontology.models.iri import DataPropertyIRI, IndividualIRI, ObjectPropertyIRI
-from ontoloom.core.ontology.models.literals import TypedLiteral
+from ontoloom.core.ontology.models.literals import IRI, TypedLiteral
 
 # =============================================================================
 # Base
@@ -29,7 +28,7 @@ class ClassAssertion(BaseAssertion):
 
     type: Literal["ClassAssertion"] = "ClassAssertion"
     class_expression: ClassExpression
-    individual: IndividualIRI
+    individual: IRI
 
 
 class ObjectPropertyAssertion(BaseAssertion):
@@ -39,9 +38,9 @@ class ObjectPropertyAssertion(BaseAssertion):
     """
 
     type: Literal["ObjectPropertyAssertion"] = "ObjectPropertyAssertion"
-    property: ObjectPropertyIRI
-    source: IndividualIRI
-    target: IndividualIRI
+    property: IRI
+    source: IRI
+    target: IRI
 
 
 class NegativeObjectPropertyAssertion(BaseAssertion):
@@ -51,9 +50,9 @@ class NegativeObjectPropertyAssertion(BaseAssertion):
     """
 
     type: Literal["NegativeObjectPropertyAssertion"] = "NegativeObjectPropertyAssertion"
-    property: ObjectPropertyIRI
-    source: IndividualIRI
-    target: IndividualIRI
+    property: IRI
+    source: IRI
+    target: IRI
 
 
 class DataPropertyAssertion(BaseAssertion):
@@ -63,8 +62,8 @@ class DataPropertyAssertion(BaseAssertion):
     """
 
     type: Literal["DataPropertyAssertion"] = "DataPropertyAssertion"
-    property: DataPropertyIRI
-    individual: IndividualIRI
+    property: IRI
+    individual: IRI
     value: TypedLiteral
 
 
@@ -75,8 +74,8 @@ class NegativeDataPropertyAssertion(BaseAssertion):
     """
 
     type: Literal["NegativeDataPropertyAssertion"] = "NegativeDataPropertyAssertion"
-    property: DataPropertyIRI
-    individual: IndividualIRI
+    property: IRI
+    individual: IRI
     value: TypedLiteral
 
 
@@ -89,14 +88,14 @@ class SameIndividual(BaseAssertion):
     """a = b — both IRIs denote the same entity."""
 
     type: Literal["SameIndividual"] = "SameIndividual"
-    individuals: list[IndividualIRI] = Field(..., min_length=2)
+    individuals: tuple[IRI, ...] = Field(..., min_length=2)
 
 
 class DifferentIndividuals(BaseAssertion):
     """a ≠ b — all listed individuals are pairwise distinct."""
 
     type: Literal["DifferentIndividuals"] = "DifferentIndividuals"
-    individuals: list[IndividualIRI] = Field(..., min_length=2)
+    individuals: tuple[IRI, ...] = Field(..., min_length=2)
 
 
 # =============================================================================

@@ -1,47 +1,25 @@
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Field
+from ontoloom.core.ontology.models.literals import DataRange, LangLiteral, TypedLiteral
+from pydantic import BaseModel, Field
 
-from ontoloom.core.ontology.models.base import FrozenModel
-from ontoloom.core.ontology.models.expressions import ClassExpression
-from ontoloom.core.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
+from ontoloom_mcp.models.expressions import ClassExpression
+from ontoloom_mcp.models.iri import (
+    AnnotationPropertyIRI,
+    DataPropertyIRI,
+    ObjectPropertyIRI,
+    StrIRI,
+)
 
 # =============================================================================
 # Base
 # =============================================================================
 
 
-class BaseAxiom(FrozenModel):
-    """Base for all OWL 2 EL axioms (TBox + RBox)."""
-
-
-# =============================================================================
-# Declarations
-# =============================================================================
-
-
-class EntityType(StrEnum):
-    CLASS = "Class"
-    OBJECT_PROPERTY = "ObjectProperty"
-    DATA_PROPERTY = "DataProperty"
-    NAMED_INDIVIDUAL = "NamedIndividual"
-    ANNOTATION_PROPERTY = "AnnotationProperty"
-    DATATYPE = "Datatype"
-
-
-class Declaration(BaseAxiom):
-    """Declares that an IRI is a specific kind of entity.
-
-    Semantically vacuous but required for OWL 2 DL well-formedness.
-    Generated mechanically — the LLM never produces these directly.
-    """
-
-    type: Literal["Declaration"] = "Declaration"
-    entity_type: EntityType
-    iri: IRI
+class BaseAxiom(BaseModel):
+    """Base for all MCP axiom input models (StrIRI variant)."""
 
 
 # =============================================================================
@@ -56,8 +34,8 @@ class AnnotationAssertion(BaseAxiom):
     """
 
     type: Literal["AnnotationAssertion"] = "AnnotationAssertion"
-    property: IRI
-    subject: IRI
+    property: AnnotationPropertyIRI
+    subject: StrIRI
     value: str | TypedLiteral | LangLiteral
 
 
@@ -89,7 +67,7 @@ class EquivalentClasses(BaseAxiom):
     """
 
     type: Literal["EquivalentClasses"] = "EquivalentClasses"
-    expressions: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    expressions: list[ClassExpression] = Field(..., min_length=2)
 
 
 class DisjointClasses(BaseAxiom):
@@ -99,7 +77,7 @@ class DisjointClasses(BaseAxiom):
     """
 
     type: Literal["DisjointClasses"] = "DisjointClasses"
-    expressions: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    expressions: list[ClassExpression] = Field(..., min_length=2)
 
 
 # =============================================================================
@@ -114,8 +92,8 @@ class SubObjectPropertyOf(BaseAxiom):
     """
 
     type: Literal["SubObjectPropertyOf"] = "SubObjectPropertyOf"
-    sub_property: IRI
-    super_property: IRI
+    sub_property: ObjectPropertyIRI
+    super_property: ObjectPropertyIRI
 
 
 class SubObjectPropertyOfChain(BaseAxiom):
@@ -128,15 +106,15 @@ class SubObjectPropertyOfChain(BaseAxiom):
     """
 
     type: Literal["SubObjectPropertyOfChain"] = "SubObjectPropertyOfChain"
-    chain: tuple[IRI, ...] = Field(..., min_length=2)
-    super_property: IRI
+    chain: list[ObjectPropertyIRI] = Field(..., min_length=2)
+    super_property: ObjectPropertyIRI
 
 
 class EquivalentObjectProperties(BaseAxiom):
     """r₁ ≡ r₂ — properties relate the same pairs of individuals."""
 
     type: Literal["EquivalentObjectProperties"] = "EquivalentObjectProperties"
-    properties: tuple[IRI, ...] = Field(..., min_length=2)
+    properties: list[ObjectPropertyIRI] = Field(..., min_length=2)
 
 
 class TransitiveObjectProperty(BaseAxiom):
@@ -146,7 +124,7 @@ class TransitiveObjectProperty(BaseAxiom):
     """
 
     type: Literal["TransitiveObjectProperty"] = "TransitiveObjectProperty"
-    property: IRI
+    property: ObjectPropertyIRI
 
 
 class ReflexiveObjectProperty(BaseAxiom):
@@ -156,7 +134,7 @@ class ReflexiveObjectProperty(BaseAxiom):
     """
 
     type: Literal["ReflexiveObjectProperty"] = "ReflexiveObjectProperty"
-    property: IRI
+    property: ObjectPropertyIRI
 
 
 class ObjectPropertyDomain(BaseAxiom):
@@ -167,7 +145,7 @@ class ObjectPropertyDomain(BaseAxiom):
     """
 
     type: Literal["ObjectPropertyDomain"] = "ObjectPropertyDomain"
-    property: IRI
+    property: ObjectPropertyIRI
     domain: ClassExpression
 
 
@@ -178,7 +156,7 @@ class ObjectPropertyRange(BaseAxiom):
     """
 
     type: Literal["ObjectPropertyRange"] = "ObjectPropertyRange"
-    property: IRI
+    property: ObjectPropertyIRI
     range: ClassExpression
 
 
@@ -191,22 +169,22 @@ class SubDataPropertyOf(BaseAxiom):
     """dp₁ ⊑ dp₂ — if dp₁(x,v) then dp₂(x,v)."""
 
     type: Literal["SubDataPropertyOf"] = "SubDataPropertyOf"
-    sub_property: IRI
-    super_property: IRI
+    sub_property: DataPropertyIRI
+    super_property: DataPropertyIRI
 
 
 class EquivalentDataProperties(BaseAxiom):
     """dp₁ ≡ dp₂ — data properties have the same values for all individuals."""
 
     type: Literal["EquivalentDataProperties"] = "EquivalentDataProperties"
-    properties: tuple[IRI, ...] = Field(..., min_length=2)
+    properties: list[DataPropertyIRI] = Field(..., min_length=2)
 
 
 class DataPropertyDomain(BaseAxiom):
     """If x has any value for dp, then x ∈ C."""
 
     type: Literal["DataPropertyDomain"] = "DataPropertyDomain"
-    property: IRI
+    property: DataPropertyIRI
     domain: ClassExpression
 
 
@@ -214,7 +192,7 @@ class DataPropertyRange(BaseAxiom):
     """All values of dp fall within this data range."""
 
     type: Literal["DataPropertyRange"] = "DataPropertyRange"
-    property: IRI
+    property: DataPropertyIRI
     range: DataRange
 
 
@@ -225,7 +203,7 @@ class FunctionalDataProperty(BaseAxiom):
     """
 
     type: Literal["FunctionalDataProperty"] = "FunctionalDataProperty"
-    property: IRI
+    property: DataPropertyIRI
 
 
 # =============================================================================
@@ -241,8 +219,8 @@ class HasKey(BaseAxiom):
 
     type: Literal["HasKey"] = "HasKey"
     class_expression: ClassExpression
-    object_properties: tuple[IRI, ...]
-    data_properties: tuple[IRI, ...]
+    object_properties: list[ObjectPropertyIRI]
+    data_properties: list[DataPropertyIRI]
 
 
 # =============================================================================
@@ -251,8 +229,7 @@ class HasKey(BaseAxiom):
 
 Axiom = Annotated[
     (
-        Declaration
-        | AnnotationAssertion
+        AnnotationAssertion
         | SubClassOf
         | EquivalentClasses
         | DisjointClasses

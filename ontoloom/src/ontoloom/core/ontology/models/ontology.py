@@ -1,8 +1,8 @@
 from pydantic import Field
 
-from ontoloom.core.ontology.models.axioms import Axiom, BaseAxiom
+from ontoloom.core.ontology.models.axioms import Axiom
 from ontoloom.core.ontology.models.base import FrozenModel
-from ontoloom.core.ontology.models.iri import IRI
+from ontoloom.core.ontology.models.literals import IRI
 
 
 class Prefix(FrozenModel):
@@ -22,17 +22,7 @@ _DEFAULT_PREFIXES = [
 
 
 class Ontology(FrozenModel):
-    """An OWL 2 EL ontology — TBox + RBox axioms.
-
-    Does not contain ABox assertions; those live in KnowledgeBase.
-    """
+    """An OWL 2 EL ontology — TBox + RBox axioms."""
 
     iri: IRI | None = None
-    prefixes: list[Prefix] = Field(default_factory=lambda: list(_DEFAULT_PREFIXES))
-    axioms: list[Axiom] = Field(default_factory=list)
-
-    def prefix_map(self) -> dict[str, str]:
-        return {p.name: p.iri for p in self.prefixes}
-
-    def axioms_of_type[T: BaseAxiom](self, *types: type[T]) -> list[T]:
-        return [a for a in self.axioms if isinstance(a, types)]
+    axioms: tuple[Axiom, ...]
