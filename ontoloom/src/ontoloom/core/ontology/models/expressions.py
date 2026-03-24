@@ -8,14 +8,14 @@ from ontoloom.core.ontology.models.base import FrozenModel
 from ontoloom.core.ontology.models.literals import IRI, DataRange, TypedLiteral
 
 
-class BaseClassExpression(FrozenModel):
+class _BaseClassExpression(FrozenModel):
     """Base for all OWL 2 EL class expressions."""
 
 
 # -- Named class --
 
 
-class NamedClass(BaseClassExpression):
+class NamedClass(_BaseClassExpression):
     """A named (atomic) class. Wraps a Class entity IRI.
 
     Also used for owl:Thing and owl:Nothing:
@@ -26,11 +26,14 @@ class NamedClass(BaseClassExpression):
     type: Literal["NamedClass"] = "NamedClass"
     iri: IRI
 
+    def __str__(self) -> str:
+        return str(self.iri)
+
 
 # -- Object property restrictions --
 
 
-class ObjectSomeValuesFrom(BaseClassExpression):
+class ObjectSomeValuesFrom(_BaseClassExpression):
     """∃r.C — things related by r to at least one member of C.
 
     SubClassOf(Animal, ObjectSomeValuesFrom(hasPart, Heart))
@@ -41,8 +44,11 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     property: IRI
     filler: ClassExpression
 
+    def __str__(self) -> str:
+        return f"ObjectSomeValuesFrom({self.property}, {self.filler})"
 
-class ObjectIntersectionOf(BaseClassExpression):
+
+class ObjectIntersectionOf(_BaseClassExpression):
     """C ⊓ D — things in ALL listed classes simultaneously.
 
     ObjectIntersectionOf([Woman, Parent]) → female parents
@@ -51,8 +57,11 @@ class ObjectIntersectionOf(BaseClassExpression):
     type: Literal["ObjectIntersectionOf"] = "ObjectIntersectionOf"
     operands: tuple[ClassExpression, ...] = Field(..., min_length=2)
 
+    def __str__(self) -> str:
+        return f"ObjectIntersectionOf({', '.join(str(o) for o in self.operands)})"
 
-class ObjectOneOf(BaseClassExpression):
+
+class ObjectOneOf(_BaseClassExpression):
     """Nominal: {a} — class containing exactly one individual.
 
     EL restriction: only a single individual.
@@ -61,8 +70,11 @@ class ObjectOneOf(BaseClassExpression):
     type: Literal["ObjectOneOf"] = "ObjectOneOf"
     individual: IRI
 
+    def __str__(self) -> str:
+        return f"ObjectOneOf({self.individual})"
 
-class ObjectHasValue(BaseClassExpression):
+
+class ObjectHasValue(_BaseClassExpression):
     """∃r.{a} — things related by r to a specific individual.
 
     ObjectHasValue(hasCreator, :Alice) → things created by Alice
@@ -74,8 +86,11 @@ class ObjectHasValue(BaseClassExpression):
     property: IRI
     individual: IRI
 
+    def __str__(self) -> str:
+        return f"ObjectHasValue({self.property}, {self.individual})"
 
-class ObjectHasSelf(BaseClassExpression):
+
+class ObjectHasSelf(_BaseClassExpression):
     """∃r.Self — things related to themselves by r.
 
     ObjectHasSelf(likes) → things that like themselves
@@ -84,11 +99,14 @@ class ObjectHasSelf(BaseClassExpression):
     type: Literal["ObjectHasSelf"] = "ObjectHasSelf"
     property: IRI
 
+    def __str__(self) -> str:
+        return f"ObjectHasSelf({self.property})"
+
 
 # -- Data property restrictions --
 
 
-class DataSomeValuesFrom(BaseClassExpression):
+class DataSomeValuesFrom(_BaseClassExpression):
     """Things with at least one value for dp in the given range.
 
     DataSomeValuesFrom(hasAge, xsd:integer)
@@ -99,8 +117,13 @@ class DataSomeValuesFrom(BaseClassExpression):
     property: IRI
     range: DataRange
 
+    def __str__(self) -> str:
+        from ontoloom.core.ontology.models.literals import _fmt_data_range
 
-class DataHasValue(BaseClassExpression):
+        return f"DataSomeValuesFrom({self.property}, {_fmt_data_range(self.range)})"
+
+
+class DataHasValue(_BaseClassExpression):
     """Things whose data property has exactly this value.
 
     DataHasValue(hasName, TypedLiteral("Alice"))
@@ -109,6 +132,9 @@ class DataHasValue(BaseClassExpression):
     type: Literal["DataHasValue"] = "DataHasValue"
     property: IRI
     value: TypedLiteral
+
+    def __str__(self) -> str:
+        return f"DataHasValue({self.property}, {self.value})"
 
 
 ClassExpression = Annotated[

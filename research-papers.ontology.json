@@ -1,0 +1,2407 @@
+{
+  "iri": null,
+  "axioms": [
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ScholarlyWork"
+      },
+      "value": "Scholarly Work"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ScholarlyWork"
+      },
+      "value": "A research output such as a paper, thesis, or report. Preprint and published versions of the same work are represented as one ScholarlyWork with versioning."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Article"
+      },
+      "value": "Article"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Article"
+      },
+      "value": "A journal or conference paper."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Thesis"
+      },
+      "value": "Thesis"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Person"
+      },
+      "value": "Person"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Person"
+      },
+      "value": "A researcher or author."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Organization"
+      },
+      "value": "Organization"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Institution"
+      },
+      "value": "Institution"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Institution"
+      },
+      "value": "A university, company, or research institute."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Department"
+      },
+      "value": "Department"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ResearchGroup"
+      },
+      "value": "Research Group"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ResearchGroup"
+      },
+      "value": "A lab or research group within an organization."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Authorship"
+      },
+      "value": "Authorship"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Authorship"
+      },
+      "value": "Reified relationship capturing who authored a work, their position, role, and affiliation at time of writing."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CorrespondingAuthorship"
+      },
+      "value": "Corresponding Authorship"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "EqualContributionAuthorship"
+      },
+      "value": "Equal Contribution Authorship"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Venue"
+      },
+      "value": "Venue"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Journal"
+      },
+      "value": "Journal"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ConferenceSeries"
+      },
+      "value": "Conference Series"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "WorkshopSeries"
+      },
+      "value": "Workshop Series"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "VenueEdition"
+      },
+      "value": "Venue Edition"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "VenueEdition"
+      },
+      "value": "A specific instance of a venue, e.g. NeurIPS 2024 or JMLR Volume 25."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Publisher"
+      },
+      "value": "Publisher"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Topic"
+      },
+      "value": "Topic"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BroadField"
+      },
+      "value": "Broad Field"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BroadField"
+      },
+      "value": "A high-level research area, e.g. an arXiv primary category like cs.AI or physics.hep-th."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "SpecificTopic"
+      },
+      "value": "Specific Topic"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "SpecificTopic"
+      },
+      "value": "A fine-grained research topic or keyword, e.g. 'attention mechanisms' or 'graph neural networks'."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Method"
+      },
+      "value": "Method"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Method"
+      },
+      "value": "A technique or approach used in research, e.g. 'transformer', 'Monte Carlo simulation', 'A/B testing'."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Dataset"
+      },
+      "value": "Dataset"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Software"
+      },
+      "value": "Software"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Software"
+      },
+      "value": "A code repository or software tool linked to a scholarly work."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "FundingSource"
+      },
+      "value": "Funding Source"
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Article"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Thesis"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Institution"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Department"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ResearchGroup"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CorrespondingAuthorship"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "EqualContributionAuthorship"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Journal"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ConferenceSeries"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "WorkshopSeries"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "BroadField"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Topic"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "SpecificTopic"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Topic"
+        }
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Article"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Thesis"
+          }
+        }
+      ]
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "BroadField"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "SpecificTopic"
+          }
+        }
+      ]
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Person"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Organization"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "ScholarlyWork"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Venue"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "VenueEdition"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Publisher"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Topic"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Method"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Dataset"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Software"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "FundingSource"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Authorship"
+          }
+        }
+      ]
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasAuthorship"
+      },
+      "value": "has authorship"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasAuthor"
+      },
+      "value": "has author"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasAffiliation"
+      },
+      "value": "has affiliation"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ofWork"
+      },
+      "value": "of work"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "cites"
+      },
+      "value": "cites"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      },
+      "value": "academically related to"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "extends"
+      },
+      "value": "extends"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "contradicts"
+      },
+      "value": "contradicts"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "reproduces"
+      },
+      "value": "reproduces"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "surveys"
+      },
+      "value": "surveys"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasNewerVersion"
+      },
+      "value": "has newer version"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "groupedWith"
+      },
+      "value": "grouped with"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasTopic"
+      },
+      "value": "has topic"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "usesMethod"
+      },
+      "value": "uses method"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "publishedIn"
+      },
+      "value": "published in"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "editionOf"
+      },
+      "value": "edition of"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "publishedBy"
+      },
+      "value": "published by"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasDataset"
+      },
+      "value": "has dataset"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasSoftware"
+      },
+      "value": "has software"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "subOrganizationOf"
+      },
+      "value": "sub-organization of"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "subTopicOf"
+      },
+      "value": "sub-topic of"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "fundedBy"
+      },
+      "value": "funded by"
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAuthorship"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAuthorship"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAuthor"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAuthor"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Person"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAffiliation"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasAffiliation"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "ofWork"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "ofWork"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "cites"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "cites"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "SubObjectPropertyOf",
+      "sub_property": {
+        "prefix": "",
+        "local_name": "extends"
+      },
+      "super_property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      }
+    },
+    {
+      "type": "SubObjectPropertyOf",
+      "sub_property": {
+        "prefix": "",
+        "local_name": "contradicts"
+      },
+      "super_property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      }
+    },
+    {
+      "type": "SubObjectPropertyOf",
+      "sub_property": {
+        "prefix": "",
+        "local_name": "reproduces"
+      },
+      "super_property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      }
+    },
+    {
+      "type": "SubObjectPropertyOf",
+      "sub_property": {
+        "prefix": "",
+        "local_name": "surveys"
+      },
+      "super_property": {
+        "prefix": "",
+        "local_name": "academicallyRelatedTo"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasNewerVersion"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasNewerVersion"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "groupedWith"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "groupedWith"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasTopic"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasTopic"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Topic"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "usesMethod"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "usesMethod"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Method"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "publishedIn"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "publishedIn"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "VenueEdition"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "editionOf"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "VenueEdition"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "editionOf"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "publishedBy"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "publishedBy"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Publisher"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasDataset"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasDataset"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Dataset"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSoftware"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSoftware"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Software"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "subOrganizationOf"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "subOrganizationOf"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Organization"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "subTopicOf"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Topic"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "subTopicOf"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Topic"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "fundedBy"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "fundedBy"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "FundingSource"
+        }
+      }
+    },
+    {
+      "type": "TransitiveObjectProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "subTopicOf"
+      }
+    },
+    {
+      "type": "TransitiveObjectProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "subOrganizationOf"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "title"
+      },
+      "value": "title"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "abstract"
+      },
+      "value": "abstract"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "doi"
+      },
+      "value": "DOI"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "publicationDate"
+      },
+      "value": "publication date"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "url"
+      },
+      "value": "URL"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "citationCount"
+      },
+      "value": "citation count"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "fundingInfo"
+      },
+      "value": "funding info"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "name"
+      },
+      "value": "name"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "authorPosition"
+      },
+      "value": "author position"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "venueRanking"
+      },
+      "value": "venue ranking"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "year"
+      },
+      "value": "year"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "orcid"
+      },
+      "value": "ORCID"
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "title"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "title"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "title"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "abstract"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "abstract"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "abstract"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "doi"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "doi"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "doi"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "publicationDate"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "publicationDate"
+      },
+      "range": "xsd:dateTime"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "publicationDate"
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "url"
+      },
+      "range": "xsd:anyURI"
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "citationCount"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "citationCount"
+      },
+      "range": "xsd:nonNegativeInteger"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "citationCount"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "fundingInfo"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "fundingInfo"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "name"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "orcid"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Person"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "orcid"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "orcid"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "authorPosition"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "authorPosition"
+      },
+      "range": "xsd:nonNegativeInteger"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "authorPosition"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "venueRanking"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "venueRanking"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "venueRanking"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "year"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "VenueEdition"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "year"
+      },
+      "range": "xsd:integer"
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "year"
+      }
+    },
+    {
+      "type": "HasKey",
+      "class_expression": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      },
+      "object_properties": [],
+      "data_properties": [
+        {
+          "prefix": "",
+          "local_name": "doi"
+        }
+      ]
+    },
+    {
+      "type": "HasKey",
+      "class_expression": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Person"
+        }
+      },
+      "object_properties": [],
+      "data_properties": [
+        {
+          "prefix": "",
+          "local_name": "orcid"
+        }
+      ]
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "name"
+      },
+      "value": "Name of any entity (person, organization, venue, topic, method, etc.). Domain-neutral by design."
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "OpenAccessWork"
+      },
+      "value": "Open Access Work"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "OpenAccessWork"
+      },
+      "value": "A scholarly work that is freely accessible without a paywall."
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "OpenAccessWork"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasAuthor"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Person"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Authorship"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "ofWork"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "ScholarlyWork"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ScholarlyWork"
+        }
+      },
+      "super_class": {
+        "type": "DataSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "title"
+        },
+        "range": "xsd:string"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "subMethodOf"
+      },
+      "value": "sub-method of"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "subMethodOf"
+      },
+      "value": "Hierarchical relation between methods. E.g., BERT subMethodOf transformer subMethodOf neural network."
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "subMethodOf"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Method"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "subMethodOf"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Method"
+        }
+      }
+    },
+    {
+      "type": "TransitiveObjectProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "subMethodOf"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BookSeries"
+      },
+      "value": "Book Series"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BookSeries"
+      },
+      "value": "A book series venue, e.g. Lecture Notes in Computer Science."
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "BookSeries"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PreprintServer"
+      },
+      "value": "Preprint Server"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PreprintServer"
+      },
+      "value": "A preprint hosting platform, e.g. arXiv, bioRxiv, SSRN."
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PreprintServer"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Venue"
+        }
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Journal"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "ConferenceSeries"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "WorkshopSeries"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "BookSeries"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PreprintServer"
+          }
+        }
+      ]
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "url"
+      },
+      "value": "URL of any resource (paper, dataset, software, etc.). Domain-neutral by design."
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "VenueEdition"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "editionOf"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Venue"
+          }
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Dataset"
+      },
+      "value": "A dataset produced or used by a scholarly work, e.g. ImageNet, MNIST."
+    }
+  ]
+}

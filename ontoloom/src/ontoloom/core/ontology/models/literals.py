@@ -66,12 +66,18 @@ class TypedLiteral(FrozenModel):
     value: str
     datatype: DataType = DataType.STRING
 
+    def __str__(self):
+        return f'"{self.value}"^^{self.datatype.value}'
+
 
 class LangLiteral(FrozenModel):
     """A value with a language tag: "Dog"@en"""
 
     value: str
     lang: str = "en"
+
+    def __str__(self) -> str:
+        return f'"{self.value}"@{self.lang}'
 
 
 # -- Data Range Expressions --
@@ -87,12 +93,18 @@ class DataIntersectionOf(BaseDataRange):
     type: Literal["DataIntersectionOf"] = "DataIntersectionOf"
     operands: list[DataRange] = Field(..., min_length=2)
 
+    def __str__(self) -> str:
+        return " ⊓ ".join(_fmt_data_range(o) for o in self.operands)
+
 
 class DataOneOf(BaseDataRange):
     """Union of data ranges. Due to us supporting OWL2 EL, only one option is allowed."""
 
     type: Literal["DataOneOf"] = "DataOneOf"
     value: TypedLiteral
+
+    def __str__(self) -> str:
+        return f"{{{self.value}}}"
 
 
 DataRange = (
@@ -102,5 +114,13 @@ DataRange = (
         Field(discriminator="type"),
     ]
 )
+
+
+def _fmt_data_range(dr: DataRange) -> str:
+    """Format a DataRange union value as a compact string."""
+    if isinstance(dr, DataType):
+        return dr.value
+    return str(dr)
+
 
 DataIntersectionOf.model_rebuild()

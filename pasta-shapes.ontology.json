@@ -1,0 +1,5614 @@
+{
+  "iri": null,
+  "axioms": [
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PastaShape"
+      },
+      "value": {
+        "value": "Pasta Shape",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PastaShape"
+      },
+      "value": {
+        "value": "A distinct form of pasta, characterized by its geometry, size, and regional origin.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Region"
+      },
+      "value": {
+        "value": "Region",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Region"
+      },
+      "value": {
+        "value": "An Italian region associated with a pasta shape's origin.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sauce"
+      },
+      "value": {
+        "value": "Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sauce"
+      },
+      "value": {
+        "value": "A sauce traditionally paired with a pasta shape.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Geometry"
+      },
+      "value": {
+        "value": "Geometry",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Geometry"
+      },
+      "value": {
+        "value": "The geometric form category of a pasta shape (e.g. tubular, ribbon, strand).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Size"
+      },
+      "value": {
+        "value": "Size",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Size"
+      },
+      "value": {
+        "value": "A size classification for pasta shapes.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "SurfaceTexture"
+      },
+      "value": {
+        "value": "Surface Texture",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "SurfaceTexture"
+      },
+      "value": {
+        "value": "The surface finish of a pasta shape, affecting sauce adhesion.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tubular"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Ribbon"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Strand"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sheet"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Stuffed"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Shaped"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spiral"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tubular"
+      },
+      "value": {
+        "value": "Tubular",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Ribbon"
+      },
+      "value": {
+        "value": "Ribbon",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Strand"
+      },
+      "value": {
+        "value": "Strand",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sheet"
+      },
+      "value": {
+        "value": "Sheet",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Stuffed"
+      },
+      "value": {
+        "value": "Stuffed",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Shaped"
+      },
+      "value": {
+        "value": "Shaped",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Spiral"
+      },
+      "value": {
+        "value": "Spiral",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tubular"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ribbon"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Strand"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sheet"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Stuffed"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Spiral"
+          }
+        }
+      ]
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Small"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Size"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Medium"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Size"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Large"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Size"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Small"
+      },
+      "value": {
+        "value": "Small (Pastina)",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Medium"
+      },
+      "value": {
+        "value": "Medium",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Large"
+      },
+      "value": {
+        "value": "Large",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Large"
+          }
+        }
+      ]
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Liscia"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "SurfaceTexture"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigata"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "SurfaceTexture"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Liscia"
+      },
+      "value": {
+        "value": "Liscia (Smooth)",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Rigata"
+      },
+      "value": {
+        "value": "Rigata (Ridged)",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigata"
+          }
+        }
+      ]
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasGeometry"
+      },
+      "value": {
+        "value": "has geometry",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasGeometry"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasGeometry"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Geometry"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasSize"
+      },
+      "value": {
+        "value": "has size",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSize"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSize"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Size"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasSurfaceTexture"
+      },
+      "value": {
+        "value": "has surface texture",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSurfaceTexture"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasSurfaceTexture"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "SurfaceTexture"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "originatesFrom"
+      },
+      "value": {
+        "value": "originates from",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "originatesFrom"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "originatesFrom"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "pairsWithSauce"
+      },
+      "value": {
+        "value": "pairs with sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "ObjectPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "pairsWithSauce"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "ObjectPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "pairsWithSauce"
+      },
+      "range": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasName"
+      },
+      "value": {
+        "value": "has name",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasName"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasName"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasEtymology"
+      },
+      "value": {
+        "value": "has etymology",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DataPropertyDomain",
+      "property": {
+        "prefix": "",
+        "local_name": "hasEtymology"
+      },
+      "domain": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "DataPropertyRange",
+      "property": {
+        "prefix": "",
+        "local_name": "hasEtymology"
+      },
+      "range": "xsd:string"
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Campania"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Liguria"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "EmiliaRomagna"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lazio"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sicily"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Puglia"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sardinia"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tuscany"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Region"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Campania"
+      },
+      "value": {
+        "value": "Campania",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Liguria"
+      },
+      "value": {
+        "value": "Liguria",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "EmiliaRomagna"
+      },
+      "value": {
+        "value": "Emilia-Romagna",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Lazio"
+      },
+      "value": {
+        "value": "Lazio",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sicily"
+      },
+      "value": {
+        "value": "Sicily",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Puglia"
+      },
+      "value": {
+        "value": "Puglia",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sardinia"
+      },
+      "value": {
+        "value": "Sardinia",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tuscany"
+      },
+      "value": {
+        "value": "Tuscany",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "TomatoSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CreamSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "OilBasedSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "MeatSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PestoSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "BrothSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "ButterSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "TomatoSauce"
+      },
+      "value": {
+        "value": "Tomato Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CreamSauce"
+      },
+      "value": {
+        "value": "Cream Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "OilBasedSauce"
+      },
+      "value": {
+        "value": "Oil-Based Sauce (Aglio e Olio)",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PestoSauce"
+      },
+      "value": {
+        "value": "Pesto",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BrothSauce"
+      },
+      "value": {
+        "value": "Broth (in Brodo)",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ButterSauce"
+      },
+      "value": {
+        "value": "Butter Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Ragu"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "MeatSauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Amatriciana"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "TomatoSauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Arrabbiata"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "TomatoSauce"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Ragu"
+      },
+      "value": {
+        "value": "Ragù",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Bolognese"
+      },
+      "value": {
+        "value": "Bolognese",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Carbonara"
+      },
+      "value": {
+        "value": "Carbonara",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Amatriciana"
+      },
+      "value": {
+        "value": "Amatriciana",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Arrabbiata"
+      },
+      "value": {
+        "value": "Arrabbiata",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CacioEPepe"
+      },
+      "value": {
+        "value": "Cacio e Pepe",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Penne"
+      },
+      "value": {
+        "value": "Penne",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Penne"
+      },
+      "value": {
+        "value": "Tube-shaped pasta cut diagonally at the ends, from the Italian word for 'quill'.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tubular"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Campania"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Arrabbiata"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Spaghetti"
+      },
+      "value": {
+        "value": "Spaghetti",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Spaghetti"
+      },
+      "value": {
+        "value": "Long, thin, cylindrical strands. From 'spago' (string).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Strand"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Campania"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Carbonara"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CacioEPepe"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Spaghetti"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "OilBasedSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Fusilli"
+      },
+      "value": {
+        "value": "Fusilli",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Fusilli"
+      },
+      "value": {
+        "value": "Corkscrew-shaped pasta. From 'fuso' (spindle).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Spiral"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Campania"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "TomatoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PestoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Rigatoni"
+      },
+      "value": {
+        "value": "Rigatoni",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Rigatoni"
+      },
+      "value": {
+        "value": "Large ridged tubes. From 'rigato' (ridged/lined).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tubular"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Large"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigata"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Lazio"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Amatriciana"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Rigatoni"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "MeatSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Fettuccine"
+      },
+      "value": {
+        "value": "Fettuccine",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ribbon"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Lazio"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CreamSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ragu"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Farfalle"
+      },
+      "value": {
+        "value": "Farfalle",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Farfalle"
+      },
+      "value": {
+        "value": "Bow-tie or butterfly shaped pasta. From 'farfalla' (butterfly).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "EmiliaRomagna"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CreamSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PestoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Orecchiette"
+      },
+      "value": {
+        "value": "Orecchiette",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Orecchiette"
+      },
+      "value": {
+        "value": "Small ear-shaped pasta. From 'orecchia' (ear).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Puglia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "OilBasedSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tortellini"
+      },
+      "value": {
+        "value": "Tortellini",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tortellini"
+      },
+      "value": {
+        "value": "Ring-shaped stuffed pasta, traditionally filled with meat. From 'tortello' (small cake).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Stuffed"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "EmiliaRomagna"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "BrothSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "ButterSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Lasagna"
+      },
+      "value": {
+        "value": "Lasagna",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Lasagna"
+      },
+      "value": {
+        "value": "Wide, flat sheets of pasta, layered with sauce and cheese.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sheet"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Large"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "EmiliaRomagna"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Bolognese"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CreamSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orzo"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Orzo"
+      },
+      "value": {
+        "value": "Orzo",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Orzo"
+      },
+      "value": {
+        "value": "Rice-shaped small pasta, used in soups and salads. From 'orzo' (barley).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orzo"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orzo"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orzo"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "BrothSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tagliatelle"
+      },
+      "value": {
+        "value": "Tagliatelle",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ribbon"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "EmiliaRomagna"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Bolognese"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Pappardelle"
+      },
+      "value": {
+        "value": "Pappardelle",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Pappardelle"
+      },
+      "value": {
+        "value": "Very broad, flat ribbon pasta. From 'pappare' (to gobble up).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ribbon"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Large"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tuscany"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Ragu"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Trofie"
+      },
+      "value": {
+        "value": "Trofie",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Trofie"
+      },
+      "value": {
+        "value": "Short, thin, twisted pasta from Liguria. Traditionally paired with pesto.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Spiral"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liguria"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PestoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Bucatini"
+      },
+      "value": {
+        "value": "Bucatini",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Bucatini"
+      },
+      "value": {
+        "value": "Thick spaghetti-like pasta with a hole through the center. From 'buco' (hole).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tubular"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Lazio"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Amatriciana"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Conchiglie"
+      },
+      "value": {
+        "value": "Conchiglie",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Conchiglie"
+      },
+      "value": {
+        "value": "Shell-shaped pasta that traps sauce inside. From 'conchiglia' (shell).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigata"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "TomatoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Conchiglie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CreamSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Malloreddus"
+      },
+      "value": {
+        "value": "Malloreddus",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Malloreddus"
+      },
+      "value": {
+        "value": "Small ridged Sardinian gnocchi-like pasta, also called 'gnocchetti sardi'.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Shaped"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Small"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigata"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sardinia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "TomatoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Malloreddus"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "MeatSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bolognese"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Ragu"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CheeseBasedSauce"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Sauce"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CheeseBasedSauce"
+      },
+      "value": {
+        "value": "Cheese-Based Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CheeseBasedSauce"
+      },
+      "value": {
+        "value": "Sauces built primarily on cheese, often with egg or pepper.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Carbonara"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CheeseBasedSauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CacioEPepe"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "CheeseBasedSauce"
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "PastaShape"
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Busiate"
+      },
+      "value": {
+        "value": "Busiate",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Busiate"
+      },
+      "value": {
+        "value": "Corkscrew-shaped pasta from Trapani, Sicily. Traditionally made by wrapping dough around a knitting needle ('buso').",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasGeometry"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Spiral"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSize"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Medium"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "originatesFrom"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sicily"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "pairsWithSauce"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PestoSauce"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Busiate"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Penne"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fusilli"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Fettuccine"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Farfalle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tortellini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Lasagna"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Trofie"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Bucatini"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Tagliatelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Pappardelle"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orecchiette"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigata"
+          }
+        }
+      }
+    },
+    {
+      "type": "SubClassOf",
+      "sub_class": {
+        "type": "NamedClass",
+        "iri": {
+          "prefix": "",
+          "local_name": "Orzo"
+        }
+      },
+      "super_class": {
+        "type": "ObjectSomeValuesFrom",
+        "property": {
+          "prefix": "",
+          "local_name": "hasSurfaceTexture"
+        },
+        "filler": {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liscia"
+          }
+        }
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Fettuccine"
+      },
+      "value": {
+        "value": "Flat ribbon pasta, approximately 6mm wide. Egg-based, from Roman cuisine. From 'fettuccia' (ribbon). Narrower than tagliatelle.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tagliatelle"
+      },
+      "value": {
+        "value": "Flat ribbon pasta, approximately 8mm wide. Egg-based, from Bolognese cuisine. From 'tagliare' (to cut). Wider than fettuccine.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "label"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "MeatSauce"
+      },
+      "value": {
+        "value": "Meat Sauce",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PastaShape"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Region"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Geometry"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Size"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "SurfaceTexture"
+          }
+        }
+      ]
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Penne"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Spaghetti"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Fusilli"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Rigatoni"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Fettuccine"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Farfalle"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Orecchiette"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tortellini"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Lasagna"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Orzo"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tagliatelle"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Pappardelle"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Trofie"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Bucatini"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Conchiglie"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Malloreddus"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Busiate"
+          }
+        }
+      ]
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Campania"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Liguria"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "EmiliaRomagna"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Lazio"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sicily"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Puglia"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Sardinia"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "Tuscany"
+          }
+        }
+      ]
+    },
+    {
+      "type": "DisjointClasses",
+      "expressions": [
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "TomatoSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CreamSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "OilBasedSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "MeatSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "PestoSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "BrothSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "ButterSauce"
+          }
+        },
+        {
+          "type": "NamedClass",
+          "iri": {
+            "prefix": "",
+            "local_name": "CheeseBasedSauce"
+          }
+        }
+      ]
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "hasName"
+      }
+    },
+    {
+      "type": "FunctionalDataProperty",
+      "property": {
+        "prefix": "",
+        "local_name": "hasEtymology"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Ragu"
+      },
+      "value": {
+        "value": "A slow-cooked meat sauce, varying by region. The base of many Italian pasta dishes.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Bolognese"
+      },
+      "value": {
+        "value": "Ragù alla bolognese: a meat-based sauce from Bologna using minced beef/pork, soffritto, tomato paste, and wine.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Carbonara"
+      },
+      "value": {
+        "value": "Roman sauce of guanciale, egg yolk, Pecorino Romano, and black pepper. Never contains cream.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Amatriciana"
+      },
+      "value": {
+        "value": "Sauce from Amatrice (Lazio): guanciale, Pecorino Romano, tomato, and chili. Related to gricia.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Arrabbiata"
+      },
+      "value": {
+        "value": "Spicy tomato sauce with garlic and red chili peppers. 'Arrabbiata' means 'angry'.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CacioEPepe"
+      },
+      "value": {
+        "value": "Ancient Roman sauce of Pecorino Romano and black pepper, emulsified with pasta water. One of Rome's four classic pastas.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "TomatoSauce"
+      },
+      "value": {
+        "value": "Sauces with tomato as the primary base ingredient.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "CreamSauce"
+      },
+      "value": {
+        "value": "Sauces based on cream or béchamel.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "OilBasedSauce"
+      },
+      "value": {
+        "value": "Sauces built on olive oil as the primary fat, often with garlic (aglio e olio).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "PestoSauce"
+      },
+      "value": {
+        "value": "Uncooked sauces made by crushing herbs, nuts, cheese, and oil. Includes Genovese (basil, pine nut) and Trapanese (tomato, almond) variants.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "BrothSauce"
+      },
+      "value": {
+        "value": "Pasta served in brodo (in broth), typically a clear meat or vegetable stock.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "ButterSauce"
+      },
+      "value": {
+        "value": "Sauces based on melted butter, often with sage (burro e salvia) or Parmigiano.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "MeatSauce"
+      },
+      "value": {
+        "value": "Sauces where meat is the primary ingredient, including ragù and other slow-cooked preparations.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Stuffed"
+      },
+      "value": {
+        "value": "Pasta enclosing a filling. Classified as a geometry category for modeling purposes, though technically a construction method rather than a pure geometric form.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tubular"
+      },
+      "value": {
+        "value": "Hollow cylindrical pasta, cut straight or diagonally. Sauce flows through and clings to the interior.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Ribbon"
+      },
+      "value": {
+        "value": "Flat, wide pasta cut into strips. Width varies from narrow (linguine) to very broad (pappardelle).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Strand"
+      },
+      "value": {
+        "value": "Long, thin, solid cylindrical pasta. Diameter distinguishes varieties (capellini < spaghetti < spaghettoni).",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sheet"
+      },
+      "value": {
+        "value": "Broad, flat pasta sheets used for layering or wrapping.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Shaped"
+      },
+      "value": {
+        "value": "Pasta formed into distinctive three-dimensional shapes (shells, ears, bows, grains) that don't fit other geometric categories.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Spiral"
+      },
+      "value": {
+        "value": "Pasta twisted or coiled into a helix or corkscrew form. Traps chunky sauces in its grooves.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasGeometry"
+      },
+      "value": {
+        "value": "Relates a pasta shape to its geometric form category.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasSize"
+      },
+      "value": {
+        "value": "Relates a pasta shape to its size classification.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasSurfaceTexture"
+      },
+      "value": {
+        "value": "Relates a pasta shape to its surface texture, which affects sauce adhesion.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "originatesFrom"
+      },
+      "value": {
+        "value": "Relates a pasta shape to the Italian region where it traditionally originated.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "pairsWithSauce"
+      },
+      "value": {
+        "value": "Relates a pasta shape to a sauce it is traditionally served with.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasName"
+      },
+      "value": {
+        "value": "The primary Italian name of a pasta shape.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "hasEtymology"
+      },
+      "value": {
+        "value": "The etymological origin of a pasta shape's name.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Small"
+      },
+      "value": {
+        "value": "Pasta small enough for soups or broth (pastina). Typically under 2cm.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Medium"
+      },
+      "value": {
+        "value": "Standard-sized pasta for plated dishes, typically 3-8cm.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Large"
+      },
+      "value": {
+        "value": "Large pasta shapes, typically over 8cm or used for baking/layering.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Liscia"
+      },
+      "value": {
+        "value": "Smooth surface finish, produced by Teflon extrusion dies. Less sauce adhesion than rigata.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Rigata"
+      },
+      "value": {
+        "value": "Ridged surface finish, produced by bronze extrusion dies. Increases sauce adhesion.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Campania"
+      },
+      "value": {
+        "value": "Southern Italian region centered on Naples. Birthplace of dried pasta traditions.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Liguria"
+      },
+      "value": {
+        "value": "Northwestern coastal region centered on Genoa. Known for pesto and olive oil-based cuisine.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "EmiliaRomagna"
+      },
+      "value": {
+        "value": "Northern region spanning Bologna to Parma. Heartland of fresh egg pasta and rich meat sauces.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Lazio"
+      },
+      "value": {
+        "value": "Central Italian region centered on Rome. Home to the four classic Roman pastas.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sicily"
+      },
+      "value": {
+        "value": "Italy's largest island. Pasta traditions influenced by Arab, Greek, and Norman cultures.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Puglia"
+      },
+      "value": {
+        "value": "Southeastern region forming the 'heel' of Italy. Known for durum wheat pasta and vegetable pairings.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Sardinia"
+      },
+      "value": {
+        "value": "Mediterranean island with distinct pastoral cuisine. Unique pasta shapes often use saffron.",
+        "lang": "en"
+      }
+    },
+    {
+      "type": "AnnotationAssertion",
+      "property": {
+        "prefix": "rdfs",
+        "local_name": "comment"
+      },
+      "subject": {
+        "prefix": "",
+        "local_name": "Tuscany"
+      },
+      "value": {
+        "value": "Central Italian region centered on Florence. Known for rustic, broad pasta with game sauces.",
+        "lang": "en"
+      }
+    }
+  ]
+}
