@@ -1,4 +1,5 @@
 import fcntl
+import re
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated, cast
@@ -7,14 +8,10 @@ from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from ontoloom.core.ontology.models.ontology import Ontology
 from ontoloom.core.ontology.operations import add_axioms, remove_axioms
+from pydantic import Field
 
-from ontoloom_mcp.formatting import (
-    ExactMatch,
-    format_axiom_listing,
-    format_axiom_summary,
-    format_diff,
-    resolve_axiom_ids,
-)
+from ontoloom_mcp.formatting import format_axiom_listing, format_axiom_summary, format_diff
+from ontoloom_mcp.hashing import ExactMatch, compute_hashes, resolve_axiom_ids
 from ontoloom_mcp.models.axioms import Axiom as MCPAxiom
 from ontoloom_mcp.models.converters import convert_axiom
 
@@ -72,8 +69,9 @@ def mcp_add_axioms(path: OntologyPath, axioms: list[MCPAxiom]):
         if result.added:
             save(new_ontology)
 
+        hashed = {ha.axiom: ha for ha in compute_hashes(new_ontology.axioms)}
         added_set = set(result.added)
-        entries = [("+" if a in added_set else "=", a) for a in converted]
+        entries = [("+" if a in added_set else "=", hashed[a]) for a in converted]
         return format_diff(
             entries,
             f"Added {len(result.added)}, skipped {len(result.skipped)}, total {len(new_ontology.axioms)} axioms.",
@@ -87,18 +85,40 @@ def mcp_describe_ontology(path: OntologyPath):
         return format_axiom_summary(ontology.axioms)
 
 
-@mcp.tool(name="list_axioms")
-def mcp_list_axioms(path: OntologyPath):
-    """List all axioms in an ontology file. Each axiom is shown with a [hash] prefix usable as a target for remove_axioms."""
+@mcp.tool(name="search_axioms")
+def mcp_search_axioms(
+    path: OntologyPath,
+    regex: str = Field(description="Regex pattern to match rendered axiom format"),
+):
+    "Search for axioms in an ontology file. Each axiom is shown with a [hash] prefix usable as a target for remove_axioms."
+
+    # maybe allow multiple searches at once with batching?
+
+    # TODO: needs pagination with large enough page size by default
+
+    pattern = re.compile(regex)
+
     with open_ontology(path) as (ontology, _):
-        return format_axiom_listing(ontology.axioms)
+        axioms = tuple(a for a in ontology.axioms if pattern.search(str(a)))
+
+        if len(axioms) > 1000:
+            # TODO: find better solution than this
+            msg = "More than 1000 matches. Please narrow down your search pattern."
+            raise ToolError(msg)
+
+        return format_axiom_listing(compute_hashes(axioms))
+
+
+# TODO: inspect tool that takes an IRI and returns all information for it, including any inferred stuff
+# TODO: tool to show hierarchy and other stuff?
 
 
 @mcp.tool(name="remove_axioms")
 def mcp_remove_axioms(path: OntologyPath, prefixes: list[str]):
     """Remove axioms by hash prefix (from list_axioms). Each prefix must uniquely match exactly one axiom. Atomic: if any prefix fails to resolve, nothing is removed."""
     with open_ontology(path) as (ontology, save):
-        results = resolve_axiom_ids(ontology.axioms, prefixes)
+        hashed = compute_hashes(ontology.axioms)
+        results = resolve_axiom_ids(hashed, prefixes)
 
         errors = [r for r in results if not isinstance(r, ExactMatch)]
 
@@ -112,7 +132,8 @@ def mcp_remove_axioms(path: OntologyPath, prefixes: list[str]):
         if result.removed:
             save(new_ontology)
 
-        entries = [("-", a) for a in result.removed]
+        removed_lookup = {ha.axiom: ha for ha in hashed if ha.axiom in to_remove}
+        entries = [("-", removed_lookup[a]) for a in result.removed]
         return format_diff(
             entries,
             f"Removed {len(result.removed)}, total {len(new_ontology.axioms)} axioms.",
