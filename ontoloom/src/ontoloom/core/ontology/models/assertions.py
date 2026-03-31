@@ -1,19 +1,10 @@
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import FrozenModel
+from ontoloom.core.ontology.models.base import _BaseAssertion
 from ontoloom.core.ontology.models.expressions import ClassExpression
 from ontoloom.core.ontology.models.literals import IRI, TypedLiteral
-
-# =============================================================================
-# Base
-# =============================================================================
-
-
-class _BaseAssertion(FrozenModel):
-    """Base for all ABox assertions."""
-
 
 # =============================================================================
 # Class and property assertions
@@ -117,21 +108,3 @@ class DifferentIndividuals(_BaseAssertion):
 
     def __str__(self) -> str:
         return f"DifferentIndividuals({', '.join(str(i) for i in self.individuals)})"
-
-
-# =============================================================================
-# Discriminated union
-# =============================================================================
-
-Assertion = Annotated[
-    (
-        ClassAssertion
-        | ObjectPropertyAssertion
-        | NegativeObjectPropertyAssertion
-        | DataPropertyAssertion
-        | NegativeDataPropertyAssertion
-        | SameIndividual
-        | DifferentIndividuals
-    ),
-    Field(discriminator="type"),
-]

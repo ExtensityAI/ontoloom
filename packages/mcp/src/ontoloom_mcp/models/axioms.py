@@ -9,6 +9,7 @@ from ontoloom_mcp.models.expressions import ClassExpression
 from ontoloom_mcp.models.iri import (
     AnnotationPropertyIRI,
     DataPropertyIRI,
+    IndividualIRI,
     ObjectPropertyIRI,
     StrIRI,
 )
@@ -224,6 +225,84 @@ class HasKey(BaseAxiom):
 
 
 # =============================================================================
+# ABox — Assertions
+# =============================================================================
+
+
+class ClassAssertion(BaseAxiom):
+    """a ∈ C — individual a is an instance of C.
+
+    ClassAssertion(Dog, :Fido)
+    """
+
+    type: Literal["ClassAssertion"] = "ClassAssertion"
+    class_expression: ClassExpression
+    individual: IndividualIRI
+
+
+class ObjectPropertyAssertion(BaseAxiom):
+    """r(a, b) — a is related to b by r.
+
+    ObjectPropertyAssertion(:owns, :Alice, :Fido)
+    """
+
+    type: Literal["ObjectPropertyAssertion"] = "ObjectPropertyAssertion"
+    property: ObjectPropertyIRI
+    source: IndividualIRI
+    target: IndividualIRI
+
+
+class NegativeObjectPropertyAssertion(BaseAxiom):
+    """¬r(a, b) — a is NOT related to b by r.
+
+    NegativeObjectPropertyAssertion(:owns, :Alice, :Rex)
+    """
+
+    type: Literal["NegativeObjectPropertyAssertion"] = "NegativeObjectPropertyAssertion"
+    property: ObjectPropertyIRI
+    source: IndividualIRI
+    target: IndividualIRI
+
+
+class DataPropertyAssertion(BaseAxiom):
+    """dp(a, v) — a has value v for dp.
+
+    DataPropertyAssertion(:hasAge, :Alice, "30"^^xsd:integer)
+    """
+
+    type: Literal["DataPropertyAssertion"] = "DataPropertyAssertion"
+    property: DataPropertyIRI
+    individual: IndividualIRI
+    value: TypedLiteral
+
+
+class NegativeDataPropertyAssertion(BaseAxiom):
+    """¬dp(a, v) — a does NOT have value v for dp.
+
+    NegativeDataPropertyAssertion(:hasAge, :Alice, "99"^^xsd:integer)
+    """
+
+    type: Literal["NegativeDataPropertyAssertion"] = "NegativeDataPropertyAssertion"
+    property: DataPropertyIRI
+    individual: IndividualIRI
+    value: TypedLiteral
+
+
+class SameIndividual(BaseAxiom):
+    """a = b — both IRIs denote the same entity."""
+
+    type: Literal["SameIndividual"] = "SameIndividual"
+    individuals: list[IndividualIRI] = Field(..., min_length=2)
+
+
+class DifferentIndividuals(BaseAxiom):
+    """a ≠ b — all listed individuals are pairwise distinct."""
+
+    type: Literal["DifferentIndividuals"] = "DifferentIndividuals"
+    individuals: list[IndividualIRI] = Field(..., min_length=2)
+
+
+# =============================================================================
 # Discriminated union
 # =============================================================================
 
@@ -246,6 +325,14 @@ Axiom = Annotated[
         | DataPropertyRange
         | FunctionalDataProperty
         | HasKey
+        # ABox — Assertions
+        | ClassAssertion
+        | ObjectPropertyAssertion
+        | NegativeObjectPropertyAssertion
+        | DataPropertyAssertion
+        | NegativeDataPropertyAssertion
+        | SameIndividual
+        | DifferentIndividuals
     ),
     Field(discriminator="type"),
 ]

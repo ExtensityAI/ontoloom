@@ -4,18 +4,18 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import FrozenModel
+from ontoloom.core.ontology.models.assertions import (
+    ClassAssertion,
+    DataPropertyAssertion,
+    DifferentIndividuals,
+    NegativeDataPropertyAssertion,
+    NegativeObjectPropertyAssertion,
+    ObjectPropertyAssertion,
+    SameIndividual,
+)
+from ontoloom.core.ontology.models.base import _BaseAxiom
 from ontoloom.core.ontology.models.expressions import ClassExpression
 from ontoloom.core.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
-
-# =============================================================================
-# Base
-# =============================================================================
-
-
-class _BaseAxiom(FrozenModel):
-    """Base for all OWL 2 EL axioms (TBox + RBox)."""
-
 
 # =============================================================================
 # Annotations
@@ -306,6 +306,14 @@ Axiom = Annotated[
         | DataPropertyRange
         | FunctionalDataProperty
         | HasKey
+        # ABox — Assertions
+        | ClassAssertion
+        | ObjectPropertyAssertion
+        | NegativeObjectPropertyAssertion
+        | DataPropertyAssertion
+        | NegativeDataPropertyAssertion
+        | SameIndividual
+        | DifferentIndividuals
     ),
     Field(discriminator="type"),
 ]

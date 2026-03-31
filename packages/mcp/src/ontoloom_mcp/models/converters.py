@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ontoloom.core.ontology.models import assertions as core_assertions
 from ontoloom.core.ontology.models import axioms as core_axioms
 from ontoloom.core.ontology.models import expressions as core_expr
 from ontoloom.core.ontology.models.literals import IRI
@@ -61,7 +62,7 @@ def convert_class_expression(e: mcp_expr.ClassExpression):
             )
 
 
-def convert_axiom(a: mcp_axioms.Axiom):
+def convert_axiom(a: mcp_axioms.Axiom):  # noqa: C901
     match a:
         # Annotations
         case mcp_axioms.AnnotationAssertion():
@@ -163,4 +164,49 @@ def convert_axiom(a: mcp_axioms.Axiom):
                 class_expression=convert_class_expression(a.class_expression),
                 object_properties=tuple(convert_iri(i) for i in a.object_properties),
                 data_properties=tuple(convert_iri(i) for i in a.data_properties),
+            )
+
+        # ABox — Assertions
+        case mcp_axioms.ClassAssertion():
+            return core_assertions.ClassAssertion(
+                class_expression=convert_class_expression(a.class_expression),
+                individual=convert_iri(a.individual),
+            )
+
+        case mcp_axioms.ObjectPropertyAssertion():
+            return core_assertions.ObjectPropertyAssertion(
+                property=convert_iri(a.property),
+                source=convert_iri(a.source),
+                target=convert_iri(a.target),
+            )
+
+        case mcp_axioms.NegativeObjectPropertyAssertion():
+            return core_assertions.NegativeObjectPropertyAssertion(
+                property=convert_iri(a.property),
+                source=convert_iri(a.source),
+                target=convert_iri(a.target),
+            )
+
+        case mcp_axioms.DataPropertyAssertion():
+            return core_assertions.DataPropertyAssertion(
+                property=convert_iri(a.property),
+                individual=convert_iri(a.individual),
+                value=a.value,
+            )
+
+        case mcp_axioms.NegativeDataPropertyAssertion():
+            return core_assertions.NegativeDataPropertyAssertion(
+                property=convert_iri(a.property),
+                individual=convert_iri(a.individual),
+                value=a.value,
+            )
+
+        case mcp_axioms.SameIndividual():
+            return core_assertions.SameIndividual(
+                individuals=tuple(convert_iri(i) for i in a.individuals),
+            )
+
+        case mcp_axioms.DifferentIndividuals():
+            return core_assertions.DifferentIndividuals(
+                individuals=tuple(convert_iri(i) for i in a.individuals),
             )

@@ -4,13 +4,8 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import FrozenModel
+from ontoloom.core.ontology.models.base import _BaseClassExpression
 from ontoloom.core.ontology.models.literals import IRI, DataRange, TypedLiteral
-
-
-class _BaseClassExpression(FrozenModel):
-    """Base for all OWL 2 EL class expressions."""
-
 
 # -- Named class --
 
