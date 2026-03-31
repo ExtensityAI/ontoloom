@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from typing import NamedTuple, cast
+from typing import NamedTuple
 
 from fastmcp.exceptions import ToolError
 from ontoloom.core.ontology.models.axioms import Axiom
@@ -134,4 +134,4 @@ def resolve_or_raise(hashed: list[HashedAxiom], prefixes: list[str]) -> list[Exa
     errors = [r for r in results if not isinstance(r, ExactMatch)]
     if errors:
         raise ToolError("\n\n".join(str(e) for e in errors))
-    return cast("list[ExactMatch]", results)
+    return [r for r in results if isinstance(r, ExactMatch)]

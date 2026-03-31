@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from ontoloom.core.ontology.index.extract import extract_from_axiom
+from ontoloom.core.ontology.index.models import EntityEntry, OntologyIndex
 from ontoloom.core.ontology.models.axioms import AnnotationAssertion
+from ontoloom.core.ontology.models.literals import IRI
 from ontoloom.core.ontology.models.ontology import Ontology
-
-from .extract import extract_from_axiom
-from .models import EntityEntry, OntologyIndex
 
 
 def build_index(ontology: Ontology) -> OntologyIndex:
-    entities: defaultdict = defaultdict(EntityEntry)
+    entities: defaultdict[IRI, EntityEntry] = defaultdict(EntityEntry)
 
     for axiom in ontology.axioms:
         for iri, role in extract_from_axiom(axiom):

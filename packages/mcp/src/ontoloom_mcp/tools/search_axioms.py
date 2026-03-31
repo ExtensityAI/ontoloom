@@ -7,7 +7,11 @@ from mcp.types import ToolAnnotations
 from ontoloom.core.ontology.index.builder import build_index
 from pydantic import BaseModel, Field
 
-from ontoloom_mcp.components.formatting import format_axiom_listing, format_search_axioms_page
+from ontoloom_mcp.components.formatting import (
+    AXIOM_TYPE_NAMES,
+    format_axiom_listing,
+    format_search_axioms_page,
+)
 from ontoloom_mcp.components.hashing import compute_hashes, resolve_or_raise
 from ontoloom_mcp.components.ontology_file import OntologyPath, open_ontology
 from ontoloom_mcp.models.converters import convert_iri
@@ -41,11 +45,13 @@ SearchQuery = Annotated[
     Field(discriminator="type"),
 ]
 
+AxiomTypeName = Literal[tuple(AXIOM_TYPE_NAMES)]
+
 
 def _search_axioms(
     path: OntologyPath,
     query: SearchQuery,
-    axiom_types: list[str] | None = None,
+    axiom_types: list[AxiomTypeName] | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
@@ -66,8 +72,8 @@ def _search_axioms(
         if isinstance(query, PrefixQuery):
             hashed = compute_hashes(ontology.axioms)
             matches = resolve_or_raise(hashed, query.prefixes)
-            match_ids = {id(m.axiom) for m in matches}
-            matched_hashed = [ha for ha in hashed if id(ha.axiom) in match_ids]
+            matched_set = {m.axiom for m in matches}
+            matched_hashed = [ha for ha in hashed if ha.axiom in matched_set]
             return format_axiom_listing(matched_hashed)
 
         if isinstance(query, IriQuery):

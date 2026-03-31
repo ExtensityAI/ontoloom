@@ -24,8 +24,8 @@ class MatchKind(StrEnum):
     FUZZY = "fuzzy"
 
 
-_KIND_ORDER = {MatchKind.EXACT: 0, MatchKind.SUBSTRING: 1, MatchKind.FUZZY: 2}
-_SOURCE_ORDER = {MatchSource.IRI: 0, MatchSource.LABEL: 1}
+_KIND_LIST = list(MatchKind)
+_SOURCE_LIST = list(MatchSource)
 
 
 @dataclass
@@ -39,7 +39,7 @@ class SearchResult:
 
     @property
     def _sort_key(self) -> tuple[int, int, int]:
-        return (_KIND_ORDER[self.kind], _SOURCE_ORDER[self.source], -self.score)
+        return (_KIND_LIST.index(self.kind), _SOURCE_LIST.index(self.source), -self.score)
 
 
 class Scope(StrEnum):
@@ -83,26 +83,28 @@ def search_entities(
     results: list[SearchResult] = []
 
     for iri, entry in entities.items():
-        best: SearchResult | None = None
+        candidates: list[SearchResult] = []
 
         if scope in (Scope.IRI, Scope.ALL):
-            match = _check_match(query_lower, query_len, iri.local_name)
-            if match is not None:
-                kind, score = match
-                best = SearchResult(iri, entry, MatchSource.IRI, kind, iri.local_name, score)
+            for iri_text in (iri.local_name, str(iri)):
+                match = _check_match(query_lower, query_len, iri_text)
+                if match is not None:
+                    kind, score = match
+                    candidates.append(
+                        SearchResult(iri, entry, MatchSource.IRI, kind, iri_text, score)
+                    )
 
         if scope in (Scope.ANNOTATIONS, Scope.ALL):
             for text in _annotation_texts(entry):
                 match = _check_match(query_lower, query_len, text)
-                if match is None:
-                    continue
-                kind, score = match
-                candidate = SearchResult(iri, entry, MatchSource.LABEL, kind, text, score)
-                if best is None or candidate._sort_key < best._sort_key:
-                    best = candidate
+                if match is not None:
+                    kind, score = match
+                    candidates.append(
+                        SearchResult(iri, entry, MatchSource.LABEL, kind, text, score)
+                    )
 
-        if best is not None:
-            results.append(best)
+        if candidates:
+            results.append(min(candidates, key=lambda r: r._sort_key))
 
     results.sort(key=lambda r: r._sort_key)
     return results[:max_results]

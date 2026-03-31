@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+from ontoloom.core.ontology.index.models import Role
 from ontoloom.core.ontology.models.assertions import (
     ClassAssertion,
     DataPropertyAssertion,
@@ -45,8 +46,6 @@ from ontoloom.core.ontology.models.expressions import (
     ObjectSomeValuesFrom,
 )
 from ontoloom.core.ontology.models.literals import IRI
-
-from .models import Role
 
 type Extraction = tuple[IRI, Role | None]
 
