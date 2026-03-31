@@ -45,13 +45,15 @@ SearchQuery = Annotated[
     Field(discriminator="type"),
 ]
 
+
 AxiomTypeName = Literal[tuple(AXIOM_TYPE_NAMES)]
+"""corresponds to exactly one axiom type name"""
 
 
 def _search_axioms(
     path: OntologyPath,
     query: SearchQuery,
-    axiom_types: list[AxiomTypeName] | None = None,
+    axiom_types: list[AxiomTypeName] | None = None,  # pyright: ignore[reportInvalidTypeForm] # this is a type, no worries
     limit: int = 50,
     offset: int = 0,
 ):
@@ -72,7 +74,7 @@ def _search_axioms(
         if isinstance(query, PrefixQuery):
             hashed = compute_hashes(ontology.axioms)
             matches = resolve_or_raise(hashed, query.prefixes)
-            matched_set = {m.axiom for m in matches}
+            matched_set = {m.axiom for m in matches}  # pyright: ignore[reportUnhashable] # axiom is hashable
             matched_hashed = [ha for ha in hashed if ha.axiom in matched_set]
             return format_axiom_listing(matched_hashed)
 
