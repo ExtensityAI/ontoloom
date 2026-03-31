@@ -3,20 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-from typing import NamedTuple
+from typing import NamedTuple, cast
 
+from fastmcp.exceptions import ToolError
 from ontoloom.core.ontology.models.axioms import Axiom
 from pydantic import BaseModel
 
 MIN_PREFIX_LEN = 4
-"""Minimum prefix length used to display hashes. Values lower than 4 likely produce many collisions."""
-
-_MAX_PREFIX_LEN = 64  # sha256 hex digest len
-
-
-# =============================================================================
-# Core data type
-# =============================================================================
+_MAX_PREFIX_LEN = 64
 
 
 class HashedAxiom(NamedTuple):
@@ -25,11 +19,6 @@ class HashedAxiom(NamedTuple):
     axiom: Axiom
     hash: str
     prefix: str
-
-
-# =============================================================================
-# Hash computation
-# =============================================================================
 
 
 def _sha256(axiom: Axiom) -> str:
@@ -67,11 +56,6 @@ def compute_hashes(axioms: tuple[Axiom, ...]) -> list[HashedAxiom]:
     hashes = [_sha256(a) for a in axioms]
     prefix_lens = _unique_prefix_lens(hashes)
     return [HashedAxiom(a, h, h[:pl]) for a, h, pl in zip(axioms, hashes, prefix_lens, strict=True)]
-
-
-# =============================================================================
-# Resolution
-# =============================================================================
 
 
 class Candidate(BaseModel):
@@ -114,10 +98,7 @@ type ResolveResult = ExactMatch | NotFound | AmbiguousMatch
 
 
 def resolve_axiom_ids(hashed: list[HashedAxiom], prefixes: list[str]) -> list[ResolveResult]:
-    """Resolve user-provided hash prefixes to axioms.
-
-    Returns one result per input prefix: ExactMatch, NotFound, or AmbiguousMatch.
-    """
+    """Resolve user-provided hash prefixes to axioms."""
     results = list[ResolveResult]()
 
     for prefix in prefixes:
@@ -131,7 +112,6 @@ def resolve_axiom_ids(hashed: list[HashedAxiom], prefixes: list[str]) -> list[Re
             results.append(ExactMatch(prefix=prefix, index=idx, axiom=ha.axiom))
 
         else:
-            # Compute disambiguating prefixes scoped to the collision group
             colliding_hashes = [ha.hash for _, ha in matches]
             candidate_prefix_lens = _unique_prefix_lens(colliding_hashes)
 
@@ -146,3 +126,12 @@ def resolve_axiom_ids(hashed: list[HashedAxiom], prefixes: list[str]) -> list[Re
             results.append(AmbiguousMatch(prefix=prefix, candidates=candidates))
 
     return results
+
+
+def resolve_or_raise(hashed: list[HashedAxiom], prefixes: list[str]) -> list[ExactMatch]:
+    """Resolve hash prefixes to axioms, raising ToolError if any fail."""
+    results = resolve_axiom_ids(hashed, prefixes)
+    errors = [r for r in results if not isinstance(r, ExactMatch)]
+    if errors:
+        raise ToolError("\n\n".join(str(e) for e in errors))
+    return cast("list[ExactMatch]", results)

@@ -60,6 +60,9 @@ def convert_class_expression(e: mcp_expr.ClassExpression):
                 property=convert_iri(e.property),
                 value=e.value,
             )
+        case _:
+            msg = f"Unhandled class expression type: {type(e).__name__}"
+            raise ValueError(msg)
 
 
 def convert_axiom(a: mcp_axioms.Axiom):  # noqa: C901
@@ -210,3 +213,6 @@ def convert_axiom(a: mcp_axioms.Axiom):  # noqa: C901
             return core_assertions.DifferentIndividuals(
                 individuals=tuple(convert_iri(i) for i in a.individuals),
             )
+        case _:
+            msg = f"Unhandled axiom type: {type(a).__name__}"
+            raise ValueError(msg)
