@@ -52,3 +52,5 @@ packages/viz/src/ontoloom_viz/static/
 symai.config.json
 config.toml
 .hydra/
+
+samples/

@@ -4,16 +4,15 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from ontoloom.core.ontology.index.builder import build_index
 from ontoloom.core.ontology.models.axioms import AnnotationAssertion
+from ontoloom.core.ontology.models.literals import IRI
 
 from ontoloom_mcp.components.formatting import format_entity_inspect
 from ontoloom_mcp.components.hashing import compute_hashes
 from ontoloom_mcp.components.ontology_file import OntologyPath, open_ontology
-from ontoloom_mcp.models.converters import convert_iri
-from ontoloom_mcp.models.iri import StrIRI
 from ontoloom_mcp.tools._helpers import format_not_found
 
 
-def _inspect_entity(path: OntologyPath, iris: list[StrIRI]):
+def _inspect_entity(path: OntologyPath, iris: list[IRI]):
     """Inspect one or more entities. Returns roles, annotations, and a summary of asserted axiom counts by type.
 
     Does NOT include inherited or inferred information. For example, if `:Dog SubClassOf :Animal` and
@@ -26,8 +25,7 @@ def _inspect_entity(path: OntologyPath, iris: list[StrIRI]):
         index = build_index(ontology)
         blocks = []
 
-        for iri_str in iris:
-            iri = convert_iri(iri_str)
+        for iri in iris:
             entry = index.entities.get(iri)
 
             if entry is None:

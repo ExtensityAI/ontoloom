@@ -18,7 +18,7 @@ _KIND_HEADERS = {
     MatchKind.FUZZY: "Fuzzy matches",
 }
 
-_LABEL_IRI = IRI(prefix="rdfs", local_name="label")
+_LABEL_IRI = IRI("rdfs:label")
 _MAX_RESULTS = 50
 
 

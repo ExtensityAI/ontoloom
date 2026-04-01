@@ -1,30 +1,57 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field
+from pydantic import Field, GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 from ontoloom.core.ontology.models.base import FrozenModel
 
 
-class IRI(FrozenModel):
-    """An OWL entity identifier: prefix + local_name.
+class IRI(str):
+    """An OWL entity identifier in `prefix:local_name` format.
 
     Examples:
-        IRI(prefix="", local_name="Dog")        → :Dog
-        IRI(prefix="owl", local_name="Thing")    → owl:Thing
-        IRI(prefix="xsd", local_name="integer")  → xsd:integer
+        IRI(":Dog")        → :Dog
+        IRI("owl:Thing")   → owl:Thing
+        IRI("xsd:integer") → xsd:integer
     """
 
-    prefix: str = Field(default="", description="Namespace prefix ('' for default)")
-    local_name: str = Field(..., min_length=1, description="Local name within namespace")
+    # If prefix/local_name splitting becomes a bottleneck, cache the split result.
 
-    def __str__(self):
-        return f"{self.prefix}:{self.local_name}"
+    def __new__(cls, value: str):
+        parts = value.split(":", 1)
+        if len(parts) != 2 or not parts[1]:
+            msg = f"IRI must be in 'prefix:local_name' format, got '{value}'"
+            raise ValueError(msg)
+        return super().__new__(cls, value)
+
+    @property
+    def prefix(self) -> str:
+        return self.split(":", 1)[0]
+
+    @property
+    def local_name(self) -> str:
+        return self.split(":", 1)[1]
 
     def __repr__(self):
         return f"IRI({self})"
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:
+        return {
+            "type": "string",
+            "description": "IRI in `prefix:local_name` format",
+            "pattern": r"^[^:]*:.+$",
+            "examples": [":Dog", "owl:Thing", "rdfs:label"],
+        }
 
 
 class DataType(StrEnum):

@@ -8,7 +8,7 @@ from ontoloom_mcp.components.ontology_file import OntologyPath, open_ontology
 
 
 def _remove_axioms(path: OntologyPath, prefixes: list[str]):
-    """Remove axioms by hash prefix (from search_axioms). Each prefix must uniquely match exactly one axiom. Atomic: if any prefix fails to resolve, nothing is removed."""
+    """Remove axioms by hash prefix (from `search_axioms`). Each prefix must uniquely match exactly one axiom. Atomic: if any prefix fails to resolve, nothing is removed."""
     with open_ontology(path, write=True) as (ontology, save):
         hashed = compute_hashes(ontology.axioms)
         matches = resolve_or_raise(hashed, prefixes)

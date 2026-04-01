@@ -18,7 +18,7 @@ def open_ontology(path: Path, *, write: bool = False):
     Uses a shared lock for reads, exclusive lock for writes.
     """
     if not path.exists():
-        msg = f"'{path}' does not exist. Create it first with create_ontology."
+        msg = f"'{path}' does not exist. Create it first with `create_ontology`."
         raise ToolError(msg)
 
     f = Path(path).open("r+")  # noqa: SIM115 -- we close it manually in finally block

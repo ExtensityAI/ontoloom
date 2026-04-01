@@ -5,17 +5,12 @@ from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from ontoloom.core.ontology.index.builder import build_index
+from ontoloom.core.ontology.models.literals import IRI
 from pydantic import BaseModel, Field
 
-from ontoloom_mcp.components.formatting import (
-    AXIOM_TYPE_NAMES,
-    format_axiom_listing,
-    format_search_axioms_page,
-)
+from ontoloom_mcp.components.formatting import format_axiom_listing, format_search_axioms_page
 from ontoloom_mcp.components.hashing import compute_hashes, resolve_or_raise
 from ontoloom_mcp.components.ontology_file import OntologyPath, open_ontology
-from ontoloom_mcp.models.converters import convert_iri
-from ontoloom_mcp.models.iri import StrIRI
 from ontoloom_mcp.tools._helpers import format_not_found
 
 
@@ -30,14 +25,18 @@ class IriQuery(BaseModel):
     """Search axioms mentioning a specific IRI."""
 
     type: Literal["iri"] = "iri"
-    iri: StrIRI = Field(description="IRI in 'prefix:local_name' format")
+    iri: IRI = Field(
+        description="IRI in `prefix:local_name` format", examples=[":Dog", "owl:Thing"]
+    )
 
 
 class PrefixQuery(BaseModel):
     """Look up specific axioms by hash prefix."""
 
     type: Literal["prefix"] = "prefix"
-    prefixes: list[str] = Field(description="Hash prefixes identifying specific axioms")
+    prefixes: list[str] = Field(
+        description="Hash prefixes identifying specific axioms (from `search_axioms` or `inspect_entity`)"
+    )
 
 
 SearchQuery = Annotated[
@@ -46,52 +45,47 @@ SearchQuery = Annotated[
 ]
 
 
-AxiomTypeName = Literal[tuple(AXIOM_TYPE_NAMES)]
-"""corresponds to exactly one axiom type name"""
-
-
 def _search_axioms(
     path: OntologyPath,
     query: SearchQuery,
-    axiom_types: list[AxiomTypeName] | None = None,  # pyright: ignore[reportInvalidTypeForm] # this is a type, no worries
+    axiom_types: list[str] | None = None,
     limit: int = 50,
     offset: int = 0,
 ):
     """Search for axioms in an ontology. Supports three query modes:
-    - regex: pattern matched against rendered axiom text
-    - iri: all axioms mentioning a specific entity
-    - prefix: look up specific axioms by hash prefix
+    - `regex`: pattern matched against rendered axiom text
+    - `iri`: all axioms mentioning a specific entity
+    - `prefix`: look up specific axioms by hash prefix
 
-    Use `axiom_types` to filter by axiom type (e.g. ["SubClassOf"]), and `limit`/`offset` to paginate.
+    Use `axiom_types` to filter by axiom type (e.g. `["SubClassOf"]`), and `limit`/`offset` to paginate.
 
     Tip: if you don't know exactly what to look for, or your search returns nothing when you expect results,
     refine progressively. Start broad, then narrow:
-    1. IriQuery(iri=":Dog") -> all axioms mentioning :Dog
-    2. Add axiom_types=["SubClassOf"] -> only SubClassOf axioms for :Dog
-    3. Or switch to RegexQuery(pattern="Dog.*Animal") -> axioms matching a specific pattern
+    1. By IRI: `query={"type": "iri", "iri": ":Dog"}` — all axioms mentioning `:Dog`
+    2. Add `axiom_types=["SubClassOf"]` — only `SubClassOf` axioms for `:Dog`
+    3. By regex: `query={"type": "regex", "pattern": "Dog.*Animal"}` — axioms matching a pattern
     """
     with open_ontology(path) as (ontology, _):
         if isinstance(query, PrefixQuery):
             hashed = compute_hashes(ontology.axioms)
             matches = resolve_or_raise(hashed, query.prefixes)
-            matched_set = {m.axiom for m in matches}  # pyright: ignore[reportUnhashable] # axiom is hashable
+            matched_set = {m.axiom for m in matches}  # pyright: ignore[reportUnhashable] # keep this, else pyright complains. we know axioms are hashable.
             matched_hashed = [ha for ha in hashed if ha.axiom in matched_set]
             return format_axiom_listing(matched_hashed)
 
         if isinstance(query, IriQuery):
             index = build_index(ontology)
-            iri = convert_iri(query.iri)
-            entry = index.entities.get(iri)
+            entry = index.entities.get(query.iri)
             if entry is None:
-                return format_not_found(iri, index)
+                return format_not_found(query.iri, index)
             candidates = entry.axioms
         else:
             try:
                 pattern = re.compile(query.pattern)
             except re.error as e:
                 msg = (
-                    f"Invalid regex pattern: {e}. "
-                    f"Example valid patterns: 'Dog.*Animal', 'SubClassOf.*:Person'"
+                    f"Invalid regex `pattern`: {e}. "
+                    f"Example valid patterns: `Dog.*Animal`, `SubClassOf.*:Person`"
                 )
                 raise ToolError(msg) from e
             candidates = [a for a in ontology.axioms if pattern.search(str(a))]

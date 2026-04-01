@@ -14,8 +14,8 @@ class NamedClass(_BaseClassExpression):
     """A named (atomic) class. Wraps a Class entity IRI.
 
     Also used for owl:Thing and owl:Nothing:
-        NamedClass(iri=IRI(prefix="owl", local_name="Thing"))
-        NamedClass(iri=IRI(prefix="owl", local_name="Nothing"))
+        NamedClass(iri=IRI("owl:Thing"))
+        NamedClass(iri=IRI("owl:Nothing"))
     """
 
     type: Literal["NamedClass"] = "NamedClass"

@@ -11,4 +11,4 @@ def format_not_found(iri: IRI, index: OntologyIndex) -> str:
     if near:
         names = ", ".join(str(r.iri) for r in near)
         suggestion = f" Similar entities: {names}."
-    return f"{iri}\nNot found.{suggestion}\nUse search_entities to find entities by name."
+    return f"{iri}\nNot found.{suggestion}\nUse `search_entities` to find entities by name."
