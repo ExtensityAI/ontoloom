@@ -10,13 +10,25 @@ from ontoloom_mcp.components.types import OntologyPath
 
 
 def _describe_ontology(path: OntologyPath):
-    """Get entity and axiom count statistics for an ontology."""
+    """Get entity counts, axiom counts, and prefix mappings for an ontology."""
     with OntologyStore(path) as store:
         axiom_counts = store.axiom_summary()
         total_entities, role_counts = store.entity_summary()
-        entity_part = format_entity_summary(total_entities, role_counts)
-        axiom_part = format_axiom_summary_from_counter(axiom_counts)
-        return f"{entity_part}\n\n{axiom_part}"
+        prefixes = store.list_prefixes()
+
+        parts = []
+        parts.append(format_entity_summary(total_entities, role_counts))
+        parts.append(format_axiom_summary_from_counter(axiom_counts))
+
+        if prefixes:
+            prefix_lines = ["Prefixes:"]
+            for name, iri in sorted(prefixes.items()):
+                prefix_lines.append(f"  {name}: \u2192 {iri}")
+            parts.append("\n".join(prefix_lines))
+        else:
+            parts.append("No prefixes defined.")
+
+        return "\n\n".join(parts)
 
 
 tool_describe_ontology = Tool.from_function(

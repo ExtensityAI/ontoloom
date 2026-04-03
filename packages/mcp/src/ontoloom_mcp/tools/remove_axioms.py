@@ -7,11 +7,11 @@ from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def _remove_axioms(path: OntologyPath, prefixes: list[str]):
-    """Remove axioms by hash prefix (from `get_axioms`). Each prefix must uniquely match exactly one axiom. Atomic: if any prefix fails to resolve, nothing is removed."""
+def _remove_axioms(path: OntologyPath, hash_prefixes: list[str]) -> str:
+    """Remove axioms by hash prefix (from `search_axioms`). Each prefix must uniquely match exactly one axiom. Atomic: if any prefix fails to resolve, nothing is removed."""
     with OntologyStore(path) as store:
         try:
-            result = store.remove_by_hash_prefix(prefixes)
+            result = store.remove_by_hash_prefix(hash_prefixes)
         except ValueError as e:
             raise ToolError(str(e)) from e
         entries = [("-", ha) for ha in result.removed]

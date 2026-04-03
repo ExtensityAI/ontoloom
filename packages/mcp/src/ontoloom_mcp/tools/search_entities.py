@@ -1,81 +1,65 @@
-from typing import Literal
-
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.models.literals import IRI
 from ontoloom.core.ontology.store import EntityMatch, OntologyStore
 
 from ontoloom_mcp.components.formatting import format_roles
 from ontoloom_mcp.components.types import OntologyPath
 
-_LABEL_IRI = IRI("rdfs:label")
-_MAX_RESULTS = 50
-
-_KIND_HEADERS = {
-    "exact": "Exact matches",
-    "substring": "Substring matches",
-}
-
-
-def _format_result_line(m: EntityMatch) -> str:
-    label = None
-    extra_annotations = []
-    for ann in m.annotations:
-        if ann.property == _LABEL_IRI and label is None:
-            label = f'"{ann.value}"'
-        elif ann.property != _LABEL_IRI:
-            extra_annotations.append(ann)
-
-    line = f"{m.iri} ({format_roles(m.roles)})"
-    if label:
-        line += f" — rdfs:label: {label}"
-
-    lines = [line]
-    lines.extend(f'  {ann.property}: "{ann.value}"' for ann in extra_annotations)
-    return "\n".join(lines)
-
-
-def _format_search_results(results: list[EntityMatch], query: str) -> str:
-    if not results:
-        return f'Search: "{query}" — no results.'
-
-    sections: dict[str, list[EntityMatch]] = {}
-    for m in results:
-        sections.setdefault(m.match_quality, []).append(m)
-
-    truncated = len(results) == _MAX_RESULTS
-    count_str = f"{len(results)}+" if truncated else str(len(results))
-    noun = "result" if len(results) == 1 else "results"
-    lines = [f'Search: "{query}" — {count_str} {noun}']
-    if truncated:
-        lines.append("(results truncated, narrow your query for more)")
-    lines.append("")
-
-    for quality in ("exact", "substring"):
-        group = sections.get(quality)
-        if not group:
-            continue
-        lines.append(f"## {_KIND_HEADERS[quality]}")
-        lines.append("")
-        lines.extend(_format_result_line(m) for m in group)
-        lines.append("")
-
-    return "\n".join(lines).rstrip()
-
 
 def _search_entities(
     path: OntologyPath,
-    query: str,
-    scope: Literal["iri", "annotations", "all"] = "all",
-):
-    """Search for entities by name with substring matching.
+    query: str | None = None,
+    role: str | None = None,
+    namespace: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> str:
+    """Search and filter entities. All parameters optional — no filters lists all entities.
 
-    Searches across IRI local names and annotation values (labels, comments).
-    Results are ranked: exact matches first, then substring matches.
+    - `query`: Substring match on IRI local names and annotation values (labels, comments).
+    - `role`: Filter by entity type (e.g. "Class", "ObjectProperty").
+    - `namespace`: Filter by IRI prefix (e.g. "ex", "snomed").
+    - `limit`/`offset`: Pagination.
     """
     with OntologyStore(path) as store:
-        results = store.search_entities(query, scope=scope, limit=_MAX_RESULTS)
-        return _format_search_results(results, query)
+        page = store.search_entities(
+            query=query,
+            role=role,
+            namespace=namespace,
+            limit=limit,
+            offset=offset,
+        )
+        if page.total == 0:
+            parts = []
+            if query:
+                parts.append(f"query={query!r}")
+            if role:
+                parts.append(f"role={role}")
+            if namespace:
+                parts.append(f"namespace={namespace}")
+            filter_desc = ", ".join(parts) if parts else "no filters"
+            return f"No entities found ({filter_desc})."
+        return _format_results(page.matches, page.total, offset)
+
+
+def _format_results(matches: list[EntityMatch], total: int, offset: int) -> str:
+    end = offset + len(matches)
+    lines = [f"Showing {offset + 1}-{end} of {total} entities:"]
+    lines.append("")
+    for m in matches:
+        role_str = format_roles(m.roles)
+        label = ""
+        for ann in m.annotations:
+            if str(ann.property) == "rdfs:label":
+                label = f' "{ann.value}"'
+                break
+        lines.append(f"  {m.iri} ({role_str}){label}")
+        lines.extend(
+            f'    {ann.property}: "{ann.value}"'
+            for ann in m.annotations
+            if str(ann.property) != "rdfs:label"
+        )
+    return "\n".join(lines)
 
 
 tool_search_entities = Tool.from_function(
