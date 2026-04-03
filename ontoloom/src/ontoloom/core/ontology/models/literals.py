@@ -3,10 +3,14 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, GetCoreSchemaHandler
+from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
-from ontoloom.core.ontology.models.base import FrozenModel
+
+class FrozenModel(BaseModel):
+    """Base for all OWL 2 EL model classes. Immutable by default."""
+
+    model_config = ConfigDict(frozen=True)
 
 
 class IRI(str):
@@ -93,7 +97,7 @@ class TypedLiteral(FrozenModel):
     value: str
     datatype: DataType = DataType.STRING
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f'"{self.value}"^^{self.datatype.value}'
 
 
@@ -105,6 +109,13 @@ class LangLiteral(FrozenModel):
 
     def __str__(self) -> str:
         return f'"{self.value}"@{self.lang}'
+
+
+class Annotation(FrozenModel):
+    """A property-value pair attached to an axiom. Not a standalone axiom."""
+
+    property: IRI
+    value: IRI | TypedLiteral | LangLiteral
 
 
 # -- Data Range Expressions --
@@ -128,7 +139,7 @@ class DataOneOf(BaseDataRange):
     """Union of data ranges. Due to us supporting OWL2 EL, only one option is allowed."""
 
     type: Literal["DataOneOf"] = "DataOneOf"
-    value: TypedLiteral
+    value: TypedLiteral | LangLiteral
 
     def __str__(self) -> str:
         return f"{{{self.value}}}"

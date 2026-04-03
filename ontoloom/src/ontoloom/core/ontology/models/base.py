@@ -1,19 +1,24 @@
-from pydantic import BaseModel, ConfigDict
+from enum import StrEnum
+
+from ontoloom.core.ontology.models.literals import Annotation, FrozenModel
 
 
-class FrozenModel(BaseModel):
-    """Base for all OWL 2 EL model classes. Immutable by default."""
-
-    model_config = ConfigDict(frozen=True)
-
-
-class _BaseClassExpression(FrozenModel):
+class BaseClassExpression(FrozenModel):
     """Base for all OWL 2 EL class expressions."""
 
 
-class _BaseAxiom(FrozenModel):
+class BaseAxiom(FrozenModel):
     """Base for all OWL 2 EL axioms (TBox + RBox + ABox)."""
 
+    annotations: tuple[Annotation, ...] = ()
 
-class _BaseAssertion(_BaseAxiom):
-    """Base for all ABox assertions."""
+
+class EntityType(StrEnum):
+    """What kind of OWL entity an IRI represents."""
+
+    CLASS = "Class"
+    OBJECT_PROPERTY = "ObjectProperty"
+    DATA_PROPERTY = "DataProperty"
+    ANNOTATION_PROPERTY = "AnnotationProperty"
+    NAMED_INDIVIDUAL = "NamedIndividual"
+    DATATYPE = "Datatype"

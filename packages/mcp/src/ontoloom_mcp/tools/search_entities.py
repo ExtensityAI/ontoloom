@@ -1,57 +1,49 @@
+from typing import Literal
+
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.index.builder import build_index
 from ontoloom.core.ontology.models.literals import IRI
+from ontoloom.core.ontology.store import EntityMatch, OntologyStore
 
-from ontoloom_mcp.components import search as search_module
-from ontoloom_mcp.components.formatting import (
-    format_annotation_compact,
-    format_annotation_value,
-    format_roles,
-)
-from ontoloom_mcp.components.ontology_file import OntologyPath, open_ontology
-from ontoloom_mcp.components.search import MatchKind, Scope, SearchResult
-
-_KIND_HEADERS = {
-    MatchKind.EXACT: "Exact matches",
-    MatchKind.SUBSTRING: "Substring matches",
-    MatchKind.FUZZY: "Fuzzy matches",
-}
+from ontoloom_mcp.components.formatting import format_roles
+from ontoloom_mcp.components.types import OntologyPath
 
 _LABEL_IRI = IRI("rdfs:label")
 _MAX_RESULTS = 50
 
+_KIND_HEADERS = {
+    "exact": "Exact matches",
+    "substring": "Substring matches",
+}
 
-def _format_result_line(r: SearchResult) -> str:
+
+def _format_result_line(m: EntityMatch) -> str:
     label = None
     extra_annotations = []
-    for ann in r.entry.annotations:
+    for ann in m.annotations:
         if ann.property == _LABEL_IRI and label is None:
-            label = format_annotation_value(ann.value)
+            label = f'"{ann.value}"'
         elif ann.property != _LABEL_IRI:
             extra_annotations.append(ann)
 
-    line = f"{r.iri} ({format_roles(r.entry.roles)})"
+    line = f"{m.iri} ({format_roles(m.roles)})"
     if label:
         line += f" — rdfs:label: {label}"
-    if r.kind == MatchKind.FUZZY:
-        line += f" ({r.score})"
 
     lines = [line]
-    lines.extend(f"  {format_annotation_compact(ann)}" for ann in extra_annotations)
-
+    lines.extend(f'  {ann.property}: "{ann.value}"' for ann in extra_annotations)
     return "\n".join(lines)
 
 
-def _format_search_results(results: list[SearchResult], query: str, max_results: int) -> str:
+def _format_search_results(results: list[EntityMatch], query: str) -> str:
     if not results:
         return f'Search: "{query}" — no results.'
 
-    sections: dict[MatchKind, list[SearchResult]] = {}
-    for r in results:
-        sections.setdefault(r.kind, []).append(r)
+    sections: dict[str, list[EntityMatch]] = {}
+    for m in results:
+        sections.setdefault(m.match_quality, []).append(m)
 
-    truncated = len(results) == max_results
+    truncated = len(results) == _MAX_RESULTS
     count_str = f"{len(results)}+" if truncated else str(len(results))
     noun = "result" if len(results) == 1 else "results"
     lines = [f'Search: "{query}" — {count_str} {noun}']
@@ -59,14 +51,13 @@ def _format_search_results(results: list[SearchResult], query: str, max_results:
         lines.append("(results truncated, narrow your query for more)")
     lines.append("")
 
-    for kind in (MatchKind.EXACT, MatchKind.SUBSTRING, MatchKind.FUZZY):
-        group = sections.get(kind)
+    for quality in ("exact", "substring"):
+        group = sections.get(quality)
         if not group:
             continue
-
-        lines.append(f"## {_KIND_HEADERS[kind]}")
+        lines.append(f"## {_KIND_HEADERS[quality]}")
         lines.append("")
-        lines.extend(_format_result_line(r) for r in group)
+        lines.extend(_format_result_line(m) for m in group)
         lines.append("")
 
     return "\n".join(lines).rstrip()
@@ -75,19 +66,16 @@ def _format_search_results(results: list[SearchResult], query: str, max_results:
 def _search_entities(
     path: OntologyPath,
     query: str,
-    scope: Scope = Scope.ALL,
+    scope: Literal["iri", "annotations", "all"] = "all",
 ):
-    """Search for entities by name with substring and fuzzy matching.
+    """Search for entities by name with substring matching.
 
     Searches across IRI local names and annotation values (labels, comments).
-    Results are ranked: exact matches first, then substring matches, then fuzzy matches.
+    Results are ranked: exact matches first, then substring matches.
     """
-    with open_ontology(path) as (ontology, _):
-        index = build_index(ontology)
-        results = search_module.search_entities(
-            index.entities, query, scope=scope, max_results=_MAX_RESULTS
-        )
-        return _format_search_results(results, query, max_results=_MAX_RESULTS)
+    with OntologyStore(path) as store:
+        results = store.search_entities(query, scope=scope, limit=_MAX_RESULTS)
+        return _format_search_results(results, query)
 
 
 tool_search_entities = Tool.from_function(

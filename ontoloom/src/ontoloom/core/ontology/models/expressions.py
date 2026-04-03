@@ -4,13 +4,13 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import _BaseClassExpression
+from ontoloom.core.ontology.models.base import BaseClassExpression
 from ontoloom.core.ontology.models.literals import IRI, DataRange, TypedLiteral
 
 # -- Named class --
 
 
-class NamedClass(_BaseClassExpression):
+class NamedClass(BaseClassExpression):
     """A named (atomic) class. Wraps a Class entity IRI.
 
     Also used for owl:Thing and owl:Nothing:
@@ -28,7 +28,7 @@ class NamedClass(_BaseClassExpression):
 # -- Object property restrictions --
 
 
-class ObjectSomeValuesFrom(_BaseClassExpression):
+class ObjectSomeValuesFrom(BaseClassExpression):
     """∃r.C — things related by r to at least one member of C.
 
     SubClassOf(Animal, ObjectSomeValuesFrom(hasPart, Heart))
@@ -43,7 +43,7 @@ class ObjectSomeValuesFrom(_BaseClassExpression):
         return f"ObjectSomeValuesFrom({self.property}, {self.filler})"
 
 
-class ObjectIntersectionOf(_BaseClassExpression):
+class ObjectIntersectionOf(BaseClassExpression):
     """C ⊓ D — things in ALL listed classes simultaneously.
 
     ObjectIntersectionOf([Woman, Parent]) → female parents
@@ -56,7 +56,7 @@ class ObjectIntersectionOf(_BaseClassExpression):
         return f"ObjectIntersectionOf({', '.join(str(o) for o in self.operands)})"
 
 
-class ObjectOneOf(_BaseClassExpression):
+class ObjectOneOf(BaseClassExpression):
     """Nominal: {a} — class containing exactly one individual.
 
     EL restriction: only a single individual.
@@ -69,7 +69,7 @@ class ObjectOneOf(_BaseClassExpression):
         return f"ObjectOneOf({self.individual})"
 
 
-class ObjectHasValue(_BaseClassExpression):
+class ObjectHasValue(BaseClassExpression):
     """∃r.{a} — things related by r to a specific individual.
 
     ObjectHasValue(hasCreator, :Alice) → things created by Alice
@@ -85,7 +85,7 @@ class ObjectHasValue(_BaseClassExpression):
         return f"ObjectHasValue({self.property}, {self.individual})"
 
 
-class ObjectHasSelf(_BaseClassExpression):
+class ObjectHasSelf(BaseClassExpression):
     """∃r.Self — things related to themselves by r.
 
     ObjectHasSelf(likes) → things that like themselves
@@ -101,7 +101,7 @@ class ObjectHasSelf(_BaseClassExpression):
 # -- Data property restrictions --
 
 
-class DataSomeValuesFrom(_BaseClassExpression):
+class DataSomeValuesFrom(BaseClassExpression):
     """Things with at least one value for dp in the given range.
 
     DataSomeValuesFrom(hasAge, xsd:integer)
@@ -118,7 +118,7 @@ class DataSomeValuesFrom(_BaseClassExpression):
         return f"DataSomeValuesFrom({self.property}, {_fmt_data_range(self.range)})"
 
 
-class DataHasValue(_BaseClassExpression):
+class DataHasValue(BaseClassExpression):
     """Things whose data property has exactly this value.
 
     DataHasValue(hasName, TypedLiteral("Alice"))
