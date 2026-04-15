@@ -1,10 +1,10 @@
 from fastmcp.tools import Tool
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def _set_prefix(path: OntologyPath, name: str, iri: str) -> str:
+def _set_prefix(path: OntologyPath, name: str, iri: str):
     """Add or update a prefix mapping (e.g. name="ex", iri="http://example.org/")."""
     with OntologyStore(path) as store:
         store.set_prefix(name, iri)

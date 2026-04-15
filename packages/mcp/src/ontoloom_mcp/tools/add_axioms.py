@@ -1,7 +1,7 @@
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.models.axioms import Axiom
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.models.axioms import Axiom
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.types import OntologyPath

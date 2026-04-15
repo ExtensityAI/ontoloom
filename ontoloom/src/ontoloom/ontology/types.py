@@ -1,13 +1,13 @@
-"""Public data types returned by OntologyStore methods."""
-
-from __future__ import annotations
-
 from collections import Counter
 from dataclasses import dataclass
+from typing import Literal
 
-from ontoloom.core.ontology.models.axioms import Axiom
-from ontoloom.core.ontology.models.base import EntityType
-from ontoloom.core.ontology.models.literals import IRI
+from ontoloom.ontology.models.axioms import Axiom
+from ontoloom.ontology.models.base import EntityType
+from ontoloom.ontology.models.literals import IRI
+
+MatchSource = Literal["iri", "annotation", "list"]
+MatchQuality = Literal["exact", "substring"]
 
 
 @dataclass
@@ -28,8 +28,8 @@ class EntityMatch:
     iri: IRI
     roles: set[EntityType]
     annotations: list[AnnotationRow]
-    match_source: str
-    match_quality: str
+    match_source: MatchSource
+    match_quality: MatchQuality
 
 
 @dataclass

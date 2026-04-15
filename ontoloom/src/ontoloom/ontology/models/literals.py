@@ -8,8 +8,6 @@ from pydantic_core import CoreSchema, core_schema
 
 
 class FrozenModel(BaseModel):
-    """Base for all OWL 2 EL model classes. Immutable by default."""
-
     model_config = ConfigDict(frozen=True)
 
 
@@ -21,8 +19,6 @@ class IRI(str):
         IRI("owl:Thing")   → owl:Thing
         IRI("xsd:integer") → xsd:integer
     """
-
-    # If prefix/local_name splitting becomes a bottleneck, cache the split result.
 
     def __new__(cls, value: str):
         parts = value.split(":", 1)
@@ -136,7 +132,7 @@ class DataIntersectionOf(BaseDataRange):
 
 
 class DataOneOf(BaseDataRange):
-    """Union of data ranges. Due to us supporting OWL2 EL, only one option is allowed."""
+    """A singleton literal value. OWL 2 EL restricts DataOneOf to exactly one value."""
 
     type: Literal["DataOneOf"] = "DataOneOf"
     value: TypedLiteral | LangLiteral

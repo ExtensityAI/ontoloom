@@ -1,7 +1,7 @@
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.models.literals import IRI
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.formatting import format_search_axioms_page
 from ontoloom_mcp.components.types import OntologyPath
@@ -14,7 +14,7 @@ def _search_axioms(
     annotation_query: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> str:
+):
     """Search and filter axioms. All parameters optional — no filters lists all axioms.
 
     - `iri`: Only axioms mentioning this entity.

@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.assertions import (
+from ontoloom.ontology.models.assertions import (
     ClassAssertion,
     DataPropertyAssertion,
     DifferentIndividuals,
@@ -11,13 +11,9 @@ from ontoloom.core.ontology.models.assertions import (
     ObjectPropertyAssertion,
     SameIndividual,
 )
-from ontoloom.core.ontology.models.base import BaseAxiom, EntityType
-from ontoloom.core.ontology.models.expressions import ClassExpression
-from ontoloom.core.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
-
-# =============================================================================
-# Annotations
-# =============================================================================
+from ontoloom.ontology.models.base import BaseAxiom, EntityType
+from ontoloom.ontology.models.expressions import ClassExpression
+from ontoloom.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
 
 
 class AnnotationAssertion(BaseAxiom):
@@ -33,11 +29,6 @@ class AnnotationAssertion(BaseAxiom):
 
     def __str__(self) -> str:
         return f"AnnotationAssertion({self.property}, {self.subject}, {self.value})"
-
-
-# =============================================================================
-# TBox — Class axioms
-# =============================================================================
 
 
 class SubClassOf(BaseAxiom):
@@ -83,11 +74,6 @@ class DisjointClasses(BaseAxiom):
 
     def __str__(self) -> str:
         return f"DisjointClasses({', '.join(str(e) for e in self.expressions)})"
-
-
-# =============================================================================
-# RBox — Object property axioms
-# =============================================================================
 
 
 class SubObjectPropertyOf(BaseAxiom):
@@ -187,11 +173,6 @@ class ObjectPropertyRange(BaseAxiom):
         return f"ObjectPropertyRange({self.property}, {self.range})"
 
 
-# =============================================================================
-# RBox — Data property axioms
-# =============================================================================
-
-
 class SubDataPropertyOf(BaseAxiom):
     """dp₁ ⊑ dp₂ — if dp₁(x,v) then dp₂(x,v)."""
 
@@ -232,7 +213,7 @@ class DataPropertyRange(BaseAxiom):
     range: DataRange
 
     def __str__(self) -> str:
-        from ontoloom.core.ontology.models.literals import _fmt_data_range
+        from ontoloom.ontology.models.literals import _fmt_data_range
 
         return f"DataPropertyRange({self.property}, {_fmt_data_range(self.range)})"
 
@@ -248,11 +229,6 @@ class FunctionalDataProperty(BaseAxiom):
 
     def __str__(self) -> str:
         return f"FunctionalDataProperty({self.property})"
-
-
-# =============================================================================
-# HasKey
-# =============================================================================
 
 
 class HasKey(BaseAxiom):
@@ -272,14 +248,7 @@ class HasKey(BaseAxiom):
         return f"HasKey({self.class_expression}, [{obj}], [{data}])"
 
 
-# =============================================================================
-# Annotation property axioms
-# =============================================================================
-
-
 class SubAnnotationPropertyOf(BaseAxiom):
-    """Annotation property hierarchy."""
-
     type: Literal["SubAnnotationPropertyOf"] = "SubAnnotationPropertyOf"
     sub_property: IRI
     super_property: IRI
@@ -289,7 +258,7 @@ class SubAnnotationPropertyOf(BaseAxiom):
 
 
 class AnnotationPropertyDomain(BaseAxiom):
-    """Domain constraint on an annotation property (no logical semantics)."""
+    """No logical semantics."""
 
     type: Literal["AnnotationPropertyDomain"] = "AnnotationPropertyDomain"
     property: IRI
@@ -300,7 +269,7 @@ class AnnotationPropertyDomain(BaseAxiom):
 
 
 class AnnotationPropertyRange(BaseAxiom):
-    """Range constraint on an annotation property (no logical semantics)."""
+    """No logical semantics."""
 
     type: Literal["AnnotationPropertyRange"] = "AnnotationPropertyRange"
     property: IRI
@@ -310,43 +279,24 @@ class AnnotationPropertyRange(BaseAxiom):
         return f"AnnotationPropertyRange({self.property}, {self.range})"
 
 
-# =============================================================================
-# Datatype definition
-# =============================================================================
-
-
 class DatatypeDefinition(BaseAxiom):
-    """Defines a custom datatype as equivalent to a data range."""
-
     type: Literal["DatatypeDefinition"] = "DatatypeDefinition"
     datatype: IRI
     data_range: DataRange
 
     def __str__(self) -> str:
-        from ontoloom.core.ontology.models.literals import _fmt_data_range
+        from ontoloom.ontology.models.literals import _fmt_data_range
 
         return f"DatatypeDefinition({self.datatype}, {_fmt_data_range(self.data_range)})"
 
 
-# =============================================================================
-# Declaration
-# =============================================================================
-
-
 class Declaration(BaseAxiom):
-    """Declares the existence and type of an entity."""
-
     type: Literal["Declaration"] = "Declaration"
     entity_type: EntityType
     iri: IRI
 
     def __str__(self) -> str:
         return f"Declaration({self.entity_type}, {self.iri})"
-
-
-# =============================================================================
-# Discriminated union
-# =============================================================================
 
 
 Axiom = Annotated[

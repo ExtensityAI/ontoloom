@@ -708,6 +708,12 @@ wheels = [
 name = "ontoloom"
 version = "0.1.0"
 source = { editable = "ontoloom" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 
 [[package]]
 name = "ontoloom-mcp"

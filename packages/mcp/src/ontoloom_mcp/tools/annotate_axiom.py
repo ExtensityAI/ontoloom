@@ -1,7 +1,7 @@
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
-from ontoloom.core.ontology.models.literals import Annotation
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.models.literals import Annotation
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.formatting import format_axiom_listing
 from ontoloom_mcp.components.types import OntologyPath
@@ -12,7 +12,7 @@ def _annotate_axiom(
     axiom_hash: str,
     add_annotations: list[Annotation] | None = None,
     remove_annotations: list[Annotation] | None = None,
-) -> str:
+):
     """Add or remove annotations on an existing axiom. The axiom's hash does not change.
 
     Use `search_axioms` to find axiom hashes.

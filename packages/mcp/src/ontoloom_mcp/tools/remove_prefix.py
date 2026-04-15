@@ -1,11 +1,11 @@
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def _remove_prefix(path: OntologyPath, name: str) -> str:
+def _remove_prefix(path: OntologyPath, name: str):
     """Remove a prefix mapping."""
     with OntologyStore(path) as store:
         try:

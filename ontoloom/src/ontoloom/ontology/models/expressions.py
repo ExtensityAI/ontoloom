@@ -4,8 +4,8 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import BaseClassExpression
-from ontoloom.core.ontology.models.literals import IRI, DataRange, TypedLiteral
+from ontoloom.ontology.models.base import BaseClassExpression
+from ontoloom.ontology.models.literals import IRI, DataRange, TypedLiteral
 
 # -- Named class --
 
@@ -113,7 +113,7 @@ class DataSomeValuesFrom(BaseClassExpression):
     range: DataRange
 
     def __str__(self) -> str:
-        from ontoloom.core.ontology.models.literals import _fmt_data_range
+        from ontoloom.ontology.models.literals import _fmt_data_range
 
         return f"DataSomeValuesFrom({self.property}, {_fmt_data_range(self.range)})"
 

@@ -2,10 +2,10 @@ import json
 from pathlib import Path
 
 from ontoloom.core.metrics import IterationMetrics, OntologyMetrics
-from ontoloom.core.ontology.components.implementation.draft_ops import OperationSequence
-from ontoloom.core.ontology.models import Ontology
-from ontoloom.core.ontology.revision.operations import Operation
-from ontoloom.core.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
+from ontoloom.ontology.components.implementation.draft_ops import OperationSequence
+from ontoloom.ontology.models import Ontology
+from ontoloom.ontology.revision.operations import Operation
+from ontoloom.ontology.run import VALID_RUN_ID_PATTERN, RunMetadata
 
 from ontoloom_viz.runs.models import (
     IterationDetail,

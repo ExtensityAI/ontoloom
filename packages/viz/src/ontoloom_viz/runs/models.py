@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from ontoloom.core.metrics import IterationMetrics, OntologyMetrics
-from ontoloom.core.ontology.models import Ontology
-from ontoloom.core.ontology.revision.operations import Operation
-from ontoloom.core.ontology.run import RunMetadata
+from ontoloom.ontology.models import Ontology
+from ontoloom.ontology.revision.operations import Operation
+from ontoloom.ontology.run import RunMetadata
 from pydantic import BaseModel, Field
 
 

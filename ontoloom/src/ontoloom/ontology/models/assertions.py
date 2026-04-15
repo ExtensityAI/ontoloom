@@ -2,13 +2,9 @@ from typing import Literal
 
 from pydantic import Field
 
-from ontoloom.core.ontology.models.base import BaseAxiom
-from ontoloom.core.ontology.models.expressions import ClassExpression
-from ontoloom.core.ontology.models.literals import IRI, LangLiteral, TypedLiteral
-
-# =============================================================================
-# Class and property assertions
-# =============================================================================
+from ontoloom.ontology.models.base import BaseAxiom
+from ontoloom.ontology.models.expressions import ClassExpression
+from ontoloom.ontology.models.literals import IRI, LangLiteral, TypedLiteral
 
 
 class ClassAssertion(BaseAxiom):
@@ -83,11 +79,6 @@ class NegativeDataPropertyAssertion(BaseAxiom):
 
     def __str__(self) -> str:
         return f"NegativeDataPropertyAssertion({self.property}, {self.individual}, {self.value})"
-
-
-# =============================================================================
-# Individual identity
-# =============================================================================
 
 
 class SameIndividual(BaseAxiom):

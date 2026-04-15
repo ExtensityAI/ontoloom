@@ -2,12 +2,12 @@ from pathlib import Path
 
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def _export_jsonl(path: OntologyPath, output_path: Path) -> str:
+def _export_jsonl(path: OntologyPath, output_path: Path):
     """Export all axioms to a JSONL file (one axiom per line, sorted by hash).
 
     Use for archival, sharing, or version control snapshots.

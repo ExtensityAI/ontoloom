@@ -1,7 +1,7 @@
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.models.literals import IRI
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.formatting import format_entity_inspect
 from ontoloom_mcp.components.types import OntologyPath

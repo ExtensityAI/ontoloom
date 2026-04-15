@@ -1,6 +1,6 @@
 from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.store import OntologyStore
 
 from ontoloom_mcp.components.formatting import (
     format_axiom_summary_from_counter,
