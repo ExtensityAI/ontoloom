@@ -12,7 +12,7 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 ## Example
 
-An agent building and maintaining a solar system ontology.
+A coding agent using ontoloom's MCP tools to build and maintain a solar system ontology.
 
 ``````
 create_ontology(path="solar.db")
