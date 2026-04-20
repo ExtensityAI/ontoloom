@@ -12,14 +12,20 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 ## Example
 
-``````
+Create an ontology and a prefix:
+
+```
 >>> create_ontology(path="pizzas.db")
 Created ontology at `pizzas.db`.
 
 >>> set_prefix(path="pizzas.db", name="pizza", iri="http://example.org/pizza#")
 Set prefix `pizza:` → `http://example.org/pizza#`
+```
 
->>> add_axioms(path="pizzas.db", axioms=[...])  # 4 axioms as typed JSON
+Add axioms. Duplicates are skipped:
+
+``````
+>>> add_axioms(path="pizzas.db", axioms=[...])
 Added 4, skipped 0 axioms.
 
 ```diff
@@ -28,7 +34,11 @@ Added 4, skipped 0 axioms.
 + [c9d0e1f2] SubClassOf(pizza:Margherita, pizza:Pizza)
 + [d3e4f5a6] AnnotationAssertion(rdfs:label, pizza:Margherita, "Margherita")
 ```
+``````
 
+Search and inspect:
+
+```
 >>> search_entities(path="pizzas.db", query="marg")
 Showing 1-1 of 1 entities:
 
@@ -46,7 +56,7 @@ Showing 1-1 of 1 entities:
 
 Prefixes:
   pizza: → http://example.org/pizza#
-``````
+```
 
 ## What you can do with it
 
