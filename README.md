@@ -12,56 +12,79 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 ## Example
 
-Create an ontology and a prefix:
-
-```
->>> create_ontology(path="pizzas.db")
-Created ontology at `pizzas.db`.
-
->>> set_prefix(path="pizzas.db", name="pizza", iri="http://example.org/pizza#")
-Set prefix `pizza:` → `http://example.org/pizza#`
-```
-
-Add axioms. Duplicates are skipped:
+An agent building and maintaining a solar system ontology.
 
 ``````
->>> add_axioms(path="pizzas.db", axioms=[...])
-Added 4, skipped 0 axioms.
+create_ontology(path="solar.db")
+set_prefix(path="solar.db", name="sol", iri="http://example.org/solar-system#")
+
+add_axioms(path="solar.db", axioms=[...])
+Added 6, skipped 0 axioms.
 
 ```diff
-+ [a1b2c3d4] Declaration(Class(pizza:Pizza))
-+ [e5f6a7b8] Declaration(Class(pizza:Margherita))
-+ [c9d0e1f2] SubClassOf(pizza:Margherita, pizza:Pizza)
-+ [d3e4f5a6] AnnotationAssertion(rdfs:label, pizza:Margherita, "Margherita")
++ [0616d02d] SubClassOf(sol:Star, sol:CelestialBody)
++ [2657de99] SubClassOf(sol:Planet, sol:CelestialBody)
++ [eb7d1df7] SubClassOf(sol:Moon, sol:CelestialBody)
++ [df252968] SubClassOf(sol:TerrestrialPlanet, sol:Planet)
++ [650a7bfe] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
++ [caf67282] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:CelestialBody))
 ```
 ``````
 
-Search and inspect:
+After a few more rounds of additions, the ontology has grown to 42 entities and 172 axioms. The Moon constraint is too loose — moons should orbit planets, not any celestial body:
+
+``````
+remove_axioms(path="solar.db", hash_prefixes=["caf67282"])
+Removed 1 axioms.
+
+```diff
+- [caf67282] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:CelestialBody))
+```
+
+add_axioms(path="solar.db", axioms=[...])
+Added 1, skipped 0 axioms.
+
+```diff
++ [58253c7e] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
+```
+``````
+
+To add Saturn's missing moons, the agent first checks the pattern by looking at an existing one:
 
 ```
->>> search_entities(path="pizzas.db", query="marg")
-Showing 1-1 of 1 entities:
+search_axioms(path="solar.db", iri="sol:Europa")
+Showing 1-4 of 4 results:
 
-  pizza:Margherita (Class) "Margherita"
-
->>> describe_ontology(path="pizzas.db")
-3 entities total
-  2 Class
-  1 AnnotationProperty
-
-4 axioms total
-  2 Declaration
-  1 SubClassOf
-  1 AnnotationAssertion
-
-Prefixes:
-  pizza: → http://example.org/pizza#
+[4a485089] Declaration(NamedIndividual, sol:Europa)
+[af28f052] ClassAssertion(sol:Moon, sol:Europa)
+[fe77f112] ObjectPropertyAssertion(sol:orbits, sol:Europa, sol:Jupiter)
+[05e24b95] ObjectPropertyAssertion(sol:hasSatellite, sol:Jupiter, sol:Europa)
 ```
+
+Then adds Enceladus and Rhea following the same structure:
+
+``````
+add_axioms(path="solar.db", axioms=[...])
+Added 10, skipped 0 axioms.
+
+```diff
++ [161051ed] Declaration(NamedIndividual, sol:Enceladus)
++ [ef694717] Declaration(NamedIndividual, sol:Rhea)
++ [76b5e1fd] ClassAssertion(sol:Moon, sol:Enceladus)
++ [216366b2] ClassAssertion(sol:Moon, sol:Rhea)
++ [ae43e129] ObjectPropertyAssertion(sol:orbits, sol:Enceladus, sol:Saturn)
++ [c6891748] ObjectPropertyAssertion(sol:orbits, sol:Rhea, sol:Saturn)
++ [2f8b94a6] ObjectPropertyAssertion(sol:hasSatellite, sol:Saturn, sol:Enceladus)
++ [2effe2e8] ObjectPropertyAssertion(sol:hasSatellite, sol:Saturn, sol:Rhea)
++ [bae0bfe4] AnnotationAssertion(rdfs:label, sol:Enceladus, "Enceladus"^^xsd:string)
++ [be77333e] AnnotationAssertion(rdfs:label, sol:Rhea, "Rhea"^^xsd:string)
+```
+``````
 
 ## What you can do with it
 
 - Build an ontology from scratch by talking to an agent
-- Poke around an existing one: search for entities, browse axioms
+- Poke around an existing one: search entities and axioms, inspect structure
 - Hand an agent an existing ontology and ask it to clean up or extend
 - Dump everything to JSONL for sharing or archival
 - Manage prefix mappings and annotations
