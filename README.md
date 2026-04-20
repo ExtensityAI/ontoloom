@@ -5,10 +5,10 @@
 MCP tools for building and exploring OWL 2 ontologies with AI agents.
 
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
-ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with OWL 2 EL ontologies. Axioms are typed Pydantic models, so anything malformed gets rejected at the API boundary before it hits storage. Each ontology is a single SQLite file, with deduplication, text search, and prefix handling built in.
+ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with OWL 2 EL ontologies. Each ontology is a single SQLite file with built-in deduplication and text search.
 
 ## Example
 
@@ -51,8 +51,8 @@ Prefixes:
 ## What you can do with it
 
 - Build an ontology from scratch by talking to an agent
-- Poke around an existing one: search for entities, browse axioms, inspect structure
-- Hand an agent an existing ontology and ask it to enrich, validate, or refactor
+- Poke around an existing one: search for entities, browse axioms
+- Hand an agent an existing ontology and ask it to clean up or extend
 - Dump everything to JSONL for sharing or archival
 - Manage prefix mappings and annotations
 
@@ -114,9 +114,9 @@ uv run --project packages/mcp python -m ontoloom_mcp.server
 
 ## How it works
 
-Each ontology lives in one `.db` file. No separate server, no migration story — the same file works for a toy ontology with a dozen axioms or a real one with millions of them.
+Each ontology lives in a single `.db` file that works the same whether it has a dozen axioms or millions.
 
-Axioms are Pydantic models validated at the API boundary, so by the time anything reaches SQLite it's well-formed. Axiom identity is a SHA-256 over the canonical logical content, ignoring annotations; that means you can add or edit a comment on an axiom without changing its identity, and duplicates get caught for free.
+Axioms are typed Pydantic models validated at the API boundary, so by the time anything reaches SQLite it's well-formed. Identity is a SHA-256 over canonical logical content, ignoring annotations — you can edit a comment on an axiom without changing its hash, and duplicates get caught automatically.
 
 ## Status
 
@@ -124,4 +124,4 @@ Alpha. The pieces all work and I'm using it, but the API isn't frozen yet. Issue
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+BSD-3-Clause — see [LICENSE](LICENSE).
