@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS axioms (
     source TEXT NOT NULL DEFAULT 'asserted' CHECK (source IN ('asserted', 'inferred'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_axioms_type ON axioms(type);
+
 -- Derived index: every entity IRI referenced by an axiom, with its structural
 -- role (Class, ObjectProperty, ...) when known. Enables entity lookup and
 -- role/namespace filtering without scanning axiom JSON. Repopulated from
@@ -27,6 +29,7 @@ CREATE TABLE IF NOT EXISTS axiom_entities (
 );
 
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri ON axiom_entities(entity_iri);
+CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_role ON axiom_entities(entity_iri, role);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom ON axiom_entities(axiom_id);
 
 -- Derived text index keyed to a specific entity: the entity's local_name plus
@@ -40,7 +43,7 @@ CREATE TABLE IF NOT EXISTS entity_text (
 );
 
 CREATE INDEX IF NOT EXISTS idx_entity_text_iri ON entity_text(entity_iri);
-CREATE INDEX IF NOT EXISTS idx_entity_text_text ON entity_text(text);
+CREATE INDEX IF NOT EXISTS idx_entity_text_prop_text ON entity_text(property, text);
 CREATE INDEX IF NOT EXISTS idx_entity_text_axiom ON entity_text(axiom_id);
 
 -- Derived text index for axiom-level metadata annotations (annotations *on*

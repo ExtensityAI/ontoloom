@@ -3,10 +3,12 @@ from mcp.types import ToolAnnotations
 from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.store import OntologyStore
 
+from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import format_entity_inspect
 from ontoloom_mcp.components.types import OntologyPath
 
 
+@handle_tool_errors
 def _get_entity(path: OntologyPath, iri: IRI):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
 

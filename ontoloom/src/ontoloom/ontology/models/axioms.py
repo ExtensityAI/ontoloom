@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ontoloom.ontology.models.assertions import (
     ClassAssertion,
@@ -241,6 +241,13 @@ class HasKey(BaseAxiom):
     class_expression: ClassExpression
     object_properties: tuple[IRI, ...]
     data_properties: tuple[IRI, ...]
+
+    @model_validator(mode="after")
+    def _check_has_properties(self):
+        if not self.object_properties and not self.data_properties:
+            msg = "HasKey must have at least one object or data property"
+            raise ValueError(msg)
+        return self
 
     def __str__(self) -> str:
         obj = ", ".join(str(p) for p in self.object_properties)

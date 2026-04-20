@@ -3,3 +3,7 @@ members = ["ontoloom", "packages/*"]
 
 [dependency-groups]
 dev = ["ruff>=0.15.0,<0.16.0", "pytest>=8.0.0"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["error"]
+testpaths = ["ontoloom/tests"]

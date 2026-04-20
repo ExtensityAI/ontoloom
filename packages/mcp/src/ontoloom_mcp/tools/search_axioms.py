@@ -3,30 +3,32 @@ from mcp.types import ToolAnnotations
 from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.store import OntologyStore
 
+from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import format_search_axioms_page
 from ontoloom_mcp.components.types import OntologyPath
 
 
+@handle_tool_errors
 def _search_axioms(
     path: OntologyPath,
-    iri: IRI | None = None,
-    axiom_types: list[str] | None = None,
-    annotation_query: str | None = None,
+    iri: str = "",
+    axiom_types: list[str] = [],  # noqa: B006
+    annotation_query: str = "",
     limit: int = 50,
     offset: int = 0,
 ):
     """Search and filter axioms. All parameters optional — no filters lists all axioms.
 
-    - `iri`: Only axioms mentioning this entity.
+    - `iri`: Only axioms mentioning this entity (e.g. ":Dog", "ex:hasPart").
     - `axiom_types`: Only axioms of these types (e.g. ["SubClassOf", "Declaration"]).
     - `annotation_query`: Substring match on axiom-level annotation values.
     - `limit`/`offset`: Pagination.
     """
     with OntologyStore(path) as store:
         page = store.search_axioms(
-            iri=iri,
-            axiom_types=axiom_types,
-            annotation_query=annotation_query,
+            iri=IRI(iri) if iri else None,
+            axiom_types=axiom_types or None,
+            annotation_query=annotation_query or None,
             limit=limit,
             offset=offset,
         )

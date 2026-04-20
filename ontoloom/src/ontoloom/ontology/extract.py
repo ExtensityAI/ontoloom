@@ -137,18 +137,22 @@ def iter_axiom_entities(axiom: Axiom) -> Iterator[EntityRef]:  # noqa: C901
                 yield p, EntityType.OBJECT_PROPERTY
             for p in dps:
                 yield p, EntityType.DATA_PROPERTY
-        case AnnotationAssertion(property=p, subject=s):
+        case AnnotationAssertion(property=p, subject=s, value=v):
             yield p, EntityType.ANNOTATION_PROPERTY
             yield s, None
+            if isinstance(v, IRI):
+                yield v, None
 
         # Annotation property axioms
         case SubAnnotationPropertyOf(sub_property=sub, super_property=sup):
             yield sub, EntityType.ANNOTATION_PROPERTY
             yield sup, EntityType.ANNOTATION_PROPERTY
-        case AnnotationPropertyDomain(property=p):
+        case AnnotationPropertyDomain(property=p, domain=d):
             yield p, EntityType.ANNOTATION_PROPERTY
-        case AnnotationPropertyRange(property=p):
+            yield d, None
+        case AnnotationPropertyRange(property=p, range=r):
             yield p, EntityType.ANNOTATION_PROPERTY
+            yield r, None
 
         # Datatype and Declaration
         case DatatypeDefinition(datatype=dt):
@@ -182,3 +186,8 @@ def iter_axiom_entities(axiom: Axiom) -> Iterator[EntityRef]:  # noqa: C901
         case _:
             msg = f"Unhandled axiom type in iter_axiom_entities: {type(axiom).__name__}"
             raise ValueError(msg)
+
+    for ann in axiom.annotations:
+        yield ann.property, EntityType.ANNOTATION_PROPERTY
+        if isinstance(ann.value, IRI):
+            yield ann.value, None

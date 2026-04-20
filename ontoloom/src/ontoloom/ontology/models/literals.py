@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
@@ -8,7 +9,10 @@ from pydantic_core import CoreSchema, core_schema
 
 
 class FrozenModel(BaseModel):
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+_IRI_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
 
 
 class IRI(str):
@@ -21,9 +25,8 @@ class IRI(str):
     """
 
     def __new__(cls, value: str):
-        parts = value.split(":", 1)
-        if len(parts) != 2 or not parts[1]:
-            msg = f"IRI must be in 'prefix:local_name' format, got '{value}'"
+        if not _IRI_RE.match(value):
+            msg = f"IRI must be in 'prefix:local_name' format, got {value!r}"
             raise ValueError(msg)
         return super().__new__(cls, value)
 
@@ -49,7 +52,7 @@ class IRI(str):
         return {
             "type": "string",
             "description": "IRI in `prefix:local_name` format",
-            "pattern": r"^[^:]*:.+$",
+            "pattern": r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:.+$",
             "examples": [":Dog", "owl:Thing", "rdfs:label"],
         }
 
@@ -101,7 +104,7 @@ class LangLiteral(FrozenModel):
     """A value with a language tag: "Dog"@en"""
 
     value: str
-    lang: str = "en"
+    lang: str = Field(default="en", pattern=r"^$|^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$")
 
     def __str__(self) -> str:
         return f'"{self.value}"@{self.lang}'
@@ -125,7 +128,7 @@ class DataIntersectionOf(BaseDataRange):
     """Intersection of data ranges."""
 
     type: Literal["DataIntersectionOf"] = "DataIntersectionOf"
-    operands: list[DataRange] = Field(..., min_length=2)
+    operands: tuple[DataRange, ...] = Field(..., min_length=2)
 
     def __str__(self) -> str:
         return " ⊓ ".join(_fmt_data_range(o) for o in self.operands)

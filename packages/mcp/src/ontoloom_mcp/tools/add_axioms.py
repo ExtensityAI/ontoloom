@@ -3,10 +3,12 @@ from mcp.types import ToolAnnotations
 from ontoloom.ontology.models.axioms import Axiom
 from ontoloom.ontology.store import OntologyStore
 
+from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.types import OntologyPath
 
 
+@handle_tool_errors
 def _add_axioms(path: OntologyPath, axioms: list[Axiom]):
     """Add axioms to an existing ontology. Duplicates are skipped. Returns a diff: `+` = added, `=` = skipped."""
     with OntologyStore(path) as store:

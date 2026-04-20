@@ -11,7 +11,7 @@ force-exclude = true
 
 line-length = 100
 indent-width = 4
-target-version = "py314"
+target-version = "py312"
 required-version = ">=0.15.0,<0.16.0"
 
 [lint]

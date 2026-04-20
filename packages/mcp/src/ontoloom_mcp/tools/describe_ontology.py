@@ -2,6 +2,7 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from ontoloom.ontology.store import OntologyStore
 
+from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import (
     format_axiom_summary_from_counter,
     format_entity_summary,
@@ -9,6 +10,7 @@ from ontoloom_mcp.components.formatting import (
 from ontoloom_mcp.components.types import OntologyPath
 
 
+@handle_tool_errors
 def _describe_ontology(path: OntologyPath):
     """Get entity counts, axiom counts, and prefix mappings for an ontology."""
     with OntologyStore(path) as store:

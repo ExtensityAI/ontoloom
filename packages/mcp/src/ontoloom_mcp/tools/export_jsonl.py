@@ -4,9 +4,11 @@ from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
 from ontoloom.ontology.store import OntologyStore
 
+from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.types import OntologyPath
 
 
+@handle_tool_errors
 def _export_jsonl(path: OntologyPath, output_path: Path):
     """Export all axioms to a JSONL file (one axiom per line, sorted by hash).
 

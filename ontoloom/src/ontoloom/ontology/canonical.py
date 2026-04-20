@@ -80,8 +80,10 @@ _PASSTHROUGH_TYPES = (
 )
 
 
-def _to_sort_key(model: FrozenModel):
-    return json.dumps(model.model_dump(), sort_keys=True, separators=(",", ":"))
+def _to_sort_key(value: FrozenModel | DataType):
+    if isinstance(value, str):  # DataType is a StrEnum (str subclass)
+        return value
+    return json.dumps(value.model_dump(), sort_keys=True, separators=(",", ":"))
 
 
 def _sort_tuple(values: tuple[str, ...]):
@@ -99,7 +101,7 @@ def _normalize_data_range(dr: DataRange):
             return dr
         case DataIntersectionOf(operands=operands):
             normalized = [_normalize_data_range(o) for o in operands]
-            sorted_operands = sorted(normalized, key=_to_sort_key)
+            sorted_operands = tuple(sorted(normalized, key=_to_sort_key))
             return dr.model_copy(update={"operands": sorted_operands})
         case _:
             msg = f"Unhandled DataRange type: {type(dr).__name__}"

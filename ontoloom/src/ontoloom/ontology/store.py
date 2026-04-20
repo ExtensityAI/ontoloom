@@ -2,6 +2,7 @@
 
 import importlib.resources
 import json
+import re
 import sqlite3
 import uuid
 from collections import Counter
@@ -37,6 +38,7 @@ _PRAGMAS = _SQL.joinpath("pragmas.sql").read_text()
 _AXIOM_ADAPTER: TypeAdapter[Axiom] = TypeAdapter(Axiom)
 
 _LOCAL_NAME = "local_name"
+_HEX_RE = re.compile(r"^[0-9a-f]*$")
 
 
 def _extract_annotation_value(value: IRI | TypedLiteral | LangLiteral):
@@ -69,10 +71,15 @@ class OntologyStore:
             msg = f"'{path}' already exists."
             raise FileExistsError(msg)
         conn = sqlite3.connect(str(path), autocommit=True)
-        _apply_pragmas(conn)
-        conn.executescript(_SCHEMA)
-        conn.execute("INSERT INTO metadata (id, data) VALUES (1, ?)", ('{"prefixes": {}}',))
-        conn.close()
+        try:
+            _apply_pragmas(conn)
+            conn.executescript(_SCHEMA)
+            conn.execute(
+                "INSERT OR IGNORE INTO metadata (id, data) VALUES (1, ?)",
+                ('{"prefixes": {}}',),
+            )
+        finally:
+            conn.close()
         return cls(path)
 
     def __init__(self, path: Path, *, session_id: str | None = None):
@@ -97,7 +104,6 @@ class OntologyStore:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._conn is not None:
-            self._conn.rollback()
             self._conn.close()
             self._conn = None
 
@@ -146,6 +152,11 @@ class OntologyStore:
         return AddResult(added=added, skipped=skipped)
 
     def remove_by_hash_prefix(self, hash_prefixes: list[str]):
+        for prefix in hash_prefixes:
+            if not _HEX_RE.match(prefix):
+                msg = f"[{prefix}] is not a valid hex hash prefix"
+                raise ValueError(msg)
+
         with self.conn:
             to_remove: list[HashedAxiom] = []
             for prefix in hash_prefixes:
@@ -179,19 +190,31 @@ class OntologyStore:
         remove_annotations: list[Annotation] | None = None,
     ):
         """Only modifies BaseAxiom.annotations metadata — does not touch entity_text
-        (which indexes axiom structure: IRIs and AnnotationAssertion values)."""
+        (which indexes axiom structure: IRIs and AnnotationAssertion values).
+
+        Accepts full hash or unambiguous prefix (like remove_by_hash_prefix)."""
         add_annotations = add_annotations or []
         remove_annotations = remove_annotations or []
 
         with self.conn:
             row = self.conn.execute(
-                "SELECT id, json(data) FROM axioms WHERE hash = ?", (axiom_hash,)
+                "SELECT id, hash, json(data) FROM axioms WHERE hash GLOB ? || '*'",
+                (axiom_hash,),
             ).fetchone()
             if row is None:
-                msg = f"No axiom with hash {axiom_hash!r}"
+                msg = f"No axiom matching hash {axiom_hash!r}"
                 raise ValueError(msg)
 
-            axiom_id, json_data = row
+            # Check for ambiguous prefix
+            count = self.conn.execute(
+                "SELECT COUNT(*) FROM axioms WHERE hash GLOB ? || '*'",
+                (axiom_hash,),
+            ).fetchone()[0]
+            if count > 1:
+                msg = f"Hash prefix {axiom_hash!r} matches {count} axioms — use a longer prefix"
+                raise ValueError(msg)
+
+            axiom_id, axiom_hash, json_data = row
             axiom = _AXIOM_ADAPTER.validate_json(json_data)
 
             current = list(axiom.annotations)
@@ -273,14 +296,6 @@ class OntologyStore:
     def get_entity(self, iri: IRI) -> EntityInfo | None:
         iri_str = str(iri)
 
-        if (
-            self.conn.execute(
-                "SELECT 1 FROM axiom_entities WHERE entity_iri = ? LIMIT 1", (iri_str,)
-            ).fetchone()
-            is None
-        ):
-            return None
-
         roles = {
             EntityType(r[0])
             for r in self.conn.execute(
@@ -313,6 +328,8 @@ class OntologyStore:
             }
         )
 
+        if not roles and not annotations and not axiom_counts:
+            return None
         return EntityInfo(roles=roles, annotations=annotations, axiom_counts=axiom_counts)
 
     # -- Search --
@@ -472,16 +489,18 @@ class OntologyStore:
 
         matches: dict[str, tuple[str, str]] = {}
 
+        query_lower = query.lower()
+
         for (iri_str,) in self.conn.execute(
-            f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND text = ?",
-            (prop_param, query),
+            f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND LOWER(text) = ?",
+            (prop_param, query_lower),
         ):
             if iri_str not in matches:
                 matches[iri_str] = (source_label, "exact")
 
         for (iri_str,) in self.conn.execute(
-            f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(text, ?) > 0",
-            (prop_param, query),
+            f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0",
+            (prop_param, query_lower),
         ):
             if iri_str not in matches:
                 matches[iri_str] = (source_label, "substring")
@@ -546,29 +565,27 @@ class OntologyStore:
             return {}
         return json.loads(row[0])
 
-    def _set_metadata(self, data: dict):
-        with self.conn:
-            self.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (json.dumps(data),))
-
     def list_prefixes(self):
         return self._get_metadata().get("prefixes", {})
 
     def set_prefix(self, name: str, iri: str):
-        meta = self._get_metadata()
-        prefixes = meta.get("prefixes", {})
-        prefixes[name] = iri
-        meta["prefixes"] = prefixes
-        self._set_metadata(meta)
+        with self.conn:
+            meta = self._get_metadata()
+            prefixes = meta.get("prefixes", {})
+            prefixes[name] = iri
+            meta["prefixes"] = prefixes
+            self.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (json.dumps(meta),))
 
     def remove_prefix(self, name: str):
-        meta = self._get_metadata()
-        prefixes = meta.get("prefixes", {})
-        if name not in prefixes:
-            msg = f"no prefix {name!r}"
-            raise ValueError(msg)
-        del prefixes[name]
-        meta["prefixes"] = prefixes
-        self._set_metadata(meta)
+        with self.conn:
+            meta = self._get_metadata()
+            prefixes = meta.get("prefixes", {})
+            if name not in prefixes:
+                msg = f"no prefix {name!r}"
+                raise ValueError(msg)
+            del prefixes[name]
+            meta["prefixes"] = prefixes
+            self.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (json.dumps(meta),))
 
     # -- Export --
 

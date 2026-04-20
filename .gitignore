@@ -39,9 +39,6 @@ coverage/
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Viz bundled static assets (built via Makefile)
-packages/viz/src/ontoloom_viz/static/
-
 # Local config
 .env
 .env.*
@@ -49,8 +46,10 @@ packages/viz/src/ontoloom_viz/static/
 !.env.test
 
 # Project-specific runtime artifacts
+*.ontology.db
 symai.config.json
 config.toml
 .hydra/
 
 samples/
+docs/

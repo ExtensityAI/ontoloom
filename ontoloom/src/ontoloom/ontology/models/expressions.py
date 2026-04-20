@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from ontoloom.ontology.models.base import BaseClassExpression
-from ontoloom.ontology.models.literals import IRI, DataRange, TypedLiteral
+from ontoloom.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
 
 # -- Named class --
 
@@ -126,7 +126,7 @@ class DataHasValue(BaseClassExpression):
 
     type: Literal["DataHasValue"] = "DataHasValue"
     property: IRI
-    value: TypedLiteral
+    value: TypedLiteral | LangLiteral
 
     def __str__(self) -> str:
         return f"DataHasValue({self.property}, {self.value})"

@@ -1,19 +1,17 @@
-"""Tests for OntologyStore."""
-
 import json
 
 import pytest
-from ontoloom.core.ontology.canonical import content_hash
-from ontoloom.core.ontology.models.axioms import (
+from ontoloom.ontology.canonical import axiom_hash
+from ontoloom.ontology.models.axioms import (
     AnnotationAssertion,
     Declaration,
     EquivalentClasses,
     SubClassOf,
 )
-from ontoloom.core.ontology.models.base import EntityType
-from ontoloom.core.ontology.models.expressions import NamedClass
-from ontoloom.core.ontology.models.literals import IRI, Annotation, LangLiteral
-from ontoloom.core.ontology.store import OntologyStore
+from ontoloom.ontology.models.base import EntityType
+from ontoloom.ontology.models.expressions import NamedClass
+from ontoloom.ontology.models.literals import IRI, Annotation, LangLiteral
+from ontoloom.ontology.store import OntologyStore, StoreNotOpenError
 
 
 @pytest.fixture()
@@ -137,7 +135,7 @@ def test_events_logged_on_add(store):
     events = cur.fetchall()
     assert len(events) == 1
     assert events[0][0] == "add"
-    assert events[0][1] == content_hash(ax)
+    assert events[0][1] == axiom_hash(ax)
 
 
 def test_events_logged_on_remove(store):
@@ -355,3 +353,192 @@ def test_pagination_pages_are_nonempty(populated_store):
     page2 = populated_store.search_entities(limit=2, offset=2)
     assert len(page1.matches) == 2
     assert len(page2.matches) > 0
+
+
+# -- get_entity --
+
+
+def test_get_entity_found(populated_store):
+    info = populated_store.get_entity(IRI("ex:Dog"))
+    assert info is not None
+    assert EntityType.CLASS in info.roles
+    assert any(a.value == "Dog" for a in info.annotations)
+    assert "SubClassOf" in info.axiom_counts
+
+
+def test_get_entity_not_found(store):
+    assert store.get_entity(IRI("ex:NonExistent")) is None
+
+
+# -- remove error cases --
+
+
+def test_remove_not_found_raises(store):
+    with pytest.raises(ValueError, match="not found"):
+        store.remove_by_hash_prefix(["deadbeef"])
+
+
+def test_remove_ambiguous_prefix_raises(store):
+    """An empty prefix matches all axioms, which is ambiguous."""
+    store.add_axioms(
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B")),
+        ]
+    )
+    # Empty prefix matches everything via GLOB '*'
+    with pytest.raises(ValueError, match="matches"):
+        store.remove_by_hash_prefix([""])
+
+
+# -- annotate searchability --
+
+
+def test_annotate_axiom_searchable_via_annotation_query(store):
+    """After annotating, the axiom should be findable via search_axioms annotation_query."""
+    ax = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Animal")),
+    )
+    result = store.add_axioms([ax])
+    h = result.added[0].hash
+
+    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="veterinary review"))
+    store.annotate_axiom(h, add_annotations=[ann])
+
+    page = store.search_axioms(annotation_query="veterinary")
+    assert page.total >= 1
+    assert any(ha.hash == h for ha in page.axioms)
+
+
+# -- export roundtrip --
+
+
+def test_export_jsonl_roundtrip(populated_store, tmp_path):
+    """Exported JSONL lines should parse back to valid axioms."""
+    from ontoloom.ontology.models.axioms import Axiom
+    from pydantic import TypeAdapter
+
+    adapter = TypeAdapter(Axiom)
+    export_path = tmp_path / "roundtrip.jsonl"
+    populated_store.export_jsonl(export_path)
+
+    for line in export_path.read_text().strip().split("\n"):
+        axiom = adapter.validate_json(line)
+        assert hasattr(axiom, "type")
+
+
+# -- INSTR safety --
+
+
+def test_search_with_like_wildcards(store):
+    """Search queries containing % and _ should match literally, not as wildcards."""
+    store.add_axioms(
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Rate100Percent")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Rate100Points")),
+        ]
+    )
+    # "100%" should NOT match "100Points" — the % must be literal
+    page = store.search_entities(query="100%", limit=10)
+    for m in page.matches:
+        assert "100%" in str(m.iri) or "100%" in m.iri.local_name
+
+
+# -- IRI validation --
+
+
+def test_iri_valid_cases():
+    assert IRI(":Dog") == ":Dog"
+    assert IRI("owl:Thing") == "owl:Thing"
+    assert IRI("ex:a:b") == "ex:a:b"  # colon in local name is fine
+    assert IRI("my_ont:Foo") == "my_ont:Foo"  # underscore in prefix
+
+
+def test_iri_rejects_empty():
+    with pytest.raises(ValueError, match="prefix:local_name"):
+        IRI("")
+
+
+def test_iri_rejects_no_colon():
+    with pytest.raises(ValueError, match="prefix:local_name"):
+        IRI("nocolon")
+
+
+def test_iri_rejects_empty_local_name():
+    with pytest.raises(ValueError, match="prefix:local_name"):
+        IRI("prefix:")
+
+
+def test_iri_rejects_control_chars():
+    with pytest.raises(ValueError):
+        IRI("ex:foo\nbar")
+    with pytest.raises(ValueError):
+        IRI("ex:foo\x00bar")
+
+
+def test_iri_rejects_invalid_prefix():
+    with pytest.raises(ValueError):
+        IRI("1bad:foo")  # starts with digit
+    with pytest.raises(ValueError):
+        IRI("a%b:foo")  # % in prefix
+
+
+# -- Store lifecycle errors --
+
+
+def test_create_existing_raises(tmp_path):
+    path = tmp_path / "test.db"
+    OntologyStore.create(path)
+    with pytest.raises(FileExistsError):
+        OntologyStore.create(path)
+
+
+def test_open_nonexistent_raises(tmp_path):
+    path = tmp_path / "does_not_exist.db"
+    with pytest.raises(FileNotFoundError):
+        OntologyStore(path)
+
+
+def test_conn_outside_context_raises(tmp_path):
+    path = tmp_path / "test.db"
+    OntologyStore.create(path)
+    store = OntologyStore(path)
+    with pytest.raises(StoreNotOpenError):
+        _ = store.conn
+
+
+# -- Batch remove atomicity --
+
+
+def test_batch_remove_multiple(store):
+    ax1 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
+    ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B"))
+    result = store.add_axioms([ax1, ax2])
+    h1 = result.added[0].hash
+    h2 = result.added[1].hash
+
+    removed = store.remove_by_hash_prefix([h1[:8], h2[:8]])
+    assert len(removed.removed) == 2
+
+
+def test_batch_remove_rollback_on_failure(store):
+    """If one prefix in a batch fails, none should be removed."""
+    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
+    result = store.add_axioms([ax])
+    h = result.added[0].hash
+
+    with pytest.raises(ValueError, match="not found"):
+        store.remove_by_hash_prefix([h[:8], "deadbeef"])
+
+    # The first axiom should still exist (rollback)
+    page = store.search_axioms(limit=10)
+    assert page.total == 1
+
+
+# -- Hash prefix validation --
+
+
+def test_remove_rejects_non_hex_prefix(store):
+    with pytest.raises(ValueError, match="not a valid hex"):
+        store.remove_by_hash_prefix(["not*hex"])

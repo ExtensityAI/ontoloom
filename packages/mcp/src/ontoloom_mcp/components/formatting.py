@@ -2,7 +2,7 @@ from collections import Counter
 
 from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.literals import IRI
-from ontoloom.ontology.store import EntityInfo, EntityMatch, HashedAxiom
+from ontoloom.ontology.types import EntityInfo, EntityMatch, HashedAxiom
 
 
 def format_roles(roles: set[EntityType]) -> str:
