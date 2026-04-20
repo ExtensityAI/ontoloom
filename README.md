@@ -8,7 +8,7 @@ MCP tools for building and exploring OWL 2 ontologies with AI agents.
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
-ontoloom gives AI agents a structured toolkit for OWL 2 EL ontologies via the [Model Context Protocol](https://modelcontextprotocol.io/). Every axiom is validated against typed Pydantic models on write — malformed structures never reach your store. Ontologies live in single-file SQLite databases with automatic deduplication, text search, and prefix management.
+ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with OWL 2 EL ontologies. Axioms are typed Pydantic models, so anything malformed gets rejected at the API boundary before it hits storage. Each ontology is a single SQLite file, with deduplication, text search, and prefix handling built in.
 
 ## Example
 
@@ -48,12 +48,12 @@ Prefixes:
   pizza: → http://example.org/pizza#
 ``````
 
-## Use cases
+## What you can do with it
 
-- Build an ontology from scratch through conversation with an AI agent
-- Explore and query an existing ontology — search entities, browse axioms, inspect structure
-- Have an agent enrich, validate, or refactor an ontology
-- Export to JSONL for sharing or archival
+- Build an ontology from scratch by talking to an agent
+- Poke around an existing one: search for entities, browse axioms, inspect structure
+- Hand an agent an existing ontology and ask it to enrich, validate, or refactor
+- Dump everything to JSONL for sharing or archival
 - Manage prefix mappings and annotations
 
 ## Tools
@@ -62,22 +62,22 @@ Prefixes:
 `create_ontology` · `set_prefix` · `remove_prefix`
 
 **Build**
-- `add_axioms` — add validated axioms, duplicates skipped
+- `add_axioms` — add validated axioms; duplicates are skipped
 - `remove_axioms` — remove by hash prefix
-- `annotate_axiom` — update annotations without changing axiom identity
+- `annotate_axiom` — update annotations without touching axiom identity
 
 **Query**
-- `describe_ontology` — entity/axiom counts and prefix mappings
-- `get_entity` — roles, annotations, axiom counts for a single entity
-- `search_entities` — text search with role/namespace filters
-- `search_axioms` — filter by entity, axiom type, annotation text
+- `describe_ontology` — entity and axiom counts, plus prefix mappings
+- `get_entity` — roles, annotations, and axiom counts for one entity
+- `search_entities` — text search, optionally filtered by role or namespace
+- `search_axioms` — filter by entity, axiom type, or annotation text
 
 **Export**
-`export_jsonl` — export all axioms to a sorted JSONL file
+`export_jsonl` — dump all axioms to a sorted JSONL file
 
 ## Getting started
 
-**Prerequisites:** Python 3.12, [uv](https://docs.astral.sh/uv/)
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone git@github.com:ExtensityAI/ontology-hydra.git
@@ -92,7 +92,7 @@ cd ontology-hydra
 
 ### Manual MCP configuration
 
-Add to your `.mcp.json` (update paths to match your clone location):
+Drop this into your `.mcp.json`, adjusting the paths for your clone:
 
 ```json
 {
@@ -114,14 +114,14 @@ uv run --project packages/mcp python -m ontoloom_mcp.server
 
 ## How it works
 
-- **SQLite per ontology** — each ontology is a single `.db` file. No server, no infrastructure. Portable, scales from dozens to millions of axioms.
-- **Typed validation on write** — axioms are Pydantic models validated at the API boundary. Malformed structures are rejected before they reach the store.
-- **Content-addressed hashing** — axiom identity is the SHA-256 of canonical logical content, excluding annotations. Adding a comment never changes an axiom's identity. Duplicates are caught automatically.
+Each ontology lives in one `.db` file. No separate server, no migration story — the same file works for a toy ontology with a dozen axioms or a real one with millions of them.
+
+Axioms are Pydantic models validated at the API boundary, so by the time anything reaches SQLite it's well-formed. Axiom identity is a SHA-256 over the canonical logical content, ignoring annotations; that means you can add or edit a comment on an axiom without changing its identity, and duplicates get caught for free.
 
 ## Status
 
-Alpha — functional and useful, but pre-1.0. API may change. Feedback welcome.
+Alpha. The pieces all work and I'm using it, but the API isn't frozen yet. Issues and PRs welcome.
 
 ## License
 
-See [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
