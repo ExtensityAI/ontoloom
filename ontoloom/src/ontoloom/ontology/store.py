@@ -512,45 +512,62 @@ class OntologyStore:
         iri: IRI | None = None,
         axiom_types: list[str] | None = None,
         annotation_query: str | None = None,
+        annotation_properties: list[str] | None = None,
+        entity_query: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ):
+        # Each active filter independently contributes a JOIN + WHERE condition.
+        joins: list[str] = []
         conditions: list[str] = []
         params: list[str | int] = []
 
-        # Build FROM clause based on which filters need joins.
-        # When both iri and annotation_query are set, iri determines
-        # the join and annotation_query is added as a subquery filter.
         if iri is not None:
-            base_from = "axioms a JOIN axiom_entities ae ON ae.axiom_id = a.id"
+            joins.append("JOIN axiom_entities ae ON ae.axiom_id = a.id")
             conditions.append("ae.entity_iri = ?")
             params.append(str(iri))
-        elif annotation_query is not None:
-            base_from = "axioms a JOIN axiom_text at ON at.axiom_id = a.id"
+
+        if annotation_query is not None:
+            joins.append("JOIN axiom_text at ON at.axiom_id = a.id")
             conditions.append("INSTR(at.text, ?) > 0")
             params.append(annotation_query)
-        else:
-            base_from = "axioms a"
+
+        if annotation_properties:
+            joins.append("JOIN entity_text et ON et.axiom_id = a.id")
+            placeholders = ",".join("?" for _ in annotation_properties)
+            conditions.append(f"et.property IN ({placeholders})")
+            params.extend(annotation_properties)
+
+        # Optimization note: when both iri and entity_query are set,
+        # axiom_entities is joined twice (ae + ae_eq). This produces N*M
+        # rows before DISTINCT. Acceptable for typical axiom sizes (2-5
+        # entities). A future optimization could skip entity_query's join
+        # when iri is already set, since iri is strictly more specific.
+        if entity_query is not None:
+            joins.append("JOIN axiom_entities ae_eq ON ae_eq.axiom_id = a.id")
+            conditions.append(
+                "ae_eq.entity_iri IN ("
+                "SELECT DISTINCT entity_iri FROM entity_text "
+                "WHERE INSTR(LOWER(text), LOWER(?)) > 0"
+                ")"
+            )
+            params.append(entity_query)
 
         if axiom_types:
             placeholders = ",".join("?" for _ in axiom_types)
             conditions.append(f"a.type IN ({placeholders})")
             params.extend(axiom_types)
 
-        if iri is not None and annotation_query is not None:
-            conditions.append("a.id IN (SELECT axiom_id FROM axiom_text WHERE INSTR(text, ?) > 0)")
-            params.append(annotation_query)
-
+        join_clause = (" " + " ".join(joins)) if joins else ""
         where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+        base = f"FROM axioms a{join_clause}{where}"
 
-        total = self.conn.execute(
-            f"SELECT COUNT(DISTINCT a.id) FROM {base_from}{where}", params
-        ).fetchone()[0]
+        total = self.conn.execute(f"SELECT COUNT(DISTINCT a.id) {base}", params).fetchone()[0]
 
         axioms = [
             HashedAxiom(axiom=_AXIOM_ADAPTER.validate_json(data), hash=h)
             for h, data in self.conn.execute(
-                f"SELECT DISTINCT a.hash, json(a.data) FROM {base_from}{where} ORDER BY a.id LIMIT ? OFFSET ?",
+                f"SELECT DISTINCT a.hash, json(a.data) {base} ORDER BY a.id LIMIT ? OFFSET ?",
                 [*params, limit, offset],
             )
         ]
