@@ -9,6 +9,8 @@ from fastmcp.exceptions import ToolError
 def handle_tool_errors(fn):
     """Translate store/OS exceptions into user-facing ToolError messages."""
 
+    # TODO: this does not seem like a best practice, do not like it
+
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         try:

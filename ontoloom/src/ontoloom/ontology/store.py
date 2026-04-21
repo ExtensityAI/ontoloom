@@ -183,6 +183,38 @@ class OntologyStore:
 
         return RemoveResult(removed=to_remove)
 
+    def remove_by_selection(self, name: str, hash_prefix: str):
+        """Remove axioms referenced by an axiom selection. Best-effort: skips missing."""
+        sel = self._verify_selection_hash(name, hash_prefix)
+        if sel["kind"] != "axioms":
+            msg = f"remove_axioms requires an axiom selection, but {name!r} is an entity selection."
+            raise ValueError(msg)
+
+        items = [
+            r[0]
+            for r in self.conn.execute(
+                "SELECT item FROM selection_items WHERE selection_name = ?", (name,)
+            )
+        ]
+
+        removed: list[HashedAxiom] = []
+        absent = 0
+        with self.conn:
+            for h in items:
+                row = self.conn.execute(
+                    "SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)
+                ).fetchone()
+                if row is None:
+                    absent += 1
+                    continue
+                full_hash, json_data = row
+                axiom = _AXIOM_ADAPTER.validate_json(json_data)
+                self._log_event("del", full_hash)
+                self.conn.execute("DELETE FROM axioms WHERE hash = ?", (full_hash,))
+                removed.append(HashedAxiom(axiom=axiom, hash=full_hash))
+
+        return removed, absent
+
     def annotate_axiom(
         self,
         axiom_hash: str,
@@ -293,7 +325,7 @@ class OntologyStore:
 
     # -- Entity queries --
 
-    def get_entity(self, iri: IRI) -> EntityInfo | None:
+    def get_entity(self, iri: IRI, *, within: str | None = None) -> EntityInfo | None:
         iri_str = str(iri)
 
         roles = {
@@ -312,18 +344,30 @@ class OntologyStore:
             )
         ]
 
+        # within kind='axioms' scopes axiom counts to that selection
+        extra_join = ""
+        extra_params: list[str] = []
+        if within is not None:
+            sel = self._get_selection(within)
+            if sel["kind"] == "axioms":
+                extra_join = (
+                    " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
+                )
+                extra_params.append(within)
+            # kind='entities' is a no-op for get_entity
+
         axiom_counts = Counter(
             {
                 r[0]: r[1]
                 for r in self.conn.execute(
-                    """
+                    f"""
                 SELECT a.type, COUNT(DISTINCT a.id)
                 FROM axiom_entities ae
-                JOIN axioms a ON ae.axiom_id = a.id
+                JOIN axioms a ON ae.axiom_id = a.id{extra_join}
                 WHERE ae.entity_iri = ? AND a.type != 'AnnotationAssertion'
                 GROUP BY a.type
                 """,
-                    (iri_str,),
+                    (*extra_params, iri_str),
                 )
             }
         )
@@ -332,6 +376,29 @@ class OntologyStore:
             return None
         return EntityInfo(roles=roles, annotations=annotations, axiom_counts=axiom_counts)
 
+    def get_entity_axiom_hashes(self, iri: IRI, *, within: str | None = None) -> list[str]:
+        """Return all axiom hashes for an entity. For get_entity select workflow."""
+        iri_str = str(iri)
+        extra_join = ""
+        extra_params: list[str] = []
+        if within is not None:
+            sel = self._get_selection(within)
+            if sel["kind"] == "axioms":
+                extra_join = (
+                    " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
+                )
+                extra_params.append(within)
+
+        return [
+            r[0]
+            for r in self.conn.execute(
+                f"SELECT DISTINCT a.hash FROM axiom_entities ae "
+                f"JOIN axioms a ON ae.axiom_id = a.id{extra_join} "
+                f"WHERE ae.entity_iri = ?",
+                (*extra_params, iri_str),
+            )
+        ]
+
     # -- Search --
 
     def search_entities(
@@ -339,38 +406,55 @@ class OntologyStore:
         query: str | None = None,
         role: str | None = None,
         namespace: str | None = None,
+        within: str | None = None,
         limit: int = 50,
         offset: int = 0,
     ):
         if query is None:
-            return self._list_entities(role=role, namespace=namespace, limit=limit, offset=offset)
+            return self._list_entities(
+                role=role, namespace=namespace, within=within, limit=limit, offset=offset
+            )
         return self._text_search_entities(
-            query=query, role=role, namespace=namespace, limit=limit, offset=offset
+            query=query, role=role, namespace=namespace, within=within, limit=limit, offset=offset
         )
 
-    def _list_entities(self, role: str | None, namespace: str | None, limit: int, offset: int):
+    def _list_entities(
+        self, role: str | None, namespace: str | None, within: str | None, limit: int, offset: int
+    ):
         conditions = ["ae.role IS NOT NULL"]
         params: list[str | int] = []
+        joins = ""
+
+        if within is not None:
+            sel = self._get_selection(within)
+            if sel["kind"] == "entities":
+                joins = " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?"
+                params.append(within)
+            else:  # axioms — entities mentioned in those axioms
+                joins = (
+                    " JOIN axioms a_w ON a_w.id = ae.axiom_id"
+                    " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?"
+                )
+                params.append(within)
 
         if role is not None:
             conditions.append("ae.role = ?")
             params.append(role)
         if namespace is not None:
-            # Namespace prefixes are validated IRI prefixes (no LIKE metacharacters).
             conditions.append("ae.entity_iri LIKE ? || ':%'")
             params.append(namespace)
 
         where = " AND ".join(conditions)
 
         total = self.conn.execute(
-            f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {where}",
+            f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{joins} WHERE {where}",
             params,
         ).fetchone()[0]
 
         page_iris = [
             r[0]
             for r in self.conn.execute(
-                f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae WHERE {where} ORDER BY ae.entity_iri LIMIT ? OFFSET ?",
+                f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} WHERE {where} ORDER BY ae.entity_iri LIMIT ? OFFSET ?",
                 [*params, limit, offset],
             )
         ]
@@ -393,10 +477,37 @@ class OntologyStore:
         )
 
     def _text_search_entities(
-        self, query: str, role: str | None, namespace: str | None, limit: int, offset: int
+        self,
+        query: str,
+        role: str | None,
+        namespace: str | None,
+        within: str | None,
+        limit: int,
+        offset: int,
     ):
         matches = self._find_text_matches(query, _LOCAL_NAME, "iri")
         matches.update(self._find_text_matches(query, None, "annotation"))
+
+        if within is not None and matches:
+            sel = self._get_selection(within)
+            if sel["kind"] == "entities":
+                allowed = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
+                    )
+                }
+            else:  # axioms — entities mentioned in those axioms
+                allowed = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                        "JOIN axioms a ON a.id = ae.axiom_id "
+                        "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
+                        (within,),
+                    )
+                }
+            matches = {k: v for k, v in matches.items() if k in allowed}
 
         if role is not None and matches:
             role_iris = self._batch_check_roles(list(matches.keys()), role)
@@ -507,20 +618,34 @@ class OntologyStore:
 
         return matches
 
-    def search_axioms(
+    def _build_axiom_search(
         self,
         iri: IRI | None = None,
         axiom_types: list[str] | None = None,
         annotation_query: str | None = None,
         annotation_properties: list[str] | None = None,
         entity_query: str | None = None,
-        limit: int = 50,
-        offset: int = 0,
-    ):
-        # Each active filter independently contributes a JOIN + WHERE condition.
+        within: str | None = None,
+    ) -> tuple[str, list[str | int]]:
+        """Build the FROM...WHERE clause for axiom searches. Returns (base_sql, params)."""
         joins: list[str] = []
         conditions: list[str] = []
         params: list[str | int] = []
+
+        # within: scope to an existing selection
+        if within is not None:
+            sel = self._get_selection(within)
+            if sel["kind"] == "axioms":
+                joins.append(
+                    "JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
+                )
+                params.append(within)
+            else:  # entities
+                joins.append("JOIN axiom_entities ae_w ON ae_w.axiom_id = a.id")
+                joins.append(
+                    "JOIN selection_items si_w ON si_w.item = ae_w.entity_iri AND si_w.selection_name = ?"
+                )
+                params.append(within)
 
         if iri is not None:
             joins.append("JOIN axiom_entities ae ON ae.axiom_id = a.id")
@@ -561,6 +686,27 @@ class OntologyStore:
         join_clause = (" " + " ".join(joins)) if joins else ""
         where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
         base = f"FROM axioms a{join_clause}{where}"
+        return base, params
+
+    def search_axioms(
+        self,
+        iri: IRI | None = None,
+        axiom_types: list[str] | None = None,
+        annotation_query: str | None = None,
+        annotation_properties: list[str] | None = None,
+        entity_query: str | None = None,
+        within: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ):
+        base, params = self._build_axiom_search(
+            iri=iri,
+            axiom_types=axiom_types,
+            annotation_query=annotation_query,
+            annotation_properties=annotation_properties,
+            entity_query=entity_query,
+            within=within,
+        )
 
         total = self.conn.execute(f"SELECT COUNT(DISTINCT a.id) {base}", params).fetchone()[0]
 
@@ -573,6 +719,102 @@ class OntologyStore:
         ]
 
         return SearchPage(axioms=axioms, total=total)
+
+    def collect_axiom_hashes(
+        self,
+        iri: IRI | None = None,
+        axiom_types: list[str] | None = None,
+        annotation_query: str | None = None,
+        annotation_properties: list[str] | None = None,
+        entity_query: str | None = None,
+        within: str | None = None,
+    ) -> list[str]:
+        """Return all matching axiom hashes (no data deserialization). For select workflows."""
+        base, params = self._build_axiom_search(
+            iri=iri,
+            axiom_types=axiom_types,
+            annotation_query=annotation_query,
+            annotation_properties=annotation_properties,
+            entity_query=entity_query,
+            within=within,
+        )
+        return [r[0] for r in self.conn.execute(f"SELECT DISTINCT a.hash {base}", params)]
+
+    def collect_entity_iris(
+        self,
+        query: str | None = None,
+        role: str | None = None,
+        namespace: str | None = None,
+        within: str | None = None,
+    ) -> list[str]:
+        """Return all matching entity IRIs (no display data). For select workflows."""
+        if query is None:
+            # List path: SQL-only
+            conditions = ["ae.role IS NOT NULL"]
+            params: list[str | int] = []
+            joins = ""
+
+            if within is not None:
+                sel = self._get_selection(within)
+                if sel["kind"] == "entities":
+                    joins = " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?"
+                    params.append(within)
+                else:
+                    joins = (
+                        " JOIN axioms a_w ON a_w.id = ae.axiom_id"
+                        " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?"
+                    )
+                    params.append(within)
+
+            if role is not None:
+                conditions.append("ae.role = ?")
+                params.append(role)
+            if namespace is not None:
+                conditions.append("ae.entity_iri LIKE ? || ':%'")
+                params.append(namespace)
+
+            where = " AND ".join(conditions)
+            return [
+                r[0]
+                for r in self.conn.execute(
+                    f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} WHERE {where}",
+                    params,
+                )
+            ]
+
+        # Text search path: reuse matching logic
+        matches = self._find_text_matches(query, _LOCAL_NAME, "iri")
+        matches.update(self._find_text_matches(query, None, "annotation"))
+
+        if within is not None and matches:
+            sel = self._get_selection(within)
+            if sel["kind"] == "entities":
+                allowed = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
+                    )
+                }
+            else:
+                allowed = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                        "JOIN axioms a ON a.id = ae.axiom_id "
+                        "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
+                        (within,),
+                    )
+                }
+            matches = {k: v for k, v in matches.items() if k in allowed}
+
+        if role is not None and matches:
+            role_iris = self._batch_check_roles(list(matches.keys()), role)
+            matches = {k: v for k, v in matches.items() if k in role_iris}
+        if namespace is not None:
+            prefix = f"{namespace}:"
+            matches = {k: v for k, v in matches.items() if k.startswith(prefix)}
+
+        return list(matches.keys())
 
     # -- Prefix management --
 
@@ -606,35 +848,426 @@ class OntologyStore:
 
     # -- Export --
 
-    def export_jsonl(self, output_path: Path):
+    def export_jsonl(self, output_path: Path, *, select: str | None = None):
+        if select is not None:
+            sel = self._get_selection(select)
+            if sel["kind"] != "axioms":
+                msg = f"export_jsonl requires an axiom selection, but {select!r} is an entity selection."
+                raise ValueError(msg)
+            query = (
+                "SELECT json(a.data) FROM axioms a "
+                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+                "ORDER BY a.hash"
+            )
+            params: tuple[str, ...] = (select,)
+        else:
+            query = "SELECT json(data) FROM axioms ORDER BY hash"
+            params = ()
+
         count = 0
         with output_path.open("w") as f:
-            for (json_text,) in self.conn.execute("SELECT json(data) FROM axioms ORDER BY hash"):
+            for (json_text,) in self.conn.execute(query, params):
                 f.write(json_text)
                 f.write("\n")
                 count += 1
         return count
 
+    # -- Selections --
+
+    def _selection_hash(self, items: list[str]) -> str:
+        """SHA-256 of sorted items, first 8 hex chars.
+
+        If collisions are ever observed (extremely unlikely with selection counts
+        in the tens), dynamic hash length can be applied as with axiom hashes.
+        """
+        import hashlib
+
+        content = "\n".join(sorted(items))
+        return hashlib.sha256(content.encode()).hexdigest()[:8]
+
+    def _get_selection(self, name: str):
+        row = self.conn.execute(
+            "SELECT kind, hash, cardinality FROM selections WHERE name = ?", (name,)
+        ).fetchone()
+        if row is None:
+            msg = f"Selection {name!r} does not exist."
+            raise ValueError(msg)
+        return {"kind": row[0], "hash": row[1], "cardinality": row[2]}
+
+    def _verify_selection_hash(self, name: str, hash_prefix: str):
+        sel = self._get_selection(name)
+        if not sel["hash"].startswith(hash_prefix):
+            msg = (
+                f"Selection {name!r} has changed since you last observed it. "
+                "Use read_selection or list_selections to verify it still "
+                "contains what you expect."
+            )
+            raise ValueError(msg)
+        return sel
+
+    def _write_selection(self, name: str, kind: str, items: list[str], source: str):
+        """Write a selection, overwriting if it exists. Returns (hash, cardinality, overwrote)."""
+        content_hash = self._selection_hash(items)
+        cardinality = len(items)
+
+        overwrote = self.conn.execute(
+            "SELECT cardinality FROM selections WHERE name = ?", (name,)
+        ).fetchone()
+
+        with self.conn:
+            self.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
+            self.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+            self.conn.execute(
+                "INSERT INTO selections (name, kind, hash, cardinality, source) VALUES (?, ?, ?, ?, ?)",
+                (name, kind, content_hash, cardinality, source),
+            )
+            if items:
+                self.conn.executemany(
+                    "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
+                    [(name, item) for item in items],
+                )
+
+        old_cardinality = overwrote[0] if overwrote else None
+        return content_hash, cardinality, old_cardinality
+
+    def list_selections(self):
+        return [
+            {
+                "name": r[0],
+                "kind": r[1],
+                "hash": r[2],
+                "cardinality": r[3],
+                "source": r[4],
+                "created_at": r[5],
+            }
+            for r in self.conn.execute(
+                "SELECT name, kind, hash, cardinality, source, created_at FROM selections ORDER BY created_at"
+            )
+        ]
+
+    def read_selection(self, name: str, *, limit: int = 20, offset: int = 0, show: str = "all"):
+        sel = self._get_selection(name)
+        kind = sel["kind"]
+
+        if kind == "axioms":
+            # LEFT JOIN to detect missing axioms
+            base = (
+                "FROM selection_items si "
+                "LEFT JOIN axioms a ON a.hash = si.item "
+                "WHERE si.selection_name = ?"
+            )
+            if show == "present":
+                base += " AND a.id IS NOT NULL"
+            elif show == "missing":
+                base += " AND a.id IS NULL"
+
+            total = self.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
+            rows = self.conn.execute(
+                f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
+                (name, limit, offset),
+            ).fetchall()
+
+            # Summary stats (always computed regardless of show filter)
+            present_count = self.conn.execute(
+                "SELECT COUNT(*) FROM selection_items si "
+                "JOIN axioms a ON a.hash = si.item "
+                "WHERE si.selection_name = ?",
+                (name,),
+            ).fetchone()[0]
+            missing_count = sel["cardinality"] - present_count
+
+            items = []
+            for item_hash, data in rows:
+                if data is None:
+                    items.append({"hash": item_hash, "missing": True})
+                else:
+                    items.append(
+                        {
+                            "hash": item_hash,
+                            "missing": False,
+                            "axiom": _AXIOM_ADAPTER.validate_json(data),
+                        }
+                    )
+
+        else:  # entities
+            # Entity exists if it has a Declaration axiom
+            base = (
+                "FROM selection_items si "
+                "LEFT JOIN ("
+                "  SELECT DISTINCT ae.entity_iri "
+                "  FROM axiom_entities ae JOIN axioms a ON a.id = ae.axiom_id "
+                "  WHERE a.type = 'Declaration'"
+                ") decl ON decl.entity_iri = si.item "
+                "WHERE si.selection_name = ?"
+            )
+            if show == "present":
+                base += " AND decl.entity_iri IS NOT NULL"
+            elif show == "missing":
+                base += " AND decl.entity_iri IS NULL"
+
+            total = self.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
+            rows = self.conn.execute(
+                f"SELECT si.item, decl.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
+                (name, limit, offset),
+            ).fetchall()
+
+            present_count = self.conn.execute(
+                "SELECT COUNT(*) FROM selection_items si "
+                "JOIN axiom_entities ae ON ae.entity_iri = si.item "
+                "JOIN axioms a ON a.id = ae.axiom_id "
+                "WHERE si.selection_name = ? AND a.type = 'Declaration'",
+                (name,),
+            ).fetchone()[0]
+            missing_count = sel["cardinality"] - present_count
+
+            items = []
+            for iri, is_present in rows:
+                items.append({"iri": iri, "missing": not is_present})
+
+        return {
+            "name": name,
+            "kind": kind,
+            "hash": sel["hash"],
+            "cardinality": sel["cardinality"],
+            "total_filtered": total,
+            "present": present_count,
+            "missing": missing_count,
+            "show": show,
+            "items": items,
+        }
+
+    def drop_selections(self, names: list[str]):
+        """Best-effort drop. Returns (dropped, not_found) lists."""
+        dropped = []
+        not_found = []
+        for name in names:
+            row = self.conn.execute(
+                "SELECT cardinality FROM selections WHERE name = ?", (name,)
+            ).fetchone()
+            if row is None:
+                not_found.append(name)
+            else:
+                with self.conn:
+                    self.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+                dropped.append((name, row[0]))
+        return dropped, not_found
+
+    def create_selection(
+        self,
+        name: str,
+        *,
+        union: list[str] | None = None,
+        intersection: list[str] | None = None,
+        difference: list[str] | None = None,
+        axioms_for: str | None = None,
+        entities_in: str | None = None,
+        source: str = "",
+    ):
+        """Create a selection from set algebra or type conversion."""
+        ops = [
+            x for x in [union, intersection, difference, axioms_for, entities_in] if x is not None
+        ]
+        if len(ops) != 1:
+            msg = "Exactly one operation must be provided (union, intersection, difference, axioms_for, or entities_in)."
+            raise ValueError(msg)
+
+        if union is not None:
+            return self._create_from_set_op("union", name, union, source)
+        if intersection is not None:
+            return self._create_from_set_op("intersection", name, intersection, source)
+        if difference is not None:
+            return self._create_from_set_op("difference", name, difference, source)
+        if axioms_for is not None:
+            return self._create_from_conversion(name, axioms_for, "axioms_for", source)
+        # entities_in is not None (guaranteed by ops check above)
+        return self._create_from_conversion(name, entities_in, "entities_in", source)  # pyright: ignore[reportArgumentType]
+
+    def _create_from_set_op(self, op: str, name: str, inputs: list[str], source: str):
+        # Validate inputs exist and are same kind
+        kinds = set()
+        for input_name in inputs:
+            sel = self._get_selection(input_name)
+            kinds.add(sel["kind"])
+        if len(kinds) > 1:
+            details = ", ".join(f"{n!r} ({self._get_selection(n)['kind']})" for n in inputs)
+            msg = f"Cannot {op}: all inputs must be the same kind. Got: {details}"
+            raise ValueError(msg)
+        kind = kinds.pop()
+
+        # Read all input items (including self if name is in inputs)
+        match op:
+            case "union":
+                placeholders = ",".join("?" for _ in inputs)
+                items = [
+                    r[0]
+                    for r in self.conn.execute(
+                        f"SELECT DISTINCT item FROM selection_items WHERE selection_name IN ({placeholders})",
+                        inputs,
+                    )
+                ]
+            case "intersection":
+                first, *rest = inputs
+                items_set = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT item FROM selection_items WHERE selection_name = ?", (first,)
+                    )
+                }
+                for other in rest:
+                    other_items = {
+                        r[0]
+                        for r in self.conn.execute(
+                            "SELECT item FROM selection_items WHERE selection_name = ?", (other,)
+                        )
+                    }
+                    items_set &= other_items
+                items = list(items_set)
+            case "difference":
+                first, *rest = inputs
+                items_set = {
+                    r[0]
+                    for r in self.conn.execute(
+                        "SELECT item FROM selection_items WHERE selection_name = ?", (first,)
+                    )
+                }
+                for other in rest:
+                    other_items = {
+                        r[0]
+                        for r in self.conn.execute(
+                            "SELECT item FROM selection_items WHERE selection_name = ?", (other,)
+                        )
+                    }
+                    items_set -= other_items
+                items = list(items_set)
+            case _:
+                msg = f"Unknown operation: {op}"
+                raise ValueError(msg)
+
+        auto_source = source or f"{op}({', '.join(repr(n) for n in inputs)})"
+        return self._write_selection(name, kind, items, auto_source)
+
+    def _create_from_conversion(self, name: str, input_name: str, op: str, source: str):
+        sel = self._get_selection(input_name)
+
+        if op == "axioms_for":
+            if sel["kind"] != "entities":
+                msg = f"'axioms_for' requires an entity selection, but {input_name!r} is an axiom selection."
+                raise ValueError(msg)
+            items = [
+                r[0]
+                for r in self.conn.execute(
+                    "SELECT DISTINCT a.hash FROM axioms a "
+                    "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                    "WHERE ae.entity_iri IN (SELECT item FROM selection_items WHERE selection_name = ?)",
+                    (input_name,),
+                )
+            ]
+            kind = "axioms"
+        else:  # entities_in
+            if sel["kind"] != "axioms":
+                msg = f"'entities_in' requires an axiom selection, but {input_name!r} is an entity selection."
+                raise ValueError(msg)
+            items = [
+                r[0]
+                for r in self.conn.execute(
+                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                    "JOIN axioms a ON a.id = ae.axiom_id "
+                    "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?)",
+                    (input_name,),
+                )
+            ]
+            kind = "entities"
+
+        auto_source = source or f"{op}({input_name!r})"
+        return self._write_selection(name, kind, items, auto_source)
+
     # -- Summaries --
 
-    def axiom_summary(self):
+    def axiom_summary(self, *, within: str | None = None):
+        if within is None:
+            return Counter(
+                {
+                    r[0]: r[1]
+                    for r in self.conn.execute("SELECT type, COUNT(*) FROM axioms GROUP BY type")
+                }
+            )
+        sel = self._get_selection(within)
+        if sel["kind"] == "axioms":
+            return Counter(
+                {
+                    r[0]: r[1]
+                    for r in self.conn.execute(
+                        "SELECT a.type, COUNT(*) FROM axioms a "
+                        "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+                        "GROUP BY a.type",
+                        (within,),
+                    )
+                }
+            )
+        # entities: count axioms mentioning those entities
         return Counter(
             {
                 r[0]: r[1]
-                for r in self.conn.execute("SELECT type, COUNT(*) FROM axioms GROUP BY type")
-            }
-        )
-
-    def entity_summary(self):
-        total = self.conn.execute(
-            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities"
-        ).fetchone()[0]
-        role_counts = Counter(
-            {
-                r[0]: r[1]
                 for r in self.conn.execute(
-                    "SELECT role, COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE role IS NOT NULL GROUP BY role"
+                    "SELECT a.type, COUNT(DISTINCT a.id) FROM axioms a "
+                    "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                    "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
+                    "GROUP BY a.type",
+                    (within,),
                 )
             }
         )
+
+    def entity_summary(self, *, within: str | None = None):
+        if within is None:
+            total = self.conn.execute(
+                "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities"
+            ).fetchone()[0]
+            role_counts = Counter(
+                {
+                    r[0]: r[1]
+                    for r in self.conn.execute(
+                        "SELECT role, COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE role IS NOT NULL GROUP BY role"
+                    )
+                }
+            )
+            return total, role_counts
+
+        sel = self._get_selection(within)
+        if sel["kind"] == "entities":
+            total = self.conn.execute(
+                "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
+                "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ?",
+                (within,),
+            ).fetchone()[0]
+            role_counts = Counter(
+                {
+                    r[0]: r[1]
+                    for r in self.conn.execute(
+                        "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
+                        "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
+                        "WHERE ae.role IS NOT NULL GROUP BY ae.role",
+                        (within,),
+                    )
+                }
+            )
+        else:  # axioms — entities mentioned in those axioms
+            total = self.conn.execute(
+                "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
+                "JOIN axioms a ON a.id = ae.axiom_id "
+                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
+                (within,),
+            ).fetchone()[0]
+            role_counts = Counter(
+                {
+                    r[0]: r[1]
+                    for r in self.conn.execute(
+                        "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
+                        "JOIN axioms a ON a.id = ae.axiom_id "
+                        "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+                        "WHERE ae.role IS NOT NULL GROUP BY ae.role",
+                        (within,),
+                    )
+                }
+            )
         return total, role_counts

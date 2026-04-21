@@ -9,13 +9,18 @@ from ontoloom_mcp.components.types import OntologyPath
 
 
 @handle_tool_errors
-def _export_jsonl(path: OntologyPath, output_path: Path):
-    """Export all axioms to a JSONL file (one axiom per line, sorted by hash).
+def _export_jsonl(path: OntologyPath, output_path: Path, select: str = ""):
+    """Export axioms to a JSONL file (one axiom per line, sorted by hash).
+
+    - `select`: Export only axioms in this axiom selection (name only, no hash required —
+      export is a read operation). Missing hashes are skipped.
 
     Use for archival, sharing, or version control snapshots.
     """
     with OntologyStore(path) as store:
-        count = store.export_jsonl(output_path)
+        count = store.export_jsonl(output_path, select=select or None)
+        if select:
+            return f"Exported {count} axioms from selection {select!r} to `{output_path}`."
         return f"Exported {count} axioms to `{output_path}`."
 
 

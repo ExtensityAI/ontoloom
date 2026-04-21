@@ -69,3 +69,24 @@ CREATE TABLE IF NOT EXISTS events (
     axiom_json BLOB,
     timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Named selections: persistent sets of axiom hashes or entity IRIs.
+-- Kind is inferred from the producing operation. Content hash enables
+-- optimistic locking (write ops require name@hash_prefix).
+CREATE TABLE IF NOT EXISTS selections (
+    name TEXT PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('axioms', 'entities')),
+    hash TEXT NOT NULL,
+    cardinality INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS selection_items (
+    selection_name TEXT NOT NULL REFERENCES selections(name) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    UNIQUE(selection_name, item)
+);
+
+CREATE INDEX IF NOT EXISTS idx_selection_items_name ON selection_items(selection_name);
+CREATE INDEX IF NOT EXISTS idx_selection_items_item ON selection_items(item);
