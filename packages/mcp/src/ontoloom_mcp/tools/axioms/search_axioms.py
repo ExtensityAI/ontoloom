@@ -1,27 +1,29 @@
-from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
+from ontoloom.ontology import axioms, selections
+from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.literals import IRI
-from ontoloom.ontology.store import OntologyStore
+from ontoloom.ontology.types import SelectionKind
 
-from ontoloom_mcp.components.errors import handle_tool_errors
-from ontoloom_mcp.components.formatting import format_search_axioms_page
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.formatting import (
+    SELECT_INLINE_MAX,
+    SELECT_PREVIEW,
+    format_search_axioms_page,
+    format_selection_result,
+)
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
 
-_SELECT_PREVIEW = 5
-_SELECT_INLINE_MAX = 20
 
-
-@handle_tool_errors
-def _search_axioms(
+def search_axioms(
     path: OntologyPath,
-    iri: str = "",
-    axiom_types: list[str] = [],  # noqa: B006
-    annotation_query: str = "",
-    annotation_properties: list[str] = [],  # noqa: B006
-    entity_query: str = "",
-    within: str = "",
-    select: str = "",
-    limit: int = 50,
+    iri: IRI | None = None,
+    axiom_types: list[str] | None = None,
+    annotation_query: str | None = None,
+    annotation_properties: list[str] | None = None,
+    entity_query: str | None = None,
+    within: SelectionName | None = None,
+    select: SelectionName | None = None,
+    limit: Limit = 50,
     offset: int = 0,
 ):
     """Search and filter axioms. All parameters optional — no filters lists all axioms.
@@ -34,68 +36,47 @@ def _search_axioms(
     - `entity_query`: Only axioms mentioning entities whose annotations match this
       substring. Note: matches any position — e.g., a SubClassOf(A, B) is returned
       if B matches, not just if A matches.
-    - `within`: Scope search to an existing selection (name only). If kind='entities',
-      restricts to axioms mentioning those entities. If kind='axioms', restricts to
-      those specific axioms.
-    - `select`: Save ALL matching axiom hashes to a selection with this name.
-      Incompatible with limit/offset. Use `read_selection` to paginate saved results.
-    - `limit`/`offset`: Pagination (incompatible with `select`).
+    - `within`: Scope to a named selection. Within an entity selection: only axioms
+      mentioning those entities. Within an axiom selection: only those specific axioms.
+    - `select`: Save ALL matching axiom hashes as a named selection. Returns all
+      results regardless of limit/offset. Use `read_selection` to paginate afterwards.
+    - `limit`/`offset`: Pagination (ignored when `select` is set).
     """
-    if select and "@" in select:
-        msg = "Selection names must not contain '@'."
-        raise ValueError(msg)
-    if select and (limit != 50 or offset != 0):
-        msg = "limit/offset are incompatible with select. Use read_selection to paginate saved results."
-        raise ValueError(msg)
-
-    with OntologyStore(path) as store:
+    with Ontology(path) as ont:
         kwargs = {
-            "iri": IRI(iri) if iri else None,
-            "axiom_types": axiom_types or None,
-            "annotation_query": annotation_query or None,
-            "annotation_properties": annotation_properties or None,
-            "entity_query": entity_query or None,
-            "within": within or None,
+            "iri": iri,
+            "axiom_types": axiom_types,
+            "annotation_query": annotation_query,
+            "annotation_properties": annotation_properties,
+            "entity_query": entity_query,
+            "within_selection": within,
         }
 
-        if select:
-            # Collect all hashes and save to selection
-            hashes = store.collect_axiom_hashes(**kwargs)
-            if not hashes:
-                return _no_results_msg(
-                    iri, axiom_types, annotation_query, annotation_properties, entity_query, within
-                )
-
+        if select is not None:
+            hashes = axioms.collect_hashes(ont, **kwargs)
             source = _build_source(
                 iri, axiom_types, annotation_query, annotation_properties, entity_query, within
             )
-            content_hash, cardinality, old_cardinality = store._write_selection(
-                select, "axioms", hashes, source
+            content_hash, cardinality, old_cardinality = selections.write(
+                ont, select, SelectionKind.AXIOMS, hashes, source
             )
 
-            parts = [f"{cardinality} axioms \u2192 {select!r} (sel@{content_hash})."]
-            if old_cardinality is not None:
-                parts.append(f"Overwrote previous ({old_cardinality} items).")
-
-            if cardinality <= _SELECT_INLINE_MAX:
-                # Show all inline
-                page = store.search_axioms(**kwargs, limit=cardinality, offset=0)
-                parts.append("")
-                parts.append(format_search_axioms_page(page.axioms, page.total, 0))
-            else:
-                # Show preview
-                page = store.search_axioms(**kwargs, limit=_SELECT_PREVIEW, offset=0)
-                parts.append(f"Preview (first {_SELECT_PREVIEW}):")
-                parts.append("")
-                parts.append(format_search_axioms_page(page.axioms, cardinality, 0))
-                parts.append(
-                    f"\nUse read_selection(name={select!r}) to browse all {cardinality} results."
+            if not hashes:
+                no_results = _no_results_msg(
+                    iri, axiom_types, annotation_query, annotation_properties, entity_query, within
                 )
+                return f"0 axioms \u2192 {select!r} (sel@{content_hash}).\n{no_results}"
 
-            return "\n".join(parts)
+            limit_n = cardinality if cardinality <= SELECT_INLINE_MAX else SELECT_PREVIEW
+            display_total = cardinality
+            page = axioms.search(ont, **kwargs, limit=limit_n, offset=0)
+            page_text = format_search_axioms_page(page.axioms, display_total, 0)
 
-        # Normal paginated search
-        page = store.search_axioms(**kwargs, limit=limit, offset=offset)
+            return format_selection_result(
+                "axioms", select, content_hash, cardinality, old_cardinality, page_text
+            )
+
+        page = axioms.search(ont, **kwargs, limit=limit, offset=offset)
         if page.total == 0:
             return _no_results_msg(
                 iri, axiom_types, annotation_query, annotation_properties, entity_query, within
@@ -140,8 +121,9 @@ def _build_source(iri, axiom_types, annotation_query, annotation_properties, ent
     return f"search_axioms({', '.join(parts)})"
 
 
-tool_search_axioms = Tool.from_function(
-    _search_axioms,
+tool_search_axioms = create_tool(
+    search_axioms,
     name="search_axioms",
+    # readOnlyHint: selections are ephemeral working sets, not ontology data
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )

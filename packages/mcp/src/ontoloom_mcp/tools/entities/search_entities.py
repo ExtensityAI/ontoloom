@@ -1,35 +1,27 @@
-from typing import Literal
-
-from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.ontology.store import OntologyStore
+from ontoloom.ontology import entities, selections
+from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.models.base import EntityType
+from ontoloom.ontology.types import SelectionKind
 
-from ontoloom_mcp.components.errors import handle_tool_errors
-from ontoloom_mcp.components.formatting import format_entity_search_page
-from ontoloom_mcp.components.types import OntologyPath
-
-Role = Literal[
-    "Class",
-    "ObjectProperty",
-    "DataProperty",
-    "AnnotationProperty",
-    "NamedIndividual",
-    "Datatype",
-]
-
-_SELECT_PREVIEW = 5
-_SELECT_INLINE_MAX = 20
+from ontoloom_mcp.components.formatting import (
+    SELECT_INLINE_MAX,
+    SELECT_PREVIEW,
+    format_entity_search_page,
+    format_selection_result,
+)
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
 
 
-@handle_tool_errors
-def _search_entities(
+def search_entities(
     path: OntologyPath,
-    query: str = "",
-    role: Role | str = "",
-    namespace: str = "",
-    within: str = "",
-    select: str = "",
-    limit: int = 50,
+    query: str | None = None,
+    role: EntityType | None = None,
+    namespace: str | None = None,
+    within: SelectionName | None = None,
+    select: SelectionName | None = None,
+    limit: Limit = 50,
     offset: int = 0,
 ):
     """Search and filter entities. All parameters optional — no filters lists all entities.
@@ -38,60 +30,41 @@ def _search_entities(
     - `role`: Filter by entity type: "Class", "ObjectProperty", "DataProperty",
       "AnnotationProperty", "NamedIndividual", "Datatype".
     - `namespace`: Filter by IRI prefix (e.g. "ex", "snomed").
-    - `within`: Scope search to an existing selection (name only). If kind='entities',
-      restricts to those specific entities (further filter). If kind='axioms', restricts
-      to entities mentioned in those axioms.
-    - `select`: Save ALL matching entity IRIs to a selection with this name.
-      Incompatible with limit/offset. Use `read_selection` to paginate saved results.
-    - `limit`/`offset`: Pagination (incompatible with `select`).
+    - `within`: Scope to a named selection. Within an entity selection: only those
+      specific entities. Within an axiom selection: only entities mentioned in those axioms.
+    - `select`: Save ALL matching entity IRIs as a named selection. Returns all
+      results regardless of limit/offset. Use `read_selection` to paginate afterwards.
+    - `limit`/`offset`: Pagination (ignored when `select` is set).
     """
-    if select and "@" in select:
-        msg = "Selection names must not contain '@'."
-        raise ValueError(msg)
-    if select and (limit != 50 or offset != 0):
-        msg = "limit/offset are incompatible with select. Use read_selection to paginate saved results."
-        raise ValueError(msg)
-
-    with OntologyStore(path) as store:
+    with Ontology(path) as ont:
         kwargs = {
-            "query": query or None,
-            "role": role or None,
-            "namespace": namespace or None,
-            "within": within or None,
+            "query": query,
+            "role": role,
+            "namespace": namespace,
+            "within_selection": within,
         }
 
-        if select:
-            # Collect all IRIs and save to selection
-            iris = store.collect_entity_iris(**kwargs)
-            if not iris:
-                return _no_results_msg(query, role, namespace, within)
-
+        if select is not None:
+            iris = entities.collect_iris(ont, **kwargs)
             source = _build_source(query, role, namespace, within)
-            content_hash, cardinality, old_cardinality = store._write_selection(
-                select, "entities", iris, source
+            content_hash, cardinality, old_cardinality = selections.write(
+                ont, select, SelectionKind.ENTITIES, iris, source
             )
 
-            parts = [f"{cardinality} entities \u2192 {select!r} (sel@{content_hash})."]
-            if old_cardinality is not None:
-                parts.append(f"Overwrote previous ({old_cardinality} items).")
+            if not iris:
+                no_results = _no_results_msg(query, role, namespace, within)
+                return f"0 entities \u2192 {select!r} (sel@{content_hash}).\n{no_results}"
 
-            if cardinality <= _SELECT_INLINE_MAX:
-                page = store.search_entities(**kwargs, limit=cardinality, offset=0)
-                parts.append("")
-                parts.append(format_entity_search_page(page.matches, page.total, 0))
-            else:
-                page = store.search_entities(**kwargs, limit=_SELECT_PREVIEW, offset=0)
-                parts.append(f"Preview (first {_SELECT_PREVIEW}):")
-                parts.append("")
-                parts.append(format_entity_search_page(page.matches, cardinality, 0))
-                parts.append(
-                    f"\nUse read_selection(name={select!r}) to browse all {cardinality} results."
-                )
+            limit_n = cardinality if cardinality <= SELECT_INLINE_MAX else SELECT_PREVIEW
+            display_total = cardinality
+            page = entities.search(ont, **kwargs, limit=limit_n, offset=0)
+            page_text = format_entity_search_page(page.matches, display_total, 0)
 
-            return "\n".join(parts)
+            return format_selection_result(
+                "entities", select, content_hash, cardinality, old_cardinality, page_text
+            )
 
-        # Normal paginated search
-        page = store.search_entities(**kwargs, limit=limit, offset=offset)
+        page = entities.search(ont, **kwargs, limit=limit, offset=offset)
         if page.total == 0:
             return _no_results_msg(query, role, namespace, within)
         return format_entity_search_page(page.matches, page.total, offset)
@@ -124,8 +97,8 @@ def _build_source(query, role, namespace, within):
     return f"search_entities({', '.join(parts)})"
 
 
-tool_search_entities = Tool.from_function(
-    _search_entities,
+tool_search_entities = create_tool(
+    search_entities,
     name="search_entities",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )

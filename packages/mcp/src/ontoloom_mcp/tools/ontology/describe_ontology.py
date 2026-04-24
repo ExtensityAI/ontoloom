@@ -1,44 +1,41 @@
-from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.ontology.store import OntologyStore
+from ontoloom.ontology import axioms, entities, prefixes, selections
+from ontoloom.ontology.connection import Ontology
 
-from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import (
     format_axiom_summary_from_counter,
     format_entity_summary,
 )
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import OntologyPath, SelectionName
 
 
-@handle_tool_errors
-def _describe_ontology(path: OntologyPath, within: str = ""):
+def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
     """Get entity counts, axiom counts, and prefix mappings for an ontology.
 
-    - `within`: Scope stats to an existing selection (name only). Works with either kind
-      (entities: count those entities + their axioms; axioms: count those specific axioms
-      + entities they mention).
+    - `within`: Scope to a named selection. Within an entity selection: count those
+      entities and their axioms. Within an axiom selection: count those axioms and
+      the entities they mention.
     """
-    within_name = within or None
-
-    with OntologyStore(path) as store:
-        axiom_counts = store.axiom_summary(within=within_name)
-        total_entities, role_counts = store.entity_summary(within=within_name)
-        prefixes = store.list_prefixes()
+    with Ontology(path) as ont:
+        axiom_counts = axioms.summary(ont, within_selection=within)
+        total_entities, role_counts = entities.summary(ont, within_selection=within)
+        prefix_map = prefixes.list_all(ont)
 
         parts = []
 
-        if within_name:
-            sel = store._get_selection(within_name)
-            parts.append(f"Scoped to selection {within_name!r} ({sel['kind']}, sel@{sel['hash']}):")
+        if within:
+            sel = selections.get_info(ont, within)
+            parts.append(f"Scoped to selection {within!r} ({sel.kind}, sel@{sel.hash}):")
             parts.append("")
 
         parts.append(format_entity_summary(total_entities, role_counts))
         parts.append(format_axiom_summary_from_counter(axiom_counts))
 
-        if not within_name:
-            if prefixes:
+        if not within:
+            if prefix_map:
                 prefix_lines = ["Prefixes:"]
-                for name, iri in sorted(prefixes.items()):
+                for name, iri in sorted(prefix_map.items()):
                     prefix_lines.append(f"  {name}: \u2192 {iri}")
                 parts.append("\n".join(prefix_lines))
             else:
@@ -47,8 +44,8 @@ def _describe_ontology(path: OntologyPath, within: str = ""):
         return "\n\n".join(parts)
 
 
-tool_describe_ontology = Tool.from_function(
-    _describe_ontology,
+tool_describe_ontology = create_tool(
+    describe_ontology,
     name="describe_ontology",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )

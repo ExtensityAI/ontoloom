@@ -1,62 +1,63 @@
-from fastmcp.tools import Tool
-from ontoloom.ontology.store import OntologyStore
+from mcp.types import ToolAnnotations
+from ontoloom.ontology import selections
+from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.types import SelectionKind
 
-from ontoloom_mcp.components.errors import handle_tool_errors
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import OntologyPath, SelectionName
 
 
-@handle_tool_errors
-def _create_selection(
+def create_selection(
     path: OntologyPath,
-    name: str,
-    union: list[str] = [],  # noqa: B006
-    intersection: list[str] = [],  # noqa: B006
-    difference: list[str] = [],  # noqa: B006
-    axioms_for: str = "",
-    entities_in: str = "",
+    name: SelectionName,
+    union: list[SelectionName] | None = None,
+    intersection: list[SelectionName] | None = None,
+    difference: list[SelectionName] | None = None,
+    axioms_for: SelectionName | None = None,
+    entities_in: SelectionName | None = None,
 ):
-    """Create a selection from set algebra or type conversion.
+    """Create a selection from set algebra or kind conversion.
 
     Exactly one operation must be provided:
-    - `union`: Combine items from these selections (all must be same kind).
-    - `intersection`: Items present in ALL selections (all must be same kind).
+
+    Set algebra (all input selections must be the same kind):
+    - `union`: Combine items from these selections.
+    - `intersection`: Items present in ALL selections.
     - `difference`: Items in first minus subsequent. Order: [A, B, C] = A - B - C.
-    - `axioms_for`: Given an entity selection, create an axiom selection of all axioms
-      mentioning those entities.
-    - `entities_in`: Given an axiom selection, create an entity selection of all entities
-      mentioned in those axioms.
+
+    Kind conversion (switch between entity and axiom selections):
+    - `axioms_for`: Given an entity selection, find all axioms mentioning those entities.
+      Use after entity search to shift focus to axiom-level operations.
+    - `entities_in`: Given an axiom selection, extract all entities mentioned in those axioms.
+      Use after axiom search to explore or annotate the involved entities.
 
     Overwrites if name exists. Kind is inferred from the operation.
 
     Composition patterns:
-    - "Everything except": search → select "all", search → select "keep",
-      create_selection(difference=["all", "keep"])
-    - "Narrow progressively": search_entities → select, create_selection(axioms_for=...),
+    - "Everything except": search -> select "all", search -> select "exclude",
+      create_selection(difference=["all", "exclude"])
+    - "Narrow progressively": search_entities -> select, create_selection(axioms_for=...),
       then search_axioms(within=...) for further filtering
     """
-    if "@" in name:
-        msg = "Selection names must not contain '@'."
-        raise ValueError(msg)
-
-    with OntologyStore(path) as store:
-        content_hash, cardinality, old_cardinality = store.create_selection(
+    with Ontology(path) as ont:
+        content_hash, cardinality, old_cardinality = selections.create(
+            ont,
             name,
-            union=union or None,
-            intersection=intersection or None,
-            difference=difference or None,
-            axioms_for=axioms_for or None,
-            entities_in=entities_in or None,
+            union=union,
+            intersection=intersection,
+            difference=difference,
+            axioms_for=axioms_for,
+            entities_in=entities_in,
         )
 
-        # Determine kind from the operation
         if union or intersection or difference:
             inputs = union or intersection or difference
-            sel = store._get_selection(inputs[0])
-            kind = sel["kind"]
+            sel = selections.get_info(ont, inputs[0])  # pyright: ignore[reportIndexIssue]
+            kind = sel.kind
         elif axioms_for:
-            kind = "axioms"
+            kind = SelectionKind.AXIOMS
         else:
-            kind = "entities"
+            kind = SelectionKind.ENTITIES
 
         parts = [f"Selection {name!r} (sel@{content_hash}): {cardinality} {kind}"]
         if old_cardinality is not None:
@@ -64,7 +65,6 @@ def _create_selection(
         return " ".join(parts)
 
 
-tool_create_selection = Tool.from_function(
-    _create_selection,
-    name="create_selection",
+tool_create_selection = create_tool(
+    create_selection, name="create_selection", annotations=ToolAnnotations(idempotentHint=True)
 )

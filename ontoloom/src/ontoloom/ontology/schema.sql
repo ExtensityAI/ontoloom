@@ -45,6 +45,7 @@ CREATE TABLE IF NOT EXISTS entity_text (
 CREATE INDEX IF NOT EXISTS idx_entity_text_iri ON entity_text(entity_iri);
 CREATE INDEX IF NOT EXISTS idx_entity_text_prop_text ON entity_text(property, text);
 CREATE INDEX IF NOT EXISTS idx_entity_text_axiom ON entity_text(axiom_id);
+CREATE INDEX IF NOT EXISTS idx_entity_text_covering ON entity_text(entity_iri, property, text);
 
 -- Derived text index for axiom-level metadata annotations (annotations *on*
 -- the axiom itself, not on an entity). Kept separate from entity_text because
@@ -57,6 +58,7 @@ CREATE TABLE IF NOT EXISTS axiom_text (
 
 CREATE INDEX IF NOT EXISTS idx_axiom_text_axiom ON axiom_text(axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_text ON axiom_text(text);
+CREATE INDEX IF NOT EXISTS idx_axiom_text_property ON axiom_text(property);
 
 -- Append-only event log of add/del operations, tagged by session. `axiom_json`
 -- is captured on 'add' (as JSONB) so events are self-contained for replay even
@@ -88,5 +90,5 @@ CREATE TABLE IF NOT EXISTS selection_items (
     UNIQUE(selection_name, item)
 );
 
-CREATE INDEX IF NOT EXISTS idx_selection_items_name ON selection_items(selection_name);
+-- UNIQUE(selection_name, item) already provides a covering index for name-based lookups.
 CREATE INDEX IF NOT EXISTS idx_selection_items_item ON selection_items(item);

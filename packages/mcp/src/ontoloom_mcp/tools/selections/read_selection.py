@@ -1,70 +1,65 @@
-from typing import Literal
-
-from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
-from ontoloom.ontology.store import OntologyStore
+from ontoloom.ontology import selections
+from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.types import SelectionKind, ShowFilter
 
-from ontoloom_mcp.components.errors import handle_tool_errors
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
 
 
-@handle_tool_errors
-def _read_selection(
+def read_selection(
     path: OntologyPath,
-    name: str,
-    limit: int = 20,
+    name: SelectionName,
+    limit: Limit = 20,
     offset: int = 0,
-    show: Literal["all", "present", "missing"] = "all",
+    show: ShowFilter = ShowFilter.ALL,
 ):
     """Paginated view of a selection's contents with missing-item visibility.
 
     - `show`: "all" (default), "present" (only items still in ontology),
-      "missing" (only items that have been removed).
+      "missing" (only items removed since the selection was created).
+      Use "missing" to audit a selection after ontology modifications.
 
     Always includes summary stats (total, present, missing) regardless of filter.
-    For bulk verification, dispatch a subagent to paginate and check rather than
-    reading everything into your context.
+    Pagination applies after the show filter. For bulk verification, dispatch a
+    subagent to paginate rather than reading everything into your context.
     """
-    with OntologyStore(path) as store:
-        result = store.read_selection(name, limit=limit, offset=offset, show=show)
+    with Ontology(path) as ont:
+        result = selections.read(ont, name, limit=limit, offset=offset, show=show)
 
-    kind = result["kind"]
-    content_hash = result["hash"]
-    cardinality = result["cardinality"]
-    present = result["present"]
-    missing = result["missing"]
-    total_filtered = result["total_filtered"]
-    items = result["items"]
-
+    meta = result.meta
     header = (
-        f"Selection {name!r} ({kind}, sel@{content_hash}): "
-        f"{cardinality} total ({present} present, {missing} missing)"
+        f"Selection {name!r} ({meta.kind}, sel@{meta.hash}): "
+        f"{meta.cardinality} total ({result.present} present, {result.missing} missing)"
     )
 
-    end = offset + len(items)
-    showing = f"Showing {offset + 1}-{end} of {total_filtered} (filter: {show}):"
+    end = offset + len(result.items)
+    if not result.items:
+        showing = f"0 results (filter: {show})."
+    else:
+        showing = f"Showing {offset + 1}-{end} of {result.total_filtered} (filter: {show}):"
 
     lines = [header, showing, ""]
 
-    if kind == "axioms":
-        for item in items:
-            h = item["hash"][:8]
-            if item["missing"]:
+    if meta.kind == SelectionKind.AXIOMS:
+        for item in result.items:
+            h = item.key[:8]
+            if item.missing:
                 lines.append(f"[{h}] *missing*")
             else:
-                lines.append(f"[{h}] {item['axiom']}")
-    else:  # entities
-        for item in items:
-            if item["missing"]:
-                lines.append(f"{item['iri']} *missing*")
+                lines.append(f"[{h}] {item.axiom}")
+    else:
+        for item in result.items:
+            if item.missing:
+                lines.append(f"{item.key} *missing*")
             else:
-                lines.append(f"{item['iri']}")
+                role_str = f" ({item.role})" if item.role else ""
+                label_str = f' "{item.label}"' if item.label else ""
+                lines.append(f"{item.key}{role_str}{label_str}")
 
     return "\n".join(lines)
 
 
-tool_read_selection = Tool.from_function(
-    _read_selection,
-    name="read_selection",
-    annotations=ToolAnnotations(readOnlyHint=True),
+tool_read_selection = create_tool(
+    read_selection, name="read_selection", annotations=ToolAnnotations(readOnlyHint=True)
 )

@@ -1,18 +1,17 @@
-from fastmcp.tools import Tool
 from mcp.types import ToolAnnotations
+from ontoloom.ontology.axioms import add
+from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.axioms import Axiom
-from ontoloom.ontology.store import OntologyStore
 
-from ontoloom_mcp.components.errors import handle_tool_errors
 from ontoloom_mcp.components.formatting import format_diff
+from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-@handle_tool_errors
-def _add_axioms(path: OntologyPath, axioms: list[Axiom]):
+def add_axioms(path: OntologyPath, axioms: list[Axiom]):
     """Add axioms to an existing ontology. Duplicates are skipped. Returns a diff: `+` = added, `=` = skipped."""
-    with OntologyStore(path) as store:
-        result = store.add_axioms(axioms)
+    with Ontology(path) as ont:
+        result = add(ont, axioms)
         entries = [("+", ha) for ha in result.added] + [("=", ha) for ha in result.skipped]
         return format_diff(
             entries,
@@ -20,6 +19,6 @@ def _add_axioms(path: OntologyPath, axioms: list[Axiom]):
         )
 
 
-tool_add_axioms = Tool.from_function(
-    _add_axioms, name="add_axioms", annotations=ToolAnnotations(idempotentHint=True)
+tool_add_axioms = create_tool(
+    add_axioms, name="add_axioms", annotations=ToolAnnotations(idempotentHint=True)
 )

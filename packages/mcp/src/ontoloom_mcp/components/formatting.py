@@ -4,6 +4,9 @@ from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.types import EntityInfo, EntityMatch, HashedAxiom
 
+SELECT_PREVIEW = 5
+SELECT_INLINE_MAX = 20
+
 
 def format_roles(roles: set[EntityType]) -> str:
     return ", ".join(sorted(str(r) for r in roles)) or "none"
@@ -59,6 +62,30 @@ def format_axiom_summary_from_counter(counts: Counter[str]) -> str:
     for typ, count in counts.most_common():
         lines.append(f"  {count} {typ}")
     return "\n".join(lines)
+
+
+def format_selection_result(
+    kind_label: str,
+    select: str,
+    content_hash: str,
+    cardinality: int,
+    old_cardinality: int | None,
+    page_text: str,
+) -> str:
+    parts = [f"{cardinality} {kind_label} \u2192 {select!r} (sel@{content_hash})."]
+    if old_cardinality is not None:
+        parts.append(f"Overwrote previous ({old_cardinality} items).")
+
+    if cardinality <= SELECT_INLINE_MAX:
+        parts.append("")
+        parts.append(page_text)
+    else:
+        parts.append(f"Preview (first {SELECT_PREVIEW}):")
+        parts.append("")
+        parts.append(page_text)
+        parts.append(f"\nUse read_selection(name={select!r}) to browse all {cardinality} results.")
+
+    return "\n".join(parts)
 
 
 def format_entity_search_page(matches: list[EntityMatch], total: int, offset: int) -> str:
