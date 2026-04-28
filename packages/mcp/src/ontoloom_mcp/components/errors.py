@@ -20,23 +20,23 @@ from ontoloom.ontology.errors import (
 
 _HINTS: dict[type[OntoloomError], Callable[..., str]] = {
     OntologyNotFoundError: lambda e: (
-        f"Ontology '{e.path}' not found. Use create_ontology to create it."
+        f"Ontology '{e.path}' not found. Use `create_ontology` to create it."
     ),
     OntologyExistsError: lambda e: str(e),
     SelectionNotFoundError: lambda e: (
         f"Selection {e.name!r} does not exist. "
-        f"Use search_entities(into=...) or match_axioms(into=...) to create one."
+        f"Use `search_entities(into=...)` or `match_axioms(into=...)` to create one."
     ),
     StaleSelectionError: lambda e: (
         f"Selection {e.name!r} has changed since you last observed it. "
-        f"Use read_selection or list_selections to get the current sel@ hash."
+        f"Use `read_selection` or `list_selections` to get the current sel@ hash."
     ),
     SelectionKindError: lambda e: (
-        f"'{e.operation}' requires a {e.expected} selection, "
+        f"`{e.operation}` requires a {e.expected} selection, "
         f"but {e.name!r} is a {e.actual} selection."
     ),
     AxiomNotFoundError: lambda e: (
-        f"No axiom matching hash prefix [{e.prefix}]. Use match_axioms to find axiom hashes."
+        f"No axiom matching hash prefix [{e.prefix}]. Use `match_axioms` to find axiom hashes."
     ),
     AmbiguousHashError: lambda e: (
         f"[{e.prefix}] matches {e.count} axioms: "
@@ -45,7 +45,7 @@ _HINTS: dict[type[OntoloomError], Callable[..., str]] = {
         f"Use a longer prefix."
     ),
     InvalidHashError: lambda e: str(e),
-    PrefixNotFoundError: lambda e: f"No prefix {e.name!r}. Use set_prefix to define it.",
+    PrefixNotFoundError: lambda e: f"No prefix {e.name!r}. Use `set_prefix` to define it.",
     StoreCorruptionError: lambda e: (
         f"Data integrity error: {e.detail}. This may indicate database corruption."
     ),

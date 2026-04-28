@@ -18,6 +18,7 @@ from ontoloom.ontology.models.literals import Annotation
 from ontoloom.ontology.types import (
     AddResult,
     HashedAxiom,
+    LockedSelection,
     RemoveResult,
     RenameResult,
     ReplaceResult,
@@ -103,14 +104,12 @@ def remove_by_hash(ont: Ontology, hash_prefixes: list[str]) -> RemoveResult:
     return RemoveResult(removed=to_remove)
 
 
-def remove_by_selection(
-    ont: Ontology, name: str, hash_prefix: str
-) -> tuple[list[HashedAxiom], int]:
+def remove_by_selection(ont: Ontology, within: LockedSelection) -> tuple[list[HashedAxiom], int]:
     """Remove axioms referenced by an axiom selection. Best-effort: skips missing."""
-    sel = selections.verify_hash(ont, name, hash_prefix)
+    sel = selections.verify_hash(ont, within.name, within.hash_prefix)
     if sel.kind != SelectionKind.AXIOMS:
         raise SelectionKindError(
-            name=name, expected="axioms", actual=sel.kind, operation="rm_axioms"
+            name=within.name, expected="axioms", actual=sel.kind, operation="rm_axioms"
         )
 
     removed: list[HashedAxiom] = []
@@ -119,7 +118,7 @@ def remove_by_selection(
         items = [
             r[0]
             for r in ont.conn.execute(
-                "SELECT item FROM selection_items WHERE selection_name = ?", (name,)
+                "SELECT item FROM selection_items WHERE selection_name = ?", (within.name,)
             )
         ]
         for h in items:
@@ -199,9 +198,14 @@ def annotate(
 def replace(ont: Ontology, old_hash_prefix: str, new_axiom: Axiom) -> ReplaceResult:
     """Atomic delete+add with event tracking.
 
+    Old axiom-level annotations are carried forward onto the new axiom — annotations
+    are excluded from the canonical hash, so the new hash is unaffected. Any
+    annotations on the input `new_axiom` are discarded; use `annotate` to modify
+    annotations afterwards.
+
     No-op if new content hashes to the same value as old.
-    If new hash matches a different existing axiom: old is deleted, add is skipped,
-    event records the mapping.
+    If new hash matches a different existing axiom: old is deleted, add is skipped
+    (the existing axiom keeps its own annotations), event records the mapping.
     """
     if not _HEX_RE.match(old_hash_prefix):
         raise InvalidHashError(old_hash_prefix)
@@ -219,16 +223,21 @@ def replace(ont: Ontology, old_hash_prefix: str, new_axiom: Axiom) -> ReplaceRes
             samples = [r[1][:8] for r in rows]
             raise AmbiguousHashError(old_hash_prefix, len(rows), samples)
 
-        old_id, old_full_hash, _old_json = rows[0]
+        old_id, old_full_hash, old_json = rows[0]
 
         if new_h == old_full_hash:
             return ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=True)
+
+        # Carry old axiom-level annotations onto the new axiom; annotations don't
+        # enter the canonical hash so new_h is unchanged.
+        old_axiom = load_axiom(old_json, f"axiom {old_full_hash[:8]} in replace")
+        new_axiom = new_axiom.model_copy(update={"annotations": old_axiom.annotations})
+        new_json = new_axiom.model_dump_json()
 
         # Delete old
         ont.conn.execute("DELETE FROM axioms WHERE id = ?", (old_id,))
 
         # Add new (idempotent — may already exist)
-        new_json = new_axiom.model_dump_json()
         cursor = ont.conn.execute(
             "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
             (new_h, new_axiom.type, new_json),
@@ -256,31 +265,36 @@ def rename_iri(
     old_iri: str,
     new_iri: str,
     *,
-    within: str | None = None,
+    within: LockedSelection | None = None,
 ) -> RenameResult:
-    """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id."""
+    """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id.
+
+    `within`: optional locked AXIOMS selection (`name@hash_prefix`) to restrict the
+    rename. The hash prefix is verified against the current selection hash —
+    raises StaleSelectionError on mismatch. Raises SelectionKindError if the
+    selection is an entity selection; convert with `axioms_for` first.
+    """
     import uuid
 
     batch = uuid.uuid4().hex[:12]
 
     # Find axioms mentioning old_iri
     if within is not None:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.AXIOMS:
-            rows = ont.conn.execute(
-                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-                "WHERE ae.entity_iri = ?",
-                (within, old_iri),
-            ).fetchall()
-        else:
-            rows = ont.conn.execute(
-                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "WHERE ae.entity_iri = ?",
-                (old_iri,),
-            ).fetchall()
+        sel = selections.verify_hash(ont, within.name, within.hash_prefix)
+        if sel.kind != SelectionKind.AXIOMS:
+            raise SelectionKindError(
+                name=within.name,
+                expected="axioms",
+                actual=sel.kind,
+                operation="rename_iri",
+            )
+        rows = ont.conn.execute(
+            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+            "WHERE ae.entity_iri = ?",
+            (within.name, old_iri),
+        ).fetchall()
     else:
         rows = ont.conn.execute(
             "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "

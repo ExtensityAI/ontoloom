@@ -38,9 +38,9 @@ def create_selection(
 
     Composition patterns:
     - "Everything except": search -> select "all", search -> select "exclude",
-      create_selection(difference=["all", "exclude"])
-    - "Narrow progressively": search_entities -> select, create_selection(axioms_for=...),
-      then match_axioms(within=...) for further filtering
+      `create_selection(difference=["all", "exclude"])`
+    - "Narrow progressively": `search_entities` -> select, `create_selection(axioms_for=...)`,
+      then `match_axioms(within=...)` for further filtering
     """
     with Ontology(path) as ont:
         content_hash, cardinality, old_cardinality = selections.create(

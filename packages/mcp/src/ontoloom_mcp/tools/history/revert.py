@@ -11,7 +11,7 @@ def revert(
 ):
     """Undo the last N operations (batches) in the current session.
 
-    Events with the same batch_id count as one operation (e.g., rename_iri).
+    Events with the same batch_id count as one operation (e.g., `rename_iri`).
     Unbatched events each count as one operation.
 
     Applies inverses in reverse order. Appends inverse events to the log.

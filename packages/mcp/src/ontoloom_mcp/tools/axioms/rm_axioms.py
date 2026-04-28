@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import axioms
 from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.types import LockedSelection
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -10,15 +11,15 @@ from ontoloom_mcp.components.types import HexPrefix, OntologyPath
 def rm_axioms(
     path: OntologyPath,
     hash_prefixes: list[HexPrefix] | None = None,
-    within: str | None = None,
+    within: LockedSelection | None = None,
 ):
     """Remove axioms by hash prefix or by selection.
 
     - `hash_prefixes`: Each prefix must uniquely match exactly one axiom.
       Atomic: if any prefix fails to resolve, nothing is removed.
-    - `within`: Format "name@hash_prefix" (e.g. "my_sel@a3f1"). The hash prefix
-      verifies the selection hasn't changed since you last read it. Remove all axioms
-      in this axiom selection. Best-effort: skips hashes no longer in DB.
+    - `within`: Selection in `name@hash_prefix` form (e.g. "my_sel@a3f1"). The hash
+      prefix verifies the selection hasn't changed since you last read it. Removes
+      all axioms in this axiom selection. Best-effort: skips hashes no longer in DB.
       Mutually exclusive with hash_prefixes.
     """
     if within is not None and hash_prefixes is not None:
@@ -30,14 +31,10 @@ def rm_axioms(
 
     with Ontology(path) as ont:
         if within is not None:
-            if "@" not in within:
-                msg = "within must be in format 'name@hash_prefix' for write operations."
-                raise ValueError(msg)
-            name, hash_prefix = within.rsplit("@", 1)
-            removed, absent = axioms.remove_by_selection(ont, name, hash_prefix)
+            removed, absent = axioms.remove_by_selection(ont, within)
             return (
                 f"Removed {len(removed)} axioms ({absent} already absent). "
-                f"Selection {name!r} retained."
+                f"Selection {within.name!r} retained."
             )
 
         result = axioms.remove_by_hash(ont, hash_prefixes)  # pyright: ignore[reportArgumentType]

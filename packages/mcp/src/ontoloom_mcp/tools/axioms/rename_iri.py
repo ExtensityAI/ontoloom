@@ -1,5 +1,7 @@
 from ontoloom.ontology import axioms
 from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.types import LockedSelection
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -7,9 +9,9 @@ from ontoloom_mcp.components.types import OntologyPath
 
 def rename_iri(
     path: OntologyPath,
-    old_iri: str,
-    new_iri: str,
-    within: str | None = None,
+    old_iri: IRI,
+    new_iri: IRI,
+    within: LockedSelection | None = None,
 ):
     """Rename an IRI across all (or restricted) axioms.
 
@@ -17,7 +19,9 @@ def rename_iri(
     saves each as an atomic replace event. All events share one batch_id for
     atomic revert. No-op if old_iri is not in use.
 
-    `within`: optional selection name to restrict which axioms are affected.
+    `within`: optional `name@hash_prefix` reference (e.g. "my_sel@a3f1") to
+    restrict the rename to a selection. The hash prefix verifies the selection
+    hasn't changed since you last observed it.
     """
     with Ontology(path) as ont:
         result = axioms.rename_iri(ont, old_iri, new_iri, within=within)

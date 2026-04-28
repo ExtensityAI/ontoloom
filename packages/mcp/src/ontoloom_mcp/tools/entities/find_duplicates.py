@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import entities, selections
 from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.types import SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
@@ -12,7 +13,7 @@ _PREVIEW_GROUPS = 20
 def find_duplicates(
     path: OntologyPath,
     into: SelectionName,
-    annotation_property: str,
+    annotation_property: IRI,
     within: SelectionName | None = None,
 ):
     """Find annotation values shared by multiple entities.

@@ -1,7 +1,11 @@
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
+
+from pydantic import GetCoreSchemaHandler
+from pydantic_core import CoreSchema, core_schema
 
 from ontoloom.ontology.models.axioms import Axiom
 from ontoloom.ontology.models.base import EntityType
@@ -9,6 +13,75 @@ from ontoloom.ontology.models.literals import IRI
 
 MatchSource = Literal["iri", "annotation", "list"]
 MatchQuality = Literal["exact", "substring"]
+
+MAX_SELECTION_NAME_LEN = 64
+
+
+def validate_selection_name(v: str):
+    """Validate a selection name. Used by both SelectionName and LockedSelection."""
+    if not v:
+        msg = "Selection name must not be empty."
+        raise ValueError(msg)
+    if "@" in v:
+        msg = "Selection names must not contain '@'."
+        raise ValueError(msg)
+    if len(v) > MAX_SELECTION_NAME_LEN:
+        msg = f"Selection name too long ({len(v)} chars, max {MAX_SELECTION_NAME_LEN})."
+        raise ValueError(msg)
+    return v
+
+
+_LOCKED_SELECTION_RE = re.compile(r"^([^@]+)@([0-9a-fA-F]+)$")
+
+
+class LockedSelection(str):
+    """A selection reference with optimistic-locking hash: `name@hash_prefix`.
+
+    Required for write operations that act on a selection. The hash prefix
+    verifies the selection hasn't changed since the caller last observed it.
+
+    Examples:
+        LockedSelection("my_sel@a3f1") → my_sel@a3f1
+    """
+
+    def __new__(cls, value: str):
+        m = _LOCKED_SELECTION_RE.match(value)
+        if not m:
+            msg = (
+                f"LockedSelection must be in 'name@hash_prefix' format "
+                f"(e.g. 'my_sel@a3f1'), got {value!r}"
+            )
+            raise ValueError(msg)
+        validate_selection_name(m.group(1))
+        return super().__new__(cls, value)
+
+    @property
+    def name(self) -> str:
+        return self.split("@", 1)[0]
+
+    @property
+    def hash_prefix(self) -> str:
+        return self.split("@", 1)[1]
+
+    def __repr__(self):
+        return f"LockedSelection({self})"
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source_type: Any, handler: GetCoreSchemaHandler
+    ) -> CoreSchema:
+        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:
+        return {
+            "type": "string",
+            "description": (
+                "Selection reference with optimistic locking, in 'name@hash_prefix' format"
+            ),
+            "pattern": r"^[^@]+@[0-9a-fA-F]+$",
+            "examples": ["my_selection@a3f1"],
+        }
 
 
 class Position(StrEnum):

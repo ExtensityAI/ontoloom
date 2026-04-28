@@ -29,7 +29,7 @@ class ConversionOp(StrEnum):
     ENTITIES_IN = "entities_in"
 
 
-def _selection_hash(items: list[str]) -> str:
+def _selection_hash(items: list[str]):
     content = "\n".join(sorted(items))
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
@@ -235,6 +235,39 @@ def remove(ont: Ontology, names: list[str]) -> tuple[list[tuple[str, int]], list
                 ont.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
                 dropped.append((name, row[0]))
     return dropped, not_found
+
+
+def _glob_to_like(pattern: str):
+    """Translate a glob (`*`, `?`) into a SQL LIKE pattern with `\\` escape."""
+    out: list[str] = []
+    for c in pattern:
+        if c == "*":
+            out.append("%")
+        elif c == "?":
+            out.append("_")
+        elif c in ("%", "_", "\\"):
+            out.append("\\" + c)
+        else:
+            out.append(c)
+    return "".join(out)
+
+
+def remove_by_pattern(ont: Ontology, pattern: str) -> list[tuple[str, int]]:
+    """Remove every selection whose name matches a glob pattern.
+
+    `pattern` uses `*` (any sequence) and `?` (one character). Returns the
+    `(name, cardinality)` of each removed selection, in name order.
+    """
+    sql_pattern = _glob_to_like(pattern)
+    with ont.conn:
+        rows = ont.conn.execute(
+            "SELECT name, cardinality FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
+            (sql_pattern,),
+        ).fetchall()
+        dropped = [(r[0], r[1]) for r in rows]
+        for name, _ in dropped:
+            ont.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+    return dropped
 
 
 def create(

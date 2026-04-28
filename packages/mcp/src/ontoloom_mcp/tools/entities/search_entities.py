@@ -2,6 +2,7 @@ from mcp.types import ToolAnnotations
 from ontoloom.ontology import entities, selections
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.base import EntityType
+from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.types import SelectionKind
 
 from ontoloom_mcp.components.formatting import (
@@ -11,7 +12,7 @@ from ontoloom_mcp.components.formatting import (
     format_selection_result,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath, PrefixName, SelectionName
 
 
 def search_entities(
@@ -19,15 +20,15 @@ def search_entities(
     into: SelectionName,
     query: str | None = None,
     role: EntityType | None = None,
-    namespace: str | None = None,
+    namespace: PrefixName | None = None,
     declared: bool | None = None,
-    properties: list[str] | None = None,
+    properties: list[IRI] | None = None,
     within: SelectionName | None = None,
     exclude_deprecated: bool = True,
 ) -> str:
     """Search for entities by name, type, or namespace. Results are saved as a named
-    selection. Use read_selection to paginate, create_selection to compose with other
-    selections.
+    selection. Use `read_selection` to paginate, `create_selection` to compose with
+    other selections.
 
     - `into`: Name for the output selection (required).
     - `query`: Substring match on IRI local names and annotation values (labels, comments).
@@ -76,11 +77,9 @@ def search_entities(
         return result
 
 
-def _within_metadata(ont: Ontology, within: str) -> str:
+def _within_metadata(ont: Ontology, within: str):
     sel = selections.get_info(ont, within)
-    return (
-        f"\nWithin selection {sel.name!r} ({sel.kind}, {sel.cardinality} items, sel@{sel.hash})"
-    )
+    return f"\nWithin selection {sel.name!r} ({sel.kind}, {sel.cardinality} items, sel@{sel.hash})"
 
 
 def _no_results_msg(query, role, namespace, declared, properties, within):

@@ -10,6 +10,7 @@ from ontoloom.ontology.errors import (
     OntologyExistsError,
     OntologyNotFoundError,
     PrefixNotFoundError,
+    SelectionKindError,
 )
 from ontoloom.ontology.models.axioms import (
     AnnotationAssertion,
@@ -20,7 +21,7 @@ from ontoloom.ontology.models.axioms import (
 from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.expressions import NamedClass, ObjectSomeValuesFrom
 from ontoloom.ontology.models.literals import IRI, Annotation, LangLiteral
-from ontoloom.ontology.types import Position, SelectionKind
+from ontoloom.ontology.types import LockedSelection, Position, SelectionKind
 
 
 @pytest.fixture()
@@ -126,6 +127,94 @@ def test_annotate_axiom_remove(ont):
 def test_annotate_nonexistent_raises(ont):
     with pytest.raises(AxiomNotFoundError):
         axioms.annotate(ont, "deadbeef", add_annotations=[])
+
+
+# -- Annotation preservation across content-hash changes --
+
+
+def test_replace_preserves_old_annotations(ont):
+    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
+    old = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Animal")),
+        annotations=(ann,),
+    )
+    axioms.add(ont, [old])
+    old_h = axiom_hash(old)
+
+    new = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Mammal")),
+    )
+    result = axioms.replace(ont, old_h, new)
+    assert not result.was_noop
+
+    row = ont.conn.execute(
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
+    ).fetchone()
+    stored = json.loads(row[0])
+    assert stored["annotations"] == [ann.model_dump(mode="json")]
+
+
+def test_replace_discards_new_axiom_annotations(ont):
+    old = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Animal")),
+    )
+    axioms.add(ont, [old])
+    old_h = axiom_hash(old)
+
+    new = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Mammal")),
+        annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="ignored")),),
+    )
+    result = axioms.replace(ont, old_h, new)
+
+    row = ont.conn.execute(
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
+    ).fetchone()
+    stored = json.loads(row[0])
+    # Old axiom had no annotations; new_axiom's annotations are discarded.
+    assert stored["annotations"] == []
+
+
+def test_rename_iri_rejects_entity_selection(ont):
+    axioms.add(
+        ont,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            SubClassOf(
+                sub_class=NamedClass(iri=IRI("ex:Dog")),
+                super_class=NamedClass(iri=IRI("ex:Animal")),
+            ),
+        ],
+    )
+    h, _, _ = selections.write(ont, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    locked = LockedSelection(f"dogs@{h}")
+
+    with pytest.raises(SelectionKindError):
+        axioms.rename_iri(ont, "ex:Animal", "ex:Mammal", within=locked)
+
+
+def test_rename_iri_preserves_annotations(ont):
+    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
+    ax = SubClassOf(
+        sub_class=NamedClass(iri=IRI("ex:Dog")),
+        super_class=NamedClass(iri=IRI("ex:Animal")),
+        annotations=(ann,),
+    )
+    axioms.add(ont, [ax])
+
+    result = axioms.rename_iri(ont, "ex:Animal", "ex:Mammal")
+    assert len(result.replaced) == 1
+    assert not result.replaced[0].was_noop
+
+    row = ont.conn.execute(
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
+    ).fetchone()
+    stored = json.loads(row[0])
+    assert stored["annotations"] == [ann.model_dump(mode="json")]
 
 
 # -- Event log --
@@ -383,6 +472,33 @@ def test_search_with_like_wildcards(ont):
     page = entities.search(ont, query="100%", limit=10)
     for m in page.matches:
         assert "100%" in str(m.iri) or "100%" in m.iri.local_name
+
+
+def test_namespace_filter_escapes_underscore(ont):
+    """Underscore in a prefix must be matched literally, not as SQL LIKE wildcard."""
+    axioms.add(
+        ont,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("a_b:X")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("aXb:Y")),
+        ],
+    )
+    iris = entities.collect_iris(ont, namespace="a_b")
+    # Without ESCAPE, `a_b:%` would match `aXb:Y` because `_` is a LIKE wildcard.
+    assert "a_b:X" in iris
+    assert "aXb:Y" not in iris
+
+
+def test_remove_selections_by_pattern(ont):
+    axioms.add(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+    selections.write(ont, "audit_one", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    selections.write(ont, "audit_two", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    selections.write(ont, "keep", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+
+    dropped = selections.remove_by_pattern(ont, "audit_*")
+    names = [n for n, _ in dropped]
+    assert names == ["audit_one", "audit_two"]
+    assert {s.name for s in selections.list_all(ont)} == {"keep"}
 
 
 # -- IRI validation --

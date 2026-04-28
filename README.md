@@ -52,8 +52,19 @@ Added 1, skipped 0 axioms.
 To add Saturn's missing moons, the agent first checks the pattern by looking at an existing one:
 
 ```
-search_axioms(path="solar.db", where=[{"field": "any", "iri": "sol:Europa"}])
-Showing 1-4 of 4 results:
+get_entity(path="solar.db", iri="sol:Europa", into="europa_axioms")
+sol:Europa (NamedIndividual)
+
+Axioms (asserted): 4
+  2 ObjectPropertyAssertion
+  1 Declaration
+  1 ClassAssertion
+
+4 axiom hashes → 'europa_axioms' (sel@a3f1c2).
+
+read_selection(path="solar.db", name="europa_axioms")
+Selection 'europa_axioms' (axioms, sel@a3f1c2): 4 total (4 present, 0 missing)
+Showing 1-4 of 4 (filter: all):
 
 [4a485089] Declaration(NamedIndividual, sol:Europa)
 [af28f052] ClassAssertion(sol:Moon, sol:Europa)
@@ -91,19 +102,32 @@ Added 10, skipped 0 axioms.
 
 ## Tools
 
-**Create & manage**
+**Setup**
 `create_ontology` · `set_prefix` · `rm_prefix`
 
 **Build**
 - `add_axioms` — add validated axioms; duplicates are skipped
-- `rm_axioms` — remove by hash prefix
-- `annotate_axiom` — update annotations without touching axiom identity
+- `rm_axioms` — remove by hash prefix or by axiom selection
+- `annotate_axiom` — update axiom-level annotations without touching identity
+- `replace_axiom` — atomic delete + add for one axiom
+- `rename_iri` — rewrite an IRI across all (or scoped) axioms in one batch
 
 **Query**
 - `describe_ontology` — entity and axiom counts, plus prefix mappings
 - `get_entity` — roles, annotations, and axiom counts for one entity
 - `search_entities` — text search, optionally filtered by role or namespace
-- `search_axioms` — filter by entity, axiom type, or annotation text
+- `find_duplicates` — entities sharing the same value for an annotation property
+- `match_axioms` — find axioms matching a structural pattern
+
+**Selections** — named, snapshotted sets of axiom hashes or entity IRIs
+- `create_selection` — set algebra (`union`/`intersection`/`difference`) and conversions (`axioms_for`, `entities_in`)
+- `read_selection` — paginated view, with present/missing visibility
+- `list_selections` — show all named selections
+- `rm_selections` — drop one or more selections
+
+**History**
+- `show_changes` — recent events grouped by batch
+- `revert` — undo a batch by appending inverse events
 
 **Export**
 `export_jsonl` — dump all axioms to a sorted JSONL file

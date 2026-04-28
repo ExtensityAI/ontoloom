@@ -2,8 +2,9 @@
 members = ["ontoloom", "packages/*"]
 
 [dependency-groups]
-dev = ["ruff>=0.15.0,<0.16.0", "pytest>=8.0.0"]
+dev = ["ruff>=0.15.0,<0.16.0", "pytest>=9.0.0"]
 
 [tool.pytest.ini_options]
 filterwarnings = ["error"]
-testpaths = ["ontoloom/tests"]
+testpaths = ["ontoloom/tests", "packages/mcp/tests"]
+addopts = ["--import-mode=importlib"]

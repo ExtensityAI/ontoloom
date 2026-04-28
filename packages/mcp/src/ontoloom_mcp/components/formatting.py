@@ -12,7 +12,7 @@ SELECT_INLINE_MAX = 20
 _LABEL_BATCH_SIZE = 500
 
 
-def lookup_labels(conn: sqlite3.Connection, iris: list[str]) -> dict[str, str | None]:
+def lookup_labels(conn: sqlite3.Connection, iris: list[str]):
     """Look up rdfs:label for a list of IRIs. Returns {iri: label | None}."""
     result: dict[str, str | None] = dict.fromkeys(iris)
     for i in range(0, len(iris), _LABEL_BATCH_SIZE):
@@ -28,7 +28,7 @@ def lookup_labels(conn: sqlite3.Connection, iris: list[str]) -> dict[str, str | 
     return result
 
 
-def collect_axiom_iris(axioms: list[HashedAxiom]) -> list[str]:
+def collect_axiom_iris(axioms: list[HashedAxiom]):
     """Extract unique entity IRIs from a list of hashed axioms."""
     seen: set[str] = set()
     for ha in axioms:
@@ -37,16 +37,16 @@ def collect_axiom_iris(axioms: list[HashedAxiom]) -> list[str]:
     return list(seen)
 
 
-def format_iri_with_label(iri: str, labels: dict[str, str | None]) -> str:
+def format_iri_with_label(iri: str, labels: dict[str, str | None]):
     label = labels.get(iri)
     return f'{iri} "{label}"' if label else iri
 
 
-def format_roles(roles: set[EntityType]) -> str:
+def format_roles(roles: set[EntityType]):
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
 
-def _format_axiom_line(ha: HashedAxiom, labels: dict[str, str | None]) -> str:
+def _format_axiom_line(ha: HashedAxiom, labels: dict[str, str | None]):
     """Format a single axiom line with an inline label hint when labels are available."""
     line = f"[{ha.hash[:8]}] {ha.axiom}"
     if not labels:
@@ -70,7 +70,7 @@ def format_diff(
     entries: list[tuple[str, HashedAxiom]],
     summary: str,
     labels: dict[str, str | None] | None = None,
-) -> str:
+):
     lb = labels or {}
     changes = "\n".join(f"{tag} {_format_axiom_line(ha, lb)}" for tag, ha in entries)
     return f"{summary}\n\n```diff\n{changes}\n```"
@@ -79,7 +79,7 @@ def format_diff(
 def format_axiom_listing(
     axioms: list[HashedAxiom],
     labels: dict[str, str | None] | None = None,
-) -> str:
+):
     if not axioms:
         return ""
     lb = labels or {}
@@ -90,7 +90,7 @@ def format_entity_inspect(
     iri: IRI,
     info: EntityInfo,
     labels: dict[str, str | None] | None = None,
-) -> str:
+):
     lb = labels or {}
     header = format_iri_with_label(str(iri), lb)
     lines = [f"{header} ({format_roles(info.roles)})", ""]
@@ -109,14 +109,14 @@ def format_entity_inspect(
     return "\n".join(lines).rstrip()
 
 
-def format_entity_summary(total: int, role_counts: Counter[str]) -> str:
+def format_entity_summary(total: int, role_counts: Counter[str]):
     lines = [f"{total} entities total"]
     for role, count in role_counts.most_common():
         lines.append(f"  {count} {role}")
     return "\n".join(lines)
 
 
-def format_axiom_summary_from_counter(counts: Counter[str]) -> str:
+def format_axiom_summary_from_counter(counts: Counter[str]):
     total = sum(counts.values())
     lines = [f"{total} axioms total"]
     for typ, count in counts.most_common():
@@ -131,7 +131,7 @@ def format_selection_result(
     cardinality: int,
     old_cardinality: int | None,
     page_text: str,
-) -> str:
+):
     parts = [f"{cardinality} {kind_label} \u2192 {select!r} (sel@{content_hash})."]
     if old_cardinality is not None:
         parts.append(f"Overwrote previous ({old_cardinality} items).")
@@ -143,12 +143,14 @@ def format_selection_result(
         parts.append(f"Preview (first {SELECT_PREVIEW}):")
         parts.append("")
         parts.append(page_text)
-        parts.append(f"\nUse read_selection(name={select!r}) to browse all {cardinality} results.")
+        parts.append(
+            f"\nUse `read_selection(name={select!r})` to browse all {cardinality} results."
+        )
 
     return "\n".join(parts)
 
 
-def format_entity_search_page(matches: list[EntityMatch], total: int, offset: int) -> str:
+def format_entity_search_page(matches: list[EntityMatch], total: int, offset: int):
     end = offset + len(matches)
     lines = [f"Showing {offset + 1}-{end} of {total} entities:"]
     lines.append("")

@@ -6,7 +6,12 @@ from ontoloom_mcp.components.types import OntologyPath
 
 
 def create_ontology(path: OntologyPath):
-    """Create a new empty OWL 2 EL ontology database. Fails if the file already exists."""
+    """Create a new empty OWL 2 EL ontology database at `path`.
+
+    The path is a SQLite file (conventionally ending in `.ontology.db`). Fails if
+    the file already exists. Define prefixes with `set_prefix` and add axioms with
+    `add_axioms`.
+    """
     Ontology.create(path)
     return f"Created ontology at `{path}`."
 

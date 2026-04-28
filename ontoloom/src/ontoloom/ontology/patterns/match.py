@@ -32,7 +32,7 @@ _EXPRESSION_TYPE_NAMES = frozenset(
 )
 
 
-def _axiom_type_for_pattern(pattern_type: str) -> str:
+def _axiom_type_for_pattern(pattern_type: str):
     """Strip 'Pattern' suffix to get the corresponding axiom/expression type name."""
     if pattern_type.endswith("Pattern"):
         return pattern_type[: -len("Pattern")]

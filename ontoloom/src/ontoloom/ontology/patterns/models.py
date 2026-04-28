@@ -365,59 +365,58 @@ class DifferentIndividualsPattern(FrozenModel):
 
 
 # ---------------------------------------------------------------------------
-# Union types
+# Pattern unions
 # ---------------------------------------------------------------------------
+# AxiomPattern and ExpressionPattern are plain unions (no Annotated wrapper) so
+# `Pattern = AxiomPattern | ExpressionPattern` flattens into one union of all
+# subtypes. The single `Annotated[..., Field(discriminator="type")]` at the
+# Pattern level then emits one flat `oneOf`+`discriminator` schema — nesting
+# Annotated unions emits `anyOf [oneOf, oneOf]`, which LLMs mishandle.
 
-ExpressionPattern = Annotated[
-    (
-        NamedClassPattern
-        | ObjectSomeValuesFromPattern
-        | ObjectIntersectionOfPattern
-        | ObjectOneOfPattern
-        | ObjectHasValuePattern
-        | ObjectHasSelfPattern
-        | DataSomeValuesFromPattern
-        | DataHasValuePattern
-    ),
-    Field(discriminator="type"),
-]
+ExpressionPattern = (
+    NamedClassPattern
+    | ObjectSomeValuesFromPattern
+    | ObjectIntersectionOfPattern
+    | ObjectOneOfPattern
+    | ObjectHasValuePattern
+    | ObjectHasSelfPattern
+    | DataSomeValuesFromPattern
+    | DataHasValuePattern
+)
 
-AxiomPattern = Annotated[
-    (
-        SubClassOfPattern
-        | EquivalentClassesPattern
-        | DisjointClassesPattern
-        | SubObjectPropertyOfPattern
-        | SubObjectPropertyOfChainPattern
-        | EquivalentObjectPropertiesPattern
-        | TransitiveObjectPropertyPattern
-        | ReflexiveObjectPropertyPattern
-        | ObjectPropertyDomainPattern
-        | ObjectPropertyRangePattern
-        | SubDataPropertyOfPattern
-        | EquivalentDataPropertiesPattern
-        | DataPropertyDomainPattern
-        | DataPropertyRangePattern
-        | FunctionalDataPropertyPattern
-        | HasKeyPattern
-        | AnnotationAssertionPattern
-        | SubAnnotationPropertyOfPattern
-        | AnnotationPropertyDomainPattern
-        | AnnotationPropertyRangePattern
-        | DatatypeDefinitionPattern
-        | DeclarationPattern
-        | ClassAssertionPattern
-        | ObjectPropertyAssertionPattern
-        | NegativeObjectPropertyAssertionPattern
-        | DataPropertyAssertionPattern
-        | NegativeDataPropertyAssertionPattern
-        | SameIndividualPattern
-        | DifferentIndividualsPattern
-    ),
-    Field(discriminator="type"),
-]
+AxiomPattern = (
+    SubClassOfPattern
+    | EquivalentClassesPattern
+    | DisjointClassesPattern
+    | SubObjectPropertyOfPattern
+    | SubObjectPropertyOfChainPattern
+    | EquivalentObjectPropertiesPattern
+    | TransitiveObjectPropertyPattern
+    | ReflexiveObjectPropertyPattern
+    | ObjectPropertyDomainPattern
+    | ObjectPropertyRangePattern
+    | SubDataPropertyOfPattern
+    | EquivalentDataPropertiesPattern
+    | DataPropertyDomainPattern
+    | DataPropertyRangePattern
+    | FunctionalDataPropertyPattern
+    | HasKeyPattern
+    | AnnotationAssertionPattern
+    | SubAnnotationPropertyOfPattern
+    | AnnotationPropertyDomainPattern
+    | AnnotationPropertyRangePattern
+    | DatatypeDefinitionPattern
+    | DeclarationPattern
+    | ClassAssertionPattern
+    | ObjectPropertyAssertionPattern
+    | NegativeObjectPropertyAssertionPattern
+    | DataPropertyAssertionPattern
+    | NegativeDataPropertyAssertionPattern
+    | SameIndividualPattern
+    | DifferentIndividualsPattern
+)
 
-Pattern = AxiomPattern | ExpressionPattern
+Pattern = Annotated[AxiomPattern | ExpressionPattern, Field(discriminator="type")]
 
 # Rebuild forward refs for recursive types
 ObjectSomeValuesFromPattern.model_rebuild()

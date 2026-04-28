@@ -153,7 +153,7 @@ DataRange = (
 )
 
 
-def _fmt_data_range(dr: DataRange) -> str:
+def _fmt_data_range(dr: DataRange):
     """Format a DataRange union value as a compact string."""
     if isinstance(dr, DataType):
         return dr.value

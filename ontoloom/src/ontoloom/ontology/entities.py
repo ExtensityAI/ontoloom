@@ -1,7 +1,7 @@
 from collections import Counter, defaultdict
 
 from ontoloom.ontology import selections
-from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.connection import Ontology, escape_like
 from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.types import (
@@ -33,6 +33,61 @@ _NOT_DEPRECATED = (
 )
 
 
+def _axiom_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str]]:
+    """Join clause for queries already in axiom-context (alias `a` for axioms).
+    Silently no-op for ENTITIES selections — these reads only respect axiom selections.
+    """
+    if within is None:
+        return "", []
+    sel = selections.get_info(ont, within)
+    if sel.kind != SelectionKind.AXIOMS:
+        return "", []
+    return (
+        " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?",
+        [within],
+    )
+
+
+def _entity_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str]]:
+    """Join clause for queries in axiom_entities-context (alias `ae`).
+    Handles both AXIOMS (via a_w) and ENTITIES (via ae.entity_iri) selection kinds.
+    """
+    if within is None:
+        return "", []
+    sel = selections.get_info(ont, within)
+    if sel.kind == SelectionKind.ENTITIES:
+        return (
+            " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?",
+            [within],
+        )
+    return (
+        " JOIN axioms a_w ON a_w.id = ae.axiom_id"
+        " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?",
+        [within],
+    )
+
+
+def _entity_scope_allowed(ont: Ontology, within: str) -> set[str]:
+    """Allowed entity IRIs under `within`, as a set for in-Python post-filtering."""
+    sel = selections.get_info(ont, within)
+    if sel.kind == SelectionKind.ENTITIES:
+        return {
+            r[0]
+            for r in ont.conn.execute(
+                "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
+            )
+        }
+    return {
+        r[0]
+        for r in ont.conn.execute(
+            "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+            "JOIN axioms a ON a.id = ae.axiom_id "
+            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
+            (within,),
+        )
+    }
+
+
 def get(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityInfo | None:
     iri_str = str(iri)
 
@@ -52,15 +107,7 @@ def get(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityInfo | N
         )
     ]
 
-    extra_join = ""
-    extra_params: list[str] = []
-    if within is not None:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.AXIOMS:
-            extra_join = (
-                " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
-            )
-            extra_params.append(within)
+    extra_join, extra_params = _axiom_scope_join(ont, within)
 
     axiom_counts = Counter(
         {
@@ -86,15 +133,7 @@ def get(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityInfo | N
 def get_axiom_hashes(ont: Ontology, iri: IRI, *, within: str | None = None) -> list[str]:
     """Return all axiom hashes for an entity."""
     iri_str = str(iri)
-    extra_join = ""
-    extra_params: list[str] = []
-    if within is not None:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.AXIOMS:
-            extra_join = (
-                " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
-            )
-            extra_params.append(within)
+    extra_join, extra_params = _axiom_scope_join(ont, within)
 
     return [
         r[0]
@@ -169,27 +208,15 @@ def collect_iris(  # noqa: C901
     """Return all matching entity IRIs (no display data). For select workflows."""
     if query is None:
         conditions = ["ae.role IS NOT NULL"]
-        params: list[str | int] = []
-        joins = ""
-
-        if within is not None:
-            sel = selections.get_info(ont, within)
-            if sel.kind == SelectionKind.ENTITIES:
-                joins = " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?"
-                params.append(within)
-            else:
-                joins = (
-                    " JOIN axioms a_w ON a_w.id = ae.axiom_id"
-                    " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?"
-                )
-                params.append(within)
+        joins, scope_params = _entity_scope_join(ont, within)
+        params: list[str | int] = list(scope_params)
 
         if role is not None:
             conditions.append("ae.role = ?")
             params.append(role)
         if namespace is not None:
-            conditions.append("ae.entity_iri LIKE ? || ':%'")
-            params.append(namespace)
+            conditions.append("ae.entity_iri LIKE ? || ':%' ESCAPE '\\'")
+            params.append(escape_like(namespace))
 
         if declared is True:
             conditions.append(_DECLARED_EXISTS)
@@ -220,24 +247,7 @@ def collect_iris(  # noqa: C901
     matches.update(_find_text_matches(ont, query, None, "annotation", properties=properties))
 
     if within is not None and matches:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.ENTITIES:
-            allowed = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
-                )
-            }
-        else:
-            allowed = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                    "JOIN axioms a ON a.id = ae.axiom_id "
-                    "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
-                    (within,),
-                )
-            }
+        allowed = _entity_scope_allowed(ont, within)
         matches = {k: v for k, v in matches.items() if k in allowed}
 
     if role is not None and matches:
@@ -374,27 +384,15 @@ def _list_entities(
     offset: int,
 ) -> EntitySearchPage:
     conditions = ["ae.role IS NOT NULL"]
-    params: list[str | int] = []
-    joins = ""
-
-    if within is not None:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.ENTITIES:
-            joins = " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?"
-            params.append(within)
-        else:
-            joins = (
-                " JOIN axioms a_w ON a_w.id = ae.axiom_id"
-                " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?"
-            )
-            params.append(within)
+    joins, scope_params = _entity_scope_join(ont, within)
+    params: list[str | int] = list(scope_params)
 
     if role is not None:
         conditions.append("ae.role = ?")
         params.append(role)
     if namespace is not None:
-        conditions.append("ae.entity_iri LIKE ? || ':%'")
-        params.append(namespace)
+        conditions.append("ae.entity_iri LIKE ? || ':%' ESCAPE '\\'")
+        params.append(escape_like(namespace))
 
     if declared is True:
         conditions.append(_DECLARED_EXISTS)
@@ -460,24 +458,7 @@ def _text_search_entities(
     matches.update(_find_text_matches(ont, query, None, "annotation", properties=properties))
 
     if within is not None and matches:
-        sel = selections.get_info(ont, within)
-        if sel.kind == SelectionKind.ENTITIES:
-            allowed = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
-                )
-            }
-        else:
-            allowed = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                    "JOIN axioms a ON a.id = ae.axiom_id "
-                    "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
-                    (within,),
-                )
-            }
+        allowed = _entity_scope_allowed(ont, within)
         matches = {k: v for k, v in matches.items() if k in allowed}
 
     if role is not None and matches:

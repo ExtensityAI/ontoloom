@@ -70,13 +70,13 @@ def project_bindings(bindings: list[Bindings], variable: str) -> list[str]:
     return iris
 
 
-def _is_iri(value: str) -> bool:
+def _is_iri(value: str):
     """Check if a binding value looks like an IRI (not a repr of a complex expression)."""
     # IRIs are in prefix:local format, reprs start with class names or contain parens
     return "(" not in value and ":" in value
 
 
-def _axiom_type_for_pattern(pattern_type: str) -> str:
+def _axiom_type_for_pattern(pattern_type: str):
     if pattern_type.endswith("Pattern"):
         return pattern_type[: -len("Pattern")]
     return pattern_type

@@ -1,6 +1,6 @@
 import json
 
-from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.connection import Ontology, escape_like
 from ontoloom.ontology.errors import PrefixNotFoundError
 
 
@@ -34,8 +34,9 @@ def remove(ont: Ontology, name: str) -> None:
             raise PrefixNotFoundError(name)
 
         count = ont.conn.execute(
-            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE entity_iri LIKE ? || ':%'",
-            (name,),
+            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
+            "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
+            (escape_like(name),),
         ).fetchone()[0]
         if count > 0:
             msg = f"Cannot remove prefix {name!r}: {count} entities still use it."
@@ -56,8 +57,9 @@ def usage_counts(ont: Ontology) -> dict[str, int]:
     counts: dict[str, int] = {}
     for prefix in registered:
         row = ont.conn.execute(
-            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE entity_iri LIKE ? || ':%'",
-            (prefix,),
+            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
+            "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
+            (escape_like(prefix),),
         ).fetchone()
         counts[prefix] = row[0]
     return counts
