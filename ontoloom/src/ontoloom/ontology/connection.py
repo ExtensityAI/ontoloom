@@ -21,6 +21,74 @@ def _apply_pragmas(conn: sqlite3.Connection):
     conn.autocommit = was_autocommit
 
 
+def _migrate(conn: sqlite3.Connection):
+    """Migrate schema for databases created before v3. Idempotent."""
+    was_autocommit = conn.autocommit
+    conn.autocommit = True
+
+    # Events: add new columns and expand CHECK constraint
+    event_cols = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
+    if "replaces_hash" not in event_cols:
+        conn.execute("ALTER TABLE events RENAME TO _events_old")
+        conn.execute(
+            "CREATE TABLE events ("
+            "  sequence_id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  session_id TEXT,"
+            "  op TEXT NOT NULL CHECK (op IN ('add', 'del', 'replace', 'annotate')),"
+            "  axiom_hash TEXT NOT NULL,"
+            "  axiom_json BLOB,"
+            "  replaces_hash TEXT,"
+            "  annotation_diff TEXT,"
+            "  batch_id TEXT,"
+            "  timestamp TEXT NOT NULL DEFAULT (datetime('now'))"
+            ")"
+        )
+        conn.execute(
+            "INSERT INTO events (sequence_id, session_id, op, axiom_hash, axiom_json, timestamp)"
+            " SELECT sequence_id, session_id, op, axiom_hash, axiom_json, timestamp FROM _events_old"
+        )
+        conn.execute("DROP TABLE _events_old")
+
+    # Axioms: remove source column
+    axiom_cols = {r[1] for r in conn.execute("PRAGMA table_info(axioms)")}
+    if "source" in axiom_cols:
+        conn.execute("ALTER TABLE axioms RENAME TO _axioms_old")
+        conn.execute(
+            "CREATE TABLE axioms ("
+            "  id INTEGER PRIMARY KEY,"
+            "  hash TEXT NOT NULL UNIQUE,"
+            "  type TEXT NOT NULL,"
+            "  data BLOB NOT NULL"
+            ")"
+        )
+        conn.execute(
+            "INSERT INTO axioms (id, hash, type, data) SELECT id, hash, type, data FROM _axioms_old"
+        )
+        conn.execute("DROP TABLE _axioms_old")
+
+    # Selections: remove comment column
+    sel_cols = {r[1] for r in conn.execute("PRAGMA table_info(selections)")}
+    if "comment" in sel_cols:
+        conn.execute("ALTER TABLE selections RENAME TO _selections_old")
+        conn.execute(
+            "CREATE TABLE selections ("
+            "  name TEXT PRIMARY KEY,"
+            "  kind TEXT NOT NULL CHECK (kind IN ('axioms', 'entities')),"
+            "  hash TEXT NOT NULL,"
+            "  cardinality INTEGER NOT NULL,"
+            "  source TEXT NOT NULL,"
+            "  created_at TEXT NOT NULL DEFAULT (datetime('now'))"
+            ")"
+        )
+        conn.execute(
+            "INSERT INTO selections (name, kind, hash, cardinality, source, created_at)"
+            " SELECT name, kind, hash, cardinality, source, created_at FROM _selections_old"
+        )
+        conn.execute("DROP TABLE _selections_old")
+
+    conn.autocommit = was_autocommit
+
+
 class StoreNotOpenError(RuntimeError):
     pass
 
@@ -68,6 +136,7 @@ class Ontology:
     def __enter__(self) -> Self:
         self._conn = sqlite3.connect(str(self._path), autocommit=False)
         _apply_pragmas(self._conn)
+        _migrate(self._conn)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

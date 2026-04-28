@@ -19,10 +19,11 @@ def populate(ont: Ontology, axiom: Axiom, axiom_id: int) -> None:
     text_rows = []
     seen_iris: set[str] = set()
 
-    for iri, role in iter_axiom_entities(axiom):
+    for iri, role, position in iter_axiom_entities(axiom):
         iri_str = str(iri)
         role_val = role.value if isinstance(role, EntityType) else role
-        entity_rows.append((axiom_id, iri_str, role_val))
+        pos_val = position.value if position is not None else None
+        entity_rows.append((axiom_id, iri_str, role_val, pos_val))
         if iri_str not in seen_iris:
             seen_iris.add(iri_str)
             text_rows.append((axiom_id, iri_str, iri.local_name, _LOCAL_NAME))
@@ -38,7 +39,7 @@ def populate(ont: Ontology, axiom: Axiom, axiom_id: int) -> None:
         )
 
     ont.conn.executemany(
-        "INSERT INTO axiom_entities (axiom_id, entity_iri, role) VALUES (?, ?, ?)",
+        "INSERT INTO axiom_entities (axiom_id, entity_iri, role, position) VALUES (?, ?, ?, ?)",
         entity_rows,
     )
     ont.conn.executemany(

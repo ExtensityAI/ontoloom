@@ -1,3 +1,4 @@
+import json
 import re
 from collections import Counter
 
@@ -13,23 +14,34 @@ from ontoloom.ontology.errors import (
 from ontoloom.ontology.indexes import _extract_annotation_value, populate
 from ontoloom.ontology.load import load_axiom
 from ontoloom.ontology.models.axioms import Axiom
-from ontoloom.ontology.models.literals import IRI, Annotation
-from ontoloom.ontology.types import AddResult, HashedAxiom, RemoveResult, SearchPage, SelectionKind
+from ontoloom.ontology.models.literals import Annotation
+from ontoloom.ontology.types import (
+    AddResult,
+    HashedAxiom,
+    RemoveResult,
+    RenameResult,
+    ReplaceResult,
+    SelectionKind,
+)
 
 _HEX_RE = re.compile(r"^[0-9a-f]+$")
 
 
-def _log_event(ont: Ontology, op: str, axiom_hash: str, axiom_json: str | None = None):
-    if axiom_json is not None:
-        ont.conn.execute(
-            "INSERT INTO events (session_id, op, axiom_hash, axiom_json) VALUES (?, ?, ?, jsonb(?))",
-            (ont.session_id, op, axiom_hash, axiom_json),
-        )
-    else:
-        ont.conn.execute(
-            "INSERT INTO events (session_id, op, axiom_hash) VALUES (?, ?, ?)",
-            (ont.session_id, op, axiom_hash),
-        )
+def _log_event(
+    ont: Ontology,
+    op: str,
+    axiom_hash: str,
+    axiom_json: str | None = None,
+    *,
+    replaces_hash: str | None = None,
+    annotation_diff: str | None = None,
+    batch_id: str | None = None,
+):
+    ont.conn.execute(
+        "INSERT INTO events (session_id, op, axiom_hash, axiom_json, replaces_hash, annotation_diff, batch_id)"
+        " VALUES (?, ?, ?, jsonb(?), ?, ?, ?)",
+        (ont.session_id, op, axiom_hash, axiom_json, replaces_hash, annotation_diff, batch_id),
+    )
 
 
 def add(ont: Ontology, axioms: list[Axiom]) -> AddResult:
@@ -85,7 +97,7 @@ def remove_by_hash(ont: Ontology, hash_prefixes: list[str]) -> RemoveResult:
             to_remove.append(HashedAxiom(axiom=axiom, hash=full_hash))
 
         for ha in to_remove:
-            _log_event(ont, "del", ha.hash)
+            _log_event(ont, "del", ha.hash, ha.axiom.model_dump_json())
             ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (ha.hash,))
 
     return RemoveResult(removed=to_remove)
@@ -101,16 +113,15 @@ def remove_by_selection(
             name=name, expected="axioms", actual=sel.kind, operation="rm_axioms"
         )
 
-    items = [
-        r[0]
-        for r in ont.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", (name,)
-        )
-    ]
-
     removed: list[HashedAxiom] = []
     absent = 0
     with ont.conn:
+        items = [
+            r[0]
+            for r in ont.conn.execute(
+                "SELECT item FROM selection_items WHERE selection_name = ?", (name,)
+            )
+        ]
         for h in items:
             row = ont.conn.execute(
                 "SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)
@@ -120,7 +131,7 @@ def remove_by_selection(
                 continue
             full_hash, json_data = row
             axiom = load_axiom(json_data, f"axiom {full_hash[:8]} in remove_by_selection")
-            _log_event(ont, "del", full_hash)
+            _log_event(ont, "del", full_hash, json_data)
             ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (full_hash,))
             removed.append(HashedAxiom(axiom=axiom, hash=full_hash))
 
@@ -163,9 +174,15 @@ def annotate(
         updated = axiom.model_copy(update={"annotations": tuple(current)})
         new_json = updated.model_dump_json()
 
-        _log_event(ont, "del", full_hash)
         ont.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, axiom_id))
-        _log_event(ont, "add", full_hash, new_json)
+
+        original = set(axiom.annotations)
+        final = set(current)
+        actually_added = [a.model_dump() for a in final - original]
+        actually_removed = [a.model_dump() for a in original - final]
+        if actually_added or actually_removed:
+            diff = json.dumps({"added": actually_added, "removed": actually_removed})
+            _log_event(ont, "annotate", full_hash, annotation_diff=diff)
 
         ont.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
         ont.conn.executemany(
@@ -179,144 +196,152 @@ def annotate(
     return HashedAxiom(axiom=updated, hash=full_hash)
 
 
-def _build_axiom_search(
-    ont: Ontology,
-    *,
-    iri: IRI | None = None,
-    axiom_types: list[str] | None = None,
-    annotation_query: str | None = None,
-    annotation_properties: list[str] | None = None,
-    entity_query: str | None = None,
-    within_selection: str | None = None,
-) -> tuple[str, list[str | int]]:
-    """Build the FROM...WHERE clause for axiom searches."""
-    joins: list[str] = []
-    conditions: list[str] = []
-    params: list[str | int] = []
+def replace(ont: Ontology, old_hash_prefix: str, new_axiom: Axiom) -> ReplaceResult:
+    """Atomic delete+add with event tracking.
 
-    if within_selection is not None:
-        sel = selections.get_info(ont, within_selection)
-        if sel.kind == SelectionKind.AXIOMS:
-            joins.append(
-                "JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
-            )
-            params.append(within_selection)
-        else:  # entities
-            joins.append("JOIN axiom_entities ae_w ON ae_w.axiom_id = a.id")
-            joins.append(
-                "JOIN selection_items si_w ON si_w.item = ae_w.entity_iri AND si_w.selection_name = ?"
-            )
-            params.append(within_selection)
-
-    if iri is not None:
-        joins.append("JOIN axiom_entities ae ON ae.axiom_id = a.id")
-        conditions.append("ae.entity_iri = ?")
-        params.append(str(iri))
-
-    if annotation_query is not None:
-        joins.append("JOIN axiom_text at ON at.axiom_id = a.id")
-        conditions.append("INSTR(at.text, ?) > 0")
-        params.append(annotation_query)
-
-    if annotation_properties:
-        joins.append("JOIN entity_text et ON et.axiom_id = a.id")
-        placeholders = ",".join("?" for _ in annotation_properties)
-        conditions.append(f"et.property IN ({placeholders})")
-        params.extend(annotation_properties)
-
-    if entity_query is not None:
-        joins.append("JOIN axiom_entities ae_eq ON ae_eq.axiom_id = a.id")
-        conditions.append(
-            "ae_eq.entity_iri IN ("
-            "SELECT DISTINCT entity_iri FROM entity_text "
-            "WHERE INSTR(LOWER(text), LOWER(?)) > 0"
-            ")"
-        )
-        params.append(entity_query)
-
-    if axiom_types:
-        placeholders = ",".join("?" for _ in axiom_types)
-        conditions.append(f"a.type IN ({placeholders})")
-        params.extend(axiom_types)
-
-    join_clause = (" " + " ".join(joins)) if joins else ""
-    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
-    base = f"FROM axioms a{join_clause}{where}"
-    return base, params
-
-
-def search(
-    ont: Ontology,
-    *,
-    iri: IRI | None = None,
-    axiom_types: list[str] | None = None,
-    annotation_query: str | None = None,
-    annotation_properties: list[str] | None = None,
-    entity_query: str | None = None,
-    within_selection: str | None = None,
-    limit: int = 50,
-    offset: int = 0,
-) -> SearchPage:
-    """Paginated axiom search with optional filters.
-
-    within_selection: scope to a named selection. Entity selection restricts to axioms
-    mentioning those entities; axiom selection restricts to those specific axioms.
+    No-op if new content hashes to the same value as old.
+    If new hash matches a different existing axiom: old is deleted, add is skipped,
+    event records the mapping.
     """
-    base, params = _build_axiom_search(
-        ont,
-        iri=iri,
-        axiom_types=axiom_types,
-        annotation_query=annotation_query,
-        annotation_properties=annotation_properties,
-        entity_query=entity_query,
-        within_selection=within_selection,
-    )
+    if not _HEX_RE.match(old_hash_prefix):
+        raise InvalidHashError(old_hash_prefix)
 
-    total = ont.conn.execute(f"SELECT COUNT(DISTINCT a.id) {base}", params).fetchone()[0]
+    new_h = axiom_hash(new_axiom)
 
-    axioms = [
-        HashedAxiom(axiom=load_axiom(data, f"axiom {h[:8]} in search"), hash=h)
-        for h, data in ont.conn.execute(
-            f"SELECT DISTINCT a.hash, json(a.data) {base} ORDER BY a.id LIMIT ? OFFSET ?",
-            [*params, limit, offset],
+    with ont.conn:
+        rows = ont.conn.execute(
+            "SELECT id, hash, json(data) FROM axioms WHERE hash LIKE ? || '%'",
+            (old_hash_prefix,),
+        ).fetchall()
+        if not rows:
+            raise AxiomNotFoundError(old_hash_prefix)
+        if len(rows) > 1:
+            samples = [r[1][:8] for r in rows]
+            raise AmbiguousHashError(old_hash_prefix, len(rows), samples)
+
+        old_id, old_full_hash, _old_json = rows[0]
+
+        if new_h == old_full_hash:
+            return ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=True)
+
+        # Delete old
+        ont.conn.execute("DELETE FROM axioms WHERE id = ?", (old_id,))
+
+        # Add new (idempotent — may already exist)
+        new_json = new_axiom.model_dump_json()
+        cursor = ont.conn.execute(
+            "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
+            (new_h, new_axiom.type, new_json),
         )
-    ]
+        if cursor.rowcount > 0:
+            new_id = cursor.lastrowid
+            if new_id is None:
+                msg = "INSERT succeeded but lastrowid is None"
+                raise RuntimeError(msg)
+            populate(ont, new_axiom, new_id)
 
-    return SearchPage(axioms=axioms, total=total)
+        _log_event(
+            ont,
+            "replace",
+            new_h,
+            new_json,
+            replaces_hash=old_full_hash,
+        )
+
+    return ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=False)
 
 
-def collect_hashes(
+def rename_iri(
     ont: Ontology,
+    old_iri: str,
+    new_iri: str,
     *,
-    iri: IRI | None = None,
-    axiom_types: list[str] | None = None,
-    annotation_query: str | None = None,
-    annotation_properties: list[str] | None = None,
-    entity_query: str | None = None,
-    within_selection: str | None = None,
-) -> list[str]:
-    """Return all matching axiom hashes (no data deserialization). For select workflows."""
-    base, params = _build_axiom_search(
-        ont,
-        iri=iri,
-        axiom_types=axiom_types,
-        annotation_query=annotation_query,
-        annotation_properties=annotation_properties,
-        entity_query=entity_query,
-        within_selection=within_selection,
-    )
-    return [r[0] for r in ont.conn.execute(f"SELECT DISTINCT a.hash {base}", params)]
+    within: str | None = None,
+) -> RenameResult:
+    """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id."""
+    import uuid
+
+    batch = uuid.uuid4().hex[:12]
+
+    # Find axioms mentioning old_iri
+    if within is not None:
+        sel = selections.get_info(ont, within)
+        if sel.kind == SelectionKind.AXIOMS:
+            rows = ont.conn.execute(
+                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+                "WHERE ae.entity_iri = ?",
+                (within, old_iri),
+            ).fetchall()
+        else:
+            rows = ont.conn.execute(
+                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                "WHERE ae.entity_iri = ?",
+                (old_iri,),
+            ).fetchall()
+    else:
+        rows = ont.conn.execute(
+            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+            "WHERE ae.entity_iri = ?",
+            (old_iri,),
+        ).fetchall()
+
+    if not rows:
+        return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=[], batch_id=batch)
+
+    results: list[ReplaceResult] = []
+    with ont.conn:
+        for old_full_hash, old_json_data in rows:
+            # Replace IRI in the JSON and rebuild
+            new_json_str = old_json_data.replace(f'"{old_iri}"', f'"{new_iri}"')
+            new_axiom = load_axiom(new_json_str, f"rename {old_iri} -> {new_iri}")
+            new_h = axiom_hash(new_axiom)
+            new_json = new_axiom.model_dump_json()
+
+            if new_h == old_full_hash:
+                results.append(ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=True))
+                continue
+
+            # Delete old
+            ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
+
+            # Add new (idempotent)
+            cursor = ont.conn.execute(
+                "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
+                (new_h, new_axiom.type, new_json),
+            )
+            if cursor.rowcount > 0:
+                new_id = cursor.lastrowid
+                if new_id is None:
+                    msg = "INSERT succeeded but lastrowid is None"
+                    raise RuntimeError(msg)
+                populate(ont, new_axiom, new_id)
+
+            _log_event(
+                ont,
+                "replace",
+                new_h,
+                new_json,
+                replaces_hash=old_full_hash,
+                batch_id=batch,
+            )
+            results.append(ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=False))
+
+    return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=results, batch_id=batch)
 
 
-def summary(ont: Ontology, *, within_selection: str | None = None) -> Counter[str]:
-    if within_selection is None:
+def summary(ont: Ontology, *, within: str | None = None) -> Counter[str]:
+    if within is None:
         return Counter(
             {
                 r[0]: r[1]
                 for r in ont.conn.execute("SELECT type, COUNT(*) FROM axioms GROUP BY type")
             }
         )
-    sel = selections.get_info(ont, within_selection)
+    sel = selections.get_info(ont, within)
     if sel.kind == SelectionKind.AXIOMS:
         return Counter(
             {
@@ -325,7 +350,7 @@ def summary(ont: Ontology, *, within_selection: str | None = None) -> Counter[st
                     "SELECT a.type, COUNT(*) FROM axioms a "
                     "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
                     "GROUP BY a.type",
-                    (within_selection,),
+                    (within,),
                 )
             }
         )
@@ -338,7 +363,7 @@ def summary(ont: Ontology, *, within_selection: str | None = None) -> Counter[st
                 "JOIN axiom_entities ae ON ae.axiom_id = a.id "
                 "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
                 "GROUP BY a.type",
-                (within_selection,),
+                (within,),
             )
         }
     )

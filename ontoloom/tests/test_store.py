@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from ontoloom.ontology import axioms, entities, export, prefixes
+from ontoloom.ontology import axioms, entities, export, prefixes, selections
 from ontoloom.ontology.canonical import axiom_hash
 from ontoloom.ontology.connection import Ontology, StoreNotOpenError
 from ontoloom.ontology.errors import (
@@ -18,8 +18,9 @@ from ontoloom.ontology.models.axioms import (
     SubClassOf,
 )
 from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.expressions import NamedClass
+from ontoloom.ontology.models.expressions import NamedClass, ObjectSomeValuesFrom
 from ontoloom.ontology.models.literals import IRI, Annotation, LangLiteral
+from ontoloom.ontology.types import Position, SelectionKind
 
 
 @pytest.fixture()
@@ -107,11 +108,6 @@ def test_annotate_axiom_updates_in_place(ont):
     assert len(updated.axiom.annotations) == 1
     assert updated.axiom.annotations[0].value.value == "important"
 
-    page = axioms.search(ont, iri=IRI("ex:Dog"), axiom_types=["SubClassOf"])
-    found = [ha for ha in page.axioms if ha.hash == h]
-    assert len(found) == 1
-    assert len(found[0].axiom.annotations) == 1
-
 
 def test_annotate_axiom_remove(ont):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
@@ -176,10 +172,9 @@ def test_events_logged_on_annotate(ont):
     cur = ont.conn.cursor()
     cur.execute("SELECT op, axiom_hash FROM events ORDER BY sequence_id")
     events = cur.fetchall()
-    assert len(events) == 3
+    assert len(events) == 2
     assert events[0] == ("add", h)
-    assert events[1] == ("del", h)
-    assert events[2] == ("add", h)
+    assert events[1] == ("annotate", h)
 
 
 def test_session_id_set(ont):
@@ -268,55 +263,6 @@ def test_search_entities_no_filters(populated):
     assert page.total >= 5
 
 
-# -- search_axioms --
-
-
-def test_search_axioms_by_iri(populated):
-    page = axioms.search(populated, iri=IRI("ex:Dog"), limit=50, offset=0)
-    assert page.total > 0
-
-
-def test_search_axioms_by_type(populated):
-    page = axioms.search(populated, axiom_types=["Declaration"], limit=50, offset=0)
-    assert all(ha.axiom.type == "Declaration" for ha in page.axioms)
-    assert page.total == 5
-
-
-def test_search_axioms_by_iri_and_type(populated):
-    page = axioms.search(
-        populated, iri=IRI("ex:Dog"), axiom_types=["SubClassOf"], limit=50, offset=0
-    )
-    assert all(ha.axiom.type == "SubClassOf" for ha in page.axioms)
-    assert page.total >= 1
-
-
-def test_search_axioms_by_annotation_query(ont):
-    ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
-        annotations=(
-            Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="reviewed by expert")),
-        ),
-    )
-    axioms.add(ont, [ax])
-    page = axioms.search(ont, annotation_query="expert", limit=50, offset=0)
-    assert page.total >= 1
-
-
-def test_search_axioms_no_filters(populated):
-    page = axioms.search(populated, limit=100, offset=0)
-    assert page.total == 8
-
-
-def test_search_axioms_pagination(populated):
-    page1 = axioms.search(populated, limit=3, offset=0)
-    page2 = axioms.search(populated, limit=3, offset=3)
-    hashes1 = {ha.hash for ha in page1.axioms}
-    hashes2 = {ha.hash for ha in page2.axioms}
-    assert len(hashes1 & hashes2) == 0
-    assert page1.total == page2.total
-
-
 # -- Export JSONL --
 
 
@@ -402,23 +348,6 @@ def test_remove_ambiguous_prefix_raises(ont):
 
 
 # -- annotate searchability --
-
-
-def test_annotate_axiom_searchable_via_annotation_query(ont):
-    """After annotating, the axiom should be findable via search_axioms annotation_query."""
-    ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
-    )
-    result = axioms.add(ont, [ax])
-    h = result.added[0].hash
-
-    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="veterinary review"))
-    axioms.annotate(ont, h, add_annotations=[ann])
-
-    page = axioms.search(ont, annotation_query="veterinary")
-    assert page.total >= 1
-    assert any(ha.hash == h for ha in page.axioms)
 
 
 # -- export roundtrip --
@@ -543,8 +472,8 @@ def test_batch_remove_rollback_on_failure(ont):
         axioms.remove_by_hash(ont, [h[:8], "deadbeef"])
 
     # The first axiom should still exist (rollback)
-    page = axioms.search(ont, limit=10)
-    assert page.total == 1
+    count = ont.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
+    assert count == 1
 
 
 # -- Hash prefix validation --
@@ -553,3 +482,129 @@ def test_batch_remove_rollback_on_failure(ont):
 def test_remove_rejects_non_hex_prefix(ont):
     with pytest.raises(InvalidHashError):
         axioms.remove_by_hash(ont, ["not*hex"])
+
+
+# -- Selection: entities_in with field (position filter) --
+
+
+@pytest.fixture()
+def axiom_selection(ont):
+    """Create an axiom selection containing SubClassOf and ObjectSomeValuesFrom axioms."""
+    result = axioms.add(
+        ont,
+        [
+            SubClassOf(
+                sub_class=NamedClass(iri=IRI("ex:Dog")),
+                super_class=NamedClass(iri=IRI("ex:Animal")),
+            ),
+            SubClassOf(
+                sub_class=NamedClass(iri=IRI("ex:Cat")),
+                super_class=ObjectSomeValuesFrom(
+                    property=IRI("ex:hasOwner"),
+                    filler=NamedClass(iri=IRI("ex:Person")),
+                ),
+            ),
+        ],
+    )
+    hashes = [ha.hash for ha in result.added]
+    selections.write(ont, "ax_sel", SelectionKind.AXIOMS, hashes, "test")
+    return ont
+
+
+def test_entities_in_with_field_sub_class(axiom_selection):
+    selections.create(
+        axiom_selection, "sub_classes", entities_in="ax_sel", field=Position.SUB_CLASS
+    )
+    items = [
+        r[0]
+        for r in axiom_selection.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", ("sub_classes",)
+        )
+    ]
+    assert set(items) == {"ex:Dog", "ex:Cat"}
+
+
+def test_entities_in_with_field_super_class(axiom_selection):
+    selections.create(
+        axiom_selection, "super_classes", entities_in="ax_sel", field=Position.SUPER_CLASS
+    )
+    items = [
+        r[0]
+        for r in axiom_selection.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", ("super_classes",)
+        )
+    ]
+    # Only the first SubClassOf has a named super_class (ex:Animal).
+    # The second has ObjectSomeValuesFrom — no entity in super_class position.
+    assert set(items) == {"ex:Animal"}
+
+
+def test_entities_in_with_field_filler(axiom_selection):
+    selections.create(axiom_selection, "fillers", entities_in="ax_sel", field=Position.FILLER)
+    items = [
+        r[0]
+        for r in axiom_selection.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", ("fillers",)
+        )
+    ]
+    assert set(items) == {"ex:Person"}
+
+
+def test_entities_in_without_field(axiom_selection):
+    selections.create(axiom_selection, "all_ents", entities_in="ax_sel")
+    items = [
+        r[0]
+        for r in axiom_selection.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", ("all_ents",)
+        )
+    ]
+    # All entities across both axioms, any position
+    assert "ex:Dog" in items
+    assert "ex:Cat" in items
+    assert "ex:Animal" in items
+    assert "ex:Person" in items
+    assert "ex:hasOwner" in items
+
+
+# -- Prefix usage counts --
+
+
+def test_prefix_usage_counts(ont):
+    prefixes.set(ont, "ex", "http://example.org/")
+    prefixes.set(ont, "other", "http://other.org/")
+    prefixes.set(ont, "unused", "http://unused.org/")
+
+    axioms.add(
+        ont,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("other:Fish")),
+        ],
+    )
+
+    counts = prefixes.usage_counts(ont)
+    assert counts["ex"] == 2
+    assert counts["other"] == 1
+    assert counts["unused"] == 0
+
+
+# -- CURIE validation --
+
+
+def test_validate_curie_valid(ont):
+    prefixes.set(ont, "ex", "http://example.org/")
+    prefixes.validate_curie(ont, "ex:Dog")  # should not raise
+
+
+def test_validate_curie_invalid(ont):
+    prefixes.set(ont, "GO", "http://purl.obolibrary.org/obo/GO_")
+    prefixes.set(ont, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+
+    with pytest.raises(ValueError, match="Unknown prefix 'GO_'"):
+        prefixes.validate_curie(ont, "GO_:0005634")
+
+
+def test_validate_curie_full_uri_skipped(ont):
+    # Full URIs are not CURIEs — validation should be skipped
+    prefixes.validate_curie(ont, "http://example.org/Dog")  # should not raise

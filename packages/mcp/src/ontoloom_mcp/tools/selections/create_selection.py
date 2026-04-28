@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.ontology.types import Position, SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -15,6 +15,7 @@ def create_selection(
     difference: list[SelectionName] | None = None,
     axioms_for: SelectionName | None = None,
     entities_in: SelectionName | None = None,
+    field: Position | None = None,
 ):
     """Create a selection from set algebra or kind conversion.
 
@@ -30,6 +31,8 @@ def create_selection(
       Use after entity search to shift focus to axiom-level operations.
     - `entities_in`: Given an axiom selection, extract all entities mentioned in those axioms.
       Use after axiom search to explore or annotate the involved entities.
+      Use `field` to extract only entities at a specific structural position
+      (e.g., field="sub_class" to get only subclasses, field="filler" for restriction fillers).
 
     Overwrites if name exists. Kind is inferred from the operation.
 
@@ -37,7 +40,7 @@ def create_selection(
     - "Everything except": search -> select "all", search -> select "exclude",
       create_selection(difference=["all", "exclude"])
     - "Narrow progressively": search_entities -> select, create_selection(axioms_for=...),
-      then search_axioms(within=...) for further filtering
+      then match_axioms(within=...) for further filtering
     """
     with Ontology(path) as ont:
         content_hash, cardinality, old_cardinality = selections.create(
@@ -48,6 +51,7 @@ def create_selection(
             difference=difference,
             axioms_for=axioms_for,
             entities_in=entities_in,
+            field=field,
         )
 
         if union or intersection or difference:

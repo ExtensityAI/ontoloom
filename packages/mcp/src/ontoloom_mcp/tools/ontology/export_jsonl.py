@@ -17,7 +17,7 @@ def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionName | 
     Use for archival, sharing, or version control snapshots.
     """
     with Ontology(path) as ont:
-        count = export.to_jsonl(ont, output_path, within_selection=within)
+        count = export.to_jsonl(ont, output_path, within=within)
         if within:
             return f"Exported {count} axioms from selection {within!r} to `{output_path}`."
         return f"Exported {count} axioms to `{output_path}`."

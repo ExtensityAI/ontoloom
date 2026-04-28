@@ -7,13 +7,11 @@ CREATE TABLE IF NOT EXISTS metadata (
 -- Canonical axiom store. `hash` is a canonical hash of the axiom content and
 -- acts as the dedup key (INSERT OR IGNORE on add). `data` is JSONB so we can
 -- round-trip full Pydantic models without a relational schema per axiom type.
--- `source` distinguishes user-asserted axioms from reasoner-inferred ones.
 CREATE TABLE IF NOT EXISTS axioms (
     id INTEGER PRIMARY KEY,
     hash TEXT NOT NULL UNIQUE,
     type TEXT NOT NULL,
-    data BLOB NOT NULL,
-    source TEXT NOT NULL DEFAULT 'asserted' CHECK (source IN ('asserted', 'inferred'))
+    data BLOB NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_axioms_type ON axioms(type);
@@ -25,12 +23,15 @@ CREATE INDEX IF NOT EXISTS idx_axioms_type ON axioms(type);
 CREATE TABLE IF NOT EXISTS axiom_entities (
     axiom_id INTEGER NOT NULL REFERENCES axioms(id) ON DELETE CASCADE,
     entity_iri TEXT NOT NULL,
-    role TEXT
+    role TEXT,
+    position TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri ON axiom_entities(entity_iri);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_role ON axiom_entities(entity_iri, role);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom ON axiom_entities(axiom_id);
+CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_pos ON axiom_entities(entity_iri, position, axiom_id);
+CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom_pos ON axiom_entities(axiom_id, position);
 
 -- Derived text index keyed to a specific entity: the entity's local_name plus
 -- any AnnotationAssertion values targeting it (labels, comments, ...). Used
@@ -60,15 +61,20 @@ CREATE INDEX IF NOT EXISTS idx_axiom_text_axiom ON axiom_text(axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_text ON axiom_text(text);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_property ON axiom_text(property);
 
--- Append-only event log of add/del operations, tagged by session. `axiom_json`
--- is captured on 'add' (as JSONB) so events are self-contained for replay even
--- after the axiom is deleted; 'del' events only need the hash.
+-- Append-only event log of all mutations, tagged by session. `axiom_json`
+-- is stored on add, del, and replace so events are self-contained for revert.
+-- `replaces_hash` links replace events to the axiom they replaced.
+-- `annotation_diff` stores JSON diff for annotate events.
+-- `batch_id` groups related events (e.g., rename_iri) for atomic revert.
 CREATE TABLE IF NOT EXISTS events (
     sequence_id INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT,
-    op TEXT NOT NULL CHECK (op IN ('add', 'del')),
+    op TEXT NOT NULL CHECK (op IN ('add', 'del', 'replace', 'annotate')),
     axiom_hash TEXT NOT NULL,
     axiom_json BLOB,
+    replaces_hash TEXT,
+    annotation_diff TEXT,
+    batch_id TEXT,
     timestamp TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

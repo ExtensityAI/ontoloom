@@ -1,0 +1,48 @@
+from ontoloom.ontology import history
+from ontoloom.ontology.connection import Ontology
+
+from ontoloom_mcp.components.tool import create_tool
+from ontoloom_mcp.components.types import OntologyPath
+
+
+def show_changes(
+    path: OntologyPath,
+    session: str | None = None,
+):
+    """Show what changed in the current session (or a specified session).
+
+    Lists all mutation events: adds, deletes, replaces, annotation edits.
+    Replace events show old→new hash mapping. Grouped by batch where applicable.
+    """
+    with Ontology(path) as ont:
+        events = history.show_changes(ont, session_id=session)
+
+    if not events:
+        return "No changes in this session."
+
+    lines: list[str] = []
+    current_batch: str | None = None
+
+    for ev in events:
+        if ev.batch_id and ev.batch_id != current_batch:
+            current_batch = ev.batch_id
+            lines.append(f"\n[batch {ev.batch_id[:8]}]")
+        elif not ev.batch_id and current_batch is not None:
+            current_batch = None
+            lines.append("")
+
+        match ev.op:
+            case "add":
+                lines.append(f"  + [{ev.axiom_hash[:8]}] added")
+            case "del":
+                lines.append(f"  - [{ev.axiom_hash[:8]}] deleted")
+            case "replace":
+                old = ev.replaces_hash[:8] if ev.replaces_hash else "?"
+                lines.append(f"  ~ [{old}] → [{ev.axiom_hash[:8]}]")
+            case "annotate":
+                lines.append(f"  @ [{ev.axiom_hash[:8]}] annotated")
+
+    return f"{len(events)} events:\n" + "\n".join(lines)
+
+
+tool_show_changes = create_tool(show_changes, name="show_changes")

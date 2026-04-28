@@ -11,6 +11,54 @@ MatchSource = Literal["iri", "annotation", "list"]
 MatchQuality = Literal["exact", "substring"]
 
 
+class Position(StrEnum):
+    """Structural role an entity plays within an axiom.
+
+    18 values: 17 stored in axiom_entities.position + ANY (query-time only).
+    """
+
+    # Query-time only (never stored in DB)
+    ANY = "any"
+
+    # SubClassOf — named superclass
+    SUB_CLASS = "sub_class"
+    SUPER_CLASS = "super_class"
+
+    # Class expression restrictions (ObjectSomeValuesFrom, ObjectHasValue, etc.)
+    RESTRICTION_PROPERTY = "restriction_property"
+    FILLER = "filler"
+
+    # Sub*PropertyOf
+    SUB_PROPERTY = "sub_property"
+    SUPER_PROPERTY = "super_property"
+
+    # SubObjectPropertyOfChain
+    CHAIN_MEMBER = "chain_member"
+
+    # AnnotationAssertion
+    SUBJECT = "subject"
+    PROPERTY = "property"
+    VALUE = "value"
+
+    # *Domain / *Range
+    DOMAIN = "domain"
+    RANGE = "range"
+
+    # ObjectPropertyAssertion
+    SOURCE = "source"
+    TARGET = "target"
+
+    # ClassAssertion
+    INDIVIDUAL = "individual"
+    CLASS = "class"
+
+    # EquivalentClasses, DisjointClasses, SameIndividual, DifferentIndividuals
+    MEMBER = "member"
+
+    # Declaration
+    ENTITY = "entity"
+
+
 class SelectionKind(StrEnum):
     """Named sets saved from search results for later operations.
 
@@ -98,12 +146,6 @@ class HashedAxiom:
 
 
 @dataclass
-class SearchPage:
-    axioms: list[HashedAxiom]
-    total: int
-
-
-@dataclass
 class AddResult:
     added: list[HashedAxiom]
     skipped: list[HashedAxiom]
@@ -112,3 +154,25 @@ class AddResult:
 @dataclass
 class RemoveResult:
     removed: list[HashedAxiom]
+
+
+@dataclass
+class DuplicateResult:
+    groups: list[tuple[str, list[str]]]
+    total_groups: int
+    affected_iris: list[str]
+
+
+@dataclass
+class ReplaceResult:
+    old_hash: str
+    new_hash: str
+    was_noop: bool  # True if new_hash == old_hash
+
+
+@dataclass
+class RenameResult:
+    old_iri: str
+    new_iri: str
+    replaced: list[ReplaceResult]
+    batch_id: str

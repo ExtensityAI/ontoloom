@@ -1,7 +1,7 @@
-"""Exhaustive smoke test for search_entities and search_axioms.
+"""Exhaustive smoke test for search_entities.
 
 Builds a realistic ontology with diverse axiom types, then verifies that
-every entity and axiom is discoverable through all applicable search paths.
+every entity is discoverable through the applicable search paths.
 """
 
 import tempfile
@@ -104,18 +104,6 @@ def _search_entities_role(ont: Ontology, role: str) -> set[str]:
 def _search_entities_ns(ont: Ontology, namespace: str) -> set[str]:
     page = entities.search(ont, namespace=namespace, limit=1000)
     return {str(m.iri) for m in page.matches}
-
-
-def _search_axioms_iri(ont: Ontology, iri: str) -> list:
-    return axioms.search(ont, iri=IRI(iri), limit=1000).axioms
-
-
-def _search_axioms_type(ont: Ontology, axiom_type: str) -> list:
-    return axioms.search(ont, axiom_types=[axiom_type], limit=1000).axioms
-
-
-def _search_axioms_ann(ont: Ontology, query: str) -> list:
-    return axioms.search(ont, annotation_query=query, limit=1000).axioms
 
 
 # ---------------------------------------------------------------------------
@@ -519,157 +507,6 @@ class TestSearchEntitiesComprehensive:
         assert len(collected) == full.total
 
 
-class TestSearchAxiomsComprehensive:
-    """Verify every axiom is findable through all applicable search paths."""
-
-    def test_all_axiom_types_searchable(self, ont):
-        result = axioms.add(ont, AXIOMS)
-        added_types = {ha.axiom.type for ha in result.added}
-
-        for axiom_type in added_types:
-            found = _search_axioms_type(ont, axiom_type)
-            assert len(found) > 0, f"No axioms found for type {axiom_type}"
-
-    def test_search_by_each_axiom_type_count(self, ont):
-        axioms.add(ont, AXIOMS)
-        expected_type_counts = {}
-        for ax in AXIOMS:
-            expected_type_counts[ax.type] = expected_type_counts.get(ax.type, 0) + 1
-
-        for axiom_type, expected in expected_type_counts.items():
-            found = _search_axioms_type(ont, axiom_type)
-            assert len(found) == expected, (
-                f"Type {axiom_type}: expected {expected}, got {len(found)}"
-            )
-
-    def test_search_axioms_by_iri_finds_all_mentioning_axioms(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # :Dog appears in: 2 Declarations? No, 1. Plus labels, SubClassOf, DisjointClasses, ClassAssertion
-        dog_axioms = _search_axioms_iri(ont, ":Dog")
-        dog_types = {ha.axiom.type for ha in dog_axioms}
-        assert "Declaration" in dog_types
-        assert "AnnotationAssertion" in dog_types
-        assert "SubClassOf" in dog_types
-        assert "DisjointClasses" in dog_types
-
-        # :Alice appears in many ABox axioms
-        alice_axioms = _search_axioms_iri(ont, ":Alice")
-        alice_types = {ha.axiom.type for ha in alice_axioms}
-        assert "Declaration" in alice_types
-        assert "AnnotationAssertion" in alice_types
-        assert "ClassAssertion" in alice_types
-        assert "ObjectPropertyAssertion" in alice_types
-        assert "NegativeObjectPropertyAssertion" in alice_types
-        assert "DataPropertyAssertion" in alice_types
-        assert "NegativeDataPropertyAssertion" in alice_types
-        assert "DifferentIndividuals" in alice_types
-
-    def test_search_axioms_by_iri_for_properties(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # :hasPart appears in: Declaration, SubClassOf (via expression), TransitiveObjectProperty,
-        # ReflexiveObjectProperty
-        part_axioms = _search_axioms_iri(ont, ":hasPart")
-        part_types = {ha.axiom.type for ha in part_axioms}
-        assert "Declaration" in part_types
-        assert "TransitiveObjectProperty" in part_types
-        assert "ReflexiveObjectProperty" in part_types
-        assert "SubClassOf" in part_types  # via ObjectSomeValuesFrom
-
-    def test_search_axioms_by_iri_for_data_properties(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        age_axioms = _search_axioms_iri(ont, ":hasAge")
-        age_types = {ha.axiom.type for ha in age_axioms}
-        assert "Declaration" in age_types
-        assert "DataPropertyDomain" in age_types
-        assert "DataPropertyRange" in age_types
-        assert "FunctionalDataProperty" in age_types
-        assert "DataPropertyAssertion" in age_types
-        assert "NegativeDataPropertyAssertion" in age_types
-
-    def test_search_axioms_by_annotation_query(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # The SubClassOf(Dog, Mammal) has an axiom-level annotation "Dogs are mammals obviously"
-        found = _search_axioms_ann(ont, "mammals obviously")
-        assert len(found) == 1
-        assert found[0].axiom.type == "SubClassOf"
-
-    def test_search_axioms_combined_iri_and_type(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # :Dog SubClassOf axioms only
-        page = axioms.search(ont, iri=IRI(":Dog"), axiom_types=["SubClassOf"], limit=1000)
-        for ha in page.axioms:
-            assert ha.axiom.type == "SubClassOf"
-        assert len(page.axioms) >= 3  # Dog < Animal, Dog < Pet, Dog < Mammal
-
-    def test_search_axioms_combined_iri_and_annotation(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # Search :Dog axioms that also have annotation containing "mammals"
-        page = axioms.search(ont, iri=IRI(":Dog"), annotation_query="mammals", limit=1000)
-        assert len(page.axioms) == 1
-        assert page.axioms[0].axiom.type == "SubClassOf"
-
-    def test_search_axioms_combined_all_three(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        page = axioms.search(
-            ont,
-            iri=IRI(":Dog"),
-            axiom_types=["SubClassOf"],
-            annotation_query="mammals",
-            limit=1000,
-        )
-        assert len(page.axioms) == 1
-
-    def test_search_axioms_pagination(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        full = axioms.search(ont, limit=1000)
-        total = full.total
-        assert total == len(AXIOMS)
-
-        collected_hashes = set()
-        offset = 0
-        while True:
-            page = axioms.search(ont, limit=5, offset=offset)
-            if not page.axioms:
-                break
-            for ha in page.axioms:
-                collected_hashes.add(ha.hash)
-            offset += 5
-
-        assert len(collected_hashes) == total
-
-    def test_no_false_positives_type_filter(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # Searching for a type with no axioms returns empty
-        page = axioms.search(ont, axiom_types=["SubObjectPropertyOfChain"], limit=1000)
-        for ha in page.axioms:
-            assert ha.axiom.type == "SubObjectPropertyOfChain"
-
-    def test_search_axioms_by_iri_entity_in_expression_only(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # :Heart appears only inside an ObjectSomeValuesFrom expression
-        heart_axioms = _search_axioms_iri(ont, ":Heart")
-        assert len(heart_axioms) >= 1
-        assert any(ha.axiom.type == "SubClassOf" for ha in heart_axioms)
-
-    def test_search_axioms_by_iri_entity_in_chain(self, ont):
-        axioms.add(ont, AXIOMS)
-
-        # :hasBrother appears only in SubObjectPropertyOfChain
-        brother_axioms = _search_axioms_iri(ont, ":hasBrother")
-        assert len(brother_axioms) >= 1
-        assert any(ha.axiom.type == "SubObjectPropertyOfChain" for ha in brother_axioms)
-
-
 class TestGetEntityComprehensive:
     """Verify get_entity returns correct roles, annotations, and axiom counts."""
 
@@ -721,115 +558,222 @@ class TestGetEntityComprehensive:
         assert "AnnotationAssertion" not in info.axiom_counts
 
 
-class TestAnnotateAndSearch:
-    """Verify annotated axioms are searchable by annotation content."""
+class TestEnhancedEntitySearch:
+    """Tests for declared, properties, and exclude_deprecated filters."""
 
-    def test_annotate_then_search(self, ont):
+    def test_declared_true_list(self, ont):
         axioms.add(ont, AXIOMS)
+        page = entities.search(ont, declared=True, exclude_deprecated=False, limit=1000)
+        declared_iris = {str(m.iri) for m in page.matches}
+        # All Declaration IRIs should be present
+        for ax in AXIOMS:
+            if isinstance(ax, Declaration):
+                assert str(ax.iri) in declared_iris, f"{ax.iri} should be declared"
+        # Undeclared entities (only appear in expressions) should NOT be present
+        assert ":Heart" not in declared_iris
+        assert ":Rational" not in declared_iris
+        assert ":TheOne" not in declared_iris
 
-        # Find the Dog < Animal SubClassOf axiom
-        page = axioms.search(ont, iri=IRI(":Dog"), axiom_types=["SubClassOf"], limit=1000)
-        dog_animal = None
-        for ha in page.axioms:
-            ax = ha.axiom
-            if (
-                hasattr(ax, "sub_class")
-                and hasattr(ax.sub_class, "iri")
-                and str(ax.sub_class.iri) == ":Dog"
-                and hasattr(ax, "super_class")
-                and hasattr(ax.super_class, "iri")
-                and str(ax.super_class.iri) == ":Animal"
-            ):
-                dog_animal = ha
-                break
-        assert dog_animal is not None
+    def test_declared_false_list(self, ont):
+        axioms.add(ont, AXIOMS)
+        page = entities.search(ont, declared=False, exclude_deprecated=False, limit=1000)
+        undeclared_iris = {str(m.iri) for m in page.matches}
+        # Entities only referenced in expressions, never declared
+        assert ":Heart" in undeclared_iris
+        assert ":Rational" in undeclared_iris
+        assert ":TheOne" in undeclared_iris
+        # Declared entities should NOT appear
+        assert ":Dog" not in undeclared_iris
+        assert ":Alice" not in undeclared_iris
 
-        # Annotate it
-        axioms.annotate(
-            ont,
-            dog_animal.hash,
-            add_annotations=[
-                Annotation(
-                    property=IRI("rdfs:comment"),
-                    value=LangLiteral(value="canines are a subset of animals"),
-                )
-            ],
+    def test_declared_true_text_search(self, ont):
+        axioms.add(ont, AXIOMS)
+        # "has" matches many entities by local_name substring
+        page = entities.search(
+            ont, query="has", declared=True, exclude_deprecated=False, limit=1000
         )
+        iris = {str(m.iri) for m in page.matches}
+        # Declared properties with "has" in the name
+        assert ":hasAge" in iris
+        assert ":hasPart" in iris
+        # :hasCreator is NOT declared (only appears in ObjectHasValue expression)
+        assert ":hasCreator" not in iris
 
-        # Now search for it by annotation
-        found = _search_axioms_ann(ont, "canines are a subset")
-        assert len(found) == 1
-        assert found[0].hash == dog_animal.hash
-
-    def test_remove_annotation_then_search_fails(self, ont):
+    def test_declared_false_text_search(self, ont):
         axioms.add(ont, AXIOMS)
-
-        # The Dog < Mammal axiom already has an annotation
-        page = axioms.search(ont, iri=IRI(":Dog"), annotation_query="mammals obviously", limit=1000)
-        assert len(page.axioms) == 1
-        ha = page.axioms[0]
-
-        # Remove that annotation
-        axioms.annotate(
-            ont,
-            ha.hash,
-            remove_annotations=[
-                Annotation(
-                    property=IRI("rdfs:comment"),
-                    value=LangLiteral(value="Dogs are mammals obviously"),
-                )
-            ],
+        page = entities.search(
+            ont, query="has", declared=False, exclude_deprecated=False, limit=1000
         )
+        iris = {str(m.iri) for m in page.matches}
+        # :hasCreator is undeclared
+        assert ":hasCreator" in iris
+        # :hasAge is declared, should NOT appear
+        assert ":hasAge" not in iris
 
-        # Should no longer be findable
-        found = _search_axioms_ann(ont, "mammals obviously")
-        assert len(found) == 0
-
-
-class TestEdgeCases:
-    """Edge cases for search."""
-
-    def test_empty_store_search(self, ont):
-        page = entities.search(ont, query="anything", limit=50)
-        assert page.matches == []
-        assert page.total == 0
-
-    def test_empty_store_axiom_search(self, ont):
-        page = axioms.search(ont, limit=50)
-        assert page.axioms == []
-        assert page.total == 0
-
-    def test_no_results_query(self, ont):
+    def test_declared_none_returns_all(self, ont):
         axioms.add(ont, AXIOMS)
-        page = entities.search(ont, query="xyzzy_nonexistent_12345", limit=50)
-        assert page.matches == []
+        all_page = entities.search(ont, declared=None, exclude_deprecated=False, limit=1000)
+        all_iris = {str(m.iri) for m in all_page.matches}
+        # Both declared and undeclared
+        assert ":Dog" in all_iris
+        assert ":Heart" in all_iris
 
-    def test_case_insensitive_search(self, ont):
+    def test_properties_filter_with_query(self, ont):
         axioms.add(ont, AXIOMS)
-        # Search is case-insensitive
-        upper = _search_entities_text(ont, "DOG")
-        lower = _search_entities_text(ont, "Dog")
-        mixed = _search_entities_text(ont, "dOg")
-        assert ":Dog" in upper
-        assert ":Dog" in lower
-        assert ":Dog" in mixed
+        # "Dog" appears in rdfs:label and as local_name. Restrict annotation search to rdfs:label.
+        page = entities.search(
+            ont, query="Dog", properties=["rdfs:label"], exclude_deprecated=False, limit=1000
+        )
+        iris = {str(m.iri) for m in page.matches}
+        # :Dog has rdfs:label "Dog", so it should match
+        assert ":Dog" in iris
 
-    def test_search_with_colon_in_query(self, ont):
+    def test_properties_filter_excludes_non_matching(self, ont):
         axioms.add(ont, AXIOMS)
-        # Searching for a full IRI-like string
-        _search_entities_text(ont, ":Dog")
+        # "domesticated" appears in skos:definition for :Pet
+        # Restrict to rdfs:label only — should NOT find :Pet via annotation
+        page = entities.search(
+            ont,
+            query="domesticated",
+            properties=["rdfs:label"],
+            exclude_deprecated=False,
+            limit=1000,
+        )
+        iris = {str(m.iri) for m in page.matches}
+        assert ":Pet" not in iris
 
-    def test_multiple_axiom_types_filter(self, ont):
+    def test_properties_filter_skos_definition(self, ont):
         axioms.add(ont, AXIOMS)
-        page = axioms.search(ont, axiom_types=["SubClassOf", "DisjointClasses"], limit=1000)
-        types = {ha.axiom.type for ha in page.axioms}
-        assert types <= {"SubClassOf", "DisjointClasses"}
-        assert "SubClassOf" in types
-        assert "DisjointClasses" in types
+        # "domesticated" in skos:definition — should find :Pet
+        page = entities.search(
+            ont,
+            query="domesticated",
+            properties=["skos:definition"],
+            exclude_deprecated=False,
+            limit=1000,
+        )
+        iris = {str(m.iri) for m in page.matches}
+        assert ":Pet" in iris
 
-    def test_total_count_matches_actual(self, ont):
+    def test_properties_filter_no_query(self, ont):
         axioms.add(ont, AXIOMS)
-        page = axioms.search(ont, limit=1)
-        assert page.total == len(AXIOMS)
-        # Only 1 axiom returned but total is correct
-        assert len(page.axioms) == 1
+        # Without query: find entities that have skos:definition annotations
+        page = entities.search(
+            ont, properties=["skos:definition"], exclude_deprecated=False, limit=1000
+        )
+        iris = {str(m.iri) for m in page.matches}
+        # :Pet has skos:definition
+        assert ":Pet" in iris
+        # :Dog has rdfs:label but NOT skos:definition
+        assert ":Dog" not in iris
+
+    def test_exclude_deprecated_true(self, ont):
+        # Add the standard fixture plus a deprecated entity
+        extra = [
+            *AXIOMS,
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI(":Obsolete"),
+                value=LangLiteral(value="Obsolete Class"),
+            ),
+            AnnotationAssertion(
+                property=IRI("owl:deprecated"),
+                subject=IRI(":Obsolete"),
+                value=TypedLiteral(value="true"),
+            ),
+        ]
+        axioms.add(ont, extra)
+
+        # Default (exclude_deprecated=True): :Obsolete should be excluded
+        page = entities.search(ont, limit=1000)
+        iris = {str(m.iri) for m in page.matches}
+        assert ":Dog" in iris
+        assert ":Obsolete" not in iris
+
+    def test_exclude_deprecated_false(self, ont):
+        extra = [
+            *AXIOMS,
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
+            AnnotationAssertion(
+                property=IRI("owl:deprecated"),
+                subject=IRI(":Obsolete"),
+                value=TypedLiteral(value="true"),
+            ),
+        ]
+        axioms.add(ont, extra)
+
+        # exclude_deprecated=False: :Obsolete should be included
+        page = entities.search(ont, exclude_deprecated=False, limit=1000)
+        iris = {str(m.iri) for m in page.matches}
+        assert ":Obsolete" in iris
+
+    def test_exclude_deprecated_text_search(self, ont):
+        extra = [
+            *AXIOMS,
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI(":Obsolete"),
+                value=LangLiteral(value="Obsolete Class"),
+            ),
+            AnnotationAssertion(
+                property=IRI("owl:deprecated"),
+                subject=IRI(":Obsolete"),
+                value=TypedLiteral(value="true"),
+            ),
+        ]
+        axioms.add(ont, extra)
+
+        # Text search for "Obsolete" with exclude_deprecated=True
+        page = entities.search(ont, query="Obsolete", exclude_deprecated=True, limit=1000)
+        iris = {str(m.iri) for m in page.matches}
+        assert ":Obsolete" not in iris
+
+        # Text search with exclude_deprecated=False
+        page2 = entities.search(ont, query="Obsolete", exclude_deprecated=False, limit=1000)
+        iris2 = {str(m.iri) for m in page2.matches}
+        assert ":Obsolete" in iris2
+
+    def test_collect_iris_declared(self, ont):
+        axioms.add(ont, AXIOMS)
+        declared_iris = entities.collect_iris(ont, declared=True, exclude_deprecated=False)
+        assert ":Dog" in declared_iris
+        assert ":Heart" not in declared_iris
+
+        undeclared_iris = entities.collect_iris(ont, declared=False, exclude_deprecated=False)
+        assert ":Heart" in undeclared_iris
+        assert ":Dog" not in undeclared_iris
+
+    def test_collect_iris_exclude_deprecated(self, ont):
+        extra = [
+            *AXIOMS,
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
+            AnnotationAssertion(
+                property=IRI("owl:deprecated"),
+                subject=IRI(":Obsolete"),
+                value=TypedLiteral(value="true"),
+            ),
+        ]
+        axioms.add(ont, extra)
+
+        iris_excl = entities.collect_iris(ont, exclude_deprecated=True)
+        assert ":Obsolete" not in iris_excl
+        assert ":Dog" in iris_excl
+
+        iris_incl = entities.collect_iris(ont, exclude_deprecated=False)
+        assert ":Obsolete" in iris_incl
+
+    def test_collect_iris_properties_with_query(self, ont):
+        axioms.add(ont, AXIOMS)
+        # "domesticated" in skos:definition for :Pet
+        iris = entities.collect_iris(
+            ont, query="domesticated", properties=["skos:definition"], exclude_deprecated=False
+        )
+        assert ":Pet" in iris
+
+        # Same query restricted to rdfs:label — should not find :Pet
+        iris2 = entities.collect_iris(
+            ont, query="domesticated", properties=["rdfs:label"], exclude_deprecated=False
+        )
+        assert ":Pet" not in iris2

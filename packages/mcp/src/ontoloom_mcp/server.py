@@ -3,10 +3,15 @@ from fastmcp import FastMCP
 from ontoloom_mcp.middleware import LastResortMiddleware, TimingMiddleware
 from ontoloom_mcp.tools.axioms.add_axioms import tool_add_axioms
 from ontoloom_mcp.tools.axioms.annotate_axiom import tool_annotate_axiom
+from ontoloom_mcp.tools.axioms.match_axioms import tool_match_axioms
+from ontoloom_mcp.tools.axioms.rename_iri import tool_rename_iri
+from ontoloom_mcp.tools.axioms.replace_axiom import tool_replace_axiom
 from ontoloom_mcp.tools.axioms.rm_axioms import tool_rm_axioms
-from ontoloom_mcp.tools.axioms.search_axioms import tool_search_axioms
+from ontoloom_mcp.tools.entities.find_duplicates import tool_find_duplicates
 from ontoloom_mcp.tools.entities.get_entity import tool_get_entity
 from ontoloom_mcp.tools.entities.search_entities import tool_search_entities
+from ontoloom_mcp.tools.history.revert import tool_revert
+from ontoloom_mcp.tools.history.show_changes import tool_show_changes
 from ontoloom_mcp.tools.ontology.create_ontology import tool_create_ontology
 from ontoloom_mcp.tools.ontology.describe_ontology import tool_describe_ontology
 from ontoloom_mcp.tools.ontology.export_jsonl import tool_export_jsonl
@@ -38,13 +43,18 @@ mcp.add_tool(tool_create_ontology)
 mcp.add_tool(tool_add_axioms)
 mcp.add_tool(tool_rm_axioms)
 mcp.add_tool(tool_annotate_axiom)
+mcp.add_tool(tool_replace_axiom)
+mcp.add_tool(tool_rename_iri)
 mcp.add_tool(tool_describe_ontology)
+mcp.add_tool(tool_find_duplicates)
 mcp.add_tool(tool_get_entity)
 mcp.add_tool(tool_search_entities)
-mcp.add_tool(tool_search_axioms)
+mcp.add_tool(tool_match_axioms)
 mcp.add_tool(tool_set_prefix)
 mcp.add_tool(tool_rm_prefix)
 mcp.add_tool(tool_export_jsonl)
+mcp.add_tool(tool_show_changes)
+mcp.add_tool(tool_revert)
 mcp.add_tool(tool_create_selection)
 mcp.add_tool(tool_read_selection)
 mcp.add_tool(tool_list_selections)

@@ -3,7 +3,11 @@ from ontoloom.ontology import axioms
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.literals import Annotation
 
-from ontoloom_mcp.components.formatting import format_axiom_listing
+from ontoloom_mcp.components.formatting import (
+    collect_axiom_iris,
+    format_axiom_listing,
+    lookup_labels,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import HexPrefix, OntologyPath
 
@@ -16,7 +20,7 @@ def annotate_axiom(
 ):
     """Add or remove annotations on an existing axiom. The axiom's hash does not change.
 
-    Use `search_axioms` to find axiom hashes. Both full hashes and unambiguous prefixes are accepted.
+    Use `match_axioms` to find axiom hashes. Both full hashes and unambiguous prefixes are accepted.
     """
     with Ontology(path) as ont:
         result = axioms.annotate(
@@ -25,7 +29,8 @@ def annotate_axiom(
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )
-        listing = format_axiom_listing([result])
+        labels = lookup_labels(ont.conn, collect_axiom_iris([result]))
+        listing = format_axiom_listing([result], labels=labels)
         n_add = len(add_annotations or [])
         n_remove = len(remove_annotations or [])
         return f"Updated annotations (+{n_add}, -{n_remove}):\n\n{listing}"

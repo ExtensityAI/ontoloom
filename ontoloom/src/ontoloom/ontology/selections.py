@@ -9,6 +9,7 @@ from ontoloom.ontology.errors import (
 )
 from ontoloom.ontology.load import load_axiom
 from ontoloom.ontology.types import (
+    Position,
     SelectionItem,
     SelectionKind,
     SelectionMeta,
@@ -30,7 +31,7 @@ class ConversionOp(StrEnum):
 
 def _selection_hash(items: list[str]) -> str:
     content = "\n".join(sorted(items))
-    return hashlib.sha256(content.encode()).hexdigest()[:8]
+    return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
 def get_info(ont: Ontology, name: str) -> SelectionMeta:
@@ -41,7 +42,11 @@ def get_info(ont: Ontology, name: str) -> SelectionMeta:
     if row is None:
         raise SelectionNotFoundError(name)
     return SelectionMeta(
-        name=name, kind=SelectionKind(row[0]), hash=row[1], cardinality=row[2], source=row[3]
+        name=name,
+        kind=SelectionKind(row[0]),
+        hash=row[1],
+        cardinality=row[2],
+        source=row[3],
     )
 
 
@@ -57,6 +62,7 @@ def write(
     ont: Ontology, name: str, kind: SelectionKind, items: list[str], source: str
 ) -> tuple[str, int, int | None]:
     """Write a selection, overwriting if it exists. Returns (hash, cardinality, old_cardinality)."""
+    items = list(dict.fromkeys(items))
     content_hash = _selection_hash(items)
     cardinality = len(items)
 
@@ -83,7 +89,13 @@ def write(
 
 def list_all(ont: Ontology) -> list[SelectionMeta]:
     return [
-        SelectionMeta(name=r[0], kind=SelectionKind(r[1]), hash=r[2], cardinality=r[3], source=r[4])
+        SelectionMeta(
+            name=r[0],
+            kind=SelectionKind(r[1]),
+            hash=r[2],
+            cardinality=r[3],
+            source=r[4],
+        )
         for r in ont.conn.execute(
             "SELECT name, kind, hash, cardinality, source FROM selections ORDER BY created_at"
         )
@@ -234,12 +246,17 @@ def create(
     difference: list[str] | None = None,
     axioms_for: str | None = None,
     entities_in: str | None = None,
+    field: Position | None = None,
     source: str = "",
 ) -> tuple[str, int, int | None]:
     """Create a selection from set algebra or type conversion."""
     ops = [x for x in [union, intersection, difference, axioms_for, entities_in] if x is not None]
     if len(ops) != 1:
         msg = "Exactly one operation must be provided (union, intersection, difference, axioms_for, or entities_in)."
+        raise ValueError(msg)
+
+    if field is not None and entities_in is None:
+        msg = "The 'field' parameter is only valid with 'entities_in'."
         raise ValueError(msg)
 
     if union is not None:
@@ -250,7 +267,9 @@ def create(
         return _create_from_set_op(ont, SetOp.DIFFERENCE, name, difference, source)
     if axioms_for is not None:
         return _create_from_conversion(ont, name, axioms_for, ConversionOp.AXIOMS_FOR, source)
-    return _create_from_conversion(ont, name, entities_in, ConversionOp.ENTITIES_IN, source)  # pyright: ignore[reportArgumentType]
+    return _create_from_conversion(
+        ont, name, entities_in, ConversionOp.ENTITIES_IN, source, field=field
+    )  # pyright: ignore[reportArgumentType]
 
 
 def _create_from_set_op(
@@ -314,13 +333,22 @@ def _create_from_set_op(
                 }
                 items_set -= other_items
             items = list(items_set)
+        case _:
+            msg = f"Unknown set operation: {op}"
+            raise ValueError(msg)
 
-    auto_source = source or f"{op}({', '.join(repr(n) for n in inputs)})"
+    auto_source = source or f"{op.value}({', '.join(repr(n) for n in inputs)})"
     return write(ont, name, kind, items, auto_source)
 
 
 def _create_from_conversion(
-    ont: Ontology, name: str, input_name: str, op: ConversionOp, source: str
+    ont: Ontology,
+    name: str,
+    input_name: str,
+    op: ConversionOp,
+    source: str,
+    *,
+    field: Position | None = None,
 ) -> tuple[str, int, int | None]:
     sel = get_info(ont, input_name)
 
@@ -344,15 +372,27 @@ def _create_from_conversion(
             raise SelectionKindError(
                 name=input_name, expected="axioms", actual=sel.kind, operation="entities_in"
             )
-        items = [
-            r[0]
-            for r in ont.conn.execute(
-                "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                "JOIN axioms a ON a.id = ae.axiom_id "
-                "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?)",
-                (input_name,),
-            )
-        ]
+        if field is not None and field != Position.ANY:
+            items = [
+                r[0]
+                for r in ont.conn.execute(
+                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                    "JOIN axioms a ON a.id = ae.axiom_id "
+                    "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?) "
+                    "AND ae.position = ?",
+                    (input_name, field),
+                )
+            ]
+        else:
+            items = [
+                r[0]
+                for r in ont.conn.execute(
+                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                    "JOIN axioms a ON a.id = ae.axiom_id "
+                    "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?)",
+                    (input_name,),
+                )
+            ]
         kind = SelectionKind.ENTITIES
 
     auto_source = source or f"{op}({input_name!r})"

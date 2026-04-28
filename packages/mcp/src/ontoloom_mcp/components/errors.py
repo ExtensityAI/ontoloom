@@ -25,7 +25,7 @@ _HINTS: dict[type[OntoloomError], Callable[..., str]] = {
     OntologyExistsError: lambda e: str(e),
     SelectionNotFoundError: lambda e: (
         f"Selection {e.name!r} does not exist. "
-        f"Use search_entities(select=...) or search_axioms(select=...) to create one."
+        f"Use search_entities(into=...) or match_axioms(into=...) to create one."
     ),
     StaleSelectionError: lambda e: (
         f"Selection {e.name!r} has changed since you last observed it. "
@@ -36,7 +36,7 @@ _HINTS: dict[type[OntoloomError], Callable[..., str]] = {
         f"but {e.name!r} is a {e.actual} selection."
     ),
     AxiomNotFoundError: lambda e: (
-        f"No axiom matching hash prefix [{e.prefix}]. Use search_axioms to find axiom hashes."
+        f"No axiom matching hash prefix [{e.prefix}]. Use match_axioms to find axiom hashes."
     ),
     AmbiguousHashError: lambda e: (
         f"[{e.prefix}] matches {e.count} axioms: "

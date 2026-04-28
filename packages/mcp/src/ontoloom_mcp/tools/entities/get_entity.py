@@ -13,21 +13,21 @@ def get_entity(
     path: OntologyPath,
     iri: IRI,
     within: SelectionName | None = None,
-    select: SelectionName | None = None,
+    into: SelectionName | None = None,
 ):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
 
     Does NOT include inherited or inferred information.
-    Use `search_axioms` to see the full axiom details.
+    Use `match_axioms` to see the full axiom details.
 
     - `within`: Scope to a named selection. Within an axiom selection: only count axioms
       about this entity that are in the selection. Entity selections have no effect here.
-    - `select`: Save this entity's axiom hashes as an axiom selection. Entry point for
-      "I want to work on this entity's axioms" — then use `search_axioms(within=...)`
-      or `rm_axioms(select=...)` on the result.
+    - `into`: Save this entity's axiom hashes as an axiom selection. Entry point for
+      "I want to work on this entity's axioms" — then use `match_axioms(within=...)`
+      or `rm_axioms(within=...)` on the result.
     """
     with Ontology(path) as ont:
-        info = entities.get(ont, iri, within_selection=within)
+        info = entities.get(ont, iri, within=within)
         if info is None:
             near = entities.search(ont, query=iri.local_name, limit=3)
             suggestion = ""
@@ -46,13 +46,13 @@ def get_entity(
                     "on get_entity. To filter displayed axioms, use an axiom selection."
                 )
 
-        if select is not None:
-            hashes = entities.get_axiom_hashes(ont, iri, within_selection=within)
+        if into is not None:
+            hashes = entities.get_axiom_hashes(ont, iri, within=within)
             source = f"get_entity(iri={str(iri)!r})"
             content_hash, cardinality, old_cardinality = selections.write(
-                ont, select, SelectionKind.AXIOMS, hashes, source
+                ont, into, SelectionKind.AXIOMS, hashes, source
             )
-            sel_msg = f"\n\n{cardinality} axiom hashes \u2192 {select!r} (sel@{content_hash})."
+            sel_msg = f"\n\n{cardinality} axiom hashes \u2192 {into!r} (sel@{content_hash})."
             if old_cardinality is not None:
                 sel_msg += f" Overwrote previous ({old_cardinality} items)."
             result += sel_msg
