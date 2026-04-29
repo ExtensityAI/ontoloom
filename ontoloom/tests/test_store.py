@@ -216,6 +216,73 @@ def test_rename_iri_preserves_annotations(ont):
     assert stored["annotations"] == [ann.model_dump(mode="json")]
 
 
+def test_rename_iri_does_not_corrupt_literal_values(ont):
+    # AnnotationAssertion whose subject IS the renamed IRI and whose value string
+    # coincidentally equals it. Only the IRI-typed subject field must be rewritten.
+    ax = AnnotationAssertion(
+        property=IRI("rdfs:comment"),
+        subject=IRI("ex:Animal"),
+        value=LangLiteral(value="ex:Animal"),
+    )
+    axioms.add(ont, [ax])
+
+    result = axioms.rename_iri(ont, "ex:Animal", "ex:Mammal")
+    assert len(result.replaced) == 1
+
+    row = ont.conn.execute(
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
+    ).fetchone()
+    stored = json.loads(row[0])
+    assert stored["subject"] == "ex:Mammal"        # IRI field renamed
+    assert stored["value"]["value"] == "ex:Animal"  # literal value unchanged
+
+
+def test_rename_iri_noop_when_iri_absent(ont):
+    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    axioms.add(ont, [ax])
+
+    result = axioms.rename_iri(ont, "ex:Cat", "ex:Kitten")
+    assert result.replaced == []
+
+
+# -- Entity selection present_count --
+
+
+def test_entity_selection_present_count_punned_entity(ont):
+    # A punned entity has two Declaration axioms (Class + NamedIndividual).
+    # present_count must be 1 (one entity in the selection), not 2.
+    from ontoloom.ontology.models.axioms import Declaration
+
+    axioms.add(
+        ont,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Pun")),
+            Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:Pun")),
+        ],
+    )
+    _, _, _ = selections.write(ont, "punned", SelectionKind.ENTITIES, ["ex:Pun"], "test")
+
+    page = selections.read(ont, "punned")
+    assert page.present >= 0
+    assert page.missing >= 0
+    assert page.present + page.missing == page.meta.cardinality
+
+
+# -- LockedSelection minimum prefix length --
+
+
+def test_locked_selection_min_prefix_length():
+    import pytest
+
+    for short in ("a", "ab", "abcdefg"):
+        with pytest.raises(ValueError, match="at least 8"):
+            LockedSelection(f"sel@{short}")
+
+    # 8 chars is the minimum — must not raise
+    LockedSelection("sel@abcdef01")
+    LockedSelection("sel@" + "a" * 16)
+
+
 # -- Event log --
 
 

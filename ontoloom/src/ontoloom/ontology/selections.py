@@ -171,7 +171,7 @@ def read(
         ).fetchall()
 
         present_count = ont.conn.execute(
-            "SELECT COUNT(*) FROM selection_items si "
+            "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
             "JOIN axiom_entities ae ON ae.entity_iri = si.item "
             "JOIN axioms a ON a.id = ae.axiom_id "
             f"WHERE si.selection_name = ? AND a.type = '{Declaration.type_}'",

@@ -14,7 +14,7 @@ from ontoloom.ontology.errors import (
 from ontoloom.ontology.indexes import _extract_annotation_value, populate
 from ontoloom.ontology.load import load_axiom
 from ontoloom.ontology.models.axioms import Axiom
-from ontoloom.ontology.models.literals import Annotation
+from ontoloom.ontology.models.literals import IRI, Annotation, FrozenModel
 from ontoloom.ontology.types import (
     AddResult,
     HashedAxiom,
@@ -260,6 +260,27 @@ def replace(ont: Ontology, old_hash_prefix: str, new_axiom: Axiom) -> ReplaceRes
     return ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=False)
 
 
+def _substitute_iri(value, old_iri: str, new_iri: str):
+    """Walk a model value tree, replacing each IRI == old_iri with new_iri.
+
+    Only IRI-typed fields are substituted; plain str fields (e.g. LangLiteral.value,
+    TypedLiteral.value) are left unchanged even if they coincidentally equal old_iri.
+    """
+    if isinstance(value, IRI):
+        return IRI(new_iri) if value == old_iri else value
+    if isinstance(value, tuple):
+        return tuple(_substitute_iri(v, old_iri, new_iri) for v in value)
+    if isinstance(value, FrozenModel):
+        updates = {}
+        for name in type(value).model_fields:
+            v = getattr(value, name)
+            replaced = _substitute_iri(v, old_iri, new_iri)
+            if replaced is not v:
+                updates[name] = replaced
+        return value.model_copy(update=updates) if updates else value
+    return value
+
+
 def rename_iri(
     ont: Ontology,
     old_iri: str,
@@ -277,41 +298,37 @@ def rename_iri(
     import uuid
 
     batch = uuid.uuid4().hex[:12]
-
-    # Find axioms mentioning old_iri
-    if within is not None:
-        sel = selections.verify_hash(ont, within.name, within.hash_prefix)
-        if sel.kind != SelectionKind.AXIOMS:
-            raise SelectionKindError(
-                name=within.name,
-                expected="axioms",
-                actual=sel.kind,
-                operation="rename_iri",
-            )
-        rows = ont.conn.execute(
-            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-            "WHERE ae.entity_iri = ?",
-            (within.name, old_iri),
-        ).fetchall()
-    else:
-        rows = ont.conn.execute(
-            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-            "WHERE ae.entity_iri = ?",
-            (old_iri,),
-        ).fetchall()
-
-    if not rows:
-        return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=[], batch_id=batch)
-
     results: list[ReplaceResult] = []
+
     with ont.conn:
+        # Candidate reads are inside the transaction to avoid TOCTOU.
+        if within is not None:
+            sel = selections.verify_hash(ont, within.name, within.hash_prefix)
+            if sel.kind != SelectionKind.AXIOMS:
+                raise SelectionKindError(
+                    name=within.name,
+                    expected="axioms",
+                    actual=sel.kind,
+                    operation="rename_iri",
+                )
+            rows = ont.conn.execute(
+                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+                "WHERE ae.entity_iri = ?",
+                (within.name, old_iri),
+            ).fetchall()
+        else:
+            rows = ont.conn.execute(
+                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+                "WHERE ae.entity_iri = ?",
+                (old_iri,),
+            ).fetchall()
+
         for old_full_hash, old_json_data in rows:
-            # Replace IRI in the JSON and rebuild
-            new_json_str = old_json_data.replace(f'"{old_iri}"', f'"{new_iri}"')
-            new_axiom = load_axiom(new_json_str, f"rename {old_iri} -> {new_iri}")
+            old_axiom = load_axiom(old_json_data, f"rename {old_iri} -> {new_iri}")
+            new_axiom = _substitute_iri(old_axiom, old_iri, new_iri)
             new_h = axiom_hash(new_axiom)
             new_json = new_axiom.model_dump_json()
 
@@ -319,10 +336,8 @@ def rename_iri(
                 results.append(ReplaceResult(old_hash=old_full_hash, new_hash=new_h, was_noop=True))
                 continue
 
-            # Delete old
             ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
 
-            # Add new (idempotent)
             cursor = ont.conn.execute(
                 "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
                 (new_h, new_axiom.type, new_json),

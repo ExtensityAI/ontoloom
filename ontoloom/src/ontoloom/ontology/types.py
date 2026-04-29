@@ -30,7 +30,7 @@ def validate_selection_name(v: str):
     return v
 
 
-_LOCKED_SELECTION_RE = re.compile(r"^([^@]+)@([0-9a-fA-F]+)$")
+_LOCKED_SELECTION_RE = re.compile(r"^([^@]+)@([0-9a-fA-F]{8,})$")
 
 
 class LockedSelection(str):
@@ -47,8 +47,8 @@ class LockedSelection(str):
         m = _LOCKED_SELECTION_RE.match(value)
         if not m:
             msg = (
-                f"LockedSelection must be in 'name@hash_prefix' format "
-                f"(e.g. 'my_sel@a3f1'), got {value!r}"
+                f"LockedSelection must be in 'name@hash_prefix' format with at least 8 hex "
+                f"characters in the prefix (e.g. 'my_sel@a3f1b2c4'), got {value!r}"
             )
             raise ValueError(msg)
         validate_selection_name(m.group(1))
@@ -78,8 +78,8 @@ class LockedSelection(str):
             "description": (
                 "Selection reference with optimistic locking, in 'name@hash_prefix' format"
             ),
-            "pattern": r"^[^@]+@[0-9a-fA-F]+$",
-            "examples": ["my_selection@a3f1"],
+            "pattern": r"^[^@]+@[0-9a-fA-F]{8,}$",
+            "examples": ["my_selection@a3f1b2c4"],
         }
 
 

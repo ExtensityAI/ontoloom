@@ -1,8 +1,11 @@
 """Public API for pattern matching.
 
-`_generated.py` is regenerated from the axiom hierarchy by `gen_patterns.py`.
-This `__init__.py` is the single import surface — consumers should not import
-from `_generated` directly, since regeneration may shuffle the module layout.
+Deliberate exception to the project rule that `__init__.py` files are empty
+and never re-export. `_generated.py` is regenerated from the axiom hierarchy
+by `gen_patterns.py`, and consumers should not depend on its internal layout
+— this module is the single stable import surface that hides regeneration
+churn. The PLC0414 `as`-aliases are explicit re-export markers required by
+ruff for this case.
 """
 
 from ontoloom.ontology.patterns._generated import (
