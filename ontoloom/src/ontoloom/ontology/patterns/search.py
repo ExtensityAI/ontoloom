@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import get_args
 
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.load import load_axiom
+from ontoloom.ontology.patterns import ExpressionPattern, Pattern
 from ontoloom.ontology.patterns.match import match_pattern
-from ontoloom.ontology.patterns.models import Pattern, Slot
+from ontoloom.ontology.patterns.slot import Slot
 from ontoloom.ontology.types import SelectionKind
 
 
@@ -31,42 +33,22 @@ def match_axioms(
     For axiom-level patterns, filters candidates by axiom type.
     For expression-level patterns, searches all axioms (or scoped set).
     """
-    pattern_type: str = pattern.type  # pyright: ignore[reportAttributeAccessIssue]
-    axiom_type = _axiom_type_for_pattern(pattern_type)
-
-    # Build candidate query
-    candidates = _fetch_candidates(ont, axiom_type, pattern, within)
-
+    candidates = _fetch_candidates(ont, pattern, within)
     matched_hashes: list[str] = []
-
     for h, json_data in candidates:
         axiom = load_axiom(json_data, f"match {h[:8]}")
         if match_pattern(pattern, axiom):
             matched_hashes.append(h)
-
     return MatchResult(axiom_hashes=matched_hashes, total=len(matched_hashes))
 
 
-def _axiom_type_for_pattern(pattern_type: str):
-    if pattern_type.endswith("Pattern"):
-        return pattern_type[: -len("Pattern")]
-    return pattern_type
+_EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
 
-
-_EXPRESSION_TYPE_NAMES = frozenset(
-    [
-        "NamedClass",
-        "ObjectSomeValuesFrom",
-        "ObjectIntersectionOf",
-        "ObjectOneOf",
-        "ObjectHasValue",
-        "ObjectHasSelf",
-        "DataSomeValuesFrom",
-        "DataHasValue",
-    ]
-)
-
-# Maps expression types to axiom types that can contain them
+# TODO: this list duplicates structural knowledge already in the axiom hierarchy.
+# Considered: ClassVar on each class set via __pydantic_init_subclass__, adding a
+# DB column, or dropping the filter (small perf cost on wildcard expression
+# patterns). None felt clean enough yet — revisit when the implementation lands
+# and we can measure the actual cost of dropping it.
 _EXPRESSION_CONTAINER_TYPES = frozenset(
     [
         "SubClassOf",
@@ -83,7 +65,6 @@ _EXPRESSION_CONTAINER_TYPES = frozenset(
 
 def _fetch_candidates(
     ont: Ontology,
-    axiom_type: str,
     pattern: Pattern,
     within: str | None,
 ) -> list[tuple[str, str]]:
@@ -92,16 +73,16 @@ def _fetch_candidates(
     conditions: list[str] = []
     params: list[str | int] = []
 
-    # Type filter
-    if axiom_type in _EXPRESSION_TYPE_NAMES:
+    if isinstance(pattern, _EXPRESSION_PATTERN_CLASSES):
         # Expression-level: search axioms that can contain class expressions
         placeholders = ",".join("?" for _ in _EXPRESSION_CONTAINER_TYPES)
         conditions.append(f"a.type IN ({placeholders})")
         params.extend(sorted(_EXPRESSION_CONTAINER_TYPES))
     else:
-        # Axiom-level: exact type match
+        # Axiom-level: exact type match — strip "Pattern" suffix from the discriminator
+        pattern_type: str = pattern.type  # pyright: ignore[reportAttributeAccessIssue]
         conditions.append("a.type = ?")
-        params.append(axiom_type)
+        params.append(pattern_type.removesuffix("Pattern"))
 
     # Narrow by concrete IRIs in the pattern (index acceleration)
     concrete_iris = _extract_concrete_iris(pattern)
@@ -147,8 +128,8 @@ def _walk_for_iris(obj: object, iris: list[str]) -> None:
     """Recursively collect concrete IRI Slots from a pattern object."""
     if isinstance(obj, Slot) and obj.is_iri:
         iris.append(str(obj))
-    elif hasattr(obj, "model_fields"):
-        for field_name in obj.model_fields:  # pyright: ignore[reportAttributeAccessIssue]
+    elif hasattr(type(obj), "model_fields"):
+        for field_name in type(obj).model_fields:  # pyright: ignore[reportAttributeAccessIssue]
             if field_name == "type":
                 continue
             val = getattr(obj, field_name)

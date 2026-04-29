@@ -8,6 +8,7 @@ from ontoloom.ontology.errors import (
     StaleSelectionError,
 )
 from ontoloom.ontology.load import load_axiom
+from ontoloom.ontology.models.axioms import Declaration
 from ontoloom.ontology.models.literals import Position
 from ontoloom.ontology.types import (
     SelectionItem,
@@ -154,7 +155,7 @@ def read(
             "LEFT JOIN ("
             "  SELECT DISTINCT ae.entity_iri "
             "  FROM axiom_entities ae JOIN axioms a ON a.id = ae.axiom_id "
-            "  WHERE a.type = 'Declaration'"
+            f"  WHERE a.type = '{Declaration.type_}'"
             ") decl ON decl.entity_iri = si.item "
             "WHERE si.selection_name = ?"
         )
@@ -173,7 +174,7 @@ def read(
             "SELECT COUNT(*) FROM selection_items si "
             "JOIN axiom_entities ae ON ae.entity_iri = si.item "
             "JOIN axioms a ON a.id = ae.axiom_id "
-            "WHERE si.selection_name = ? AND a.type = 'Declaration'",
+            f"WHERE si.selection_name = ? AND a.type = '{Declaration.type_}'",
             (name,),
         ).fetchone()[0]
         missing_count = sel.cardinality - present_count
@@ -188,7 +189,7 @@ def read(
                 ont.conn.execute(
                     f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
                     f"JOIN axioms a ON a.id = ae.axiom_id "
-                    f"WHERE a.type = 'Declaration' AND ae.entity_iri IN ({placeholders})",
+                    f"WHERE a.type = '{Declaration.type_}' AND ae.entity_iri IN ({placeholders})",
                     present_iris,
                 ).fetchall()
             )

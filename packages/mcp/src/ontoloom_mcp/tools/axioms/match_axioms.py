@@ -1,6 +1,6 @@
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.patterns.models import Pattern
+from ontoloom.ontology.patterns import Pattern
 from ontoloom.ontology.patterns.search import match_axioms as core_match
 from ontoloom.ontology.types import SelectionKind
 

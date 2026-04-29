@@ -2,6 +2,7 @@ from collections import Counter, defaultdict
 
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology, escape_like
+from ontoloom.ontology.models.axioms import AnnotationAssertion, Declaration
 from ontoloom.ontology.models.literals import IRI, EntityType
 from ontoloom.ontology.types import (
     AnnotationRow,
@@ -18,12 +19,12 @@ _LOCAL_NAME = "local_name"
 _DECLARED_EXISTS = (
     "EXISTS (SELECT 1 FROM axiom_entities ae_d "
     "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    "WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = 'Declaration')"
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.type_}')"
 )
 _DECLARED_NOT_EXISTS = (
     "NOT EXISTS (SELECT 1 FROM axiom_entities ae_d "
     "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    "WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = 'Declaration')"
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.type_}')"
 )
 _NOT_DEPRECATED = (
     "NOT EXISTS (SELECT 1 FROM entity_text et_dep "
@@ -116,7 +117,7 @@ def get(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityInfo | N
             SELECT a.type, COUNT(DISTINCT a.id)
             FROM axiom_entities ae
             JOIN axioms a ON ae.axiom_id = a.id{extra_join}
-            WHERE ae.entity_iri = ? AND a.type != 'AnnotationAssertion'
+            WHERE ae.entity_iri = ? AND a.type != '{AnnotationAssertion.type_}'
             GROUP BY a.type
             """,
                 (*extra_params, iri_str),
@@ -551,7 +552,7 @@ def _filter_declared(
         for r in ont.conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = 'Declaration'",
+            f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.type_}'",
             iris,
         )
     }

@@ -4,32 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from itertools import permutations
+from typing import get_args
 
 from pydantic import BaseModel
+from pydantic.fields import FieldInfo
 
 from ontoloom.ontology.models.base import BaseAxiom, BaseClassExpression
 from ontoloom.ontology.models.expressions import NamedClass
-from ontoloom.ontology.patterns.models import (
-    ContainsExpr,
-    ContainsSlot,
-    Pattern,
-    Slot,
-)
+from ontoloom.ontology.models.markers import is_unordered
+from ontoloom.ontology.patterns import Contains, ExpressionPattern, Pattern
+from ontoloom.ontology.patterns.slot import Slot
 
 Bindings = dict[str, str]
 
-_EXPRESSION_TYPE_NAMES = frozenset(
-    [
-        "NamedClass",
-        "ObjectSomeValuesFrom",
-        "ObjectIntersectionOf",
-        "ObjectOneOf",
-        "ObjectHasValue",
-        "ObjectHasSelf",
-        "DataSomeValuesFrom",
-        "DataHasValue",
-    ]
-)
+_EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
 
 
 def _axiom_type_for_pattern(pattern_type: str):
@@ -50,22 +38,19 @@ def match_pattern(pattern: Pattern, axiom: BaseAxiom) -> list[Bindings]:
     - Axiom-level pattern: matches the whole axiom. Returns 0 or 1 binding dicts.
     - Expression-level pattern: searches all sub-expressions. Returns 0+ binding dicts.
     """
-    pattern_type: str = pattern.type  # pyright: ignore[reportAttributeAccessIssue]
-    axiom_type_name = _axiom_type_for_pattern(pattern_type)
-
-    # Axiom-level: pattern type corresponds to axiom type
-    if axiom_type_name == axiom.type:
-        result = _match_model(pattern, axiom, {})
-        return [result] if result is not None else []
-
-    # Expression-level: search all sub-expressions in the axiom
-    if axiom_type_name in _EXPRESSION_TYPE_NAMES:
+    if isinstance(pattern, _EXPRESSION_PATTERN_CLASSES):
         results: list[Bindings] = []
         for expr in _iter_expressions(axiom):
             bindings = _match_model(pattern, expr, {})
             if bindings is not None:
                 results.append(bindings)
         return results
+
+    # Axiom-level pattern: type must match the axiom's type
+    pattern_type: str = pattern.type  # pyright: ignore[reportAttributeAccessIssue]
+    if _axiom_type_for_pattern(pattern_type) == axiom.type:
+        result = _match_model(pattern, axiom, {})
+        return [result] if result is not None else []
 
     return []
 
@@ -83,7 +68,8 @@ def _match_model(pattern: BaseModel, actual: BaseModel, bindings: Bindings) -> B
     if pattern_type and actual_type and _axiom_type_for_pattern(pattern_type) != actual_type:
         return None
 
-    for field_name in pattern.model_fields:
+    actual_fields = type(actual).model_fields
+    for field_name in type(pattern).model_fields:
         if field_name in ("type", "annotations"):
             continue
 
@@ -92,7 +78,9 @@ def _match_model(pattern: BaseModel, actual: BaseModel, bindings: Bindings) -> B
         if actual_val is None:
             return None
 
-        result = _match_field(pattern_val, actual_val, bindings)
+        # Look up Unordered marker on the actual axiom's field — pattern fields
+        # don't carry the marker, the axiom side does.
+        result = _match_field(pattern_val, actual_val, bindings, actual_fields.get(field_name))
         if result is None:
             return None
         bindings = result
@@ -100,7 +88,12 @@ def _match_model(pattern: BaseModel, actual: BaseModel, bindings: Bindings) -> B
     return bindings
 
 
-def _match_field(pattern_val: object, actual_val: object, bindings: Bindings) -> Bindings | None:
+def _match_field(
+    pattern_val: object,
+    actual_val: object,
+    bindings: Bindings,
+    info: FieldInfo | None = None,
+) -> Bindings | None:
     """Dispatch matching based on the pattern value's type."""
     # Slot against a class expression (shorthand semantics)
     if isinstance(pattern_val, Slot) and isinstance(actual_val, BaseClassExpression):
@@ -110,14 +103,17 @@ def _match_field(pattern_val: object, actual_val: object, bindings: Bindings) ->
     if isinstance(pattern_val, Slot) and isinstance(actual_val, str):
         return _match_slot_vs_str(pattern_val, str(actual_val), bindings)
 
-    # Contains: partial list match
-    if isinstance(pattern_val, ContainsExpr) and isinstance(actual_val, tuple):
-        return _match_contains(pattern_val.contains, actual_val, bindings)
-    if isinstance(pattern_val, ContainsSlot) and isinstance(actual_val, tuple):
+    # Contains: partial-set match (any subset, any order)
+    if isinstance(pattern_val, Contains) and isinstance(actual_val, tuple):
         return _match_contains(pattern_val.contains, actual_val, bindings)
 
-    # Tuple: exact list match
+    # Plain tuple: dispatch on field metadata. Unordered fields require equal
+    # length but allow any permutation; ordered fields require exact pairing.
     if isinstance(pattern_val, tuple) and isinstance(actual_val, tuple):
+        if info is not None and is_unordered(info):
+            if len(pattern_val) != len(actual_val):
+                return None
+            return _match_contains(pattern_val, actual_val, bindings)
         return _match_tuple(pattern_val, actual_val, bindings)
 
     # Nested model (expression pattern vs expression)
@@ -228,7 +224,7 @@ def _match_contains(
 
 def _iter_expressions(obj: BaseModel) -> Iterator[BaseClassExpression]:
     """Recursively yield all ClassExpression nodes within an axiom or expression."""
-    for field_name in obj.model_fields:
+    for field_name in type(obj).model_fields:
         if field_name in ("type", "annotations"):
             continue
         val = getattr(obj, field_name)
