@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.load import load_axiom
-from ontoloom.ontology.patterns.match import Bindings, match_pattern
+from ontoloom.ontology.patterns.match import match_pattern
 from ontoloom.ontology.patterns.models import Pattern, Slot
 from ontoloom.ontology.types import SelectionKind
 
@@ -17,7 +17,6 @@ class MatchResult:
     """Result of a pattern match search."""
 
     axiom_hashes: list[str]
-    all_bindings: list[Bindings]
     total: int
 
 
@@ -27,7 +26,7 @@ def match_axioms(
     *,
     within: str | None = None,
 ) -> MatchResult:
-    """Find axioms matching a pattern. Returns hashes + bindings.
+    """Find axioms matching a pattern. Returns matched hashes.
 
     For axiom-level patterns, filters candidates by axiom type.
     For expression-level patterns, searches all axioms (or scoped set).
@@ -39,41 +38,13 @@ def match_axioms(
     candidates = _fetch_candidates(ont, axiom_type, pattern, within)
 
     matched_hashes: list[str] = []
-    all_bindings: list[Bindings] = []
 
     for h, json_data in candidates:
         axiom = load_axiom(json_data, f"match {h[:8]}")
-        bindings_list = match_pattern(pattern, axiom)
-        if bindings_list:
+        if match_pattern(pattern, axiom):
             matched_hashes.append(h)
-            all_bindings.extend(bindings_list)
 
-    return MatchResult(
-        axiom_hashes=matched_hashes,
-        all_bindings=all_bindings,
-        total=len(matched_hashes),
-    )
-
-
-def project_bindings(bindings: list[Bindings], variable: str) -> list[str]:
-    """Extract unique IRI values from a variable across all bindings.
-
-    Skips non-IRI values (e.g., repr of complex expressions).
-    """
-    iris: list[str] = []
-    seen: set[str] = set()
-    for b in bindings:
-        val = b.get(variable)
-        if val and _is_iri(val) and val not in seen:
-            seen.add(val)
-            iris.append(val)
-    return iris
-
-
-def _is_iri(value: str):
-    """Check if a binding value looks like an IRI (not a repr of a complex expression)."""
-    # IRIs are in prefix:local format, reprs start with class names or contain parens
-    return "(" not in value and ":" in value
+    return MatchResult(axiom_hashes=matched_hashes, total=len(matched_hashes))
 
 
 def _axiom_type_for_pattern(pattern_type: str):

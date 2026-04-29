@@ -10,7 +10,7 @@ members = [
 
 [manifest.dependency-groups]
 dev = [
-    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest", specifier = ">=9.0.0" },
     { name = "ruff", specifier = ">=0.15.0,<0.16.0" },
 ]
 
