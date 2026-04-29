@@ -1,8 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import entities, selections
 from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.models.literals import IRI, EntityType
 from ontoloom.ontology.types import SelectionKind
 
 from ontoloom_mcp.components.formatting import (

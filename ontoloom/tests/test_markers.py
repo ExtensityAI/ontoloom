@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from ontoloom.ontology.models.base import EntityType
+from ontoloom.ontology.models.literals import EntityType, Position
 from ontoloom.ontology.models.markers import (
     EntityKind,
     EntityPosition,
@@ -9,7 +9,6 @@ from ontoloom.ontology.models.markers import (
     get_entity_position,
     is_unordered,
 )
-from ontoloom.ontology.types import Position
 from pydantic import BaseModel, ConfigDict
 
 
@@ -44,3 +43,29 @@ def test_get_entity_position_returns_position():
 def test_marker_equality_via_dataclass():
     assert EntityKind(EntityType.CLASS) == EntityKind(EntityType.CLASS)
     assert Unordered() == Unordered()
+
+
+def test_tagged_model_type_classvar():
+    """type_ ClassVar resolves to the Literal default of the type field."""
+    from ontoloom.ontology.models.axioms import Declaration, SubClassOf
+
+    assert Declaration.type_ == "Declaration"
+    assert SubClassOf.type_ == "SubClassOf"
+
+
+def test_tagged_model_rejects_missing_default():
+    """A TaggedModel subclass that declares `type` without a str default raises."""
+    import pytest
+    from ontoloom.ontology.models.literals import TaggedModel
+
+    with pytest.raises(TypeError, match="must be Literal"):
+
+        class _Bad(TaggedModel):
+            type: str  # no default — invalid
+
+
+def test_type_field_constants():
+    from ontoloom.ontology.models.base import ANNOTATIONS_FIELD, TYPE_FIELD
+
+    assert TYPE_FIELD == "type"
+    assert ANNOTATIONS_FIELD == "annotations"

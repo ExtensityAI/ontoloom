@@ -4,12 +4,15 @@ Three single-purpose markers declare OWL-domain facts about Pydantic fields.
 Read by canonical normalization, entity extraction, pattern matching, and codegen.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from pydantic.fields import FieldInfo
 
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.types import Position
+if TYPE_CHECKING:
+    from ontoloom.ontology.models.literals import EntityType, Position
 
 
 @dataclass(frozen=True, slots=True)

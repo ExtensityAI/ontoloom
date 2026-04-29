@@ -5,7 +5,15 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from ontoloom.ontology.models.base import BaseClassExpression
-from ontoloom.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
+from ontoloom.ontology.models.literals import (
+    IRI,
+    DataRange,
+    EntityType,
+    LangLiteral,
+    Position,
+    TypedLiteral,
+)
+from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
 
 # -- Named class --
 
@@ -19,7 +27,7 @@ class NamedClass(BaseClassExpression):
     """
 
     type: Literal["NamedClass"] = "NamedClass"
-    iri: IRI
+    iri: Annotated[IRI, EntityKind(EntityType.CLASS)]
 
     def __str__(self) -> str:
         return str(self.iri)
@@ -36,8 +44,12 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     """
 
     type: Literal["ObjectSomeValuesFrom"] = "ObjectSomeValuesFrom"
-    property: IRI
-    filler: ClassExpression
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.RESTRICTION_PROPERTY),
+    ]
+    filler: Annotated[ClassExpression, EntityPosition(Position.FILLER)]
 
     def __str__(self) -> str:
         return f"ObjectSomeValuesFrom({self.property}, {self.filler})"
@@ -50,7 +62,11 @@ class ObjectIntersectionOf(BaseClassExpression):
     """
 
     type: Literal["ObjectIntersectionOf"] = "ObjectIntersectionOf"
-    operands: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    operands: Annotated[
+        tuple[ClassExpression, ...],
+        Unordered(),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"ObjectIntersectionOf({', '.join(str(o) for o in self.operands)})"
@@ -63,7 +79,7 @@ class ObjectOneOf(BaseClassExpression):
     """
 
     type: Literal["ObjectOneOf"] = "ObjectOneOf"
-    individual: IRI
+    individual: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL)]
 
     def __str__(self) -> str:
         return f"ObjectOneOf({self.individual})"
@@ -78,8 +94,16 @@ class ObjectHasValue(BaseClassExpression):
     """
 
     type: Literal["ObjectHasValue"] = "ObjectHasValue"
-    property: IRI
-    individual: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.RESTRICTION_PROPERTY),
+    ]
+    individual: Annotated[
+        IRI,
+        EntityKind(EntityType.NAMED_INDIVIDUAL),
+        EntityPosition(Position.FILLER),
+    ]
 
     def __str__(self) -> str:
         return f"ObjectHasValue({self.property}, {self.individual})"
@@ -92,7 +116,11 @@ class ObjectHasSelf(BaseClassExpression):
     """
 
     type: Literal["ObjectHasSelf"] = "ObjectHasSelf"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.RESTRICTION_PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"ObjectHasSelf({self.property})"
@@ -109,7 +137,11 @@ class DataSomeValuesFrom(BaseClassExpression):
     """
 
     type: Literal["DataSomeValuesFrom"] = "DataSomeValuesFrom"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.RESTRICTION_PROPERTY),
+    ]
     range: DataRange
 
     def __str__(self) -> str:
@@ -125,7 +157,11 @@ class DataHasValue(BaseClassExpression):
     """
 
     type: Literal["DataHasValue"] = "DataHasValue"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.RESTRICTION_PROPERTY),
+    ]
     value: TypedLiteral | LangLiteral
 
     def __str__(self) -> str:

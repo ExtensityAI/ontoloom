@@ -1,8 +1,7 @@
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.extract import iter_axiom_entities
 from ontoloom.ontology.models.axioms import AnnotationAssertion, Axiom
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI, LangLiteral, TypedLiteral
+from ontoloom.ontology.models.literals import IRI, EntityType, LangLiteral, TypedLiteral
 
 _LOCAL_NAME = "local_name"
 

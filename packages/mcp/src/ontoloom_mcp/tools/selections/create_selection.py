@@ -1,7 +1,8 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.types import Position, SelectionKind
+from ontoloom.ontology.models.literals import Position
+from ontoloom.ontology.types import SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName

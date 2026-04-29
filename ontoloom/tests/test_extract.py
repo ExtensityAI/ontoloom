@@ -30,7 +30,6 @@ from ontoloom.ontology.models.axioms import (
     SubObjectPropertyOfChain,
     TransitiveObjectProperty,
 )
-from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.expressions import (
     DataSomeValuesFrom,
     NamedClass,
@@ -44,10 +43,11 @@ from ontoloom.ontology.models.literals import (
     IRI,
     Annotation,
     DataType,
+    EntityType,
     LangLiteral,
+    Position,
     TypedLiteral,
 )
-from ontoloom.ontology.types import Position
 
 
 def NC(iri: str):  # noqa: N802

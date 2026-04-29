@@ -1,10 +1,11 @@
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field
 
 from ontoloom.ontology.models.base import BaseAxiom
 from ontoloom.ontology.models.expressions import ClassExpression
-from ontoloom.ontology.models.literals import IRI, LangLiteral, TypedLiteral
+from ontoloom.ontology.models.literals import IRI, EntityType, LangLiteral, Position, TypedLiteral
+from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
 
 
 class ClassAssertion(BaseAxiom):
@@ -14,8 +15,10 @@ class ClassAssertion(BaseAxiom):
     """
 
     type: Literal["ClassAssertion"] = "ClassAssertion"
-    class_expression: ClassExpression
-    individual: IRI
+    class_expression: Annotated[ClassExpression, EntityPosition(Position.CLASS)]
+    individual: Annotated[
+        IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.INDIVIDUAL)
+    ]
 
     def __str__(self) -> str:
         return f"ClassAssertion({self.class_expression}, {self.individual})"
@@ -28,9 +31,11 @@ class ObjectPropertyAssertion(BaseAxiom):
     """
 
     type: Literal["ObjectPropertyAssertion"] = "ObjectPropertyAssertion"
-    property: IRI
-    source: IRI
-    target: IRI
+    property: Annotated[
+        IRI, EntityKind(EntityType.OBJECT_PROPERTY), EntityPosition(Position.PROPERTY)
+    ]
+    source: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.SOURCE)]
+    target: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.TARGET)]
 
     def __str__(self) -> str:
         return f"ObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
@@ -43,9 +48,11 @@ class NegativeObjectPropertyAssertion(BaseAxiom):
     """
 
     type: Literal["NegativeObjectPropertyAssertion"] = "NegativeObjectPropertyAssertion"
-    property: IRI
-    source: IRI
-    target: IRI
+    property: Annotated[
+        IRI, EntityKind(EntityType.OBJECT_PROPERTY), EntityPosition(Position.PROPERTY)
+    ]
+    source: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.SOURCE)]
+    target: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.TARGET)]
 
     def __str__(self) -> str:
         return f"NegativeObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
@@ -58,8 +65,12 @@ class DataPropertyAssertion(BaseAxiom):
     """
 
     type: Literal["DataPropertyAssertion"] = "DataPropertyAssertion"
-    property: IRI
-    individual: IRI
+    property: Annotated[
+        IRI, EntityKind(EntityType.DATA_PROPERTY), EntityPosition(Position.PROPERTY)
+    ]
+    individual: Annotated[
+        IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.INDIVIDUAL)
+    ]
     value: TypedLiteral | LangLiteral
 
     def __str__(self) -> str:
@@ -73,8 +84,12 @@ class NegativeDataPropertyAssertion(BaseAxiom):
     """
 
     type: Literal["NegativeDataPropertyAssertion"] = "NegativeDataPropertyAssertion"
-    property: IRI
-    individual: IRI
+    property: Annotated[
+        IRI, EntityKind(EntityType.DATA_PROPERTY), EntityPosition(Position.PROPERTY)
+    ]
+    individual: Annotated[
+        IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.INDIVIDUAL)
+    ]
     value: TypedLiteral | LangLiteral
 
     def __str__(self) -> str:
@@ -85,7 +100,13 @@ class SameIndividual(BaseAxiom):
     """a = b — both IRIs denote the same entity."""
 
     type: Literal["SameIndividual"] = "SameIndividual"
-    individuals: tuple[IRI, ...] = Field(..., min_length=2)
+    individuals: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.NAMED_INDIVIDUAL),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"SameIndividual({', '.join(str(i) for i in self.individuals)})"
@@ -95,7 +116,13 @@ class DifferentIndividuals(BaseAxiom):
     """a ≠ b — all listed individuals are pairwise distinct."""
 
     type: Literal["DifferentIndividuals"] = "DifferentIndividuals"
-    individuals: tuple[IRI, ...] = Field(..., min_length=2)
+    individuals: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.NAMED_INDIVIDUAL),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"DifferentIndividuals({', '.join(str(i) for i in self.individuals)})"

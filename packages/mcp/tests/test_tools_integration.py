@@ -8,9 +8,8 @@ import pytest
 from fastmcp.exceptions import ToolError
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.axioms import Declaration, SubClassOf
-from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.expressions import NamedClass
-from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.models.literals import IRI, EntityType
 from ontoloom.ontology.types import LockedSelection
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms

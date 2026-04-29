@@ -8,8 +8,8 @@ from ontoloom.ontology.errors import (
     StaleSelectionError,
 )
 from ontoloom.ontology.load import load_axiom
+from ontoloom.ontology.models.literals import Position
 from ontoloom.ontology.types import (
-    Position,
     SelectionItem,
     SelectionKind,
     SelectionMeta,

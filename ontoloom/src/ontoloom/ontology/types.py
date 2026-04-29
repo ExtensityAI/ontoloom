@@ -8,8 +8,7 @@ from pydantic import GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
 from ontoloom.ontology.models.axioms import Axiom
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.models.literals import IRI, EntityType
 
 MatchSource = Literal["iri", "annotation", "list"]
 MatchQuality = Literal["exact", "substring"]
@@ -82,54 +81,6 @@ class LockedSelection(str):
             "pattern": r"^[^@]+@[0-9a-fA-F]+$",
             "examples": ["my_selection@a3f1"],
         }
-
-
-class Position(StrEnum):
-    """Structural role an entity plays within an axiom.
-
-    18 values: 17 stored in axiom_entities.position + ANY (query-time only).
-    """
-
-    # Query-time only (never stored in DB)
-    ANY = "any"
-
-    # SubClassOf — named superclass
-    SUB_CLASS = "sub_class"
-    SUPER_CLASS = "super_class"
-
-    # Class expression restrictions (ObjectSomeValuesFrom, ObjectHasValue, etc.)
-    RESTRICTION_PROPERTY = "restriction_property"
-    FILLER = "filler"
-
-    # Sub*PropertyOf
-    SUB_PROPERTY = "sub_property"
-    SUPER_PROPERTY = "super_property"
-
-    # SubObjectPropertyOfChain
-    CHAIN_MEMBER = "chain_member"
-
-    # AnnotationAssertion
-    SUBJECT = "subject"
-    PROPERTY = "property"
-    VALUE = "value"
-
-    # *Domain / *Range
-    DOMAIN = "domain"
-    RANGE = "range"
-
-    # ObjectPropertyAssertion
-    SOURCE = "source"
-    TARGET = "target"
-
-    # ClassAssertion
-    INDIVIDUAL = "individual"
-    CLASS = "class"
-
-    # EquivalentClasses, DisjointClasses, SameIndividual, DifferentIndividuals
-    MEMBER = "member"
-
-    # Declaration
-    ENTITY = "entity"
 
 
 class SelectionKind(StrEnum):

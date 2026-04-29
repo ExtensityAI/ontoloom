@@ -2,8 +2,7 @@ import pytest
 from ontoloom.ontology import axioms, entities, selections
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.axioms import AnnotationAssertion, Declaration
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI, LangLiteral
+from ontoloom.ontology.models.literals import IRI, EntityType, LangLiteral
 from ontoloom.ontology.types import SelectionKind
 
 

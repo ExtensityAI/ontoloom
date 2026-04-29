@@ -18,10 +18,9 @@ from ontoloom.ontology.models.axioms import (
     EquivalentClasses,
     SubClassOf,
 )
-from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.expressions import NamedClass, ObjectSomeValuesFrom
-from ontoloom.ontology.models.literals import IRI, Annotation, LangLiteral
-from ontoloom.ontology.types import LockedSelection, Position, SelectionKind
+from ontoloom.ontology.models.literals import IRI, Annotation, EntityType, LangLiteral, Position
+from ontoloom.ontology.types import LockedSelection, SelectionKind
 
 
 @pytest.fixture()

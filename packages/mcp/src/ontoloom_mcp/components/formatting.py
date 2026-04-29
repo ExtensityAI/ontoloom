@@ -2,8 +2,7 @@ import sqlite3
 from collections import Counter
 
 from ontoloom.ontology.extract import iter_axiom_entities
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.models.literals import IRI, EntityType
 from ontoloom.ontology.types import EntityInfo, EntityMatch, HashedAxiom
 
 SELECT_PREVIEW = 5

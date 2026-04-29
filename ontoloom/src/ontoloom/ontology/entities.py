@@ -2,8 +2,7 @@ from collections import Counter, defaultdict
 
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology, escape_like
-from ontoloom.ontology.models.base import EntityType
-from ontoloom.ontology.models.literals import IRI
+from ontoloom.ontology.models.literals import IRI, EntityType
 from ontoloom.ontology.types import (
     AnnotationRow,
     DuplicateResult,

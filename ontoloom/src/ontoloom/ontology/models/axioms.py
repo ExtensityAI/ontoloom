@@ -11,9 +11,17 @@ from ontoloom.ontology.models.assertions import (
     ObjectPropertyAssertion,
     SameIndividual,
 )
-from ontoloom.ontology.models.base import BaseAxiom, EntityType
+from ontoloom.ontology.models.base import BaseAxiom
 from ontoloom.ontology.models.expressions import ClassExpression
-from ontoloom.ontology.models.literals import IRI, DataRange, LangLiteral, TypedLiteral
+from ontoloom.ontology.models.literals import (
+    IRI,
+    DataRange,
+    EntityType,
+    LangLiteral,
+    Position,
+    TypedLiteral,
+)
+from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
 
 
 class AnnotationAssertion(BaseAxiom):
@@ -23,9 +31,16 @@ class AnnotationAssertion(BaseAxiom):
     """
 
     type: Literal["AnnotationAssertion"] = "AnnotationAssertion"
-    property: IRI
-    subject: IRI
-    value: IRI | TypedLiteral | LangLiteral
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    subject: Annotated[IRI, EntityPosition(Position.SUBJECT)]
+    value: Annotated[
+        IRI | TypedLiteral | LangLiteral,
+        EntityPosition(Position.VALUE),
+    ]
 
     def __str__(self) -> str:
         return f"AnnotationAssertion({self.property}, {self.subject}, {self.value})"
@@ -41,8 +56,8 @@ class SubClassOf(BaseAxiom):
     """
 
     type: Literal["SubClassOf"] = "SubClassOf"
-    sub_class: ClassExpression
-    super_class: ClassExpression
+    sub_class: Annotated[ClassExpression, EntityPosition(Position.SUB_CLASS)]
+    super_class: Annotated[ClassExpression, EntityPosition(Position.SUPER_CLASS)]
 
     def __str__(self) -> str:
         return f"SubClassOf({self.sub_class}, {self.super_class})"
@@ -57,7 +72,12 @@ class EquivalentClasses(BaseAxiom):
     """
 
     type: Literal["EquivalentClasses"] = "EquivalentClasses"
-    expressions: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    expressions: Annotated[
+        tuple[ClassExpression, ...],
+        Unordered(),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"EquivalentClasses({', '.join(str(e) for e in self.expressions)})"
@@ -70,7 +90,12 @@ class DisjointClasses(BaseAxiom):
     """
 
     type: Literal["DisjointClasses"] = "DisjointClasses"
-    expressions: tuple[ClassExpression, ...] = Field(..., min_length=2)
+    expressions: Annotated[
+        tuple[ClassExpression, ...],
+        Unordered(),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"DisjointClasses({', '.join(str(e) for e in self.expressions)})"
@@ -83,8 +108,16 @@ class SubObjectPropertyOf(BaseAxiom):
     """
 
     type: Literal["SubObjectPropertyOf"] = "SubObjectPropertyOf"
-    sub_property: IRI
-    super_property: IRI
+    sub_property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.SUB_PROPERTY),
+    ]
+    super_property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.SUPER_PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"SubObjectPropertyOf({self.sub_property}, {self.super_property})"
@@ -100,8 +133,17 @@ class SubObjectPropertyOfChain(BaseAxiom):
     """
 
     type: Literal["SubObjectPropertyOfChain"] = "SubObjectPropertyOfChain"
-    chain: tuple[IRI, ...] = Field(..., min_length=2)
-    super_property: IRI
+    chain: Annotated[
+        tuple[IRI, ...],
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.CHAIN_MEMBER),
+        Field(min_length=2),
+    ]
+    super_property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.SUPER_PROPERTY),
+    ]
 
     def __str__(self) -> str:
         chain = ", ".join(str(p) for p in self.chain)
@@ -112,7 +154,13 @@ class EquivalentObjectProperties(BaseAxiom):
     """r₁ ≡ r₂ — properties relate the same pairs of individuals."""
 
     type: Literal["EquivalentObjectProperties"] = "EquivalentObjectProperties"
-    properties: tuple[IRI, ...] = Field(..., min_length=2)
+    properties: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"EquivalentObjectProperties({', '.join(str(p) for p in self.properties)})"
@@ -125,7 +173,11 @@ class TransitiveObjectProperty(BaseAxiom):
     """
 
     type: Literal["TransitiveObjectProperty"] = "TransitiveObjectProperty"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"TransitiveObjectProperty({self.property})"
@@ -138,7 +190,11 @@ class ReflexiveObjectProperty(BaseAxiom):
     """
 
     type: Literal["ReflexiveObjectProperty"] = "ReflexiveObjectProperty"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"ReflexiveObjectProperty({self.property})"
@@ -152,8 +208,12 @@ class ObjectPropertyDomain(BaseAxiom):
     """
 
     type: Literal["ObjectPropertyDomain"] = "ObjectPropertyDomain"
-    property: IRI
-    domain: ClassExpression
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    domain: Annotated[ClassExpression, EntityPosition(Position.DOMAIN)]
 
     def __str__(self) -> str:
         return f"ObjectPropertyDomain({self.property}, {self.domain})"
@@ -166,8 +226,12 @@ class ObjectPropertyRange(BaseAxiom):
     """
 
     type: Literal["ObjectPropertyRange"] = "ObjectPropertyRange"
-    property: IRI
-    range: ClassExpression
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    range: Annotated[ClassExpression, EntityPosition(Position.RANGE)]
 
     def __str__(self) -> str:
         return f"ObjectPropertyRange({self.property}, {self.range})"
@@ -177,8 +241,16 @@ class SubDataPropertyOf(BaseAxiom):
     """dp₁ ⊑ dp₂ — if dp₁(x,v) then dp₂(x,v)."""
 
     type: Literal["SubDataPropertyOf"] = "SubDataPropertyOf"
-    sub_property: IRI
-    super_property: IRI
+    sub_property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.SUB_PROPERTY),
+    ]
+    super_property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.SUPER_PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"SubDataPropertyOf({self.sub_property}, {self.super_property})"
@@ -188,7 +260,13 @@ class EquivalentDataProperties(BaseAxiom):
     """dp₁ ≡ dp₂ — data properties have the same values for all individuals."""
 
     type: Literal["EquivalentDataProperties"] = "EquivalentDataProperties"
-    properties: tuple[IRI, ...] = Field(..., min_length=2)
+    properties: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.MEMBER),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return f"EquivalentDataProperties({', '.join(str(p) for p in self.properties)})"
@@ -198,8 +276,12 @@ class DataPropertyDomain(BaseAxiom):
     """If x has any value for dp, then x ∈ C."""
 
     type: Literal["DataPropertyDomain"] = "DataPropertyDomain"
-    property: IRI
-    domain: ClassExpression
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    domain: Annotated[ClassExpression, EntityPosition(Position.DOMAIN)]
 
     def __str__(self) -> str:
         return f"DataPropertyDomain({self.property}, {self.domain})"
@@ -209,8 +291,12 @@ class DataPropertyRange(BaseAxiom):
     """All values of dp fall within this data range."""
 
     type: Literal["DataPropertyRange"] = "DataPropertyRange"
-    property: IRI
-    range: DataRange
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    range: Annotated[DataRange, EntityPosition(Position.RANGE)]
 
     def __str__(self) -> str:
         from ontoloom.ontology.models.literals import _fmt_data_range
@@ -225,7 +311,11 @@ class FunctionalDataProperty(BaseAxiom):
     """
 
     type: Literal["FunctionalDataProperty"] = "FunctionalDataProperty"
-    property: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"FunctionalDataProperty({self.property})"
@@ -238,9 +328,19 @@ class HasKey(BaseAxiom):
     """
 
     type: Literal["HasKey"] = "HasKey"
-    class_expression: ClassExpression
-    object_properties: tuple[IRI, ...]
-    data_properties: tuple[IRI, ...]
+    class_expression: Annotated[ClassExpression, EntityPosition(Position.CLASS)]
+    object_properties: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.OBJECT_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    data_properties: Annotated[
+        tuple[IRI, ...],
+        Unordered(),
+        EntityKind(EntityType.DATA_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
 
     @model_validator(mode="after")
     def _check_has_properties(self):
@@ -257,8 +357,16 @@ class HasKey(BaseAxiom):
 
 class SubAnnotationPropertyOf(BaseAxiom):
     type: Literal["SubAnnotationPropertyOf"] = "SubAnnotationPropertyOf"
-    sub_property: IRI
-    super_property: IRI
+    sub_property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.SUB_PROPERTY),
+    ]
+    super_property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.SUPER_PROPERTY),
+    ]
 
     def __str__(self) -> str:
         return f"SubAnnotationPropertyOf({self.sub_property}, {self.super_property})"
@@ -268,8 +376,12 @@ class AnnotationPropertyDomain(BaseAxiom):
     """No logical semantics."""
 
     type: Literal["AnnotationPropertyDomain"] = "AnnotationPropertyDomain"
-    property: IRI
-    domain: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    domain: Annotated[IRI, EntityPosition(Position.DOMAIN)]
 
     def __str__(self) -> str:
         return f"AnnotationPropertyDomain({self.property}, {self.domain})"
@@ -279,8 +391,12 @@ class AnnotationPropertyRange(BaseAxiom):
     """No logical semantics."""
 
     type: Literal["AnnotationPropertyRange"] = "AnnotationPropertyRange"
-    property: IRI
-    range: IRI
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    range: Annotated[IRI, EntityPosition(Position.RANGE)]
 
     def __str__(self) -> str:
         return f"AnnotationPropertyRange({self.property}, {self.range})"
@@ -288,8 +404,12 @@ class AnnotationPropertyRange(BaseAxiom):
 
 class DatatypeDefinition(BaseAxiom):
     type: Literal["DatatypeDefinition"] = "DatatypeDefinition"
-    datatype: IRI
-    data_range: DataRange
+    datatype: Annotated[
+        IRI,
+        EntityKind(EntityType.DATATYPE),
+        EntityPosition(Position.ENTITY),
+    ]
+    data_range: Annotated[DataRange, EntityPosition(Position.RANGE)]
 
     def __str__(self) -> str:
         from ontoloom.ontology.models.literals import _fmt_data_range
@@ -300,7 +420,7 @@ class DatatypeDefinition(BaseAxiom):
 class Declaration(BaseAxiom):
     type: Literal["Declaration"] = "Declaration"
     entity_type: EntityType
-    iri: IRI
+    iri: Annotated[IRI, EntityPosition(Position.ENTITY)]
 
     def __str__(self) -> str:
         return f"Declaration({self.entity_type}, {self.iri})"

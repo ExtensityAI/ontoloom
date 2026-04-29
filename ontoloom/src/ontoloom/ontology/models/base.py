@@ -1,20 +1,14 @@
-from enum import StrEnum
+from typing import Final
 
-from ontoloom.ontology.models.literals import Annotation, FrozenModel
+from ontoloom.ontology.models.literals import Annotation, TaggedModel
+
+TYPE_FIELD: Final = "type"
+ANNOTATIONS_FIELD: Final = "annotations"
 
 
-class BaseClassExpression(FrozenModel):
+class BaseClassExpression(TaggedModel):
     pass
 
 
-class BaseAxiom(FrozenModel):
+class BaseAxiom(TaggedModel):
     annotations: tuple[Annotation, ...] = ()
-
-
-class EntityType(StrEnum):
-    CLASS = "Class"
-    OBJECT_PROPERTY = "ObjectProperty"
-    DATA_PROPERTY = "DataProperty"
-    ANNOTATION_PROPERTY = "AnnotationProperty"
-    NAMED_INDIVIDUAL = "NamedIndividual"
-    DATATYPE = "Datatype"

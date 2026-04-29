@@ -2,14 +2,97 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
+from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
+
+
+class EntityType(StrEnum):
+    """The kind of OWL entity an IRI refers to."""
+
+    CLASS = "Class"
+    OBJECT_PROPERTY = "ObjectProperty"
+    DATA_PROPERTY = "DataProperty"
+    ANNOTATION_PROPERTY = "AnnotationProperty"
+    NAMED_INDIVIDUAL = "NamedIndividual"
+    DATATYPE = "Datatype"
+
+
+class Position(StrEnum):
+    """Structural role an entity plays within an axiom.
+
+    18 values: 17 stored in axiom_entities.position + ANY (query-time only).
+    """
+
+    # Query-time only (never stored in DB)
+    ANY = "any"
+
+    # SubClassOf — named superclass
+    SUB_CLASS = "sub_class"
+    SUPER_CLASS = "super_class"
+
+    # Class expression restrictions (ObjectSomeValuesFrom, ObjectHasValue, etc.)
+    RESTRICTION_PROPERTY = "restriction_property"
+    FILLER = "filler"
+
+    # Sub*PropertyOf
+    SUB_PROPERTY = "sub_property"
+    SUPER_PROPERTY = "super_property"
+
+    # SubObjectPropertyOfChain
+    CHAIN_MEMBER = "chain_member"
+
+    # AnnotationAssertion
+    SUBJECT = "subject"
+    PROPERTY = "property"
+    VALUE = "value"
+
+    # *Domain / *Range
+    DOMAIN = "domain"
+    RANGE = "range"
+
+    # ObjectPropertyAssertion
+    SOURCE = "source"
+    TARGET = "target"
+
+    # ClassAssertion
+    INDIVIDUAL = "individual"
+    CLASS = "class"
+
+    # EquivalentClasses, DisjointClasses, SameIndividual, DifferentIndividuals
+    MEMBER = "member"
+
+    # Declaration
+    ENTITY = "entity"
+
 
 class FrozenModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
+
+
+class TaggedModel(FrozenModel):
+    """A FrozenModel that participates in a discriminated union via a `type` field.
+
+    Subclasses must declare `type: Literal["..."] = "..."`. Intermediate bases
+    that don't declare their own `type` are skipped silently. The literal default
+    is mirrored to a `type_` ClassVar for class-level access (e.g. SQL queries).
+    """
+
+    type_: ClassVar[str] = ""
+
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
+        super().__pydantic_init_subclass__(**kwargs)
+        if "type" not in cls.__annotations__:
+            return
+        default = cls.model_fields["type"].default
+        if not isinstance(default, str) or not default:
+            msg = f'{cls.__name__}.type must be Literal["..."] = "..." with a non-empty str default'
+            raise TypeError(msg)
+        cls.type_ = default
 
 
 _IRI_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
@@ -113,14 +196,21 @@ class LangLiteral(FrozenModel):
 class Annotation(FrozenModel):
     """A property-value pair attached to an axiom. Not a standalone axiom."""
 
-    property: IRI
-    value: IRI | TypedLiteral | LangLiteral
+    property: Annotated[
+        IRI,
+        EntityKind(EntityType.ANNOTATION_PROPERTY),
+        EntityPosition(Position.PROPERTY),
+    ]
+    value: Annotated[
+        IRI | TypedLiteral | LangLiteral,
+        EntityPosition(Position.VALUE),
+    ]
 
 
 # -- Data Range Expressions --
 
 
-class BaseDataRange(FrozenModel):
+class BaseDataRange(TaggedModel):
     """Base for all data range expressions."""
 
 
@@ -128,7 +218,11 @@ class DataIntersectionOf(BaseDataRange):
     """Intersection of data ranges."""
 
     type: Literal["DataIntersectionOf"] = "DataIntersectionOf"
-    operands: tuple[DataRange, ...] = Field(..., min_length=2)
+    operands: Annotated[
+        tuple[DataRange, ...],
+        Unordered(),
+        Field(min_length=2),
+    ]
 
     def __str__(self) -> str:
         return " ⊓ ".join(_fmt_data_range(o) for o in self.operands)

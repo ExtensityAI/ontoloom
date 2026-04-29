@@ -15,10 +15,10 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, GetCoreSchemaHandler
 from pydantic_core import CoreSchema, core_schema
 
-from ontoloom.ontology.models.base import EntityType
 from ontoloom.ontology.models.literals import (
     IRI,
     DataRange,
+    EntityType,
     FrozenModel,
     LangLiteral,
     TypedLiteral,
