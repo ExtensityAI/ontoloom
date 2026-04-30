@@ -1,3 +1,4 @@
+from mcp.types import ToolAnnotations
 from ontoloom.ontology import selections
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.patterns import Pattern
@@ -5,7 +6,7 @@ from ontoloom.ontology.patterns.search import match_axioms as core_match
 from ontoloom.ontology.types import SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
 
 
 def match_axioms(
@@ -13,34 +14,47 @@ def match_axioms(
     pattern: Pattern,
     into: SelectionName,
     within: SelectionName | None = None,
+    limit: Limit = 100,
 ):
-    """Find axioms matching a structural pattern. Saves matches to an axiom selection.
+    """Find axioms matching a structural pattern; save matches to an axiom selection.
 
-    `pattern`: A pattern object (same structure as axioms, with "?var" for variables
-    and "*" for wildcards in IRI positions). String IRIs in expression positions are
-    shorthand for NamedClass(iri=X).
-
-    - Axiom-level patterns (e.g., SubClassOfPattern) match whole axioms of that type.
-    - Expression-level patterns (e.g., ObjectSomeValuesFromPattern) match any axiom
+    Pattern semantics:
+    - Pattern objects mirror axiom structure, with `"?var"` for variables and `"*"`
+      for wildcards in IRI positions. String IRIs in expression positions are
+      shorthand for `NamedClass(iri=X)`.
+    - Axiom-level patterns (e.g., `SubClassOfPattern`) match whole axioms of that type.
+    - Expression-level patterns (e.g., `ObjectSomeValuesFromPattern`) match any axiom
       containing that expression at any depth.
+    - Variables (`?name`) enforce cross-position equality: same variable in two
+      positions means both must match the same value. Use
+      `create_selection(entities_in=...)` afterwards to extract entities from matches.
 
-    Variables (?name) enforce cross-position equality: the same variable in two positions
-    means both must match the same value. Use create_selection(entities_in=...) afterwards
-    to extract entities from the matched axioms.
-
-    `into`: Name for the axiom selection to save results.
-    `within`: Optional selection to restrict search to.
+    Args:
+    - `pattern`: The pattern object to match.
+    - `into`: Name for the axiom selection to save results.
+    - `within`: Optional selection to restrict search to.
+    - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
     """
     with Ontology(path) as ont:
-        result = core_match(ont, pattern, within=within)
-        content_hash, cardinality, old_card = selections.write(
+        result = core_match(ont, pattern, within=within, limit=limit)
+        upserted = selections.upsert(
             ont, into, SelectionKind.AXIOMS, result.axiom_hashes, "match_axioms"
         )
 
-    msg = f"{result.total} axioms matched → sel@{content_hash} ({cardinality} items)"
-    if old_card is not None:
-        msg += f" (was {old_card})"
+    truncated_hint = (
+        f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
+    )
+    msg = (
+        f"{result.total} axioms matched{truncated_hint} -> sel@{upserted.content_hash} "
+        f"({upserted.cardinality} items)"
+    )
+    if upserted.old_cardinality is not None:
+        msg += f" (was {upserted.old_cardinality})"
     return msg
 
 
-tool_match_axioms = create_tool(match_axioms, name="match_axioms")
+tool_match_axioms = create_tool(
+    match_axioms,
+    name="match_axioms",
+    annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True),
+)

@@ -24,7 +24,10 @@ from ontoloom.ontology.patterns._generated import (
     ClassAssertionPattern as ClassAssertionPattern,
 )
 from ontoloom.ontology.patterns._generated import (
-    Contains as Contains,
+    ContainsExpr as ContainsExpr,
+)
+from ontoloom.ontology.patterns._generated import (
+    ContainsSlot as ContainsSlot,
 )
 from ontoloom.ontology.patterns._generated import (
     DataHasValuePattern as DataHasValuePattern,

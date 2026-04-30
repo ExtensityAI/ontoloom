@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, override
 
 from pydantic import Field
 
@@ -20,6 +20,7 @@ class ClassAssertion(BaseAxiom):
         IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.INDIVIDUAL)
     ]
 
+    @override
     def __str__(self) -> str:
         return f"ClassAssertion({self.class_expression}, {self.individual})"
 
@@ -37,6 +38,7 @@ class ObjectPropertyAssertion(BaseAxiom):
     source: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.SOURCE)]
     target: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.TARGET)]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
 
@@ -54,6 +56,7 @@ class NegativeObjectPropertyAssertion(BaseAxiom):
     source: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.SOURCE)]
     target: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL), EntityPosition(Position.TARGET)]
 
+    @override
     def __str__(self) -> str:
         return f"NegativeObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
 
@@ -73,6 +76,7 @@ class DataPropertyAssertion(BaseAxiom):
     ]
     value: TypedLiteral | LangLiteral
 
+    @override
     def __str__(self) -> str:
         return f"DataPropertyAssertion({self.property}, {self.individual}, {self.value})"
 
@@ -92,6 +96,7 @@ class NegativeDataPropertyAssertion(BaseAxiom):
     ]
     value: TypedLiteral | LangLiteral
 
+    @override
     def __str__(self) -> str:
         return f"NegativeDataPropertyAssertion({self.property}, {self.individual}, {self.value})"
 
@@ -108,6 +113,7 @@ class SameIndividual(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"SameIndividual({', '.join(str(i) for i in self.individuals)})"
 
@@ -124,5 +130,6 @@ class DifferentIndividuals(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"DifferentIndividuals({', '.join(str(i) for i in self.individuals)})"

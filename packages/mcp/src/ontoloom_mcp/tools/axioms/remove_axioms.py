@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import axioms
 from ontoloom.ontology.connection import Ontology
+from ontoloom.ontology.errors import BadRequestError
 from ontoloom.ontology.types import LockedSelection
 
 from ontoloom_mcp.components.formatting import format_diff
@@ -8,40 +9,40 @@ from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import HexPrefix, OntologyPath
 
 
-def rm_axioms(
+def remove_axioms(
     path: OntologyPath,
-    hash_prefixes: list[HexPrefix] | None = None,
+    axiom_hashes: list[HexPrefix] | None = None,
     within: LockedSelection | None = None,
 ):
     """Remove axioms by hash prefix or by selection.
 
-    - `hash_prefixes`: Each prefix must uniquely match exactly one axiom.
-      Atomic: if any prefix fails to resolve, nothing is removed.
+    - `axiom_hashes`: Each hash (full or unambiguous prefix) must match exactly one
+      axiom. Atomic: if any hash fails to resolve, nothing is removed.
     - `within`: Selection in `name@hash_prefix` form (e.g. "my_sel@a3f1"). The hash
       prefix verifies the selection hasn't changed since you last read it. Removes
       all axioms in this axiom selection. Best-effort: skips hashes no longer in DB.
-      Mutually exclusive with hash_prefixes.
+      Mutually exclusive with axiom_hashes.
     """
-    if within is not None and hash_prefixes is not None:
-        msg = "Cannot use both 'within' and 'hash_prefixes'. Choose one."
-        raise ValueError(msg)
-    if within is None and hash_prefixes is None:
-        msg = "Provide either 'hash_prefixes' or 'within'."
-        raise ValueError(msg)
+    if within is not None and axiom_hashes is not None:
+        msg = "Cannot use both 'within' and 'axiom_hashes'. Choose one."
+        raise BadRequestError(msg)
+    if within is None and axiom_hashes is None:
+        msg = "Provide either 'axiom_hashes' or 'within'."
+        raise BadRequestError(msg)
 
     with Ontology(path) as ont:
         if within is not None:
-            removed, absent = axioms.remove_by_selection(ont, within)
+            sel_result = axioms.remove_by_selection(ont, within)
             return (
-                f"Removed {len(removed)} axioms ({absent} already absent). "
+                f"Removed {len(sel_result.removed)} axioms ({sel_result.absent} already absent). "
                 f"Selection {within.name!r} retained."
             )
 
-        result = axioms.remove_by_hash(ont, hash_prefixes)  # pyright: ignore[reportArgumentType]
+        result = axioms.remove_by_hash(ont, axiom_hashes)  # pyright: ignore[reportArgumentType]
         entries = [("-", ha) for ha in result.removed]
         return format_diff(entries, f"Removed {len(result.removed)} axioms.")
 
 
-tool_rm_axioms = create_tool(
-    rm_axioms, name="rm_axioms", annotations=ToolAnnotations(destructiveHint=True)
+tool_remove_axioms = create_tool(
+    remove_axioms, name="remove_axioms", annotations=ToolAnnotations(destructiveHint=True)
 )

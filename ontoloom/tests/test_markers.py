@@ -56,7 +56,7 @@ def test_tagged_model_type_classvar():
 def test_tagged_model_rejects_missing_default():
     """A TaggedModel subclass that declares `type` without a str default raises."""
     import pytest
-    from ontoloom.ontology.models.literals import TaggedModel
+    from ontoloom.ontology.models._pydantic import TaggedModel
 
     with pytest.raises(TypeError, match="must be Literal"):
 

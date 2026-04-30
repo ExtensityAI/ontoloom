@@ -15,6 +15,14 @@ def create_tool(
     name: str,
     annotations: ToolAnnotations | None = None,
 ) -> FunctionTool:
-    """Create an MCP tool with retry and error translation applied."""
+    """Create an MCP tool with retry and error translation applied.
+
+    `annotations` convention: omit when all hints take their MCP defaults
+    (`readOnlyHint=False`, `destructiveHint=True`, `idempotentHint=False`,
+    `openWorldHint=True`). Set hints explicitly only to declare non-default
+    behavior — e.g. read-only tools set `readOnlyHint=True`; idempotent
+    mutations set `idempotentHint=True`; benign writes opt out of
+    `destructiveHint`.
+    """
     wrapped = retry_on_busy(translate_errors(fn))
     return Tool.from_function(wrapped, name=name, annotations=annotations)

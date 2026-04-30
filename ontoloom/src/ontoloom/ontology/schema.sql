@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS events (
     replaces_hash TEXT,
     annotation_diff TEXT,
     batch_id TEXT,
-    timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+    timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 -- Named selections: persistent sets of axiom hashes or entity IRIs.
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS selections (
     hash TEXT NOT NULL,
     cardinality INTEGER NOT NULL,
     source TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS selection_items (

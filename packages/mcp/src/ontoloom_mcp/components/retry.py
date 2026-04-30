@@ -21,7 +21,7 @@ def retry_on_busy(fn):
             try:
                 return fn(*args, **kwargs)
             except sqlite3.OperationalError as e:
-                if "locked" not in str(e):
+                if e.sqlite_errorcode not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED):
                     raise
                 last = e
                 if attempt < _MAX_ATTEMPTS - 1:

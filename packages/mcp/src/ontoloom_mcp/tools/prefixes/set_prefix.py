@@ -14,8 +14,8 @@ def set_prefix(path: OntologyPath, name: PrefixName, iri: str):
     prefix does not affect axioms already stored with that prefix string.
     """
     with Ontology(path) as ont:
-        prefixes.set(ont, name, iri)
-        return f"Set prefix `{name}:` \u2192 `{iri}`"
+        prefixes.set_prefix(ont, name, iri)
+        return f"Set prefix `{name}:` -> `{iri}`"
 
 
 tool_set_prefix = create_tool(

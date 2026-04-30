@@ -12,8 +12,8 @@ from ontoloom_mcp.components.types import OntologyPath, SelectionName
 def get_entity(
     path: OntologyPath,
     iri: IRI,
-    within: SelectionName | None = None,
     into: SelectionName | None = None,
+    within: SelectionName | None = None,
 ):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
 
@@ -24,22 +24,14 @@ def get_entity(
       about this entity that are in the selection. Entity selections have no effect here.
     - `into`: Save this entity's axiom hashes as an axiom selection. Entry point for
       "I want to work on this entity's axioms" — then use `match_axioms(within=...)`
-      or `rm_axioms(within=...)` on the result.
+      or `remove_axioms(within=...)` on the result.
     """
     with Ontology(path) as ont:
         info = entities.get(ont, iri, within=within)
-        if info is None:
-            near = entities.search(ont, query=iri.local_name, limit=3)
-            suggestion = ""
-            if near.matches:
-                names = ", ".join(str(m.iri) for m in near.matches)
-                suggestion = f" Similar entities: {names}."
-            return f"{iri}\nNot found.{suggestion}\nUse `search_entities` to find entities by name."
-
         result = format_entity_inspect(iri, info)
 
         if within:
-            sel = selections.get_info(ont, within)
+            sel = selections.get(ont, within)
             if sel.kind == SelectionKind.ENTITIES:
                 result += (
                     "\n\nNote: `within` with an entity selection has no filtering effect "
@@ -49,12 +41,10 @@ def get_entity(
         if into is not None:
             hashes = entities.get_axiom_hashes(ont, iri, within=within)
             source = f"get_entity(iri={str(iri)!r})"
-            content_hash, cardinality, old_cardinality = selections.write(
-                ont, into, SelectionKind.AXIOMS, hashes, source
-            )
-            sel_msg = f"\n\n{cardinality} axiom hashes \u2192 {into!r} (sel@{content_hash})."
-            if old_cardinality is not None:
-                sel_msg += f" Overwrote previous ({old_cardinality} items)."
+            upserted = selections.upsert(ont, into, SelectionKind.AXIOMS, hashes, source)
+            sel_msg = f"\n\n{upserted.cardinality} axiom hashes -> {into!r} (sel@{upserted.content_hash})."
+            if upserted.old_cardinality is not None:
+                sel_msg += f" Overwrote previous ({upserted.old_cardinality} items)."
             result += sel_msg
 
         return result

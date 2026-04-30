@@ -3,33 +3,40 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import GetCoreSchemaHandler
-from pydantic_core import CoreSchema, core_schema
+from ontoloom.ontology.models._pydantic import _PydanticStr
+from ontoloom.ontology.models.literals import IRI_PATTERN
 
-_IRI_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
-_VAR_RE = re.compile(r"^\?[a-zA-Z_][a-zA-Z0-9_]*$")
+_VAR_PATTERN = re.compile(r"^\?[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-class Slot(str):
+class Slot(_PydanticStr):
     """A pattern slot: concrete IRI, variable (?name), or wildcard (*).
 
-    - "ex:Dog"  → concrete IRI (validated)
-    - "?C"      → variable (binds to matched value)
-    - "*"       → wildcard (matches anything, no binding)
+    - "ex:Dog"  -> concrete IRI (validated)
+    - "?C"      -> variable (binds to matched value)
+    - "*"       -> wildcard (matches anything, no binding)
+
+    Slot is a `str` subclass, not a Pydantic model — it intentionally carries
+    no `type` discriminator. Generated `T | Slot` unions (e.g. `IRI | Slot`,
+    `DataRange | Slot`, `TypedLiteral | LangLiteral | Slot`) rely on structural
+    disambiguation: Pydantic sees a JSON string and routes to `Slot`; an object
+    routes to the model variant. This is reliable because every non-Slot member
+    of these unions is a Pydantic model (or dict on the wire), never a bare
+    string.
     """
 
     def __new__(cls, value: str):
         if value == "*":
             pass
         elif value.startswith("?"):
-            if not _VAR_RE.match(value):
+            if not _VAR_PATTERN.match(value):
                 msg = f"Variable must be ?identifier, got {value!r}"
                 raise ValueError(msg)
         else:
-            if not _IRI_RE.match(value):
+            if not IRI_PATTERN.match(value):
                 msg = f"Slot must be IRI (prefix:name), ?variable, or *, got {value!r}"
                 raise ValueError(msg)
-        return str.__new__(cls, value)
+        return super().__new__(cls, value)
 
     @property
     def is_wildcard(self) -> bool:
@@ -46,12 +53,6 @@ class Slot(str):
     @property
     def var_name(self) -> str:
         return self[1:]
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
     @classmethod
     def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:

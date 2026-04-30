@@ -1,3 +1,4 @@
+from mcp.types import ToolAnnotations
 from ontoloom.ontology import history
 from ontoloom.ontology.connection import Ontology
 
@@ -21,7 +22,7 @@ def revert(
     with Ontology(path) as ont:
         report = history.revert(ont, n)
 
-    parts = [f"Reverted {report.reverted} events."]
+    parts = [f"Reverted {report.reverted} events across {n} batch(es)."]
     if report.skipped:
         parts.append(f"Skipped {report.skipped} (conflicts).")
     parts.append("")
@@ -29,4 +30,8 @@ def revert(
     return "\n".join(parts)
 
 
-tool_revert = create_tool(revert, name="revert")
+tool_revert = create_tool(
+    revert,
+    name="revert",
+    annotations=ToolAnnotations(destructiveHint=True),
+)

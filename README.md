@@ -34,7 +34,7 @@ Added 6, skipped 0 axioms.
 After a few more rounds of additions, the ontology has grown to 42 entities and 172 axioms. The Moon constraint is too loose — moons should orbit planets, not any celestial body:
 
 ``````
-rm_axioms(path="solar.db", hash_prefixes=["caf67282"])
+remove_axioms(path="solar.db", axiom_hashes=["caf67282"])
 Removed 1 axioms.
 
 ```diff
@@ -103,11 +103,11 @@ Added 10, skipped 0 axioms.
 ## Tools
 
 **Setup**
-`create_ontology` · `set_prefix` · `rm_prefix`
+`create_ontology` · `set_prefix` · `remove_prefix`
 
 **Build**
 - `add_axioms` — add validated axioms; duplicates are skipped
-- `rm_axioms` — remove by hash prefix or by axiom selection
+- `remove_axioms` — remove by hash prefix or by axiom selection
 - `annotate_axiom` — update axiom-level annotations without touching identity
 - `replace_axiom` — atomic delete + add for one axiom
 - `rename_iri` — rewrite an IRI across all (or scoped) axioms in one batch
@@ -123,7 +123,7 @@ Added 10, skipped 0 axioms.
 - `create_selection` — set algebra (`union`/`intersection`/`difference`) and conversions (`axioms_for`, `entities_in`)
 - `read_selection` — paginated view, with present/missing visibility
 - `list_selections` — show all named selections
-- `rm_selections` — drop one or more selections
+- `remove_selections` — drop one or more selections
 
 **History**
 - `show_changes` — recent events grouped by batch
@@ -168,6 +168,14 @@ Drop this into your `.mcp.json`, adjusting the paths for your clone:
 ```bash
 uv run --project packages/mcp python -m ontoloom_mcp.server
 ```
+
+### Sandboxing (optional)
+
+Set `ONTOLOOM_WORKSPACE_ROOT=/path/to/workspace` to confine all `Ontology(...)`, `export_jsonl`, and import paths to that directory tree. Useful when running an agent that may take instructions from untrusted documents — the agent can't open or write SQLite files outside the workspace. Unset (default) means unrestricted single-user behavior.
+
+### Event log retention
+
+The event log (`events` table) permanently retains full axiom content, including annotation values. There is no expiry, pruning, or redaction mechanism. Do not store sensitive information in annotation values if log retention is a concern.
 
 ## How it works
 

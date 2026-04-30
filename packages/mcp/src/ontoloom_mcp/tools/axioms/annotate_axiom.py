@@ -1,12 +1,12 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import axioms
+from ontoloom.ontology import entities as core_entities
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.literals import Annotation
 
 from ontoloom_mcp.components.formatting import (
-    collect_axiom_iris,
     format_axiom_listing,
-    lookup_labels,
+    walk_unique_iris,
 )
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import HexPrefix, OntologyPath
@@ -20,7 +20,10 @@ def annotate_axiom(
 ):
     """Add or remove annotations on an existing axiom. The axiom's hash does not change.
 
-    Use `match_axioms` to find axiom hashes. Both full hashes and unambiguous prefixes are accepted.
+    Args:
+    - `axiom_hash`: Full hash or unambiguous prefix. Use `match_axioms` to find one.
+    - `add_annotations`: Annotations to add (deduplicated against existing).
+    - `remove_annotations`: Annotations to remove (no-op if absent).
     """
     with Ontology(path) as ont:
         result = axioms.annotate(
@@ -29,8 +32,9 @@ def annotate_axiom(
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )
-        labels = lookup_labels(ont.conn, collect_axiom_iris([result]))
-        listing = format_axiom_listing([result], labels=labels)
+        iris = walk_unique_iris(result.axiom)
+        labels = core_entities.lookup_labels(ont, iris)
+        listing = format_axiom_listing([result], labels=labels, iris_per_axiom=[iris])
         n_add = len(add_annotations or [])
         n_remove = len(remove_annotations or [])
         return f"Updated annotations (+{n_add}, -{n_remove}):\n\n{listing}"

@@ -2,7 +2,7 @@
 members = ["ontoloom", "packages/*"]
 
 [dependency-groups]
-dev = ["ruff>=0.15.0,<0.16.0", "pytest>=9.0.0"]
+dev = ["ruff>=0.15.0,<0.16.0", "pytest>=9.0.0", "pyright>=1.1.409"]
 
 [tool.pytest.ini_options]
 filterwarnings = ["error"]

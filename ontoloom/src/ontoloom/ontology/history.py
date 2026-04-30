@@ -3,12 +3,15 @@
 import json
 from dataclasses import dataclass, field
 
+from ontoloom.ontology.canonical import truncate_hash
 from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.indexes import populate
+from ontoloom.ontology.indexes import insert_axiom, repopulate_axiom_text
 from ontoloom.ontology.load import load_axiom
 from ontoloom.ontology.models.literals import Annotation
 
 
+# A: needs documentation, especially which options there are. also, why do we not do it with like inheritance, like have a pydantic class for this with a base and then a bunch of children with different type values, and then we load different records? this way, in db we do have the merged version with nullable fields, but in code we have the clean event records depending on types? could use op!
+# A global: also regarding above, op is a str, but pretty sure it should be a StrEnum? check!
 @dataclass
 class EventRecord:
     sequence_id: int
@@ -20,7 +23,8 @@ class EventRecord:
     timestamp: str
 
 
-@dataclass
+# A: needs documentation, why is it just called Batch?
+@dataclass  # A global: if you use dataclass, always frozen and slots!
 class Batch:
     """A group of events that form one logical operation."""
 
@@ -28,6 +32,7 @@ class Batch:
 
     @property
     def batch_id(self) -> str | None:
+        # A: this is not good - what is this? why can we not get it from anywhere else?
         return self.events[0].batch_id if self.events else None
 
     @property
@@ -35,6 +40,7 @@ class Batch:
         return len(self.events)
 
 
+# A: name bad? not sure
 @dataclass
 class RevertReport:
     reverted: int
@@ -43,6 +49,8 @@ class RevertReport:
 
 
 def show_changes(ont: Ontology, *, session_id: str | None = None) -> list[EventRecord]:
+    # A: bad func name, show_changes is not what this does! also, again, return type not needeed?
+    # A global: why not iter_...? seems like we do not need a fetchall and can just iterate over and yield
     """Return events for a session (default: current session)."""
     sid = session_id or ont.session_id
     rows = ont.conn.execute(
@@ -65,6 +73,7 @@ def show_changes(ont: Ontology, *, session_id: str | None = None) -> list[EventR
 
 
 def _group_into_batches(events: list[EventRecord]) -> list[Batch]:
+    # A: what is this? if batch_id is part of events, we can just group them in the sql query, no? or do we need unbatched as well ever? why not batched select by default?
     """Group events into batches. Events with same batch_id form one batch.
     Unbatched events are each their own batch."""
     batches: list[Batch] = []
@@ -91,6 +100,7 @@ def _group_into_batches(events: list[EventRecord]) -> list[Batch]:
 
 
 def revert(ont: Ontology, n: int = 1) -> RevertReport:
+    # A: this needs a proper look, but low priority. not sure if the semantics are good. Naming is bad tho, again. already mentioend in other files.
     """Undo the last N batches in the current session.
 
     Applies inverses in reverse order. Appends inverse events to the log.
@@ -144,11 +154,11 @@ def _revert_add(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     h = event.axiom_hash
     row = ont.conn.execute("SELECT id FROM axioms WHERE hash = ?", (h,)).fetchone()
     if row is None:
-        return False, f"skip revert-add [{h[:8]}]: already deleted"
+        return False, f"skip revert-add [{truncate_hash(h)}]: already deleted"
 
     ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (h,))
     _log_inverse(ont, "del", h)
-    return True, f"reverted add [{h[:8]}]: deleted"
+    return True, f"reverted add [{truncate_hash(h)}]: deleted"
 
 
 def _revert_del(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
@@ -159,26 +169,19 @@ def _revert_del(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     ).fetchone()
 
     if json_data is None or json_data[0] is None:
-        return False, f"skip revert-del [{h[:8]}]: no stored axiom_json"
+        return False, f"skip revert-del [{truncate_hash(h)}]: no stored axiom_json"
 
     axiom_json = json_data[0]
 
     # Check if already exists (re-added through another path)
     existing = ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone()
     if existing is not None:
-        return False, f"skip revert-del [{h[:8]}]: already exists"
+        return False, f"skip revert-del [{truncate_hash(h)}]: already exists"
 
-    axiom = load_axiom(axiom_json, f"revert-del {h[:8]}")
-    cursor = ont.conn.execute(
-        "INSERT INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
-        (h, axiom.type, axiom_json),
-    )
-    axiom_id = cursor.lastrowid
-    if axiom_id is not None:
-        populate(ont, axiom, axiom_id)
-
+    axiom = load_axiom(axiom_json, f"revert-del {truncate_hash(h)}")
+    insert_axiom(ont, axiom)
     _log_inverse(ont, "add", h, axiom_json)
-    return True, f"reverted del [{h[:8]}]: re-added"
+    return True, f"reverted del [{truncate_hash(h)}]: re-added"
 
 
 def _revert_replace(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
@@ -187,7 +190,7 @@ def _revert_replace(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     old_h = event.replaces_hash
 
     if old_h is None:
-        return False, f"skip revert-replace [{new_h[:8]}]: no replaces_hash"
+        return False, f"skip revert-replace [{truncate_hash(new_h)}]: no replaces_hash"
 
     # Find the old axiom's JSON from the original del event (or the replace event itself)
     # The old axiom was deleted — its JSON should be in a prior 'del' or 'replace' event
@@ -199,7 +202,10 @@ def _revert_replace(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     ).fetchone()
 
     if old_json_row is None or old_json_row[0] is None:
-        return False, f"skip revert-replace [{new_h[:8]}→{old_h[:8]}]: no stored json for old axiom"
+        return (
+            False,
+            f"skip revert-replace [{truncate_hash(new_h)}->{truncate_hash(old_h)}]: no stored json for old axiom",
+        )
 
     old_json = old_json_row[0]
 
@@ -209,17 +215,11 @@ def _revert_replace(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     # Re-add old axiom
     existing = ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone()
     if existing is None:
-        old_axiom = load_axiom(old_json, f"revert-replace {old_h[:8]}")
-        cursor = ont.conn.execute(
-            "INSERT INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
-            (old_h, old_axiom.type, old_json),
-        )
-        axiom_id = cursor.lastrowid
-        if axiom_id is not None:
-            populate(ont, old_axiom, axiom_id)
+        old_axiom = load_axiom(old_json, f"revert-replace {truncate_hash(old_h)}")
+        insert_axiom(ont, old_axiom)
 
     _log_inverse(ont, "replace", old_h, old_json, replaces_hash=new_h)
-    return True, f"reverted replace [{new_h[:8]}→{old_h[:8]}]: restored old"
+    return True, f"reverted replace [{truncate_hash(new_h)}->{truncate_hash(old_h)}]: restored old"
 
 
 def _revert_annotate(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
@@ -227,14 +227,14 @@ def _revert_annotate(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     h = event.axiom_hash
 
     if event.annotation_diff is None:
-        return False, f"skip revert-annotate [{h[:8]}]: no diff stored"
+        return False, f"skip revert-annotate [{truncate_hash(h)}]: no diff stored"
 
     row = ont.conn.execute("SELECT id, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     if row is None:
-        return False, f"skip revert-annotate [{h[:8]}]: axiom not found"
+        return False, f"skip revert-annotate [{truncate_hash(h)}]: axiom not found"
 
     axiom_id, json_data = row
-    axiom = load_axiom(json_data, f"revert-annotate {h[:8]}")
+    axiom = load_axiom(json_data, f"revert-annotate {truncate_hash(h)}")
     diff = json.loads(event.annotation_diff)
 
     # Inverse: remove what was added, add what was removed
@@ -252,17 +252,7 @@ def _revert_annotate(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
     new_json = updated.model_dump_json()
     ont.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, axiom_id))
 
-    # Rebuild axiom_text index
-    from ontoloom.ontology.indexes import _extract_annotation_value
-
-    ont.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
-    ont.conn.executemany(
-        "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
-        [
-            (axiom_id, _extract_annotation_value(ann.value), str(ann.property))
-            for ann in updated.annotations
-        ],
-    )
+    repopulate_axiom_text(ont, axiom_id, updated.annotations)
 
     # Log inverse annotate event
     inverse_diff = json.dumps(
@@ -272,7 +262,7 @@ def _revert_annotate(ont: Ontology, event: EventRecord) -> tuple[bool, str]:
         }
     )
     _log_inverse(ont, "annotate", h, annotation_diff=inverse_diff)
-    return True, f"reverted annotate [{h[:8]}]: annotations restored"
+    return True, f"reverted annotate [{truncate_hash(h)}]: annotations restored"
 
 
 def _log_inverse(

@@ -1,0 +1,7 @@
+{
+  "pythonVersion": "3.12",
+  "include": ["ontoloom/src", "packages/mcp/src", "ontoloom/tests", "packages/mcp/tests"],
+  "reportImplicitOverride": "warning",
+  "reportMatchNotExhaustive": "warning",
+  "reportUnnecessaryTypeIgnoreComment": "warning"
+}

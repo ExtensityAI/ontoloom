@@ -44,7 +44,7 @@ def create_selection(
       then `match_axioms(within=...)` for further filtering
     """
     with Ontology(path) as ont:
-        content_hash, cardinality, old_cardinality = selections.create(
+        upserted = selections.create(
             ont,
             name,
             union=union,
@@ -55,18 +55,18 @@ def create_selection(
             field=field,
         )
 
-        if union or intersection or difference:
-            inputs = union or intersection or difference
-            sel = selections.get_info(ont, inputs[0])  # pyright: ignore[reportIndexIssue]
+        inputs = union or intersection or difference
+        if inputs:
+            sel = selections.get(ont, inputs[0])
             kind = sel.kind
         elif axioms_for:
             kind = SelectionKind.AXIOMS
         else:
             kind = SelectionKind.ENTITIES
 
-        parts = [f"Selection {name!r} (sel@{content_hash}): {cardinality} {kind}"]
-        if old_cardinality is not None:
-            parts.append(f"(overwrote previous: {old_cardinality} items)")
+        parts = [f"Selection {name!r} (sel@{upserted.content_hash}): {upserted.cardinality} {kind}"]
+        if upserted.old_cardinality is not None:
+            parts.append(f"(overwrote previous: {upserted.old_cardinality} items)")
         return " ".join(parts)
 
 

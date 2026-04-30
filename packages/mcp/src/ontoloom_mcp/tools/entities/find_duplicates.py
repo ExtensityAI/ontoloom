@@ -18,11 +18,14 @@ def find_duplicates(
 ):
     """Find annotation values shared by multiple entities.
 
-    Checks for duplicate values of a specific annotation property (e.g.,
-    "rdfs:label") across entities. Saves all affected entities as an entity
-    selection for further inspection.
+    Reports groups of entities that share the same value for `annotation_property`
+    (e.g., "rdfs:label"). Saves all affected entities as an entity selection.
 
-    Use `within` to restrict the check to entities in an existing selection.
+    Args:
+    - `into`: Name for the output selection (entities involved in any duplicate).
+    - `annotation_property`: The property whose values are checked for duplicates
+      (e.g. "rdfs:label").
+    - `within`: Optional entity selection to restrict the check to.
     """
     with Ontology(path) as ont:
         result = entities.find_duplicates(ont, annotation_property, within=within)
@@ -33,20 +36,22 @@ def find_duplicates(
         source = f"find_duplicates(annotation_property={annotation_property!r})"
         if within:
             source += f", within={within!r}"
-        content_hash, cardinality, old_cardinality = selections.write(
+        upserted = selections.upsert(
             ont, into, SelectionKind.ENTITIES, result.affected_iris, source=source
         )
 
     lines = [
         f"Found {result.total_groups} duplicate {annotation_property} values "
-        f"across {cardinality} entities → {into!r} (sel@{content_hash})."
+        f"across {upserted.cardinality} entities -> {into!r} (sel@{upserted.content_hash})."
     ]
-    if old_cardinality is not None:
-        lines.append(f"Overwrote previous ({old_cardinality} items).")
+    if upserted.old_cardinality is not None:
+        lines.append(f"Overwrote previous ({upserted.old_cardinality} items).")
     lines.append("")
 
-    for value, iris in result.groups[:_PREVIEW_GROUPS]:
-        lines.append(f'  "{value}" ({len(iris)} entities): {", ".join(iris)}')
+    lines.extend(
+        f'  "{group.value}" ({len(group.iris)} entities): {", ".join(group.iris)}'
+        for group in result.groups[:_PREVIEW_GROUPS]
+    )
 
     if result.total_groups > _PREVIEW_GROUPS:
         lines.append(f"\n  ... and {result.total_groups - _PREVIEW_GROUPS} more groups.")

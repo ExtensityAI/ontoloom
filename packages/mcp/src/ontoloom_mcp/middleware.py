@@ -2,6 +2,7 @@
 
 import logging
 import time
+from typing import override
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
@@ -12,6 +13,7 @@ logger = logging.getLogger("ontoloom")
 class TimingMiddleware(Middleware):
     """Log wall-clock time per tool call."""
 
+    @override
     async def on_call_tool(self, context, call_next):
         start = time.perf_counter()
         try:
@@ -24,6 +26,7 @@ class TimingMiddleware(Middleware):
 class LastResortMiddleware(Middleware):
     """Catch unhandled exceptions so clients get a clean error instead of a crash."""
 
+    @override
     async def on_call_tool(self, context, call_next):
         try:
             return await call_next(context)
@@ -31,5 +34,5 @@ class LastResortMiddleware(Middleware):
             raise
         except Exception as e:
             logger.exception("Unhandled exception in tool %s", context.message.name)
-            msg = f"Internal error: {type(e).__name__}"
+            msg = f"Internal error: {type(e).__name__}: {e}"
             raise ToolError(msg) from e

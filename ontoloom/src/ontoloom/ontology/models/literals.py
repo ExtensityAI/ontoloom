@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import re
 from enum import StrEnum
-from typing import Annotated, Any, ClassVar, Literal
+from typing import Annotated, Any, Literal, override
 
-from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler
-from pydantic_core import CoreSchema, core_schema
+from pydantic import Field
 
+from ontoloom.ontology.models._pydantic import FrozenModel, TaggedModel, _PydanticStr
 from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
 
 
@@ -69,46 +69,44 @@ class Position(StrEnum):
     ENTITY = "entity"
 
 
-class FrozenModel(BaseModel):
-    model_config = ConfigDict(frozen=True, extra="forbid")
+# Subset of Position values that may appear in an EntityPosition marker or be
+# persisted to axiom_entities.position. ANY is reserved for query-time filters.
+type StoredPosition = Literal[
+    Position.SUB_CLASS,
+    Position.SUPER_CLASS,
+    Position.RESTRICTION_PROPERTY,
+    Position.FILLER,
+    Position.SUB_PROPERTY,
+    Position.SUPER_PROPERTY,
+    Position.CHAIN_MEMBER,
+    Position.SUBJECT,
+    Position.PROPERTY,
+    Position.VALUE,
+    Position.DOMAIN,
+    Position.RANGE,
+    Position.SOURCE,
+    Position.TARGET,
+    Position.INDIVIDUAL,
+    Position.CLASS,
+    Position.MEMBER,
+    Position.ENTITY,
+]
 
 
-class TaggedModel(FrozenModel):
-    """A FrozenModel that participates in a discriminated union via a `type` field.
-
-    Subclasses must declare `type: Literal["..."] = "..."`. Intermediate bases
-    that don't declare their own `type` are skipped silently. The literal default
-    is mirrored to a `type_` ClassVar for class-level access (e.g. SQL queries).
-    """
-
-    type_: ClassVar[str] = ""
-
-    @classmethod
-    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        super().__pydantic_init_subclass__(**kwargs)
-        if "type" not in cls.__annotations__:
-            return
-        default = cls.model_fields["type"].default
-        if not isinstance(default, str) or not default:
-            msg = f'{cls.__name__}.type must be Literal["..."] = "..." with a non-empty str default'
-            raise TypeError(msg)
-        cls.type_ = default
+IRI_PATTERN = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
 
 
-_IRI_RE = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
-
-
-class IRI(str):
+class IRI(_PydanticStr):
     """An OWL entity identifier in `prefix:local_name` format.
 
     Examples:
-        IRI(":Dog")        → :Dog
-        IRI("owl:Thing")   → owl:Thing
-        IRI("xsd:integer") → xsd:integer
+        IRI(":Dog")        -> :Dog
+        IRI("owl:Thing")   -> owl:Thing
+        IRI("xsd:integer") -> xsd:integer
     """
 
     def __new__(cls, value: str):
-        if not _IRI_RE.match(value):
+        if not IRI_PATTERN.match(value):
             msg = f"IRI must be in 'prefix:local_name' format, got {value!r}"
             raise ValueError(msg)
         return super().__new__(cls, value)
@@ -121,14 +119,9 @@ class IRI(str):
     def local_name(self) -> str:
         return self.split(":", 1)[1]
 
+    @override
     def __repr__(self):
         return f"IRI({self})"
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
     @classmethod
     def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:
@@ -179,6 +172,7 @@ class TypedLiteral(FrozenModel):
     value: str
     datatype: DataType = DataType.STRING
 
+    @override
     def __str__(self) -> str:
         return f'"{self.value}"^^{self.datatype.value}'
 
@@ -187,8 +181,11 @@ class LangLiteral(FrozenModel):
     """A value with a language tag: "Dog"@en"""
 
     value: str
+    # Empty string is a valid sentinel meaning "no language tag". Prefer an
+    # explicit tag (e.g. lang="en") whenever the language is known.
     lang: str = Field(default="en", pattern=r"^$|^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$")
 
+    @override
     def __str__(self) -> str:
         return f'"{self.value}"@{self.lang}'
 
@@ -201,6 +198,9 @@ class Annotation(FrozenModel):
         EntityKind(EntityType.ANNOTATION_PROPERTY),
         EntityPosition(Position.PROPERTY),
     ]
+    # Smart-union by structural disambiguation: IRI is a str subclass,
+    # TypedLiteral has `datatype`, LangLiteral has `lang` — all uniquely
+    # identifiable without a `type` discriminator field.
     value: Annotated[
         IRI | TypedLiteral | LangLiteral,
         EntityPosition(Position.VALUE),
@@ -214,6 +214,23 @@ class BaseDataRange(TaggedModel):
     """Base for all data range expressions."""
 
 
+class DataTypeRef(BaseDataRange):
+    """Wraps a `DataType` enum so the `DataRange` union is uniformly tagged.
+
+    Without this wrapper, `DataRange` mixes a bare-string member (`DataType` is a
+    `StrEnum`) with discriminated-model members, producing a nested
+    `anyOf[oneOf, string]` JSON Schema that LLMs mishandle. See
+    `feedback_no_nested_annotated_unions.md`.
+    """
+
+    type: Literal["DataTypeRef"] = "DataTypeRef"
+    value: DataType
+
+    @override
+    def __str__(self) -> str:
+        return self.value.value
+
+
 class DataIntersectionOf(BaseDataRange):
     """Intersection of data ranges."""
 
@@ -224,8 +241,9 @@ class DataIntersectionOf(BaseDataRange):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
-        return " ⊓ ".join(_fmt_data_range(o) for o in self.operands)
+        return " ⊓ ".join(str(o) for o in self.operands)
 
 
 class DataOneOf(BaseDataRange):
@@ -234,24 +252,15 @@ class DataOneOf(BaseDataRange):
     type: Literal["DataOneOf"] = "DataOneOf"
     value: TypedLiteral | LangLiteral
 
+    @override
     def __str__(self) -> str:
         return f"{{{self.value}}}"
 
 
-DataRange = (
-    DataType
-    | Annotated[
-        DataIntersectionOf | DataOneOf,
-        Field(discriminator="type"),
-    ]
-)
-
-
-def _fmt_data_range(dr: DataRange):
-    """Format a DataRange union value as a compact string."""
-    if isinstance(dr, DataType):
-        return dr.value
-    return str(dr)
+DataRange = Annotated[
+    DataTypeRef | DataIntersectionOf | DataOneOf,
+    Field(discriminator="type"),
+]
 
 
 DataIntersectionOf.model_rebuild()

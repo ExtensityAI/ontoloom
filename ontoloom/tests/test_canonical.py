@@ -1,4 +1,12 @@
-from ontoloom.ontology.canonical import axiom_hash, canonical_json
+from ontoloom.ontology import selections
+from ontoloom.ontology.canonical import (
+    HASH_DISPLAY_LEN,
+    axiom_hash,
+    canonical_json,
+    min_distinguishing_prefixes,
+    truncate_hash,
+)
+from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.models.assertions import DifferentIndividuals, SameIndividual
 from ontoloom.ontology.models.axioms import (
     DataPropertyRange,
@@ -22,9 +30,11 @@ from ontoloom.ontology.models.literals import (
     DataIntersectionOf,
     DataOneOf,
     DataType,
+    DataTypeRef,
     LangLiteral,
     TypedLiteral,
 )
+from ontoloom.ontology.types import SelectionKind
 
 # -- Annotation exclusion --
 
@@ -168,11 +178,15 @@ def test_subclassof_order_preserved():
 def test_data_intersection_operand_order_irrelevant():
     ax1 = DataPropertyRange(
         property=IRI("ex:hasAge"),
-        range=DataIntersectionOf(operands=(DataType.INTEGER, DataType.DECIMAL)),
+        range=DataIntersectionOf(
+            operands=(DataTypeRef(value=DataType.INTEGER), DataTypeRef(value=DataType.DECIMAL))
+        ),
     )
     ax2 = DataPropertyRange(
         property=IRI("ex:hasAge"),
-        range=DataIntersectionOf(operands=(DataType.DECIMAL, DataType.INTEGER)),
+        range=DataIntersectionOf(
+            operands=(DataTypeRef(value=DataType.DECIMAL), DataTypeRef(value=DataType.INTEGER))
+        ),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
 
@@ -180,24 +194,35 @@ def test_data_intersection_operand_order_irrelevant():
 def test_datatype_definition_with_data_intersection():
     ax1 = DatatypeDefinition(
         datatype=IRI("ex:PosInt"),
-        data_range=DataIntersectionOf(operands=(DataType.INTEGER, DataType.NON_NEGATIVE_INTEGER)),
+        data_range=DataIntersectionOf(
+            operands=(
+                DataTypeRef(value=DataType.INTEGER),
+                DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER),
+            )
+        ),
     )
     ax2 = DatatypeDefinition(
         datatype=IRI("ex:PosInt"),
-        data_range=DataIntersectionOf(operands=(DataType.NON_NEGATIVE_INTEGER, DataType.INTEGER)),
+        data_range=DataIntersectionOf(
+            operands=(
+                DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER),
+                DataTypeRef(value=DataType.INTEGER),
+            )
+        ),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_data_intersection_with_data_one_of_operand():
     one = DataOneOf(value=TypedLiteral(value="1", datatype=DataType.INTEGER))
+    int_ref = DataTypeRef(value=DataType.INTEGER)
     ax1 = DataPropertyRange(
         property=IRI("ex:p"),
-        range=DataIntersectionOf(operands=(DataType.INTEGER, one)),
+        range=DataIntersectionOf(operands=(int_ref, one)),
     )
     ax2 = DataPropertyRange(
         property=IRI("ex:p"),
-        range=DataIntersectionOf(operands=(one, DataType.INTEGER)),
+        range=DataIntersectionOf(operands=(one, int_ref)),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
 
@@ -207,14 +232,126 @@ def test_data_some_values_from_with_data_intersection():
         sub_class=NamedClass(iri=IRI("ex:A")),
         super_class=DataSomeValuesFrom(
             property=IRI("ex:p"),
-            range=DataIntersectionOf(operands=(DataType.STRING, DataType.TOKEN)),
+            range=DataIntersectionOf(
+                operands=(
+                    DataTypeRef(value=DataType.STRING),
+                    DataTypeRef(value=DataType.TOKEN),
+                )
+            ),
         ),
     )
     ax2 = SubClassOf(
         sub_class=NamedClass(iri=IRI("ex:A")),
         super_class=DataSomeValuesFrom(
             property=IRI("ex:p"),
-            range=DataIntersectionOf(operands=(DataType.TOKEN, DataType.STRING)),
+            range=DataIntersectionOf(
+                operands=(
+                    DataTypeRef(value=DataType.TOKEN),
+                    DataTypeRef(value=DataType.STRING),
+                )
+            ),
         ),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
+
+
+# -- P-03-9: Determinism --
+
+
+def test_canonical_idempotent():
+    from ontoloom.ontology.canonical import _normalize_model
+
+    ax = EquivalentClasses(
+        expressions=(
+            NamedClass(iri=IRI("ex:B")),
+            NamedClass(iri=IRI("ex:A")),
+        )
+    )
+    assert canonical_json(_normalize_model(ax)) == canonical_json(
+        _normalize_model(_normalize_model(ax))
+    )
+
+
+def test_selection_hash_order_independent(tmp_path):
+    path = tmp_path / "test.db"
+    Ontology.create(path)
+    with Ontology(path) as ont:
+        h1 = selections.upsert(
+            ont, "s1", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
+        ).content_hash
+        h2 = selections.upsert(
+            ont, "s2", SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
+        ).content_hash
+        assert h1 == h2
+
+
+def test_selection_pagination_stable_across_processes(tmp_path):
+    """Set-op selections must paginate the same way regardless of PYTHONHASHSEED.
+
+    Set ops materialise via Python `set`, whose iteration order is randomized;
+    selection_items.rowid would differ across runs without deterministic ordering
+    at the set-op level, and read_selection paginates by rowid.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    db_path = tmp_path / "det.db"
+    Ontology.create(db_path)
+    script = textwrap.dedent(f"""\
+        from pathlib import Path
+        from ontoloom.ontology import selections
+        from ontoloom.ontology.connection import Ontology
+        from ontoloom.ontology.types import SelectionKind
+
+        with Ontology(Path({str(db_path)!r})) as ont:
+            selections.upsert(ont, "a", SelectionKind.ENTITIES,
+                ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
+            selections.upsert(ont, "b", SelectionKind.ENTITIES,
+                ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
+            selections.create(ont, "r", intersection=["a", "b"])
+            page = selections.read(ont, "r", limit=5)
+            print(",".join(item.key for item in page.items))
+    """)
+
+    def run(seed: int):
+        return subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env={**__import__("os").environ, "PYTHONHASHSEED": str(seed)},
+            check=True,
+        ).stdout.strip()
+
+    assert run(0) == run(1) == run(42)
+
+
+# -- P-08-25: hash display helpers --
+
+
+def test_truncate_hash_uses_display_len():
+    h = "a" * 64
+    assert truncate_hash(h) == "a" * HASH_DISPLAY_LEN
+
+
+def test_min_distinguishing_prefixes_single():
+    h = "abcdef0123"
+    assert min_distinguishing_prefixes([h]) == [h]
+
+
+def test_min_distinguishing_prefixes_disjoint():
+    # All hashes diverge at the first character — each gets a 1-char prefix.
+    assert min_distinguishing_prefixes(["abcd", "bcde", "cdef"]) == ["a", "b", "c"]
+
+
+def test_min_distinguishing_prefixes_shared_prefix():
+    # "a3f1b2c4" and "a3f1c5d6" share "a3f1"; need 5 chars to disambiguate.
+    # "a3a2..." diverges at char 2, so 3 chars suffice.
+    out = min_distinguishing_prefixes(["a3f1b2c4", "a3f1c5d6", "a3a2ffff"])
+    assert out == ["a3f1b", "a3f1c", "a3a"]
+
+
+def test_min_distinguishing_prefixes_preserves_input_order():
+    # Input order is preserved; only distinguishing length is computed.
+    out = min_distinguishing_prefixes(["zzz9", "aaa1", "aaa2"])
+    assert out == ["z", "aaa1", "aaa2"]

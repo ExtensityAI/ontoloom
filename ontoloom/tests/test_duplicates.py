@@ -44,9 +44,9 @@ def test_find_duplicates_basic(ont):
 
     assert result.total_groups == 1
     assert len(result.groups) == 1
-    text, iris = result.groups[0]
-    assert text == "transport"
-    assert set(iris) == {"ex:A", "ex:B"}
+    group = result.groups[0]
+    assert group.value == "transport"
+    assert set(group.iris) == {"ex:A", "ex:B"}
     assert "ex:C" not in result.affected_iris
 
 
@@ -73,10 +73,10 @@ def test_find_duplicates_multiple_groups(ont):
 
     assert result.total_groups == 2
     # Ordered by count DESC: alpha (3) before beta (2)
-    assert result.groups[0][0] == "alpha"
-    assert len(result.groups[0][1]) == 3
-    assert result.groups[1][0] == "beta"
-    assert len(result.groups[1][1]) == 2
+    assert result.groups[0].value == "alpha"
+    assert len(result.groups[0].iris) == 3
+    assert result.groups[1].value == "beta"
+    assert len(result.groups[1].iris) == 2
 
 
 def test_find_duplicates_no_duplicates(ont):
@@ -114,13 +114,13 @@ def test_find_duplicates_within(ont):
     _add_label(ont, "ex:D", "dup")
 
     # Selection contains only A and B
-    selections.write(ont, "subset", SelectionKind.ENTITIES, ["ex:A", "ex:B"], "test")
+    selections.upsert(ont, "subset", SelectionKind.ENTITIES, ["ex:A", "ex:B"], "test")
 
     result = entities.find_duplicates(ont, annotation_property="rdfs:label", within="subset")
 
     assert result.total_groups == 1
-    text, iris = result.groups[0]
-    assert text == "dup"
-    assert set(iris) == {"ex:A", "ex:B"}
+    group = result.groups[0]
+    assert group.value == "dup"
+    assert set(group.iris) == {"ex:A", "ex:B"}
     assert "ex:C" not in result.affected_iris
     assert "ex:D" not in result.affected_iris

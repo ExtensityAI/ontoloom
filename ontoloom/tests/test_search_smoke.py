@@ -58,6 +58,7 @@ from ontoloom.ontology.models.literals import (
     Annotation,
     DataOneOf,
     DataType,
+    DataTypeRef,
     EntityType,
     LangLiteral,
     TypedLiteral,
@@ -181,7 +182,9 @@ AXIOMS = [
     ),
     SubClassOf(
         sub_class=nc(":Person"),
-        super_class=DataSomeValuesFrom(property=IRI(":hasAge"), range=DataType.INTEGER),
+        super_class=DataSomeValuesFrom(
+            property=IRI(":hasAge"), range=DataTypeRef(value=DataType.INTEGER)
+        ),
     ),
     SubClassOf(
         sub_class=nc(":Person"),
@@ -211,7 +214,9 @@ AXIOMS = [
     SubDataPropertyOf(sub_property=IRI(":hasWeight"), super_property=IRI(":hasMeasurement")),
     EquivalentDataProperties(properties=(IRI(":hasName"), IRI(":fullName"))),
     DataPropertyDomain(property=IRI(":hasAge"), domain=nc(":Person")),
-    DataPropertyRange(property=IRI(":hasAge"), range=DataType.NON_NEGATIVE_INTEGER),
+    DataPropertyRange(
+        property=IRI(":hasAge"), range=DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER)
+    ),
     FunctionalDataProperty(property=IRI(":hasAge")),
     # --- HasKey ---
     HasKey(
@@ -547,8 +552,11 @@ class TestGetEntityComprehensive:
         assert info.axiom_counts["FunctionalDataProperty"] >= 1
 
     def test_get_nonexistent_entity(self, ont):
+        from ontoloom.ontology.errors import EntityNotFoundError
+
         axioms.add(ont, AXIOMS)
-        assert entities.get(ont, IRI(":Nonexistent")) is None
+        with pytest.raises(EntityNotFoundError):
+            entities.get(ont, IRI(":Nonexistent"))
 
     def test_annotation_counts_exclude_annotation_assertions(self, ont):
         axioms.add(ont, AXIOMS)
@@ -777,3 +785,69 @@ class TestEnhancedEntitySearch:
             ont, query="domesticated", properties=["rdfs:label"], exclude_deprecated=False
         )
         assert ":Pet" not in iris2
+
+
+# -- F-F14: text search tiebreaker ordering --
+
+
+class TestTextSearchTiebreakers:
+    """Pin all three sort keys: quality (exact<substring), source (iri<annotation), IRI."""
+
+    def test_tiebreaker_ordering(self, ont):
+        # Build four entities that each match query "target" via a distinct (quality, source) tier.
+        axioms.add(
+            ont,
+            [
+                # tier (0,0): exact IRI match — local name IS "target"
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":target")),
+                # tier (0,1): exact annotation match — local name does NOT contain "target"
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":aaa")),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"),
+                    subject=IRI(":aaa"),
+                    value=LangLiteral(value="target"),
+                ),
+                # tier (1,0): substring IRI match — local name contains but ≠ "target"
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":target_extra")),
+                # tier (1,1): substring annotation match — annotation contains "target"
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":zzz")),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"),
+                    subject=IRI(":zzz"),
+                    value=LangLiteral(value="has_target_in_label"),
+                ),
+            ],
+        )
+
+        page = entities.search(ont, query="target", limit=100)
+        iris = [str(m.iri) for m in page.matches]
+
+        assert ":target" in iris
+        assert ":aaa" in iris
+        assert ":target_extra" in iris
+        assert ":zzz" in iris
+
+        idx_exact_iri = iris.index(":target")
+        idx_exact_ann = iris.index(":aaa")
+        idx_sub_iri = iris.index(":target_extra")
+        idx_sub_ann = iris.index(":zzz")
+
+        # Tiebreaker 1: exact before substring
+        assert idx_exact_iri < idx_sub_iri
+        assert idx_exact_ann < idx_sub_ann
+        # Tiebreaker 2: iri-source before annotation-source within same quality
+        assert idx_exact_iri < idx_exact_ann
+        assert idx_sub_iri < idx_sub_ann
+        # Combined: exact-iri < exact-ann < sub-iri < sub-ann
+        assert idx_exact_iri < idx_exact_ann < idx_sub_iri < idx_sub_ann
+
+        # Verify match metadata is set correctly
+        match_map = {str(m.iri): m for m in page.matches}
+        assert match_map[":target"].match_quality == "exact"
+        assert match_map[":target"].match_source == "iri"
+        assert match_map[":aaa"].match_quality == "exact"
+        assert match_map[":aaa"].match_source == "annotation"
+        assert match_map[":target_extra"].match_quality == "substring"
+        assert match_map[":target_extra"].match_source == "iri"
+        assert match_map[":zzz"].match_quality == "substring"
+        assert match_map[":zzz"].match_source == "annotation"

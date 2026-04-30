@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from pydantic.fields import FieldInfo
 
 if TYPE_CHECKING:
-    from ontoloom.ontology.models.literals import EntityType, Position
+    from ontoloom.ontology.models.literals import EntityType, Position, StoredPosition
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,10 +39,11 @@ class EntityPosition:
     """Values flowing through this field play this structural role in the axiom.
 
     Contextual: the parent's field declaration sets it; the extraction walker
-    propagates it downward into nested expressions.
+    propagates it downward into nested expressions. `Position.ANY` is rejected
+    statically: it's a query-time filter, not a stored or extracted role.
     """
 
-    position: Position
+    position: StoredPosition
 
 
 def is_unordered(info: FieldInfo) -> bool:

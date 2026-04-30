@@ -43,6 +43,7 @@ from ontoloom.ontology.models.literals import (
     IRI,
     Annotation,
     DataType,
+    DataTypeRef,
     EntityType,
     LangLiteral,
     Position,
@@ -128,7 +129,9 @@ def test_object_has_self():
 def test_data_some_values_from():
     ax = SubClassOf(
         sub_class=NC(":A"),
-        super_class=DataSomeValuesFrom(property=IRI(":dp"), range=DataType.INTEGER),
+        super_class=DataSomeValuesFrom(
+            property=IRI(":dp"), range=DataTypeRef(value=DataType.INTEGER)
+        ),
     )
     entities = _entities(ax)
     assert (":dp", EntityType.DATA_PROPERTY, P.RESTRICTION_PROPERTY) in entities
@@ -196,7 +199,7 @@ def test_data_property_domain():
 
 
 def test_data_property_range():
-    ax = DataPropertyRange(property=IRI(":dp"), range=DataType.INTEGER)
+    ax = DataPropertyRange(property=IRI(":dp"), range=DataTypeRef(value=DataType.INTEGER))
     entities = _entities(ax)
     assert (":dp", EntityType.DATA_PROPERTY, P.PROPERTY) in entities
 

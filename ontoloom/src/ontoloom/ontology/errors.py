@@ -1,10 +1,30 @@
 """Domain exceptions for the ontoloom core library."""
 
+from __future__ import annotations
+
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ontoloom.ontology.types import SelectionKind
 
 
 class OntoloomError(Exception):
     """Base for all ontoloom domain errors."""
+
+
+class BadRequestError(OntoloomError):
+    """User-input precondition failed at a core API boundary.
+
+    Raise at user-facing entry points when arguments are individually well-typed
+    but the combination violates a precondition (e.g. mismatched selection
+    kinds, non-positive limits, prefix still in use). Use ValueError for
+    programming errors that signal a bug in calling code.
+    """
+
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
 
 
 class OntologyNotFoundError(OntoloomError, FileNotFoundError):
@@ -34,21 +54,27 @@ class SelectionNotFoundError(OntoloomError):
 class StaleSelectionError(OntoloomError):
     """Selection has changed since last observed."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, supplied_prefix: str, current_hash: str | None):
         self.name = name
-        super().__init__(f"Selection {name!r} has changed since you last observed it.")
+        self.supplied_prefix = supplied_prefix
+        self.current_hash = current_hash
+        current = current_hash[:12] if current_hash else "<absent>"
+        super().__init__(
+            f"Selection {name!r} has changed (your prefix: {supplied_prefix!r}, "
+            f"current hash: {current!r}). Re-read the selection to get the current hash."
+        )
 
 
 class SelectionKindError(OntoloomError):
     """Wrong selection kind for the requested operation."""
 
-    def __init__(self, name: str, expected: str, actual: str, operation: str):
+    def __init__(self, name: str, expected: SelectionKind, actual: SelectionKind, operation: str):
         self.name = name
         self.expected = expected
         self.actual = actual
         self.operation = operation
         super().__init__(
-            f"'{operation}' requires a {expected} selection, but {name!r} is a {actual} selection."
+            f"'{operation}' requires an {expected} selection, but {name!r} is an {actual} selection."
         )
 
 
@@ -60,15 +86,32 @@ class AxiomNotFoundError(OntoloomError):
         super().__init__(f"No axiom matching hash prefix [{prefix}].")
 
 
-class AmbiguousHashError(OntoloomError):
-    """Hash prefix matches multiple axioms."""
+class EntityNotFoundError(OntoloomError):
+    """No entity with the given IRI exists in the ontology.
 
-    def __init__(self, prefix: str, count: int, samples: list[str]):
+    `near_matches` are IRIs of entities with similar local names — populated by
+    `entities.get` so callers can show "did you mean…?" without re-querying.
+    """
+
+    def __init__(self, iri: str, near_matches: list[str] | None = None):
+        self.iri = iri
+        self.near_matches = near_matches or []
+        super().__init__(f"Entity {iri!r} not found.")
+
+
+class AmbiguousHashError(OntoloomError):
+    """Hash prefix matches multiple axioms.
+
+    `distinguishing_prefixes` are the minimum-length prefixes that uniquely
+    identify each match — the caller can copy any of them verbatim to retry.
+    """
+
+    def __init__(self, prefix: str, count: int, distinguishing_prefixes: list[str]):
         self.prefix = prefix
         self.count = count
-        self.samples = samples
+        self.distinguishing_prefixes = distinguishing_prefixes
         max_shown = 10
-        shown = ", ".join(samples[:max_shown])
+        shown = ", ".join(distinguishing_prefixes[:max_shown])
         suffix = f", ... ({count - max_shown} more)" if count > max_shown else ""
         super().__init__(f"[{prefix}] matches {count} axioms: {shown}{suffix}.")
 
@@ -96,3 +139,19 @@ class StoreCorruptionError(OntoloomError):
         self.detail = detail
         self.original = original
         super().__init__(f"Corrupted stored data: {detail}")
+
+
+class InternalError(OntoloomError):
+    """Internal invariant violated. Indicates a bug in ontoloom itself, not user input."""
+
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(detail)
+
+
+class OntologySchemaError(OntoloomError):
+    """Database is not an ontoloom store or its schema version does not match."""
+
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(detail)

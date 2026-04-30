@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, override
 
 from pydantic import Field
 
@@ -29,6 +29,7 @@ class NamedClass(BaseClassExpression):
     type: Literal["NamedClass"] = "NamedClass"
     iri: Annotated[IRI, EntityKind(EntityType.CLASS)]
 
+    @override
     def __str__(self) -> str:
         return str(self.iri)
 
@@ -40,7 +41,7 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     """∃r.C — things related by r to at least one member of C.
 
     SubClassOf(Animal, ObjectSomeValuesFrom(hasPart, Heart))
-        → every animal has some heart as a part
+        -> every animal has some heart as a part
     """
 
     type: Literal["ObjectSomeValuesFrom"] = "ObjectSomeValuesFrom"
@@ -51,6 +52,7 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     ]
     filler: Annotated[ClassExpression, EntityPosition(Position.FILLER)]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectSomeValuesFrom({self.property}, {self.filler})"
 
@@ -58,7 +60,7 @@ class ObjectSomeValuesFrom(BaseClassExpression):
 class ObjectIntersectionOf(BaseClassExpression):
     """C ⊓ D — things in ALL listed classes simultaneously.
 
-    ObjectIntersectionOf([Woman, Parent]) → female parents
+    ObjectIntersectionOf([Woman, Parent]) -> female parents
     """
 
     type: Literal["ObjectIntersectionOf"] = "ObjectIntersectionOf"
@@ -68,6 +70,7 @@ class ObjectIntersectionOf(BaseClassExpression):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectIntersectionOf({', '.join(str(o) for o in self.operands)})"
 
@@ -81,6 +84,7 @@ class ObjectOneOf(BaseClassExpression):
     type: Literal["ObjectOneOf"] = "ObjectOneOf"
     individual: Annotated[IRI, EntityKind(EntityType.NAMED_INDIVIDUAL)]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectOneOf({self.individual})"
 
@@ -88,7 +92,7 @@ class ObjectOneOf(BaseClassExpression):
 class ObjectHasValue(BaseClassExpression):
     """∃r.{a} — things related by r to a specific individual.
 
-    ObjectHasValue(hasCreator, :Alice) → things created by Alice
+    ObjectHasValue(hasCreator, :Alice) -> things created by Alice
 
     Syntactic sugar for ObjectSomeValuesFrom(r, ObjectOneOf({a})).
     """
@@ -105,6 +109,7 @@ class ObjectHasValue(BaseClassExpression):
         EntityPosition(Position.FILLER),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectHasValue({self.property}, {self.individual})"
 
@@ -112,7 +117,7 @@ class ObjectHasValue(BaseClassExpression):
 class ObjectHasSelf(BaseClassExpression):
     """∃r.Self — things related to themselves by r.
 
-    ObjectHasSelf(likes) → things that like themselves
+    ObjectHasSelf(likes) -> things that like themselves
     """
 
     type: Literal["ObjectHasSelf"] = "ObjectHasSelf"
@@ -122,6 +127,7 @@ class ObjectHasSelf(BaseClassExpression):
         EntityPosition(Position.RESTRICTION_PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectHasSelf({self.property})"
 
@@ -133,7 +139,7 @@ class DataSomeValuesFrom(BaseClassExpression):
     """Things with at least one value for dp in the given range.
 
     DataSomeValuesFrom(hasAge, xsd:integer)
-        → things that have an integer age
+        -> things that have an integer age
     """
 
     type: Literal["DataSomeValuesFrom"] = "DataSomeValuesFrom"
@@ -144,6 +150,7 @@ class DataSomeValuesFrom(BaseClassExpression):
     ]
     range: DataRange
 
+    @override
     def __str__(self) -> str:
         from ontoloom.ontology.models.literals import _fmt_data_range
 
@@ -164,6 +171,7 @@ class DataHasValue(BaseClassExpression):
     ]
     value: TypedLiteral | LangLiteral
 
+    @override
     def __str__(self) -> str:
         return f"DataHasValue({self.property}, {self.value})"
 

@@ -1,5 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.ontology import selections
+from ontoloom.ontology.canonical import truncate_hash
 from ontoloom.ontology.connection import Ontology
 from ontoloom.ontology.types import SelectionKind, ShowFilter
 
@@ -43,7 +44,7 @@ def read_selection(
 
     if meta.kind == SelectionKind.AXIOMS:
         for item in result.items:
-            h = item.key[:8]
+            h = truncate_hash(item.key)
             if item.missing:
                 lines.append(f"[{h}] *missing*")
             else:

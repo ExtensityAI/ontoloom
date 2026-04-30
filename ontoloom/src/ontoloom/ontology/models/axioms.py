@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, override
 
 from pydantic import Field, model_validator
 
@@ -42,6 +42,7 @@ class AnnotationAssertion(BaseAxiom):
         EntityPosition(Position.VALUE),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"AnnotationAssertion({self.property}, {self.subject}, {self.value})"
 
@@ -50,15 +51,16 @@ class SubClassOf(BaseAxiom):
     """C ⊑ D — every instance of sub_class is an instance of super_class.
 
     SubClassOf(Dog, Animal)
-        → every dog is an animal
+        -> every dog is an animal
     SubClassOf(Mammal, ∃hasPart.Lung)
-        → every mammal has some lung
+        -> every mammal has some lung
     """
 
     type: Literal["SubClassOf"] = "SubClassOf"
     sub_class: Annotated[ClassExpression, EntityPosition(Position.SUB_CLASS)]
     super_class: Annotated[ClassExpression, EntityPosition(Position.SUPER_CLASS)]
 
+    @override
     def __str__(self) -> str:
         return f"SubClassOf({self.sub_class}, {self.super_class})"
 
@@ -79,6 +81,7 @@ class EquivalentClasses(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"EquivalentClasses({', '.join(str(e) for e in self.expressions)})"
 
@@ -86,7 +89,7 @@ class EquivalentClasses(BaseAxiom):
 class DisjointClasses(BaseAxiom):
     """Classes share no instances.
 
-    DisjointClasses(Male, Female) → nothing is both male and female
+    DisjointClasses(Male, Female) -> nothing is both male and female
     """
 
     type: Literal["DisjointClasses"] = "DisjointClasses"
@@ -97,6 +100,7 @@ class DisjointClasses(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"DisjointClasses({', '.join(str(e) for e in self.expressions)})"
 
@@ -119,6 +123,7 @@ class SubObjectPropertyOf(BaseAxiom):
         EntityPosition(Position.SUPER_PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"SubObjectPropertyOf({self.sub_property}, {self.super_property})"
 
@@ -145,6 +150,7 @@ class SubObjectPropertyOfChain(BaseAxiom):
         EntityPosition(Position.SUPER_PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         chain = ", ".join(str(p) for p in self.chain)
         return f"SubObjectPropertyOfChain([{chain}], {self.super_property})"
@@ -162,12 +168,13 @@ class EquivalentObjectProperties(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"EquivalentObjectProperties({', '.join(str(p) for p in self.properties)})"
 
 
 class TransitiveObjectProperty(BaseAxiom):
-    """r(x,y) ∧ r(y,z) → r(x,z)
+    """r(x,y) ∧ r(y,z) -> r(x,z)
 
     Equivalent to SubObjectPropertyOfChain([r, r], r).
     """
@@ -179,6 +186,7 @@ class TransitiveObjectProperty(BaseAxiom):
         EntityPosition(Position.PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"TransitiveObjectProperty({self.property})"
 
@@ -196,6 +204,7 @@ class ReflexiveObjectProperty(BaseAxiom):
         EntityPosition(Position.PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"ReflexiveObjectProperty({self.property})"
 
@@ -215,6 +224,7 @@ class ObjectPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[ClassExpression, EntityPosition(Position.DOMAIN)]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectPropertyDomain({self.property}, {self.domain})"
 
@@ -233,6 +243,7 @@ class ObjectPropertyRange(BaseAxiom):
     ]
     range: Annotated[ClassExpression, EntityPosition(Position.RANGE)]
 
+    @override
     def __str__(self) -> str:
         return f"ObjectPropertyRange({self.property}, {self.range})"
 
@@ -252,6 +263,7 @@ class SubDataPropertyOf(BaseAxiom):
         EntityPosition(Position.SUPER_PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"SubDataPropertyOf({self.sub_property}, {self.super_property})"
 
@@ -268,6 +280,7 @@ class EquivalentDataProperties(BaseAxiom):
         Field(min_length=2),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"EquivalentDataProperties({', '.join(str(p) for p in self.properties)})"
 
@@ -283,6 +296,7 @@ class DataPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[ClassExpression, EntityPosition(Position.DOMAIN)]
 
+    @override
     def __str__(self) -> str:
         return f"DataPropertyDomain({self.property}, {self.domain})"
 
@@ -298,6 +312,7 @@ class DataPropertyRange(BaseAxiom):
     ]
     range: Annotated[DataRange, EntityPosition(Position.RANGE)]
 
+    @override
     def __str__(self) -> str:
         from ontoloom.ontology.models.literals import _fmt_data_range
 
@@ -307,7 +322,7 @@ class DataPropertyRange(BaseAxiom):
 class FunctionalDataProperty(BaseAxiom):
     """dp has at most one value per individual.
 
-    FunctionalDataProperty(hasAge) → each thing has at most one age
+    FunctionalDataProperty(hasAge) -> each thing has at most one age
     """
 
     type: Literal["FunctionalDataProperty"] = "FunctionalDataProperty"
@@ -317,6 +332,7 @@ class FunctionalDataProperty(BaseAxiom):
         EntityPosition(Position.PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"FunctionalDataProperty({self.property})"
 
@@ -324,7 +340,7 @@ class FunctionalDataProperty(BaseAxiom):
 class HasKey(BaseAxiom):
     """Instances of CE are uniquely identified by the listed properties.
 
-    HasKey(Person, [hasSSN]) → SSN uniquely identifies a person
+    HasKey(Person, [hasSSN]) -> SSN uniquely identifies a person
     """
 
     type: Literal["HasKey"] = "HasKey"
@@ -349,6 +365,7 @@ class HasKey(BaseAxiom):
             raise ValueError(msg)
         return self
 
+    @override
     def __str__(self) -> str:
         obj = ", ".join(str(p) for p in self.object_properties)
         data = ", ".join(str(p) for p in self.data_properties)
@@ -368,6 +385,7 @@ class SubAnnotationPropertyOf(BaseAxiom):
         EntityPosition(Position.SUPER_PROPERTY),
     ]
 
+    @override
     def __str__(self) -> str:
         return f"SubAnnotationPropertyOf({self.sub_property}, {self.super_property})"
 
@@ -383,6 +401,7 @@ class AnnotationPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[IRI, EntityPosition(Position.DOMAIN)]
 
+    @override
     def __str__(self) -> str:
         return f"AnnotationPropertyDomain({self.property}, {self.domain})"
 
@@ -398,6 +417,7 @@ class AnnotationPropertyRange(BaseAxiom):
     ]
     range: Annotated[IRI, EntityPosition(Position.RANGE)]
 
+    @override
     def __str__(self) -> str:
         return f"AnnotationPropertyRange({self.property}, {self.range})"
 
@@ -411,6 +431,7 @@ class DatatypeDefinition(BaseAxiom):
     ]
     data_range: Annotated[DataRange, EntityPosition(Position.RANGE)]
 
+    @override
     def __str__(self) -> str:
         from ontoloom.ontology.models.literals import _fmt_data_range
 
@@ -422,6 +443,7 @@ class Declaration(BaseAxiom):
     entity_type: EntityType
     iri: Annotated[IRI, EntityPosition(Position.ENTITY)]
 
+    @override
     def __str__(self) -> str:
         return f"Declaration({self.entity_type}, {self.iri})"
 

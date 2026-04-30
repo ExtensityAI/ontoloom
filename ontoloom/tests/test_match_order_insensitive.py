@@ -2,7 +2,8 @@ from ontoloom.ontology.models.axioms import EquivalentClasses
 from ontoloom.ontology.models.expressions import NamedClass
 from ontoloom.ontology.models.literals import IRI
 from ontoloom.ontology.patterns import EquivalentClassesPattern, NamedClassPattern
-from ontoloom.ontology.patterns.match import match_pattern
+from ontoloom.ontology.patterns.match import _match_pattern
+from ontoloom.ontology.patterns.slot import Slot
 
 
 def test_equivalent_classes_pattern_order_insensitive():
@@ -11,11 +12,11 @@ def test_equivalent_classes_pattern_order_insensitive():
     )
     pattern = EquivalentClassesPattern(
         expressions=(
-            NamedClassPattern(iri="ex:Dog"),
-            NamedClassPattern(iri="ex:Cat"),
+            NamedClassPattern(iri=Slot("ex:Dog")),
+            NamedClassPattern(iri=Slot("ex:Cat")),
         ),
     )
-    bindings = match_pattern(pattern, axiom)
+    bindings = _match_pattern(pattern, axiom)
     assert bindings == [{}]
 
 
@@ -30,11 +31,11 @@ def test_equivalent_classes_pattern_length_mismatch():
     )
     pattern = EquivalentClassesPattern(
         expressions=(
-            NamedClassPattern(iri="ex:Dog"),
-            NamedClassPattern(iri="ex:Cat"),
+            NamedClassPattern(iri=Slot("ex:Dog")),
+            NamedClassPattern(iri=Slot("ex:Cat")),
         ),
     )
-    assert match_pattern(pattern, axiom) == []
+    assert _match_pattern(pattern, axiom) == []
 
 
 def test_chain_pattern_order_sensitive():
@@ -47,7 +48,7 @@ def test_chain_pattern_order_sensitive():
         super_property=IRI("ex:hasUncle"),
     )
     swapped = SubObjectPropertyOfChainPattern(
-        chain=("ex:hasBrother", "ex:hasParent"),
-        super_property="ex:hasUncle",
+        chain=(Slot("ex:hasBrother"), Slot("ex:hasParent")),
+        super_property=Slot("ex:hasUncle"),
     )
-    assert match_pattern(swapped, axiom) == []
+    assert _match_pattern(swapped, axiom) == []

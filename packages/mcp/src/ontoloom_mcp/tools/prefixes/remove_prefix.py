@@ -6,7 +6,7 @@ from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, PrefixName
 
 
-def rm_prefix(path: OntologyPath, name: PrefixName):
+def remove_prefix(path: OntologyPath, name: PrefixName):
     """Remove a prefix mapping.
 
     Axioms that already reference `name:local_name` are not modified — IRIs are
@@ -18,6 +18,6 @@ def rm_prefix(path: OntologyPath, name: PrefixName):
         return f"Removed prefix `{name}:`"
 
 
-tool_rm_prefix = create_tool(
-    rm_prefix, name="rm_prefix", annotations=ToolAnnotations(destructiveHint=True)
+tool_remove_prefix = create_tool(
+    remove_prefix, name="remove_prefix", annotations=ToolAnnotations(destructiveHint=True)
 )

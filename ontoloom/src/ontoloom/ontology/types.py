@@ -1,57 +1,92 @@
+# Shared lightweight types used across core and MCP layers; no business logic.
+# Intentional grab-bag: selection DTOs, entity types, axiom helpers.
 import re
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Any, Literal, override
 
-from pydantic import GetCoreSchemaHandler
-from pydantic_core import CoreSchema, core_schema
-
-from ontoloom.ontology.models.axioms import Axiom
+from ontoloom.ontology.errors import BadRequestError
+from ontoloom.ontology.models._pydantic import _PydanticStr
+from ontoloom.ontology.models.base import BaseAxiom
 from ontoloom.ontology.models.literals import IRI, EntityType
 
-MatchSource = Literal["iri", "annotation", "list"]
+# A: look through this file, there are lots of types that maybe should be colocated with their functions, or located elsewhere - this seems like a bit of a lazy approach. for each of these, check where it shoudl actually be, it might be that some need to be in new files etc etc
+
+# A global: also, rethink all these types - which ones are good, which ones are bad? which to improve or simplify? for each, figure out where they are needed and for what, etc.
+
+
+class SetOp(StrEnum):
+    UNION = "union"
+    INTERSECTION = "intersection"
+    DIFFERENCE = "difference"
+
+
+class ConversionOp(StrEnum):
+    AXIOMS_FOR = "axioms_for"
+    ENTITIES_IN = "entities_in"
+
+
+MatchSource = Literal[
+    "iri", "annotation", "list"
+]  # A global: should these not be str enums? maybe check everywhere, but it might be okay depending on the case, so please judge each
 MatchQuality = Literal["exact", "substring"]
 
 MAX_SELECTION_NAME_LEN = 64
+
+# A: not sure but checking for control chars seems so weird to me?
+_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def validate_selection_name(v: str):
     """Validate a selection name. Used by both SelectionName and LockedSelection."""
     if not v:
         msg = "Selection name must not be empty."
-        raise ValueError(msg)
+        raise BadRequestError(msg)
     if "@" in v:
         msg = "Selection names must not contain '@'."
-        raise ValueError(msg)
+        raise BadRequestError(msg)
+    if _CONTROL_CHARS.search(v):
+        msg = "Selection name must not contain control characters (NUL, newline, tab, etc.)."
+        raise BadRequestError(msg)
     if len(v) > MAX_SELECTION_NAME_LEN:
         msg = f"Selection name too long ({len(v)} chars, max {MAX_SELECTION_NAME_LEN})."
-        raise ValueError(msg)
+        raise BadRequestError(msg)
     return v
 
 
-_LOCKED_SELECTION_RE = re.compile(r"^([^@]+)@([0-9a-fA-F]{8,})$")
+_HASH_PREFIX_RE = re.compile(r"^[0-9a-fA-F]{8,}$")
 
 
-class LockedSelection(str):
+class LockedSelection(_PydanticStr):
     """A selection reference with optimistic-locking hash: `name@hash_prefix`.
 
-    Required for write operations that act on a selection. The hash prefix
-    verifies the selection hasn't changed since the caller last observed it.
+    Used for `within=` on tools whose operation mutates the scoped selection
+    (remove_axioms, rename_iri). The hash prefix verifies the selection hasn't
+    changed since the caller last observed it.
+
+    Read-only or output-only selection parameters use bare `SelectionName`
+    instead. find_duplicates writes a selection but does NOT mutate its
+    `within=` scope, so it takes `SelectionName`.
+
+    Read paths (`summary`, `describe_ontology`, `read_selection`) deliberately
+    do not require a hash prefix — they always reflect current state, and any
+    "staleness" is observable on the next read. Locking is for write paths,
+    where the caller's intent depends on a known prior state.
 
     Examples:
-        LockedSelection("my_sel@a3f1") → my_sel@a3f1
+        LockedSelection("my_sel@a3f1") -> my_sel@a3f1
     """
 
     def __new__(cls, value: str):
-        m = _LOCKED_SELECTION_RE.match(value)
-        if not m:
+        name, sep, hash_prefix = value.partition("@")
+        if not sep or not _HASH_PREFIX_RE.match(hash_prefix):
             msg = (
                 f"LockedSelection must be in 'name@hash_prefix' format with at least 8 hex "
                 f"characters in the prefix (e.g. 'my_sel@a3f1b2c4'), got {value!r}"
             )
             raise ValueError(msg)
-        validate_selection_name(m.group(1))
+        validate_selection_name(name)
         return super().__new__(cls, value)
 
     @property
@@ -62,14 +97,9 @@ class LockedSelection(str):
     def hash_prefix(self) -> str:
         return self.split("@", 1)[1]
 
+    @override
     def __repr__(self):
         return f"LockedSelection({self})"
-
-    @classmethod
-    def __get_pydantic_core_schema__(
-        cls, source_type: Any, handler: GetCoreSchemaHandler
-    ) -> CoreSchema:
-        return core_schema.no_info_after_validator_function(cls, core_schema.str_schema())
 
     @classmethod
     def __get_pydantic_json_schema__(cls, schema: Any, handler: Any) -> dict[str, Any]:
@@ -107,7 +137,7 @@ class ShowFilter(StrEnum):
     MISSING = "missing"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SelectionMeta:
     name: str
     kind: SelectionKind
@@ -116,16 +146,16 @@ class SelectionMeta:
     source: str = ""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SelectionItem:
     key: str
     missing: bool
-    axiom: Axiom | None = None
+    axiom: BaseAxiom | None = None
     role: str | None = None
     label: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SelectionPage:
     meta: SelectionMeta
     items: list[SelectionItem] = field(default_factory=list)
@@ -135,20 +165,32 @@ class SelectionPage:
     show: ShowFilter = ShowFilter.ALL
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class AnnotationRow:
     property: IRI
     value: str
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
+class AxiomSummary:
+    total: int
+    by_type: Counter[str]
+
+
+@dataclass(frozen=True, slots=True)
+class EntitySummary:
+    total: int
+    by_role: Counter[str]
+
+
+@dataclass(frozen=True, slots=True)
 class EntityInfo:
     roles: set[EntityType]
     annotations: list[AnnotationRow]
     axiom_counts: Counter[str]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class EntityMatch:
     iri: IRI
     roles: set[EntityType]
@@ -157,44 +199,84 @@ class EntityMatch:
     match_quality: MatchQuality
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class EntitySearchPage:
     matches: list[EntityMatch]
     total: int
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class HashedAxiom:
-    axiom: Axiom
+    axiom: BaseAxiom
     hash: str
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class AddResult:
     added: list[HashedAxiom]
     skipped: list[HashedAxiom]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RemoveResult:
     removed: list[HashedAxiom]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
+class RemoveBySelectionResult:
+    removed: list[HashedAxiom]
+    absent: int
+
+
+@dataclass(frozen=True, slots=True)
+class UpsertSelectionResult:
+    content_hash: str
+    cardinality: int
+    old_cardinality: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class DroppedSelection:
+    name: str
+    cardinality: int
+
+
+@dataclass(frozen=True, slots=True)
+class RemoveSelectionsResult:
+    dropped: list[DroppedSelection]
+    not_found: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class DuplicateGroup:
+    value: str
+    iris: list[str]
+
+
+@dataclass(frozen=True, slots=True)
 class DuplicateResult:
-    groups: list[tuple[str, list[str]]]
+    groups: list[DuplicateGroup]
     total_groups: int
     affected_iris: list[str]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class ReplaceResult:
-    old_hash: str
-    new_hash: str
-    was_noop: bool  # True if new_hash == old_hash
+    old: HashedAxiom
+    new: HashedAxiom
+    was_noop: bool  # True if new.hash == old.hash
+    was_merged_into_existing: bool = False  # True if new_hash collided with another existing axiom
+
+    @property
+    def old_hash(self) -> str:
+        return self.old.hash
+
+    @property
+    def new_hash(self) -> str:
+        return self.new.hash
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class RenameResult:
     old_iri: str
     new_iri: str

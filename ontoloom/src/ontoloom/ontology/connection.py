@@ -1,19 +1,67 @@
 import importlib.resources
+import os
 import sqlite3
 import uuid
 from pathlib import Path
 from typing import Self
 
-from ontoloom.ontology.errors import OntologyExistsError, OntologyNotFoundError
+from ontoloom.ontology.errors import (
+    BadRequestError,
+    OntologyExistsError,
+    OntologyNotFoundError,
+    OntologySchemaError,
+)
+from ontoloom.ontology.models._pydantic import FrozenModel
 
 _SQL = importlib.resources.files("ontoloom.ontology")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
 _PRAGMAS = _SQL.joinpath("pragmas.sql").read_text()
 
+CURRENT_SCHEMA_VERSION = 2
+
+
+# Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`
+# to confine `Ontology(...)` and `export.to_jsonl`/`import_jsonl`. Unset (default)
+# means unrestricted, preserving single-user behavior.
+_env = os.environ.get("ONTOLOOM_WORKSPACE_ROOT")
+WORKSPACE_ROOT = Path(_env).resolve() if _env else None
+
+
+# A: add small doc
+def assert_within_workspace(path: Path):
+    if WORKSPACE_ROOT is None:
+        return
+    if not path.resolve().is_relative_to(WORKSPACE_ROOT):
+        msg = f"Path {path!s} is outside the configured workspace ({WORKSPACE_ROOT})."
+        raise BadRequestError(msg)
+
+
+# A: maybe add a sentinel value or sth, s.t. we know that this is unambiguously ontoloom into the schema? then we can drop all the required tables and other machinery, I do not like it.
+class Metadata(FrozenModel):
+    """Typed shape of the singleton row in the `metadata` table."""
+
+    prefixes: dict[str, str]
+    schema_version: int
+
+
+_REQUIRED_TABLES = frozenset(
+    {
+        "axiom_entities",
+        "axiom_text",
+        "axioms",
+        "entity_text",
+        "events",
+        "metadata",
+        "selection_items",
+        "selections",
+    }
+)
+
 # Backslash chosen as the LIKE-ESCAPE character; pair every use with `ESCAPE '\\'`.
 LIKE_ESCAPE = "\\"
 
 
+# A: do we really need to escape like and other meta chars? is this secure?
 def escape_like(value: str):
     """Escape SQL LIKE metacharacters (`\\`, `%`, `_`) so a parameter is matched literally.
     Use with `LIKE ? ESCAPE '\\'`.
@@ -25,94 +73,50 @@ def escape_like(value: str):
     )
 
 
+# A: inline
 def _apply_pragmas(conn: sqlite3.Connection):
-    was_autocommit = conn.autocommit
-    conn.autocommit = True
-    for line in _PRAGMAS.strip().splitlines():
-        line = line.strip()
-        if line:
-            conn.execute(line)
-    conn.autocommit = was_autocommit
+    # executescript handles SQL parsing (multi-line statements, comments) properly;
+    # the previous line-by-line splitter would silently break on either.
+    conn.executescript(_PRAGMAS)
 
 
-def _migrate(conn: sqlite3.Connection):
-    """Migrate schema for databases created before v3. Idempotent."""
-    was_autocommit = conn.autocommit
-    conn.autocommit = True
-
-    # Events: add new columns and expand CHECK constraint
-    event_cols = {r[1] for r in conn.execute("PRAGMA table_info(events)")}
-    if "replaces_hash" not in event_cols:
-        conn.execute("ALTER TABLE events RENAME TO _events_old")
-        conn.execute(
-            "CREATE TABLE events ("
-            "  sequence_id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  session_id TEXT,"
-            "  op TEXT NOT NULL CHECK (op IN ('add', 'del', 'replace', 'annotate')),"
-            "  axiom_hash TEXT NOT NULL,"
-            "  axiom_json BLOB,"
-            "  replaces_hash TEXT,"
-            "  annotation_diff TEXT,"
-            "  batch_id TEXT,"
-            "  timestamp TEXT NOT NULL DEFAULT (datetime('now'))"
-            ")"
+# A: drop after adding the sentinel as seen above, we can then just check if metadata contains it and else error
+def _validate_schema(conn: sqlite3.Connection):
+    existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    missing = _REQUIRED_TABLES - existing
+    if missing:
+        msg = (
+            f"Not an ontoloom database or schema is incomplete (missing tables: {sorted(missing)})"
         )
-        conn.execute(
-            "INSERT INTO events (sequence_id, session_id, op, axiom_hash, axiom_json, timestamp)"
-            " SELECT sequence_id, session_id, op, axiom_hash, axiom_json, timestamp FROM _events_old"
-        )
-        conn.execute("DROP TABLE _events_old")
-
-    # Axioms: remove source column
-    axiom_cols = {r[1] for r in conn.execute("PRAGMA table_info(axioms)")}
-    if "source" in axiom_cols:
-        conn.execute("ALTER TABLE axioms RENAME TO _axioms_old")
-        conn.execute(
-            "CREATE TABLE axioms ("
-            "  id INTEGER PRIMARY KEY,"
-            "  hash TEXT NOT NULL UNIQUE,"
-            "  type TEXT NOT NULL,"
-            "  data BLOB NOT NULL"
-            ")"
-        )
-        conn.execute(
-            "INSERT INTO axioms (id, hash, type, data) SELECT id, hash, type, data FROM _axioms_old"
-        )
-        conn.execute("DROP TABLE _axioms_old")
-
-    # Selections: remove comment column
-    sel_cols = {r[1] for r in conn.execute("PRAGMA table_info(selections)")}
-    if "comment" in sel_cols:
-        conn.execute("ALTER TABLE selections RENAME TO _selections_old")
-        conn.execute(
-            "CREATE TABLE selections ("
-            "  name TEXT PRIMARY KEY,"
-            "  kind TEXT NOT NULL CHECK (kind IN ('axioms', 'entities')),"
-            "  hash TEXT NOT NULL,"
-            "  cardinality INTEGER NOT NULL,"
-            "  source TEXT NOT NULL,"
-            "  created_at TEXT NOT NULL DEFAULT (datetime('now'))"
-            ")"
-        )
-        conn.execute(
-            "INSERT INTO selections (name, kind, hash, cardinality, source, created_at)"
-            " SELECT name, kind, hash, cardinality, source, created_at FROM _selections_old"
-        )
-        conn.execute("DROP TABLE _selections_old")
-
-    conn.autocommit = was_autocommit
+        raise OntologySchemaError(msg)
+    row = conn.execute(
+        "SELECT json_extract(data, '$.schema_version') FROM metadata WHERE id = 1"
+    ).fetchone()
+    stored = row[0] if row else None
+    if stored != CURRENT_SCHEMA_VERSION:
+        msg = f"Schema version mismatch: expected {CURRENT_SCHEMA_VERSION}, got {stored!r}"
+        raise OntologySchemaError(msg)
 
 
+# A: need a doc
 class StoreNotOpenError(RuntimeError):
     pass
 
 
 class Ontology:
-    """Context manager for an open ontology database."""
+    # A: should only explain what this is, doc seems more like it should be a comment!
+    """Context manager for an open ontology database.
+
+    Single-use within one thread. `__enter__`/`__exit__` may be called multiple
+    times sequentially on the same instance, but concurrent use across threads
+    is not supported (sqlite3 default `check_same_thread=True`). MCP tools
+    construct a fresh `Ontology(path)` per call, which is the intended pattern.
+    """
 
     @classmethod
     def create(cls, path: Path) -> Self:
         """Create a new empty ontology database. Returns an unopened instance."""
+        assert_within_workspace(path)
         if path.exists():
             raise OntologyExistsError(path)
         conn = sqlite3.connect(str(path), autocommit=True)
@@ -121,14 +125,16 @@ class Ontology:
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO metadata (id, data) VALUES (1, ?)",
-                ('{"prefixes": {}}',),
+                (Metadata(prefixes={}, schema_version=CURRENT_SCHEMA_VERSION).model_dump_json(),),
             )
         finally:
             conn.close()
         return cls(path)
 
+    # A: when do we ever supply a session_id?
     def __init__(self, path: Path, *, session_id: str | None = None):
         """Reference an existing ontology. Raises OntologyNotFoundError if missing."""
+        assert_within_workspace(path)
         if not path.exists():
             raise OntologyNotFoundError(path)
         self._path = path
@@ -137,7 +143,8 @@ class Ontology:
 
     @property
     def conn(self) -> sqlite3.Connection:
-        """Active connection. Raises StoreNotOpenError if not inside `with` block."""
+        # A: why do we need a StoreNotOpenError? this is an actual bug, never usefully surfaced to MCP user?
+        """Active connection. Internal to ontoloom.ontology.*; MCP tools must not access this directly."""
         if self._conn is None:
             msg = "Store is not open. Use `with Ontology(path) as ont:`."
             raise StoreNotOpenError(msg)
@@ -148,9 +155,15 @@ class Ontology:
         return self._session_id
 
     def __enter__(self) -> Self:
-        self._conn = sqlite3.connect(str(self._path), autocommit=False)
-        _apply_pragmas(self._conn)
-        _migrate(self._conn)
+        conn = sqlite3.connect(str(self._path), autocommit=True)
+        try:
+            _apply_pragmas(conn)
+            conn.autocommit = False
+            _validate_schema(conn)  # A: should only do that once on open ontology, no?
+        except Exception:
+            conn.close()
+            raise
+        self._conn = conn
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

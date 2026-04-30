@@ -25,10 +25,12 @@ def search_entities(
     within: SelectionName | None = None,
     exclude_deprecated: bool = True,
 ) -> str:
-    """Search for entities by name, type, or namespace. Results are saved as a named
-    selection. Use `read_selection` to paginate, `create_selection` to compose with
-    other selections.
+    """Search for entities by name, type, or namespace; save the result as a selection.
 
+    Use `read_selection` to paginate the saved selection, `create_selection` to
+    compose it with other selections.
+
+    Args:
     - `into`: Name for the output selection (required).
     - `query`: Substring match on IRI local names and annotation values (labels, comments).
     - `role`: Filter by entity type: "Class", "ObjectProperty", "DataProperty",
@@ -54,21 +56,19 @@ def search_entities(
 
         iris = entities.collect_iris(ont, **kwargs)
         source = _build_source(query, role, namespace, declared, properties, within)
-        content_hash, cardinality, old_cardinality = selections.write(
-            ont, into, SelectionKind.ENTITIES, iris, source
-        )
+        upserted = selections.upsert(ont, into, SelectionKind.ENTITIES, iris, source)
 
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties, within)
-            return f"0 entities \u2192 {into!r} (sel@{content_hash}).\n{no_results}"
+            return f"0 entities -> {into!r} (sel@{upserted.content_hash}).\n{no_results}"
 
-        limit_n = cardinality if cardinality <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = entities.search(ont, **kwargs, limit=limit_n, offset=0)
-        page_text = format_entity_search_page(page.matches, cardinality, 0)
-
-        result = format_selection_result(
-            "entities", into, content_hash, cardinality, old_cardinality, page_text
+        limit_n = (
+            upserted.cardinality if upserted.cardinality <= SELECT_INLINE_MAX else SELECT_PREVIEW
         )
+        page = entities.search(ont, **kwargs, limit=limit_n, offset=0)
+        page_text = format_entity_search_page(page.matches, upserted.cardinality, 0)
+
+        result = format_selection_result("entities", into, upserted, page_text)
 
         if within is not None:
             result += "\n" + _within_metadata(ont, within)
@@ -77,29 +77,11 @@ def search_entities(
 
 
 def _within_metadata(ont: Ontology, within: str):
-    sel = selections.get_info(ont, within)
+    sel = selections.get(ont, within)
     return f"\nWithin selection {sel.name!r} ({sel.kind}, {sel.cardinality} items, sel@{sel.hash})"
 
 
-def _no_results_msg(query, role, namespace, declared, properties, within):
-    parts = []
-    if query:
-        parts.append(f"query={query!r}")
-    if role:
-        parts.append(f"role={role}")
-    if namespace:
-        parts.append(f"namespace={namespace}")
-    if declared is not None:
-        parts.append(f"declared={declared}")
-    if properties:
-        parts.append(f"properties={properties}")
-    if within:
-        parts.append(f"within={within!r}")
-    filter_desc = ", ".join(parts) if parts else "no filters"
-    return f"No entities found ({filter_desc})."
-
-
-def _build_source(query, role, namespace, declared, properties, within):
+def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:
     parts = []
     if query:
         parts.append(f"query={query!r}")
@@ -113,6 +95,17 @@ def _build_source(query, role, namespace, declared, properties, within):
         parts.append(f"properties={properties}")
     if within:
         parts.append(f"within={within!r}")
+    return parts
+
+
+def _no_results_msg(query, role, namespace, declared, properties, within):
+    parts = _filter_parts(query, role, namespace, declared, properties, within)
+    desc = ", ".join(parts) if parts else "no filters"
+    return f"No entities found ({desc})."
+
+
+def _build_source(query, role, namespace, declared, properties, within):
+    parts = _filter_parts(query, role, namespace, declared, properties, within)
     return f"search_entities({', '.join(parts)})"
 
 
