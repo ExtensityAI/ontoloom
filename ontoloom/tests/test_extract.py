@@ -1,28 +1,27 @@
-"""Direct unit tests for iter_axiom_entities — verify exact IRIs, roles, and positions."""
+"""Direct unit tests for iter_axiom_entities -> verify exact IRIs, roles, and positions."""
 
-from ontoloom.ontology.extract import iter_axiom_entities
-from ontoloom.ontology.models.assertions import (
-    ClassAssertion,
-    DataPropertyAssertion,
-    DifferentIndividuals,
-    NegativeObjectPropertyAssertion,
-    ObjectPropertyAssertion,
-    SameIndividual,
-)
-from ontoloom.ontology.models.axioms import (
+from ontoloom.entity_walker import iter_axiom_entities
+from ontoloom.owl.annotations import Annotation
+from ontoloom.owl.axioms import (
     AnnotationAssertion,
     AnnotationPropertyDomain,
     AnnotationPropertyRange,
+    ClassAssertion,
+    DataPropertyAssertion,
     DataPropertyDomain,
     DataPropertyRange,
     Declaration,
+    DifferentIndividuals,
     DisjointClasses,
     EquivalentClasses,
     EquivalentObjectProperties,
     FunctionalDataProperty,
     HasKey,
+    NegativeObjectPropertyAssertion,
+    ObjectPropertyAssertion,
     ObjectPropertyDomain,
     ObjectPropertyRange,
+    SameIndividual,
     SubAnnotationPropertyOf,
     SubClassOf,
     SubDataPropertyOf,
@@ -30,7 +29,7 @@ from ontoloom.ontology.models.axioms import (
     SubObjectPropertyOfChain,
     TransitiveObjectProperty,
 )
-from ontoloom.ontology.models.expressions import (
+from ontoloom.owl.expressions import (
     DataSomeValuesFrom,
     NamedClass,
     ObjectHasSelf,
@@ -39,16 +38,14 @@ from ontoloom.ontology.models.expressions import (
     ObjectOneOf,
     ObjectSomeValuesFrom,
 )
-from ontoloom.ontology.models.literals import (
-    IRI,
-    Annotation,
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import (
     DataType,
     DataTypeRef,
-    EntityType,
     LangLiteral,
-    Position,
     TypedLiteral,
 )
+from ontoloom.owl.markers import EntityType, Position
 
 
 def NC(iri: str):  # noqa: N802

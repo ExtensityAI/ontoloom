@@ -6,11 +6,12 @@ Each test calls a tool function directly (the same callable wrapped by
 
 import pytest
 from fastmcp.exceptions import ToolError
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.axioms import Declaration, SubClassOf
-from ontoloom.ontology.models.expressions import NamedClass
-from ontoloom.ontology.models.literals import IRI, EntityType
-from ontoloom.ontology.types import LockedSelection
+from ontoloom.connection import Ontology
+from ontoloom.owl.axioms import Declaration, SubClassOf
+from ontoloom.owl.expressions import NamedClass
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.selections.types import LockedSelection, SelectionName
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
 from ontoloom_mcp.tools.axioms.remove_axioms import remove_axioms
@@ -69,14 +70,13 @@ def test_get_entity_returns_info(populated_db):
 
 
 def test_search_entities_creates_selection(populated_db):
-    result = search_entities(path=populated_db, into="dogs", query="Dog")
-    assert "dogs" in result
-    assert "sel@" in result
+    result = search_entities(path=populated_db, into=SelectionName("dogs"), query="Dog")
+    assert "dogs@" in result
 
 
 def test_read_selection_after_search(populated_db):
-    search_entities(path=populated_db, into="dogs", query="Dog")
-    result = read_selection(path=populated_db, name="dogs")
+    search_entities(path=populated_db, into=SelectionName("dogs"), query="Dog")
+    result = read_selection(path=populated_db, name=SelectionName("dogs"))
     assert "ex:Dog" in result
 
 
@@ -113,11 +113,13 @@ def test_read_selection_not_found_translates(populated_db):
 
 def test_remove_axioms_stale_selection_translates(populated_db):
     # Create an axiom selection, then mutate it, then try to use the stale hash.
-    search_entities(path=populated_db, into="dogs_ent", query="Dog")
+    search_entities(path=populated_db, into=SelectionName("dogs_ent"), query="Dog")
     # Manually create an axiom selection from those entities (use create_selection directly)
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
-    create_selection(path=populated_db, name="dogs_ax", axioms_for="dogs_ent")
+    create_selection(
+        path=populated_db, name=SelectionName("dogs_ax"), axioms_for=SelectionName("dogs_ent")
+    )
     # Build a LockedSelection with a wrong hash to trigger StaleSelectionError.
     stale = LockedSelection("dogs_ax@deadbeef")
 

@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import selections
-from ontoloom.ontology.canonical import truncate_hash
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.types import SelectionKind, ShowFilter
+from ontoloom.connection import Ontology
+from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.selections.store import read_selection as core_read_selection
+from ontoloom.selections.types import SelectionKind, ShowFilter
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
@@ -26,12 +26,12 @@ def read_selection(
     subagent to paginate rather than reading everything into your context.
     """
     with Ontology(path) as ont:
-        result = selections.read(ont, name, limit=limit, offset=offset, show=show)
+        result = core_read_selection(ont, name, limit=limit, offset=offset, show=show)
 
     meta = result.meta
     header = (
-        f"Selection {name!r} ({meta.kind}, sel@{meta.hash}): "
-        f"{meta.cardinality} total ({result.present} present, {result.missing} missing)"
+        f"Selection {meta.locked!r} ({meta.kind}): "
+        f"{meta.size} total ({result.present} present, {result.missing} missing)"
     )
 
     end = offset + len(result.items)
@@ -44,7 +44,7 @@ def read_selection(
 
     if meta.kind == SelectionKind.AXIOMS:
         for item in result.items:
-            h = truncate_hash(item.key)
+            h = item.key[:HASH_DISPLAY_LEN]
             if item.missing:
                 lines.append(f"[{h}] *missing*")
             else:

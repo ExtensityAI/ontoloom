@@ -1,9 +1,13 @@
 import pytest
-from ontoloom.ontology import axioms, entities, selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.axioms import AnnotationAssertion, Declaration
-from ontoloom.ontology.models.literals import IRI, EntityType, LangLiteral
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.axioms.store import add_axioms
+from ontoloom.connection import Ontology
+from ontoloom.entities.store import find_duplicate_entities
+from ontoloom.owl.axioms import AnnotationAssertion, Declaration
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import LangLiteral
+from ontoloom.owl.markers import EntityType
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 
 @pytest.fixture()
@@ -15,7 +19,7 @@ def ont(tmp_path):
 
 
 def _add_label(ont, subject: str, label: str):
-    axioms.add(
+    add_axioms(
         ont,
         [
             AnnotationAssertion(
@@ -28,7 +32,7 @@ def _add_label(ont, subject: str, label: str):
 
 
 def test_find_duplicates_basic(ont):
-    axioms.add(
+    add_axioms(
         ont,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
@@ -40,7 +44,7 @@ def test_find_duplicates_basic(ont):
     _add_label(ont, "ex:B", "transport")
     _add_label(ont, "ex:C", "unique")
 
-    result = entities.find_duplicates(ont, annotation_property="rdfs:label")
+    result = find_duplicate_entities(ont, annotation_property="rdfs:label")
 
     assert result.total_groups == 1
     assert len(result.groups) == 1
@@ -51,7 +55,7 @@ def test_find_duplicates_basic(ont):
 
 
 def test_find_duplicates_multiple_groups(ont):
-    axioms.add(
+    add_axioms(
         ont,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
@@ -69,7 +73,7 @@ def test_find_duplicates_multiple_groups(ont):
     _add_label(ont, "ex:D", "beta")
     _add_label(ont, "ex:E", "beta")
 
-    result = entities.find_duplicates(ont, annotation_property="rdfs:label")
+    result = find_duplicate_entities(ont, annotation_property="rdfs:label")
 
     assert result.total_groups == 2
     # Ordered by count DESC: alpha (3) before beta (2)
@@ -80,7 +84,7 @@ def test_find_duplicates_multiple_groups(ont):
 
 
 def test_find_duplicates_no_duplicates(ont):
-    axioms.add(
+    add_axioms(
         ont,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
@@ -90,15 +94,15 @@ def test_find_duplicates_no_duplicates(ont):
     _add_label(ont, "ex:A", "unique_one")
     _add_label(ont, "ex:B", "unique_two")
 
-    result = entities.find_duplicates(ont, annotation_property="rdfs:label")
+    result = find_duplicate_entities(ont, annotation_property="rdfs:label")
 
     assert result.total_groups == 0
-    assert result.groups == []
-    assert result.affected_iris == []
+    assert result.groups == ()
+    assert result.affected_iris == ()
 
 
 def test_find_duplicates_within(ont):
-    axioms.add(
+    add_axioms(
         ont,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
@@ -114,9 +118,9 @@ def test_find_duplicates_within(ont):
     _add_label(ont, "ex:D", "dup")
 
     # Selection contains only A and B
-    selections.upsert(ont, "subset", SelectionKind.ENTITIES, ["ex:A", "ex:B"], "test")
+    upsert_selection(ont, "subset", SelectionKind.ENTITIES, ["ex:A", "ex:B"], "test")
 
-    result = entities.find_duplicates(ont, annotation_property="rdfs:label", within="subset")
+    result = find_duplicate_entities(ont, annotation_property="rdfs:label", within="subset")
 
     assert result.total_groups == 1
     group = result.groups[0]

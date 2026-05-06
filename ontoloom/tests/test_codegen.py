@@ -9,7 +9,7 @@ def test_gen_patterns_produces_python_source():
     assert "class ContainsExpr" in source
     assert "class ContainsSlot" in source
     assert "Pattern = Annotated[" in source
-    assert 'discriminator="type"' in source
+    assert "tagged_union_meta()" in source
 
 
 def test_gen_patterns_is_deterministic():
@@ -37,7 +37,7 @@ def test_gen_patterns_unordered_tuple_gets_contains():
 
 def test_gen_patterns_ordered_tuple_has_no_contains():
     source = generate()
-    # SubObjectPropertyOfChain.chain is ordered — no Contains
+    # SubObjectPropertyOfChain.chain is ordered -> no Contains
     assert "chain: tuple[Slot, ...]" in source
 
 
@@ -52,15 +52,15 @@ def test_gen_patterns_exprslot_alias_defined():
 
 
 def test_new_axiom_type_works_without_module_edits():
-    """Adding a new axiom type with markers — canonical and extract pick it up
+    """Adding a new axiom type with markers -> canonical and extract pick it up
     purely from the field metadata, no edits to canonical.py or extract.py needed."""
     from typing import Annotated, Literal
 
-    from ontoloom.ontology.canonical import canonical_json
-    from ontoloom.ontology.extract import iter_axiom_entities
-    from ontoloom.ontology.models.base import BaseAxiom
-    from ontoloom.ontology.models.literals import IRI, EntityType, Position
-    from ontoloom.ontology.models.markers import EntityKind, EntityPosition, Unordered
+    from ontoloom.canonical import canonical_json
+    from ontoloom.entity_walker import iter_axiom_entities
+    from ontoloom.owl.axioms import BaseAxiom
+    from ontoloom.owl.iri import IRI
+    from ontoloom.owl.markers import EntityType, Position, Unordered
     from pydantic import Field
 
     class _TestAxiom(BaseAxiom):
@@ -68,8 +68,8 @@ def test_new_axiom_type_works_without_module_edits():
         members: Annotated[
             tuple[IRI, ...],
             Unordered(),
-            EntityKind(EntityType.CLASS),
-            EntityPosition(Position.MEMBER),
+            EntityType.CLASS,
+            Position.MEMBER,
             Field(min_length=2),
         ]
 
@@ -109,8 +109,8 @@ def test_gen_patterns_cross_process_deterministic():
 def test_gen_patterns_fields_match_axiom_fields():
     from typing import get_args
 
-    from ontoloom.ontology.models.axioms import Axiom
-    from ontoloom.ontology.patterns._generated import AxiomPattern
+    from ontoloom.owl.axioms import Axiom
+    from ontoloom.patterns._generated import AxiomPattern
 
     skip = frozenset(("type", "annotations"))
     axiom_classes = {cls.__name__: cls for cls in get_args(get_args(Axiom)[0])}
@@ -132,8 +132,8 @@ def test_gen_patterns_fields_match_axiom_fields():
 def test_exprslot_and_axiomslot_exact_membership():
     from typing import get_args
 
-    from ontoloom.ontology.patterns._generated import AxiomPattern, ExpressionPattern, ExprSlot
-    from ontoloom.ontology.patterns.slot import Slot
+    from ontoloom.patterns._generated import AxiomPattern, ExpressionPattern, ExprSlot
+    from ontoloom.patterns.slot import Slot
 
     expr_types = set(get_args(ExpressionPattern))
     exprslot_types = set(get_args(ExprSlot))
@@ -147,7 +147,7 @@ def test_exprslot_and_axiomslot_exact_membership():
 
 def test_expression_container_types_reflective_derivation():
     """_EXPRESSION_CONTAINER_TYPES must match the axiom types that actually carry ClassExpression fields."""
-    from ontoloom.ontology.patterns.search import _EXPRESSION_CONTAINER_TYPES
+    from ontoloom.patterns.store import _EXPRESSION_CONTAINER_TYPES
 
     expected = frozenset(
         {
@@ -166,8 +166,10 @@ def test_expression_container_types_reflective_derivation():
 
 def test_gen_patterns_field_type_transformations():
     """Key field-type transformations verified at runtime via model_fields annotations."""
-    from ontoloom.ontology.patterns import _generated as gen
-    from ontoloom.ontology.patterns.slot import Slot
+    from typing import get_args
+
+    from ontoloom.patterns import _generated as gen
+    from ontoloom.patterns.slot import Slot
 
     # IRI field → Slot
     ann = gen.AnnotationAssertionPattern.model_fields["property"].annotation
@@ -175,13 +177,15 @@ def test_gen_patterns_field_type_transformations():
 
     # ClassExpression field → ExprSlot (a union containing Slot)
     ann = gen.SubClassOfPattern.model_fields["sub_class"].annotation
-    assert hasattr(ann, "__args__"), f"expected union for .sub_class, got {ann}"
-    assert Slot in ann.__args__, f"Slot missing from ExprSlot union: {ann}"
+    args = get_args(ann)
+    assert args, f"expected union for .sub_class, got {ann}"
+    assert Slot in args, f"Slot missing from ExprSlot union: {ann}"
 
     # DataRange field → DataRange | Slot (union containing Slot)
     ann = gen.DataPropertyRangePattern.model_fields["range"].annotation
-    assert hasattr(ann, "__args__"), f"expected union for .range, got {ann}"
-    assert Slot in ann.__args__, f"Slot missing from DataRange|Slot union: {ann}"
+    args = get_args(ann)
+    assert args, f"expected union for .range, got {ann}"
+    assert Slot in args, f"Slot missing from DataRange|Slot union: {ann}"
 
     # Ordered tuple of IRI → tuple[Slot, ...] (no Contains)
     ann = gen.SubObjectPropertyOfChainPattern.model_fields["chain"].annotation
@@ -189,5 +193,6 @@ def test_gen_patterns_field_type_transformations():
 
     # Unordered tuple of IRI → tuple[Slot, ...] | ContainsSlot
     ann = gen.EquivalentObjectPropertiesPattern.model_fields["properties"].annotation
-    assert hasattr(ann, "__args__"), f"expected union for .properties, got {ann}"
-    assert gen.ContainsSlot in ann.__args__
+    args = get_args(ann)
+    assert args, f"expected union for .properties, got {ann}"
+    assert gen.ContainsSlot in args

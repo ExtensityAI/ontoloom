@@ -1,9 +1,9 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.patterns import Pattern
-from ontoloom.ontology.patterns.search import match_axioms as core_match
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.connection import Ontology
+from ontoloom.patterns import Pattern
+from ontoloom.patterns.store import match_axioms as core_match
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
@@ -37,19 +37,17 @@ def match_axioms(
     """
     with Ontology(path) as ont:
         result = core_match(ont, pattern, within=within, limit=limit)
-        upserted = selections.upsert(
+        upserted = upsert_selection(
             ont, into, SelectionKind.AXIOMS, result.axiom_hashes, "match_axioms"
         )
 
     truncated_hint = (
         f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
     )
-    msg = (
-        f"{result.total} axioms matched{truncated_hint} -> sel@{upserted.content_hash} "
-        f"({upserted.cardinality} items)"
-    )
-    if upserted.old_cardinality is not None:
-        msg += f" (was {upserted.old_cardinality})"
+    sel = upserted.selection
+    msg = f"{result.total} axioms matched{truncated_hint} -> {sel.locked!r} ({sel.size} items)"
+    if upserted.previous_size is not None:
+        msg += f" (was {upserted.previous_size})"
     return msg
 
 

@@ -1,19 +1,14 @@
 from pathlib import Path
 from typing import Annotated
 
-from ontoloom.ontology.types import validate_selection_name
+from ontoloom.selections.types import SelectionName
 from pydantic import AfterValidator, Field
 
 OntologyPath = Annotated[Path, "Path to an `.ontology.db` file"]
 
-# Read-only references to a selection: just a bare name.
-# Used by tools that read or scope a selection without mutating it
-# (search, match, get_entity, describe_ontology, find_duplicates, etc.).
-SelectionName = Annotated[str, AfterValidator(validate_selection_name)]
-
 # Same shape constraints as SelectionName; `*` and `?` are interpreted as wildcards
-# at the call site, not at the type level.
-SelectionPattern = Annotated[str, AfterValidator(validate_selection_name)]
+# at the call site, not at the type level. Reuses SelectionName's parse for validation.
+SelectionPattern = Annotated[str, AfterValidator(SelectionName.parse)]
 
 # A: why is page size called Limit?
 Limit = Annotated[int, Field(ge=1, description="Page size, minimum 1")]

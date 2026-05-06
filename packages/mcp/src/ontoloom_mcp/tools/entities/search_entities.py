@@ -1,8 +1,11 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import entities, selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.literals import IRI, EntityType
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.connection import Ontology
+from ontoloom.entities.store import collect_entity_iris
+from ontoloom.entities.store import search_entities as core_search_entities
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.selections.store import get_selection, upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -24,7 +27,7 @@ def search_entities(
     properties: list[IRI] | None = None,
     within: SelectionName | None = None,
     exclude_deprecated: bool = True,
-) -> str:
+):
     """Search for entities by name, type, or namespace; save the result as a selection.
 
     Use `read_selection` to paginate the saved selection, `create_selection` to
@@ -54,21 +57,20 @@ def search_entities(
             "exclude_deprecated": exclude_deprecated,
         }
 
-        iris = entities.collect_iris(ont, **kwargs)
+        iris = collect_entity_iris(ont, **kwargs)
         source = _build_source(query, role, namespace, declared, properties, within)
-        upserted = selections.upsert(ont, into, SelectionKind.ENTITIES, iris, source)
+        upserted = upsert_selection(ont, into, SelectionKind.ENTITIES, iris, source)
+        sel = upserted.selection
 
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties, within)
-            return f"0 entities -> {into!r} (sel@{upserted.content_hash}).\n{no_results}"
+            return f"0 entities -> {sel.locked!r}.\n{no_results}"
 
-        limit_n = (
-            upserted.cardinality if upserted.cardinality <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        )
-        page = entities.search(ont, **kwargs, limit=limit_n, offset=0)
-        page_text = format_entity_search_page(page.matches, upserted.cardinality, 0)
+        limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
+        page = core_search_entities(ont, **kwargs, limit=limit_n, offset=0)
+        page_text = format_entity_search_page(page.matches, sel.size, 0)
 
-        result = format_selection_result("entities", into, upserted, page_text)
+        result = format_selection_result("entities", upserted, page_text)
 
         if within is not None:
             result += "\n" + _within_metadata(ont, within)
@@ -77,8 +79,8 @@ def search_entities(
 
 
 def _within_metadata(ont: Ontology, within: str):
-    sel = selections.get(ont, within)
-    return f"\nWithin selection {sel.name!r} ({sel.kind}, {sel.cardinality} items, sel@{sel.hash})"
+    sel = get_selection(ont, within)
+    return f"\nWithin selection {sel.locked!r} ({sel.kind}, {sel.size} items)"
 
 
 def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:
@@ -86,15 +88,15 @@ def _filter_parts(query, role, namespace, declared, properties, within) -> list[
     if query:
         parts.append(f"query={query!r}")
     if role:
-        parts.append(f"role={role!r}")
+        parts.append(f"role={str(role)!r}")
     if namespace:
-        parts.append(f"namespace={namespace!r}")
+        parts.append(f"namespace={str(namespace)!r}")
     if declared is not None:
         parts.append(f"declared={declared}")
     if properties:
-        parts.append(f"properties={properties}")
+        parts.append(f"properties=[{', '.join(repr(str(p)) for p in properties)}]")
     if within:
-        parts.append(f"within={within!r}")
+        parts.append(f"within={str(within)!r}")
     return parts
 
 

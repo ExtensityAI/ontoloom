@@ -1,8 +1,7 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.literals import Position
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.connection import Ontology
+from ontoloom.owl.markers import Position
+from ontoloom.selections.store import create_selection as core_create_selection
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -44,7 +43,7 @@ def create_selection(
       then `match_axioms(within=...)` for further filtering
     """
     with Ontology(path) as ont:
-        upserted = selections.create(
+        upserted = core_create_selection(
             ont,
             name,
             union=union,
@@ -55,18 +54,10 @@ def create_selection(
             field=field,
         )
 
-        inputs = union or intersection or difference
-        if inputs:
-            sel = selections.get(ont, inputs[0])
-            kind = sel.kind
-        elif axioms_for:
-            kind = SelectionKind.AXIOMS
-        else:
-            kind = SelectionKind.ENTITIES
-
-        parts = [f"Selection {name!r} (sel@{upserted.content_hash}): {upserted.cardinality} {kind}"]
-        if upserted.old_cardinality is not None:
-            parts.append(f"(overwrote previous: {upserted.old_cardinality} items)")
+        sel = upserted.selection
+        parts = [f"Selection {sel.locked!r}: {sel.size} {sel.kind}"]
+        if upserted.previous_size is not None:
+            parts.append(f"(overwrote previous: {upserted.previous_size} items)")
         return " ".join(parts)
 
 

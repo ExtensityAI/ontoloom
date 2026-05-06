@@ -1,8 +1,9 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import entities, selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.literals import IRI
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.connection import Ontology
+from ontoloom.entities.store import find_duplicate_entities
+from ontoloom.owl.iri import IRI
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -28,24 +29,25 @@ def find_duplicates(
     - `within`: Optional entity selection to restrict the check to.
     """
     with Ontology(path) as ont:
-        result = entities.find_duplicates(ont, annotation_property, within=within)
+        result = find_duplicate_entities(ont, annotation_property, within=within)
 
         if not result.affected_iris:
             return f"No duplicate {annotation_property} values found."
 
-        source = f"find_duplicates(annotation_property={annotation_property!r})"
+        source = f"find_duplicates(annotation_property={str(annotation_property)!r})"
         if within:
-            source += f", within={within!r}"
-        upserted = selections.upsert(
+            source += f", within={str(within)!r}"
+        upserted = upsert_selection(
             ont, into, SelectionKind.ENTITIES, result.affected_iris, source=source
         )
+        sel = upserted.selection
 
     lines = [
         f"Found {result.total_groups} duplicate {annotation_property} values "
-        f"across {upserted.cardinality} entities -> {into!r} (sel@{upserted.content_hash})."
+        f"across {sel.size} entities -> {sel.locked!r}."
     ]
-    if upserted.old_cardinality is not None:
-        lines.append(f"Overwrote previous ({upserted.old_cardinality} items).")
+    if upserted.previous_size is not None:
+        lines.append(f"Overwrote previous ({upserted.previous_size} items).")
     lines.append("")
 
     lines.extend(

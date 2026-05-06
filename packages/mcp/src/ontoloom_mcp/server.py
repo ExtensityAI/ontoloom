@@ -27,12 +27,13 @@ mcp = FastMCP(
     mask_error_details=False,  # exception messages reach agent context; set True in untrusted/multi-user deployments
     instructions=(
         "OWL 2 EL ontology editor backed by SQLite. Each .ontology.db file is one ontology.\n\n"
-        "Entities (classes, properties, individuals) are not managed directly — they are "
+        "Entities (classes, properties, individuals) are not managed directly -> they are "
         "derived from axioms. Add/remove axioms to change the ontology.\n\n"
         "Selections are named sets of axiom hashes or entity IRIs that persist across calls. "
         "Use them to build up working sets incrementally: search, save, narrow, combine, "
-        "then act (export, delete, inspect). Outputs include sel@hash identifiers for "
-        "optimistic locking on write operations."
+        "then act (export, delete, inspect). Outputs include 'name@hash' identifiers; pass "
+        "that exact form back as `within=` for write operations to confirm the selection "
+        "hasn't drifted (optimistic locking)."
     ),
 )
 

@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import selections
-from ontoloom.ontology.connection import Ontology
+from ontoloom.connection import Ontology
+from ontoloom.selections.store import list_selections as core_list_selections
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -9,14 +9,14 @@ from ontoloom_mcp.components.types import OntologyPath
 def list_selections(path: OntologyPath):
     """List all named selections in the ontology."""
     with Ontology(path) as ont:
-        sels = selections.list_all(ont)
+        sels = core_list_selections(ont)
 
     if not sels:
         return "No selections."
 
     lines = ["Selections:"]
     for sel in sels:
-        lines.append(f"  {sel.name} ({sel.kind}, sel@{sel.hash}) \u2014 {sel.cardinality} items")
+        lines.append(f"  {sel.locked!r} ({sel.kind}) -> {sel.size} items")
         lines.append(f"    source: {sel.source}")
     return "\n".join(lines)
 

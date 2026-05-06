@@ -20,7 +20,7 @@ def create_tool(
     `annotations` convention: omit when all hints take their MCP defaults
     (`readOnlyHint=False`, `destructiveHint=True`, `idempotentHint=False`,
     `openWorldHint=True`). Set hints explicitly only to declare non-default
-    behavior — e.g. read-only tools set `readOnlyHint=True`; idempotent
+    behavior -> e.g. read-only tools set `readOnlyHint=True`; idempotent
     mutations set `idempotentHint=True`; benign writes opt out of
     `destructiveHint`.
     """

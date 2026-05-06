@@ -1,32 +1,27 @@
-from ontoloom.ontology import selections
-from ontoloom.ontology.canonical import (
-    HASH_DISPLAY_LEN,
-    axiom_hash,
-    canonical_json,
-    min_distinguishing_prefixes,
-    truncate_hash,
-)
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.assertions import DifferentIndividuals, SameIndividual
-from ontoloom.ontology.models.axioms import (
+from ontoloom.canonical import canonical_json
+from ontoloom.connection import Ontology
+from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom, disambiguating_prefixes
+from ontoloom.owl.annotations import Annotation
+from ontoloom.owl.axioms import (
     DataPropertyRange,
     DatatypeDefinition,
+    DifferentIndividuals,
     DisjointClasses,
     EquivalentClasses,
     EquivalentDataProperties,
     EquivalentObjectProperties,
     HasKey,
+    SameIndividual,
     SubClassOf,
 )
-from ontoloom.ontology.models.expressions import (
+from ontoloom.owl.expressions import (
     DataSomeValuesFrom,
     NamedClass,
     ObjectIntersectionOf,
     ObjectSomeValuesFrom,
 )
-from ontoloom.ontology.models.literals import (
-    IRI,
-    Annotation,
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import (
     DataIntersectionOf,
     DataOneOf,
     DataType,
@@ -34,7 +29,8 @@ from ontoloom.ontology.models.literals import (
     LangLiteral,
     TypedLiteral,
 )
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 # -- Annotation exclusion --
 
@@ -64,7 +60,7 @@ def test_axiom_hash_stable_across_annotations():
         super_class=NamedClass(iri=IRI("ex:Animal")),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note")),),
     )
-    assert axiom_hash(ax1) == axiom_hash(ax2)
+    assert HashedAxiom.of(ax1).hash == HashedAxiom.of(ax2).hash
 
 
 def test_axiom_hash_different_for_different_content():
@@ -76,7 +72,7 @@ def test_axiom_hash_different_for_different_content():
         sub_class=NamedClass(iri=IRI("ex:Cat")),
         super_class=NamedClass(iri=IRI("ex:Animal")),
     )
-    assert axiom_hash(ax1) != axiom_hash(ax2)
+    assert HashedAxiom.of(ax1).hash != HashedAxiom.of(ax2).hash
 
 
 # -- Set-semantic sorting: axiom-level --
@@ -259,7 +255,7 @@ def test_data_some_values_from_with_data_intersection():
 
 
 def test_canonical_idempotent():
-    from ontoloom.ontology.canonical import _normalize_model
+    from ontoloom.canonical import _normalize_model
 
     ax = EquivalentClasses(
         expressions=(
@@ -276,12 +272,12 @@ def test_selection_hash_order_independent(tmp_path):
     path = tmp_path / "test.db"
     Ontology.create(path)
     with Ontology(path) as ont:
-        h1 = selections.upsert(
+        h1 = upsert_selection(
             ont, "s1", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
-        ).content_hash
-        h2 = selections.upsert(
+        ).selection.hash
+        h2 = upsert_selection(
             ont, "s2", SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
-        ).content_hash
+        ).selection.hash
         assert h1 == h2
 
 
@@ -300,17 +296,17 @@ def test_selection_pagination_stable_across_processes(tmp_path):
     Ontology.create(db_path)
     script = textwrap.dedent(f"""\
         from pathlib import Path
-        from ontoloom.ontology import selections
-        from ontoloom.ontology.connection import Ontology
-        from ontoloom.ontology.types import SelectionKind
+        from ontoloom.selections.store import create_selection, read_selection, upsert_selection
+        from ontoloom.selections.types import SelectionKind
+        from ontoloom.connection import Ontology
 
         with Ontology(Path({str(db_path)!r})) as ont:
-            selections.upsert(ont, "a", SelectionKind.ENTITIES,
+            upsert_selection(ont, "a", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
-            selections.upsert(ont, "b", SelectionKind.ENTITIES,
+            upsert_selection(ont, "b", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
-            selections.create(ont, "r", intersection=["a", "b"])
-            page = selections.read(ont, "r", limit=5)
+            create_selection(ont, "r", intersection=["a", "b"])
+            page = read_selection(ont, "r", limit=5)
             print(",".join(item.key for item in page.items))
     """)
 
@@ -331,27 +327,27 @@ def test_selection_pagination_stable_across_processes(tmp_path):
 
 def test_truncate_hash_uses_display_len():
     h = "a" * 64
-    assert truncate_hash(h) == "a" * HASH_DISPLAY_LEN
+    assert h[:HASH_DISPLAY_LEN] == "a" * HASH_DISPLAY_LEN
 
 
 def test_min_distinguishing_prefixes_single():
     h = "abcdef0123"
-    assert min_distinguishing_prefixes([h]) == [h]
+    assert disambiguating_prefixes([h]) == [h]
 
 
 def test_min_distinguishing_prefixes_disjoint():
-    # All hashes diverge at the first character — each gets a 1-char prefix.
-    assert min_distinguishing_prefixes(["abcd", "bcde", "cdef"]) == ["a", "b", "c"]
+    # All hashes diverge at the first character -> each gets a 1-char prefix.
+    assert disambiguating_prefixes(["abcd", "bcde", "cdef"]) == ["a", "b", "c"]
 
 
 def test_min_distinguishing_prefixes_shared_prefix():
     # "a3f1b2c4" and "a3f1c5d6" share "a3f1"; need 5 chars to disambiguate.
     # "a3a2..." diverges at char 2, so 3 chars suffice.
-    out = min_distinguishing_prefixes(["a3f1b2c4", "a3f1c5d6", "a3a2ffff"])
+    out = disambiguating_prefixes(["a3f1b2c4", "a3f1c5d6", "a3a2ffff"])
     assert out == ["a3f1b", "a3f1c", "a3a"]
 
 
 def test_min_distinguishing_prefixes_preserves_input_order():
     # Input order is preserved; only distinguishing length is computed.
-    out = min_distinguishing_prefixes(["zzz9", "aaa1", "aaa2"])
+    out = disambiguating_prefixes(["zzz9", "aaa1", "aaa2"])
     assert out == ["z", "aaa1", "aaa2"]

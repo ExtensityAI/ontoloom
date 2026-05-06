@@ -1,12 +1,21 @@
 import pytest
-from ontoloom.ontology import axioms, selections
-from ontoloom.ontology.canonical import axiom_hash
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.errors import BadRequestError, StaleSelectionError
-from ontoloom.ontology.models.axioms import Declaration, SubClassOf
-from ontoloom.ontology.models.expressions import NamedClass
-from ontoloom.ontology.models.literals import IRI, EntityType
-from ontoloom.ontology.types import LockedSelection, SelectionKind, ShowFilter, validate_selection_name
+from ontoloom.axioms.store import add_axioms
+from ontoloom.connection import Ontology
+from ontoloom.errors import BadRequestError
+from ontoloom.hashing import HashedAxiom
+from ontoloom.owl.axioms import Declaration, SubClassOf
+from ontoloom.owl.expressions import NamedClass
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.selections.store import (
+    StaleSelectionError,
+    create_selection,
+    get_selection,
+    read_selection,
+    upsert_selection,
+    verify_selection_hash,
+)
+from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName, ShowFilter
 
 
 @pytest.fixture()
@@ -21,13 +30,13 @@ def ont(tmp_path):
 
 
 def test_union_commutativity(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    selections.upsert(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
-    _r = selections.create(ont, "u_ab", union=["a", "b"])
-    hash_ab, card_ab = _r.content_hash, _r.cardinality
-    _r = selections.create(ont, "u_ba", union=["b", "a"])
-    hash_ba, card_ba = _r.content_hash, _r.cardinality
+    _r = create_selection(ont, "u_ab", union=["a", "b"])
+    hash_ab, card_ab = _r.selection.hash, _r.selection.size
+    _r = create_selection(ont, "u_ba", union=["b", "a"])
+    hash_ba, card_ba = _r.selection.hash, _r.selection.size
 
     assert card_ab == 3
     assert card_ba == 3
@@ -35,31 +44,31 @@ def test_union_commutativity(ont):
 
 
 def test_intersection(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    selections.upsert(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
-    card = selections.create(ont, "inter", intersection=["a", "b"]).cardinality
+    card = create_selection(ont, "inter", intersection=["a", "b"]).selection.size
     assert card == 1
 
-    page = selections.read(ont, "inter")
+    page = read_selection(ont, "inter")
     assert [item.key for item in page.items] == ["ex:Cat"]
 
-    selections.upsert(ont, "c", SelectionKind.ENTITIES, ["ex:Fish"], "test")
-    card_disjoint = selections.create(ont, "inter_disjoint", intersection=["a", "c"]).cardinality
+    upsert_selection(ont, "c", SelectionKind.ENTITIES, ["ex:Fish"], "test")
+    card_disjoint = create_selection(ont, "inter_disjoint", intersection=["a", "c"]).selection.size
     assert card_disjoint == 0
 
 
 def test_difference(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test")
-    selections.upsert(ont, "b", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test")
+    upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat"], "test")
 
-    card_a_minus_b = selections.create(ont, "diff_ab", difference=["a", "b"]).cardinality
+    card_a_minus_b = create_selection(ont, "diff_ab", difference=["a", "b"]).selection.size
     assert card_a_minus_b == 2
 
-    page = selections.read(ont, "diff_ab")
+    page = read_selection(ont, "diff_ab")
     assert {item.key for item in page.items} == {"ex:Dog", "ex:Fish"}
 
-    card_b_minus_a = selections.create(ont, "diff_ba", difference=["b", "a"]).cardinality
+    card_b_minus_a = create_selection(ont, "diff_ba", difference=["b", "a"]).selection.size
     assert card_b_minus_a == 0
 
 
@@ -69,12 +78,12 @@ def test_axioms_for(ont):
         super_class=NamedClass(iri=IRI("ex:Animal")),
     )
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    axioms.add(ont, [ax1, ax2])
+    add_axioms(ont, [ax1, ax2])
 
-    selections.upsert(ont, "ents", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    card = selections.create(ont, "ax_for_dog", axioms_for="ents").cardinality
+    upsert_selection(ont, "ents", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    card = create_selection(ont, "ax_for_dog", axioms_for="ents").selection.size
 
-    meta = selections.get(ont, "ax_for_dog")
+    meta = get_selection(ont, "ax_for_dog")
     assert meta.kind == SelectionKind.AXIOMS
     assert card == 2
 
@@ -84,80 +93,80 @@ def test_entities_in(ont):
         sub_class=NamedClass(iri=IRI("ex:Dog")),
         super_class=NamedClass(iri=IRI("ex:Animal")),
     )
-    axioms.add(ont, [ax])
-    h = axiom_hash(ax)
+    add_axioms(ont, [ax])
+    h = HashedAxiom.of(ax).hash
 
-    selections.upsert(ont, "axsel", SelectionKind.AXIOMS, [h], "test")
-    _card = selections.create(ont, "ent_in", entities_in="axsel").cardinality
+    upsert_selection(ont, "axsel", SelectionKind.AXIOMS, [h], "test")
+    _card = create_selection(ont, "ent_in", entities_in="axsel").selection.size
 
-    meta = selections.get(ont, "ent_in")
+    meta = get_selection(ont, "ent_in")
     assert meta.kind == SelectionKind.ENTITIES
 
-    page = selections.read(ont, "ent_in")
+    page = read_selection(ont, "ent_in")
     keys = {item.key for item in page.items}
     assert "ex:Dog" in keys
     assert "ex:Animal" in keys
 
 
 def test_mixed_kind_raises(ont):
-    selections.upsert(ont, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
-    selections.upsert(ont, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(ont, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
+    upsert_selection(ont, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
     with pytest.raises(BadRequestError):
-        selections.create(ont, "mixed_union", union=["ax_sel", "ent_sel"])
+        create_selection(ont, "mixed_union", union=["ax_sel", "ent_sel"])
 
 
 def test_empty_inputs_raises(ont):
     with pytest.raises(BadRequestError):
-        selections.create(ont, "x", union=[])
+        create_selection(ont, "x", union=[])
 
 
 def test_overwrite_produces_new_hash(ont):
-    hash1 = selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").content_hash
-    _r = selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test")
-    hash2, card2 = _r.content_hash, _r.cardinality
+    hash1 = upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
+    _r = upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    hash2, card2 = _r.selection.hash, _r.selection.size
 
     assert hash2 != hash1
     assert card2 == 1
-    assert selections.get(ont, "s").cardinality == 1
+    assert get_selection(ont, "s").size == 1
 
 
 def test_write_if_hash_matches(ont):
-    h1 = selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").content_hash
-    _r = selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash=h1[:8])
-    h2, card2 = _r.content_hash, _r.cardinality
+    h1 = upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
+    _r = upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash=h1[:8])
+    h2, card2 = _r.selection.hash, _r.selection.size
     assert card2 == 1
     assert h2 != h1
 
 
 def test_write_if_hash_mismatch_raises(ont):
-    selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test")
     with pytest.raises(StaleSelectionError):
-        selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash="deadbeef")
+        upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash="deadbeef")
 
 
 def test_write_if_hash_missing_selection_raises(ont):
     with pytest.raises(StaleSelectionError):
-        selections.upsert(
+        upsert_selection(
             ont, "ghost", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash="abcd1234"
         )
 
 
 def test_single_input_intersection_rejected(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(BadRequestError, match="at least two"):
-        selections.create(ont, "r", intersection=["a"])
+        create_selection(ont, "r", intersection=["a"])
 
 
 def test_single_input_difference_rejected(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(BadRequestError, match="at least two"):
-        selections.create(ont, "r", difference=["a"])
+        create_selection(ont, "r", difference=["a"])
 
 
 def test_single_input_union_returns_copy(ont):
-    selections.upsert(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    card = selections.create(ont, "r", union=["a"]).cardinality
+    upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    card = create_selection(ont, "r", union=["a"]).selection.size
     assert card == 2
 
 
@@ -165,37 +174,37 @@ def test_single_input_union_returns_copy(ont):
 
 
 def test_validate_selection_name_empty():
-    with pytest.raises(BadRequestError):
-        validate_selection_name("")
+    with pytest.raises(ValueError):
+        SelectionName("")
 
 
 def test_validate_selection_name_with_at():
-    with pytest.raises(BadRequestError):
-        validate_selection_name("name@hash")
+    with pytest.raises(ValueError):
+        SelectionName("name@hash")
 
 
 def test_validate_selection_name_too_long():
-    with pytest.raises(BadRequestError):
-        validate_selection_name("a" * 65)
+    with pytest.raises(ValueError):
+        SelectionName("a" * 65)
 
 
 @pytest.mark.parametrize("bad", ["foo\x00bar", "foo\nbar", "foo\tbar", "foo\x7fbar"])
 def test_validate_selection_name_rejects_control_chars(bad):
-    with pytest.raises(BadRequestError, match="control characters"):
-        validate_selection_name(bad)
+    with pytest.raises(ValueError, match="control characters"):
+        SelectionName(bad)
 
 
 def test_validate_selection_name_valid():
-    assert validate_selection_name("my_sel") == "my_sel"
+    assert SelectionName("my_sel") == "my_sel"
 
 
 def test_verify_hash_match_and_mismatch(ont):
-    hash1 = selections.upsert(ont, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test").content_hash
+    hash1 = upsert_selection(ont, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
 
-    selections.verify_hash(ont, "sel", hash1[:8])  # should not raise
+    verify_selection_hash(ont, "sel", hash1[:8])  # should not raise
 
     with pytest.raises(StaleSelectionError):
-        selections.verify_hash(ont, "sel", "00000000")
+        verify_selection_hash(ont, "sel", "00000000")
 
 
 def test_read_with_show_filters(ont):
@@ -203,19 +212,19 @@ def test_read_with_show_filters(ont):
         sub_class=NamedClass(iri=IRI("ex:Dog")),
         super_class=NamedClass(iri=IRI("ex:Animal")),
     )
-    axioms.add(ont, [ax])
-    real_hash = axiom_hash(ax)
+    add_axioms(ont, [ax])
+    real_hash = HashedAxiom.of(ax).hash
 
     fake_hash = "d" * 64
-    selections.upsert(ont, "sel", SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
+    upsert_selection(ont, "sel", SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
 
-    page_present = selections.read(ont, "sel", show=ShowFilter.PRESENT)
+    page_present = read_selection(ont, "sel", show=ShowFilter.PRESENT)
     assert all(not item.missing for item in page_present.items)
 
-    page_missing = selections.read(ont, "sel", show=ShowFilter.MISSING)
+    page_missing = read_selection(ont, "sel", show=ShowFilter.MISSING)
     assert all(item.missing for item in page_missing.items)
 
-    page_all = selections.read(ont, "sel", show=ShowFilter.ALL)
+    page_all = read_selection(ont, "sel", show=ShowFilter.ALL)
     assert len(page_all.items) == 2
 
 
@@ -242,17 +251,17 @@ def test_locked_selection_full_64_char_accepted():
 def test_read_entities_selection_punned_entity_present_missing_sum(ont):
     # OWL punning: :X declared as both CLASS and NAMED_INDIVIDUAL (two Declaration axioms).
     # Entity selection containing :X must satisfy present + missing == cardinality.
-    axioms.add(
+    add_axioms(
         ont,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:X")),
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:X")),
         ],
     )
-    # :ex:Ghost has no Declaration — should be counted as missing.
-    selections.upsert(ont, "s", SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
-    page = selections.read(ont, "s")
-    assert page.present + page.missing == page.meta.cardinality
+    # :ex:Ghost has no Declaration -> should be counted as missing.
+    upsert_selection(ont, "s", SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
+    page = read_selection(ont, "s")
+    assert page.present + page.missing == page.meta.size
     assert page.present == 1  # ex:X is declared (punned, but COUNT(DISTINCT) = 1)
     assert page.missing == 1  # ex:Ghost has no Declaration
 
@@ -265,8 +274,8 @@ def test_selection_hash_round_trip(ont):
     # they came back). The content hash must be stable across both writes because
     # _selection_hash sorts internally.
     items = ["ex:C", "ex:A", "ex:B"]
-    result1 = selections.upsert(ont, "s", SelectionKind.ENTITIES, items, "test")
-    page = selections.read(ont, "s")
+    result1 = upsert_selection(ont, "s", SelectionKind.ENTITIES, items, "test")
+    page = read_selection(ont, "s")
     read_back = [item.key for item in page.items]
-    result2 = selections.upsert(ont, "s2", SelectionKind.ENTITIES, read_back, "test")
-    assert result1.content_hash == result2.content_hash
+    result2 = upsert_selection(ont, "s2", SelectionKind.ENTITIES, read_back, "test")
+    assert result1.selection.hash == result2.selection.hash

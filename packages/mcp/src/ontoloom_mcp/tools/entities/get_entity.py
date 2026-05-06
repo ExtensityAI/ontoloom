@@ -1,8 +1,10 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import entities, selections
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.literals import IRI
-from ontoloom.ontology.types import SelectionKind
+from ontoloom.connection import Ontology
+from ontoloom.entities.store import axiom_hashes_for_entity
+from ontoloom.entities.store import get_entity as core_get_entity
+from ontoloom.owl.iri import IRI
+from ontoloom.selections.store import get_selection, upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 from ontoloom_mcp.components.formatting import format_entity_inspect
 from ontoloom_mcp.components.tool import create_tool
@@ -23,15 +25,15 @@ def get_entity(
     - `within`: Scope to a named selection. Within an axiom selection: only count axioms
       about this entity that are in the selection. Entity selections have no effect here.
     - `into`: Save this entity's axiom hashes as an axiom selection. Entry point for
-      "I want to work on this entity's axioms" — then use `match_axioms(within=...)`
+      "I want to work on this entity's axioms" -> then use `match_axioms(within=...)`
       or `remove_axioms(within=...)` on the result.
     """
     with Ontology(path) as ont:
-        info = entities.get(ont, iri, within=within)
+        info = core_get_entity(ont, iri, within=within)
         result = format_entity_inspect(iri, info)
 
         if within:
-            sel = selections.get(ont, within)
+            sel = get_selection(ont, within)
             if sel.kind == SelectionKind.ENTITIES:
                 result += (
                     "\n\nNote: `within` with an entity selection has no filtering effect "
@@ -39,12 +41,13 @@ def get_entity(
                 )
 
         if into is not None:
-            hashes = entities.get_axiom_hashes(ont, iri, within=within)
+            hashes = axiom_hashes_for_entity(ont, iri, within=within)
             source = f"get_entity(iri={str(iri)!r})"
-            upserted = selections.upsert(ont, into, SelectionKind.AXIOMS, hashes, source)
-            sel_msg = f"\n\n{upserted.cardinality} axiom hashes -> {into!r} (sel@{upserted.content_hash})."
-            if upserted.old_cardinality is not None:
-                sel_msg += f" Overwrote previous ({upserted.old_cardinality} items)."
+            upserted = upsert_selection(ont, into, SelectionKind.AXIOMS, hashes, source)
+            sel = upserted.selection
+            sel_msg = f"\n\n{sel.size} axiom hashes -> {sel.locked!r}."
+            if upserted.previous_size is not None:
+                sel_msg += f" Overwrote previous ({upserted.previous_size} items)."
             result += sel_msg
 
         return result

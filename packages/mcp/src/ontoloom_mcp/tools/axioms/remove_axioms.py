@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import axioms
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.errors import BadRequestError
-from ontoloom.ontology.types import LockedSelection
+from ontoloom.axioms.store import remove_axioms_by_hash, remove_axioms_by_selection
+from ontoloom.connection import Ontology
+from ontoloom.errors import BadRequestError
+from ontoloom.selections.types import LockedSelection
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -32,13 +32,13 @@ def remove_axioms(
 
     with Ontology(path) as ont:
         if within is not None:
-            sel_result = axioms.remove_by_selection(ont, within)
+            sel_result = remove_axioms_by_selection(ont, within)
             return (
                 f"Removed {len(sel_result.removed)} axioms ({sel_result.absent} already absent). "
-                f"Selection {within.name!r} retained."
+                f"Selection {str(within.name)!r} retained."
             )
 
-        result = axioms.remove_by_hash(ont, axiom_hashes)  # pyright: ignore[reportArgumentType]
+        result = remove_axioms_by_hash(ont, axiom_hashes)  # pyright: ignore[reportArgumentType]
         entries = [("-", ha) for ha in result.removed]
         return format_diff(entries, f"Removed {len(result.removed)} axioms.")
 

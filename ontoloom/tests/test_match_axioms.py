@@ -1,25 +1,27 @@
 import pytest
-from ontoloom.ontology import axioms, selections
-from ontoloom.ontology.canonical import axiom_hash
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.axioms import (
+from ontoloom.axioms.store import add_axioms
+from ontoloom.connection import Ontology
+from ontoloom.hashing import HashedAxiom
+from ontoloom.owl.axioms import (
     Declaration,
     EquivalentClasses,
     SubClassOf,
     SubObjectPropertyOfChain,
 )
-from ontoloom.ontology.models.expressions import NamedClass
-from ontoloom.ontology.models.literals import IRI, EntityType
-from ontoloom.ontology.patterns import (
+from ontoloom.owl.expressions import NamedClass
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.patterns import (
     ContainsExpr,
     EquivalentClassesPattern,
     NamedClassPattern,
     SubClassOfPattern,
     SubObjectPropertyOfChainPattern,
 )
-from ontoloom.ontology.patterns.search import match_axioms
-from ontoloom.ontology.patterns.slot import Slot
-from ontoloom.ontology.selections import SelectionKind
+from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.store import match_axioms
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind
 
 
 @pytest.fixture()
@@ -32,9 +34,9 @@ def ont(tmp_path):
 
 @pytest.fixture()
 def populated(ont):
-    from ontoloom.ontology.models.axioms import ObjectPropertyDomain
+    from ontoloom.owl.axioms import ObjectPropertyDomain
 
-    axioms.add(
+    add_axioms(
         ont,
         [
             SubClassOf(
@@ -76,9 +78,9 @@ def test_within_axiom_selection(populated):
     dog_ax = SubClassOf(
         sub_class=NamedClass(iri=IRI("ex:Dog")), super_class=NamedClass(iri=IRI("ex:Animal"))
     )
-    dog_hash = axiom_hash(dog_ax)
+    dog_hash = HashedAxiom.of(dog_ax).hash
 
-    selections.upsert(populated, "dog_only", SelectionKind.AXIOMS, [dog_hash], source="test")
+    upsert_selection(populated, "dog_only", SelectionKind.AXIOMS, [dog_hash], source="test")
 
     pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
     result = match_axioms(populated, pattern, within="dog_only")
@@ -87,7 +89,7 @@ def test_within_axiom_selection(populated):
 
 
 def test_within_entity_selection(populated):
-    selections.upsert(populated, "cat_entities", SelectionKind.ENTITIES, ["ex:Cat"], source="test")
+    upsert_selection(populated, "cat_entities", SelectionKind.ENTITIES, ["ex:Cat"], source="test")
 
     pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
     result = match_axioms(populated, pattern, within="cat_entities")
@@ -96,19 +98,19 @@ def test_within_entity_selection(populated):
     cat_ax = SubClassOf(
         sub_class=NamedClass(iri=IRI("ex:Cat")), super_class=NamedClass(iri=IRI("ex:Animal"))
     )
-    assert result.axiom_hashes[0] == axiom_hash(cat_ax)
+    assert result.axiom_hashes[0] == HashedAxiom.of(cat_ax).hash
 
 
 def test_variable_cross_position_same_value(populated):
     self_ax = SubClassOf(
         sub_class=NamedClass(iri=IRI("ex:Self")), super_class=NamedClass(iri=IRI("ex:Self"))
     )
-    axioms.add(populated, [self_ax])
+    add_axioms(populated, [self_ax])
 
     pattern = SubClassOfPattern(sub_class=Slot("?C"), super_class=Slot("?C"))
     result = match_axioms(populated, pattern)
     assert result.total == 1
-    assert result.axiom_hashes[0] == axiom_hash(self_ax)
+    assert result.axiom_hashes[0] == HashedAxiom.of(self_ax).hash
 
 
 def test_index_narrowing_with_many_iris(populated):
@@ -116,7 +118,7 @@ def test_index_narrowing_with_many_iris(populated):
         chain=(IRI("ex:r1"), IRI("ex:r2"), IRI("ex:r3"), IRI("ex:r4")),
         super_property=IRI("ex:s"),
     )
-    axioms.add(populated, [chain_ax])
+    add_axioms(populated, [chain_ax])
 
     pattern = SubObjectPropertyOfChainPattern(
         chain=(Slot("ex:r1"), Slot("ex:r2"), Slot("ex:r3"), Slot("ex:r4")),
@@ -134,14 +136,14 @@ def test_contains_partial_set_match(populated):
             NamedClass(iri=IRI("ex:C")),
         )
     )
-    axioms.add(populated, [ec_ax])
+    add_axioms(populated, [ec_ax])
 
     pattern = EquivalentClassesPattern(
         expressions=ContainsExpr(contains=(NamedClassPattern(iri=Slot("ex:A")),))
     )
     result = match_axioms(populated, pattern)
     assert result.total >= 1
-    assert axiom_hash(ec_ax) in result.axiom_hashes
+    assert HashedAxiom.of(ec_ax).hash in result.axiom_hashes
 
 
 def test_pattern_matches_nothing(populated):

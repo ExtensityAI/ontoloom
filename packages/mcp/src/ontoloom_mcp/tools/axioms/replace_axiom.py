@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
-from ontoloom.ontology import axioms
-from ontoloom.ontology.canonical import truncate_hash
-from ontoloom.ontology.connection import Ontology
-from ontoloom.ontology.models.axioms import Axiom
+from ontoloom.axioms.store import replace_axiom as core_replace_axiom
+from ontoloom.connection import Ontology
+from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.owl.axioms import Axiom
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -17,7 +17,7 @@ def replace_axiom(
     """Replace one axiom with a new one (atomic delete + add, single event).
 
     Old axiom-level annotations are carried forward; any annotations on `new_axiom`
-    are discarded — use `annotate_axiom` afterwards to modify annotations.
+    are discarded -> use `annotate_axiom` afterwards to modify annotations.
 
     Args:
     - `axiom_hash`: Full hash or unambiguous prefix of the axiom to replace.
@@ -29,14 +29,12 @@ def replace_axiom(
       skipped (existing preserved with its annotations), event records mapping.
     """
     with Ontology(path) as ont:
-        result = axioms.replace(ont, axiom_hash, new_axiom)
+        result = core_replace_axiom(ont, axiom_hash, new_axiom)
 
     if result.was_noop:
-        return f"No-op: new axiom has same hash as old ({truncate_hash(result.old_hash)})."
+        return f"No-op: new axiom has same hash as old ({result.old_hash[:HASH_DISPLAY_LEN]})."
 
-    summary = (
-        f"Replaced [{truncate_hash(result.old_hash)}] with [{truncate_hash(result.new_hash)}]."
-    )
+    summary = f"Replaced [{result.old_hash[:HASH_DISPLAY_LEN]}] with [{result.new_hash[:HASH_DISPLAY_LEN]}]."
     if result.was_merged_into_existing:
         summary += " New hash already existed; merged into existing axiom."
     return format_diff([("-", result.old), ("+", result.new)], summary)

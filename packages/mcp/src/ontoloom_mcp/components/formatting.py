@@ -1,14 +1,13 @@
-from ontoloom.ontology.canonical import truncate_hash
-from ontoloom.ontology.extract import iter_axiom_entities
-from ontoloom.ontology.models.literals import IRI, EntityType
-from ontoloom.ontology.types import (
-    AxiomSummary,
-    EntityInfo,
-    EntityMatch,
-    EntitySummary,
-    HashedAxiom,
-    UpsertSelectionResult,
-)
+from collections.abc import Sequence
+from collections.abc import Set as AbstractSet
+
+from ontoloom.axioms.types import AxiomSummary
+from ontoloom.entities.types import EntityInfo, EntityMatch, EntitySummary
+from ontoloom.entity_walker import iter_axiom_entities
+from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.selections.store import UpsertResult
 
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
@@ -47,7 +46,7 @@ def format_iri_with_label(iri: str, labels: dict[str, str | None]):
     return f'{iri} "{label}"' if label else iri
 
 
-def format_roles(roles: set[EntityType]):
+def format_roles(roles: AbstractSet[EntityType]):
     # A: good func
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
@@ -58,7 +57,7 @@ def _format_axiom_line(
     iris: list[str] | None = None,
 ):
     """Format a single axiom line with inline label hints. `iris` precomputed avoids re-walking."""
-    line = f"[{truncate_hash(ha.hash)}] {ha.axiom}"  # A: truncate_hash could also accept HashedAxiom (is there any reason it does not? where is it called? or maybe accept str and HashedAxiom?)
+    line = f"[{ha.hash[:HASH_DISPLAY_LEN]}] {ha.axiom}"  # A: truncate_hash could also accept HashedAxiom (is there any reason it does not? where is it called? or maybe accept str and HashedAxiom?)
     if not labels:
         return line
     # A: do not like that iris is optional and used if passed in - what could we do? same with labels, this seems bad? maybe have a custom type for this stuff as well? but we need to look deeply to figure out which one and all
@@ -74,16 +73,16 @@ def format_diff(
     entries: list[tuple[str, HashedAxiom]],
     summary: str,
     labels: dict[str, str | None] | None = None,
-    iris_per_entry: list[list[str]] | None = None,
+    iris_per_entry: list[list[str] | None] | None = None,
 ):
     lb = labels or {}
-    if (
-        iris_per_entry is None
-    ):  # A: this is weird do not like it at all, need to reason through please
-        iris_per_entry = [None] * len(entries)  # type: ignore[list-item]
+    # A: this is weird do not like it at all, need to reason through please
+    iris_list: list[list[str] | None] = (
+        iris_per_entry if iris_per_entry is not None else [None] * len(entries)
+    )
     changes = "\n".join(
         f"{tag} {_format_axiom_line(ha, lb, iris)}"
-        for (tag, ha), iris in zip(entries, iris_per_entry, strict=True)
+        for (tag, ha), iris in zip(entries, iris_list, strict=True)
     )
     return f"{summary}\n\n```diff\n{changes}\n```"
 
@@ -91,15 +90,16 @@ def format_diff(
 def format_axiom_listing(
     axioms: list[HashedAxiom],
     labels: dict[str, str | None] | None = None,
-    iris_per_axiom: list[list[str]] | None = None,
+    iris_per_axiom: list[list[str] | None] | None = None,
 ):
     if not axioms:
         return ""
     lb = labels or {}  # A: very much duplicated code with above, do not like, reason please
-    if iris_per_axiom is None:
-        iris_per_axiom = [None] * len(axioms)  # type: ignore[list-item]
+    iris_list: list[list[str] | None] = (
+        iris_per_axiom if iris_per_axiom is not None else [None] * len(axioms)
+    )
     return "\n".join(
-        _format_axiom_line(ha, lb, iris) for ha, iris in zip(axioms, iris_per_axiom, strict=True)
+        _format_axiom_line(ha, lb, iris) for ha, iris in zip(axioms, iris_list, strict=True)
     )
 
 
@@ -148,16 +148,15 @@ def format_axiom_summary(summary: AxiomSummary):
 
 def format_selection_result(
     kind_label: str,
-    select: str,
-    upserted: UpsertSelectionResult,
+    upserted: UpsertResult,
     page_text: str,
 ):
-    # A: see above, also what are all these params? I guess we are missing sth like Selection or sth type!!!! this is not good
-    parts = [f"{upserted.cardinality} {kind_label} -> {select!r} (sel@{upserted.content_hash})."]
-    if upserted.old_cardinality is not None:
-        parts.append(f"Overwrote previous ({upserted.old_cardinality} items).")
+    sel = upserted.selection
+    parts = [f"{sel.size} {kind_label} -> {sel.locked!r}."]
+    if upserted.previous_size is not None:
+        parts.append(f"Overwrote previous ({upserted.previous_size} items).")
 
-    if upserted.cardinality <= SELECT_INLINE_MAX:
+    if sel.size <= SELECT_INLINE_MAX:
         parts.append("")
         parts.append(page_text)
     else:
@@ -165,13 +164,13 @@ def format_selection_result(
         parts.append("")
         parts.append(page_text)
         parts.append(
-            f"\nUse `read_selection(name={select!r})` to browse all {upserted.cardinality} results."
+            f"\nUse `read_selection` with name {str(sel.name)!r} to browse all {sel.size} results."
         )
 
     return "\n".join(parts)
 
 
-def format_entity_search_page(matches: list[EntityMatch], total: int, offset: int):
+def format_entity_search_page(matches: Sequence[EntityMatch], total: int, offset: int):
     # A: again, need a type for this - EntitySearchPage or sth, derived from SearchPage that contains like total and offset or sth, and then matches on EntitySearchPage and all!!
     end = offset + len(matches)
     lines = [f"Showing {offset + 1}-{end} of {total} entities:"]
