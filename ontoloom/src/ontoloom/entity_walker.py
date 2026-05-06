@@ -6,6 +6,9 @@ special-cased because its kind comes from a sibling field's runtime value.
 """
 
 from collections.abc import Iterator
+from typing import Annotated, TypeAliasType, get_args, get_origin
+
+from pydantic.fields import FieldInfo
 
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import BaseAxiom, Declaration
@@ -38,7 +41,32 @@ def _walk_model(model: FrozenModel, position: Position | None) -> Iterator[Entit
         if name in _SKIP:
             continue
         field_pos = find_marker(info, Position) or position  # explicit marker beats inherited
-        yield from _walk_value(getattr(model, name), find_marker(info, EntityType), field_pos)
+        yield from _walk_value(getattr(model, name), _field_kind(info), field_pos)
+
+
+def _field_kind(info: FieldInfo) -> EntityType | None:
+    return find_marker(info, EntityType) or _peel_entity_type(info.annotation)
+
+
+def _peel_entity_type(annotation: object) -> EntityType | None:
+    # PEP 695 type alias -> resolve to underlying form, keep peeling.
+    if isinstance(annotation, TypeAliasType):
+        return _peel_entity_type(annotation.__value__)
+    origin = get_origin(annotation)
+    # Annotated[T, *meta] -> check meta first, then descend into T.
+    if origin is Annotated:
+        args = get_args(annotation)
+        for m in args[1:]:
+            if isinstance(m, EntityType):
+                return m
+        return _peel_entity_type(args[0])
+    # tuple[X, ...] -> descend into element type.
+    if origin is tuple:
+        args = get_args(annotation)
+        if args:
+            return _peel_entity_type(args[0])
+    # concrete class, union, or anything else -> stop.
+    return None
 
 
 def _walk_value(value, kind: EntityType | None, position: Position | None) -> Iterator[EntityRef]:
