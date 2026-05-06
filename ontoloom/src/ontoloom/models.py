@@ -1,6 +1,7 @@
 """Project-wide Pydantic base types: frozen models and validated string subclasses."""
 
 from abc import abstractmethod
+from collections.abc import Callable
 from typing import Any, ClassVar, get_args, override
 
 from pydantic import BaseModel, ConfigDict, Discriminator, Field, GetCoreSchemaHandler
@@ -8,17 +9,28 @@ from pydantic_core import CoreSchema, core_schema
 
 
 # Pydantic emits `oneOf + discriminator` for tagged unions but no outer
-# `type: "object"` (each branch carries its own). Claude Code's MCP client falls
+# `type` constraint (each branch carries its own). Claude Code's MCP client falls
 # back to JSON-string serialization when a param schema lacks an explicit `type`
-# at the top, so the server receives a string instead of a dict. Adding
-# `type: "object"` is a no-op for validation but tells the client to send a
-# structured value.
-def tagged_union_meta():
+# at the top, so the server receives a string instead of a dict. The `type` schema
+# keyword is a no-op for validation but tells the client to send a structured
+# value (or string, if the union accepts both). Defaults preserve object-only behavior.
+def tagged_union_meta(
+    disc: str | Callable[[Any], str] = "type",
+    schema_type: str | list[str] = "object",
+):
     """Annotated metadata for a top-level discriminated union exposed as an MCP tool param.
 
     Splat into Annotated: `Annotated[A | B, *tagged_union_meta()]`.
+
+    Args:
+        disc: Discriminator field name (string) or callable that extracts the tag
+              from raw input (string, dict, or model instance). Defaults to "type".
+        schema_type: JSON schema `type` value: "object" for object-only unions,
+                     ["string", "object"] for string-or-object unions, etc.
+                     Defaults to "object".
     """
-    return (Discriminator("type"), Field(json_schema_extra={"type": "object"}))
+    json_schema_extra: dict[str, Any] = {"type": schema_type}
+    return (Discriminator(disc), Field(json_schema_extra=json_schema_extra))
 
 
 class FrozenModel(BaseModel):
