@@ -18,7 +18,6 @@ class BaseClassExpression(FrozenModel):
 
 
 def is_class_expression(x: object) -> TypeGuard[IRI | BaseClassExpression]:
-    """Check if x is a class expression (IRI or BaseClassExpression instance)."""
     return isinstance(x, (IRI, BaseClassExpression))
 
 
