@@ -16,7 +16,6 @@ from ontoloom.owl.axioms import (
 )
 from ontoloom.owl.expressions import (
     DataSomeValuesFrom,
-    NamedClass,
     ObjectIntersectionOf,
     ObjectSomeValuesFrom,
 )
@@ -37,12 +36,12 @@ from ontoloom.selections.types import SelectionKind
 
 def test_annotations_excluded_from_canonical_json():
     a1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     a2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(
             Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="important")),
         ),
@@ -52,12 +51,12 @@ def test_annotations_excluded_from_canonical_json():
 
 def test_axiom_hash_stable_across_annotations():
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note")),),
     )
     assert HashedAxiom.of(ax1).hash == HashedAxiom.of(ax2).hash
@@ -65,12 +64,12 @@ def test_axiom_hash_stable_across_annotations():
 
 def test_axiom_hash_different_for_different_content():
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Cat")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
     )
     assert HashedAxiom.of(ax1).hash != HashedAxiom.of(ax2).hash
 
@@ -80,49 +79,49 @@ def test_axiom_hash_different_for_different_content():
 
 def test_equivalent_classes_order_irrelevant():
     a, b, c = IRI("ex:A"), IRI("ex:B"), IRI("ex:C")
-    ax1 = EquivalentClasses(expressions=(NamedClass(iri=a), NamedClass(iri=b), NamedClass(iri=c)))
-    ax2 = EquivalentClasses(expressions=(NamedClass(iri=c), NamedClass(iri=a), NamedClass(iri=b)))
+    ax1 = EquivalentClasses(equivalent_classes=(a, b, c))
+    ax2 = EquivalentClasses(equivalent_classes=(c, a, b))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_disjoint_classes_order_irrelevant():
-    ax1 = DisjointClasses(expressions=(NamedClass(iri=IRI("ex:A")), NamedClass(iri=IRI("ex:B"))))
-    ax2 = DisjointClasses(expressions=(NamedClass(iri=IRI("ex:B")), NamedClass(iri=IRI("ex:A"))))
+    ax1 = DisjointClasses(disjoint_classes=(IRI("ex:A"), IRI("ex:B")))
+    ax2 = DisjointClasses(disjoint_classes=(IRI("ex:B"), IRI("ex:A")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_equivalent_object_properties_order_irrelevant():
-    ax1 = EquivalentObjectProperties(properties=(IRI("ex:p"), IRI("ex:q"), IRI("ex:r")))
-    ax2 = EquivalentObjectProperties(properties=(IRI("ex:r"), IRI("ex:p"), IRI("ex:q")))
+    ax1 = EquivalentObjectProperties(object_properties=(IRI("ex:p"), IRI("ex:q"), IRI("ex:r")))
+    ax2 = EquivalentObjectProperties(object_properties=(IRI("ex:r"), IRI("ex:p"), IRI("ex:q")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_equivalent_data_properties_order_irrelevant():
-    ax1 = EquivalentDataProperties(properties=(IRI("ex:dp1"), IRI("ex:dp2")))
-    ax2 = EquivalentDataProperties(properties=(IRI("ex:dp2"), IRI("ex:dp1")))
+    ax1 = EquivalentDataProperties(data_properties=(IRI("ex:dp1"), IRI("ex:dp2")))
+    ax2 = EquivalentDataProperties(data_properties=(IRI("ex:dp2"), IRI("ex:dp1")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_same_individual_order_irrelevant():
-    ax1 = SameIndividual(individuals=(IRI("ex:a"), IRI("ex:b")))
-    ax2 = SameIndividual(individuals=(IRI("ex:b"), IRI("ex:a")))
+    ax1 = SameIndividual(same_individuals=(IRI("ex:a"), IRI("ex:b")))
+    ax2 = SameIndividual(same_individuals=(IRI("ex:b"), IRI("ex:a")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_different_individuals_order_irrelevant():
-    ax1 = DifferentIndividuals(individuals=(IRI("ex:a"), IRI("ex:b"), IRI("ex:c")))
-    ax2 = DifferentIndividuals(individuals=(IRI("ex:c"), IRI("ex:a"), IRI("ex:b")))
+    ax1 = DifferentIndividuals(different_individuals=(IRI("ex:a"), IRI("ex:b"), IRI("ex:c")))
+    ax2 = DifferentIndividuals(different_individuals=(IRI("ex:c"), IRI("ex:a"), IRI("ex:b")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_has_key_properties_order_irrelevant():
     ax1 = HasKey(
-        class_expression=NamedClass(iri=IRI("ex:Person")),
+        class_expression=IRI("ex:Person"),
         object_properties=(IRI("ex:p1"), IRI("ex:p2")),
         data_properties=(IRI("ex:d1"), IRI("ex:d2")),
     )
     ax2 = HasKey(
-        class_expression=NamedClass(iri=IRI("ex:Person")),
+        class_expression=IRI("ex:Person"),
         object_properties=(IRI("ex:p2"), IRI("ex:p1")),
         data_properties=(IRI("ex:d2"), IRI("ex:d1")),
     )
@@ -133,27 +132,27 @@ def test_has_key_properties_order_irrelevant():
 
 
 def test_intersection_operands_sorted():
-    a = NamedClass(iri=IRI("ex:A"))
-    b = NamedClass(iri=IRI("ex:B"))
+    a = IRI("ex:A")
+    b = IRI("ex:B")
     expr1 = ObjectIntersectionOf(operands=(a, b))
     expr2 = ObjectIntersectionOf(operands=(b, a))
-    ax1 = SubClassOf(sub_class=NamedClass(iri=IRI("ex:X")), super_class=expr1)
-    ax2 = SubClassOf(sub_class=NamedClass(iri=IRI("ex:X")), super_class=expr2)
+    ax1 = SubClassOf(sub_class=IRI("ex:X"), super_class=expr1)
+    ax2 = SubClassOf(sub_class=IRI("ex:X"), super_class=expr2)
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_deeply_nested_normalization():
-    a = NamedClass(iri=IRI("ex:A"))
-    b = NamedClass(iri=IRI("ex:B"))
-    c = NamedClass(iri=IRI("ex:C"))
+    a = IRI("ex:A")
+    b = IRI("ex:B")
+    c = IRI("ex:C")
     p = IRI("ex:p")
 
     inter_ba = ObjectIntersectionOf(operands=(b, a))
     inter_ab = ObjectIntersectionOf(operands=(a, b))
     some_pc = ObjectSomeValuesFrom(property=p, filler=c)
 
-    ax1 = EquivalentClasses(expressions=(inter_ba, some_pc))
-    ax2 = EquivalentClasses(expressions=(some_pc, inter_ab))
+    ax1 = EquivalentClasses(equivalent_classes=(inter_ba, some_pc))
+    ax2 = EquivalentClasses(equivalent_classes=(some_pc, inter_ab))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
@@ -161,8 +160,8 @@ def test_deeply_nested_normalization():
 
 
 def test_subclassof_order_preserved():
-    a = NamedClass(iri=IRI("ex:A"))
-    b = NamedClass(iri=IRI("ex:B"))
+    a = IRI("ex:A")
+    b = IRI("ex:B")
     ax1 = SubClassOf(sub_class=a, super_class=b)
     ax2 = SubClassOf(sub_class=b, super_class=a)
     assert canonical_json(ax1) != canonical_json(ax2)
@@ -173,15 +172,15 @@ def test_subclassof_order_preserved():
 
 def test_data_intersection_operand_order_irrelevant():
     ax1 = DataPropertyRange(
-        property=IRI("ex:hasAge"),
+        data_property=IRI("ex:hasAge"),
         range=DataIntersectionOf(
-            operands=(DataTypeRef(value=DataType.INTEGER), DataTypeRef(value=DataType.DECIMAL))
+            operands=(DataTypeRef(datatype=DataType.INTEGER), DataTypeRef(datatype=DataType.DECIMAL))
         ),
     )
     ax2 = DataPropertyRange(
-        property=IRI("ex:hasAge"),
+        data_property=IRI("ex:hasAge"),
         range=DataIntersectionOf(
-            operands=(DataTypeRef(value=DataType.DECIMAL), DataTypeRef(value=DataType.INTEGER))
+            operands=(DataTypeRef(datatype=DataType.DECIMAL), DataTypeRef(datatype=DataType.INTEGER))
         ),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
@@ -192,8 +191,8 @@ def test_datatype_definition_with_data_intersection():
         datatype=IRI("ex:PosInt"),
         data_range=DataIntersectionOf(
             operands=(
-                DataTypeRef(value=DataType.INTEGER),
-                DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER),
+                DataTypeRef(datatype=DataType.INTEGER),
+                DataTypeRef(datatype=DataType.NON_NEGATIVE_INTEGER),
             )
         ),
     )
@@ -201,8 +200,8 @@ def test_datatype_definition_with_data_intersection():
         datatype=IRI("ex:PosInt"),
         data_range=DataIntersectionOf(
             operands=(
-                DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER),
-                DataTypeRef(value=DataType.INTEGER),
+                DataTypeRef(datatype=DataType.NON_NEGATIVE_INTEGER),
+                DataTypeRef(datatype=DataType.INTEGER),
             )
         ),
     )
@@ -211,13 +210,13 @@ def test_datatype_definition_with_data_intersection():
 
 def test_data_intersection_with_data_one_of_operand():
     one = DataOneOf(value=TypedLiteral(value="1", datatype=DataType.INTEGER))
-    int_ref = DataTypeRef(value=DataType.INTEGER)
+    int_ref = DataTypeRef(datatype=DataType.INTEGER)
     ax1 = DataPropertyRange(
-        property=IRI("ex:p"),
+        data_property=IRI("ex:p"),
         range=DataIntersectionOf(operands=(int_ref, one)),
     )
     ax2 = DataPropertyRange(
-        property=IRI("ex:p"),
+        data_property=IRI("ex:p"),
         range=DataIntersectionOf(operands=(one, int_ref)),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
@@ -225,25 +224,25 @@ def test_data_intersection_with_data_one_of_operand():
 
 def test_data_some_values_from_with_data_intersection():
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:A")),
+        sub_class=IRI("ex:A"),
         super_class=DataSomeValuesFrom(
             property=IRI("ex:p"),
             range=DataIntersectionOf(
                 operands=(
-                    DataTypeRef(value=DataType.STRING),
-                    DataTypeRef(value=DataType.TOKEN),
+                    DataTypeRef(datatype=DataType.STRING),
+                    DataTypeRef(datatype=DataType.TOKEN),
                 )
             ),
         ),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:A")),
+        sub_class=IRI("ex:A"),
         super_class=DataSomeValuesFrom(
             property=IRI("ex:p"),
             range=DataIntersectionOf(
                 operands=(
-                    DataTypeRef(value=DataType.TOKEN),
-                    DataTypeRef(value=DataType.STRING),
+                    DataTypeRef(datatype=DataType.TOKEN),
+                    DataTypeRef(datatype=DataType.STRING),
                 )
             ),
         ),
@@ -258,9 +257,9 @@ def test_canonical_idempotent():
     from ontoloom.canonical import _normalize_model
 
     ax = EquivalentClasses(
-        expressions=(
-            NamedClass(iri=IRI("ex:B")),
-            NamedClass(iri=IRI("ex:A")),
+        equivalent_classes=(
+            IRI("ex:B"),
+            IRI("ex:A"),
         )
     )
     assert canonical_json(_normalize_model(ax)) == canonical_json(
@@ -296,8 +295,9 @@ def test_selection_pagination_stable_across_processes(tmp_path):
     Ontology.create(db_path)
     script = textwrap.dedent(f"""\
         from pathlib import Path
+        from ontoloom.selections.expr import IntersectExpr
         from ontoloom.selections.store import create_selection, read_selection, upsert_selection
-        from ontoloom.selections.types import SelectionKind
+        from ontoloom.selections.types import SelectionKind, SelectionName
         from ontoloom.connection import Ontology
 
         with Ontology(Path({str(db_path)!r})) as ont:
@@ -305,7 +305,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
                 ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
             upsert_selection(ont, "b", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
-            create_selection(ont, "r", intersection=["a", "b"])
+            create_selection(ont, "r", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
             page = read_selection(ont, "r", limit=5)
             print(",".join(item.key for item in page.items))
     """)

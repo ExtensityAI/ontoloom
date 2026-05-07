@@ -1,16 +1,15 @@
 """Base for the generated pattern classes."""
 
-from typing import ClassVar
-
 from ontoloom.models import FrozenModel
 
 
 class BasePattern(FrozenModel):
-    """Common base for the generated axiom and expression pattern classes.
+    """Common base for generated axiom and expression pattern classes.
 
-    Lets `isinstance(val, BasePattern)` narrow pattern values without listing
-    every concrete class. Each generated pattern sets `axiom_type` to the OWL
-    type string it matches.
+    `cls.axiom_tag()` returns the matched OWL type (the class name minus the
+    "Pattern" suffix), e.g. `SubClassOfPattern.axiom_tag() == "SubClassOf"`.
     """
 
-    axiom_type: ClassVar[str]
+    @classmethod
+    def axiom_tag(cls) -> str:
+        return cls.__name__.removesuffix("Pattern")

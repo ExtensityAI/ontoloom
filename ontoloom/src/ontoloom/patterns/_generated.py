@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Annotated, ClassVar, Literal
+from typing import Annotated
 
-from ontoloom.models import FrozenModel, tagged_union_meta
+from pydantic import Tag
+
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import DataRange, LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
@@ -19,226 +21,188 @@ class ContainsSlot(FrozenModel):
     """Partial-set match for slot-tuple fields (e.g. property lists)."""
     contains: tuple[Slot, ...]
 
-class NamedClassPattern(BasePattern):
-    axiom_type: ClassVar[str] = "NamedClass"
-    type: Literal["NamedClassPattern"] = "NamedClassPattern"
-    iri: Slot
-
 class ObjectSomeValuesFromPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectSomeValuesFrom"
-    type: Literal["ObjectSomeValuesFromPattern"] = "ObjectSomeValuesFromPattern"
     property: Slot
     filler: ExprSlot
 
 class ObjectIntersectionOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectIntersectionOf"
-    type: Literal["ObjectIntersectionOfPattern"] = "ObjectIntersectionOfPattern"
     operands: tuple[ExprSlot, ...] | ContainsExpr
 
 class ObjectOneOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectOneOf"
-    type: Literal["ObjectOneOfPattern"] = "ObjectOneOfPattern"
     individual: Slot
 
 class ObjectHasValuePattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectHasValue"
-    type: Literal["ObjectHasValuePattern"] = "ObjectHasValuePattern"
     property: Slot
     individual: Slot
 
 class ObjectHasSelfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectHasSelf"
-    type: Literal["ObjectHasSelfPattern"] = "ObjectHasSelfPattern"
-    property: Slot
+    self_property: Slot
 
 class DataSomeValuesFromPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DataSomeValuesFrom"
-    type: Literal["DataSomeValuesFromPattern"] = "DataSomeValuesFromPattern"
     property: Slot
     range: DataRange | Slot
 
 class DataHasValuePattern(BasePattern):
-    axiom_type: ClassVar[str] = "DataHasValue"
-    type: Literal["DataHasValuePattern"] = "DataHasValuePattern"
     property: Slot
     value: TypedLiteral | LangLiteral | Slot
 
-ExprSlot = Slot | NamedClassPattern | ObjectSomeValuesFromPattern | ObjectIntersectionOfPattern | ObjectOneOfPattern | ObjectHasValuePattern | ObjectHasSelfPattern | DataSomeValuesFromPattern | DataHasValuePattern
+ExprSlot = Slot | ObjectSomeValuesFromPattern | ObjectIntersectionOfPattern | ObjectOneOfPattern | ObjectHasValuePattern | ObjectHasSelfPattern | DataSomeValuesFromPattern | DataHasValuePattern
 
 class AnnotationAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "AnnotationAssertion"
-    type: Literal["AnnotationAssertionPattern"] = "AnnotationAssertionPattern"
     property: Slot
     subject: Slot
     value: IRI | TypedLiteral | LangLiteral | Slot
 
 class SubClassOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SubClassOf"
-    type: Literal["SubClassOfPattern"] = "SubClassOfPattern"
     sub_class: ExprSlot
     super_class: ExprSlot
 
 class EquivalentClassesPattern(BasePattern):
-    axiom_type: ClassVar[str] = "EquivalentClasses"
-    type: Literal["EquivalentClassesPattern"] = "EquivalentClassesPattern"
-    expressions: tuple[ExprSlot, ...] | ContainsExpr
+    equivalent_classes: tuple[ExprSlot, ...] | ContainsExpr
 
 class DisjointClassesPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DisjointClasses"
-    type: Literal["DisjointClassesPattern"] = "DisjointClassesPattern"
-    expressions: tuple[ExprSlot, ...] | ContainsExpr
+    disjoint_classes: tuple[ExprSlot, ...] | ContainsExpr
 
 class SubObjectPropertyOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SubObjectPropertyOf"
-    type: Literal["SubObjectPropertyOfPattern"] = "SubObjectPropertyOfPattern"
-    sub_property: Slot
-    super_property: Slot
+    sub_object_property: Slot
+    super_object_property: Slot
 
 class SubObjectPropertyOfChainPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SubObjectPropertyOfChain"
-    type: Literal["SubObjectPropertyOfChainPattern"] = "SubObjectPropertyOfChainPattern"
     chain: tuple[Slot, ...]
     super_property: Slot
 
 class EquivalentObjectPropertiesPattern(BasePattern):
-    axiom_type: ClassVar[str] = "EquivalentObjectProperties"
-    type: Literal["EquivalentObjectPropertiesPattern"] = "EquivalentObjectPropertiesPattern"
-    properties: tuple[Slot, ...] | ContainsSlot
+    object_properties: tuple[Slot, ...] | ContainsSlot
 
 class TransitiveObjectPropertyPattern(BasePattern):
-    axiom_type: ClassVar[str] = "TransitiveObjectProperty"
-    type: Literal["TransitiveObjectPropertyPattern"] = "TransitiveObjectPropertyPattern"
-    property: Slot
+    transitive_property: Slot
 
 class ReflexiveObjectPropertyPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ReflexiveObjectProperty"
-    type: Literal["ReflexiveObjectPropertyPattern"] = "ReflexiveObjectPropertyPattern"
-    property: Slot
+    reflexive_property: Slot
 
 class ObjectPropertyDomainPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectPropertyDomain"
-    type: Literal["ObjectPropertyDomainPattern"] = "ObjectPropertyDomainPattern"
-    property: Slot
+    object_property: Slot
     domain: ExprSlot
 
 class ObjectPropertyRangePattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectPropertyRange"
-    type: Literal["ObjectPropertyRangePattern"] = "ObjectPropertyRangePattern"
-    property: Slot
+    object_property: Slot
     range: ExprSlot
 
 class SubDataPropertyOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SubDataPropertyOf"
-    type: Literal["SubDataPropertyOfPattern"] = "SubDataPropertyOfPattern"
-    sub_property: Slot
-    super_property: Slot
+    sub_data_property: Slot
+    super_data_property: Slot
 
 class EquivalentDataPropertiesPattern(BasePattern):
-    axiom_type: ClassVar[str] = "EquivalentDataProperties"
-    type: Literal["EquivalentDataPropertiesPattern"] = "EquivalentDataPropertiesPattern"
-    properties: tuple[Slot, ...] | ContainsSlot
+    data_properties: tuple[Slot, ...] | ContainsSlot
 
 class DataPropertyDomainPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DataPropertyDomain"
-    type: Literal["DataPropertyDomainPattern"] = "DataPropertyDomainPattern"
-    property: Slot
+    data_property: Slot
     domain: ExprSlot
 
 class DataPropertyRangePattern(BasePattern):
-    axiom_type: ClassVar[str] = "DataPropertyRange"
-    type: Literal["DataPropertyRangePattern"] = "DataPropertyRangePattern"
-    property: Slot
+    data_property: Slot
     range: DataRange | Slot
 
 class FunctionalDataPropertyPattern(BasePattern):
-    axiom_type: ClassVar[str] = "FunctionalDataProperty"
-    type: Literal["FunctionalDataPropertyPattern"] = "FunctionalDataPropertyPattern"
-    property: Slot
+    functional_property: Slot
 
 class SubAnnotationPropertyOfPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SubAnnotationPropertyOf"
-    type: Literal["SubAnnotationPropertyOfPattern"] = "SubAnnotationPropertyOfPattern"
-    sub_property: Slot
-    super_property: Slot
+    sub_annotation_property: Slot
+    super_annotation_property: Slot
 
 class AnnotationPropertyDomainPattern(BasePattern):
-    axiom_type: ClassVar[str] = "AnnotationPropertyDomain"
-    type: Literal["AnnotationPropertyDomainPattern"] = "AnnotationPropertyDomainPattern"
-    property: Slot
+    annotation_property: Slot
     domain: Slot
 
 class AnnotationPropertyRangePattern(BasePattern):
-    axiom_type: ClassVar[str] = "AnnotationPropertyRange"
-    type: Literal["AnnotationPropertyRangePattern"] = "AnnotationPropertyRangePattern"
-    property: Slot
+    annotation_property: Slot
     range: Slot
 
 class HasKeyPattern(BasePattern):
-    axiom_type: ClassVar[str] = "HasKey"
-    type: Literal["HasKeyPattern"] = "HasKeyPattern"
     class_expression: ExprSlot
     object_properties: tuple[Slot, ...] | ContainsSlot
     data_properties: tuple[Slot, ...] | ContainsSlot
 
 class DatatypeDefinitionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DatatypeDefinition"
-    type: Literal["DatatypeDefinitionPattern"] = "DatatypeDefinitionPattern"
     datatype: Slot
     data_range: DataRange | Slot
 
 class DeclarationPattern(BasePattern):
-    axiom_type: ClassVar[str] = "Declaration"
-    type: Literal["DeclarationPattern"] = "DeclarationPattern"
     entity_type: EntityType | Slot
     iri: Slot
 
 class ClassAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ClassAssertion"
-    type: Literal["ClassAssertionPattern"] = "ClassAssertionPattern"
     class_expression: ExprSlot
     individual: Slot
 
 class ObjectPropertyAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "ObjectPropertyAssertion"
-    type: Literal["ObjectPropertyAssertionPattern"] = "ObjectPropertyAssertionPattern"
     property: Slot
     source: Slot
     target: Slot
 
 class NegativeObjectPropertyAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "NegativeObjectPropertyAssertion"
-    type: Literal["NegativeObjectPropertyAssertionPattern"] = "NegativeObjectPropertyAssertionPattern"
     property: Slot
     source: Slot
     target: Slot
 
 class DataPropertyAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DataPropertyAssertion"
-    type: Literal["DataPropertyAssertionPattern"] = "DataPropertyAssertionPattern"
     property: Slot
     individual: Slot
     value: TypedLiteral | LangLiteral | Slot
 
 class NegativeDataPropertyAssertionPattern(BasePattern):
-    axiom_type: ClassVar[str] = "NegativeDataPropertyAssertion"
-    type: Literal["NegativeDataPropertyAssertionPattern"] = "NegativeDataPropertyAssertionPattern"
     property: Slot
     individual: Slot
     value: TypedLiteral | LangLiteral | Slot
 
 class SameIndividualPattern(BasePattern):
-    axiom_type: ClassVar[str] = "SameIndividual"
-    type: Literal["SameIndividualPattern"] = "SameIndividualPattern"
-    individuals: tuple[Slot, ...] | ContainsSlot
+    same_individuals: tuple[Slot, ...] | ContainsSlot
 
 class DifferentIndividualsPattern(BasePattern):
-    axiom_type: ClassVar[str] = "DifferentIndividuals"
-    type: Literal["DifferentIndividualsPattern"] = "DifferentIndividualsPattern"
-    individuals: tuple[Slot, ...] | ContainsSlot
+    different_individuals: tuple[Slot, ...] | ContainsSlot
 
-ExpressionPattern = NamedClassPattern | ObjectSomeValuesFromPattern | ObjectIntersectionOfPattern | ObjectOneOfPattern | ObjectHasValuePattern | ObjectHasSelfPattern | DataSomeValuesFromPattern | DataHasValuePattern
+ExpressionPattern = ObjectSomeValuesFromPattern | ObjectIntersectionOfPattern | ObjectOneOfPattern | ObjectHasValuePattern | ObjectHasSelfPattern | DataSomeValuesFromPattern | DataHasValuePattern
 AxiomPattern = AnnotationAssertionPattern | SubClassOfPattern | EquivalentClassesPattern | DisjointClassesPattern | SubObjectPropertyOfPattern | SubObjectPropertyOfChainPattern | EquivalentObjectPropertiesPattern | TransitiveObjectPropertyPattern | ReflexiveObjectPropertyPattern | ObjectPropertyDomainPattern | ObjectPropertyRangePattern | SubDataPropertyOfPattern | EquivalentDataPropertiesPattern | DataPropertyDomainPattern | DataPropertyRangePattern | FunctionalDataPropertyPattern | SubAnnotationPropertyOfPattern | AnnotationPropertyDomainPattern | AnnotationPropertyRangePattern | HasKeyPattern | DatatypeDefinitionPattern | DeclarationPattern | ClassAssertionPattern | ObjectPropertyAssertionPattern | NegativeObjectPropertyAssertionPattern | DataPropertyAssertionPattern | NegativeDataPropertyAssertionPattern | SameIndividualPattern | DifferentIndividualsPattern
-Pattern = Annotated[ExpressionPattern | AxiomPattern, *tagged_union_meta()]
+_PATTERN_CLASSES = (
+    ObjectSomeValuesFromPattern,
+    ObjectIntersectionOfPattern,
+    ObjectOneOfPattern,
+    ObjectHasValuePattern,
+    ObjectHasSelfPattern,
+    DataSomeValuesFromPattern,
+    DataHasValuePattern,
+    AnnotationAssertionPattern,
+    SubClassOfPattern,
+    EquivalentClassesPattern,
+    DisjointClassesPattern,
+    SubObjectPropertyOfPattern,
+    SubObjectPropertyOfChainPattern,
+    EquivalentObjectPropertiesPattern,
+    TransitiveObjectPropertyPattern,
+    ReflexiveObjectPropertyPattern,
+    ObjectPropertyDomainPattern,
+    ObjectPropertyRangePattern,
+    SubDataPropertyOfPattern,
+    EquivalentDataPropertiesPattern,
+    DataPropertyDomainPattern,
+    DataPropertyRangePattern,
+    FunctionalDataPropertyPattern,
+    SubAnnotationPropertyOfPattern,
+    AnnotationPropertyDomainPattern,
+    AnnotationPropertyRangePattern,
+    HasKeyPattern,
+    DatatypeDefinitionPattern,
+    DeclarationPattern,
+    ClassAssertionPattern,
+    ObjectPropertyAssertionPattern,
+    NegativeObjectPropertyAssertionPattern,
+    DataPropertyAssertionPattern,
+    NegativeDataPropertyAssertionPattern,
+    SameIndividualPattern,
+    DifferentIndividualsPattern,
+)
+_get_pattern_tag = make_tag_resolver(_PATTERN_CLASSES)
+Pattern = Annotated[Annotated[ObjectSomeValuesFromPattern, Tag("ObjectSomeValuesFromPattern")] | Annotated[ObjectIntersectionOfPattern, Tag("ObjectIntersectionOfPattern")] | Annotated[ObjectOneOfPattern, Tag("ObjectOneOfPattern")] | Annotated[ObjectHasValuePattern, Tag("ObjectHasValuePattern")] | Annotated[ObjectHasSelfPattern, Tag("ObjectHasSelfPattern")] | Annotated[DataSomeValuesFromPattern, Tag("DataSomeValuesFromPattern")] | Annotated[DataHasValuePattern, Tag("DataHasValuePattern")] | Annotated[AnnotationAssertionPattern, Tag("AnnotationAssertionPattern")] | Annotated[SubClassOfPattern, Tag("SubClassOfPattern")] | Annotated[EquivalentClassesPattern, Tag("EquivalentClassesPattern")] | Annotated[DisjointClassesPattern, Tag("DisjointClassesPattern")] | Annotated[SubObjectPropertyOfPattern, Tag("SubObjectPropertyOfPattern")] | Annotated[SubObjectPropertyOfChainPattern, Tag("SubObjectPropertyOfChainPattern")] | Annotated[EquivalentObjectPropertiesPattern, Tag("EquivalentObjectPropertiesPattern")] | Annotated[TransitiveObjectPropertyPattern, Tag("TransitiveObjectPropertyPattern")] | Annotated[ReflexiveObjectPropertyPattern, Tag("ReflexiveObjectPropertyPattern")] | Annotated[ObjectPropertyDomainPattern, Tag("ObjectPropertyDomainPattern")] | Annotated[ObjectPropertyRangePattern, Tag("ObjectPropertyRangePattern")] | Annotated[SubDataPropertyOfPattern, Tag("SubDataPropertyOfPattern")] | Annotated[EquivalentDataPropertiesPattern, Tag("EquivalentDataPropertiesPattern")] | Annotated[DataPropertyDomainPattern, Tag("DataPropertyDomainPattern")] | Annotated[DataPropertyRangePattern, Tag("DataPropertyRangePattern")] | Annotated[FunctionalDataPropertyPattern, Tag("FunctionalDataPropertyPattern")] | Annotated[SubAnnotationPropertyOfPattern, Tag("SubAnnotationPropertyOfPattern")] | Annotated[AnnotationPropertyDomainPattern, Tag("AnnotationPropertyDomainPattern")] | Annotated[AnnotationPropertyRangePattern, Tag("AnnotationPropertyRangePattern")] | Annotated[HasKeyPattern, Tag("HasKeyPattern")] | Annotated[DatatypeDefinitionPattern, Tag("DatatypeDefinitionPattern")] | Annotated[DeclarationPattern, Tag("DeclarationPattern")] | Annotated[ClassAssertionPattern, Tag("ClassAssertionPattern")] | Annotated[ObjectPropertyAssertionPattern, Tag("ObjectPropertyAssertionPattern")] | Annotated[NegativeObjectPropertyAssertionPattern, Tag("NegativeObjectPropertyAssertionPattern")] | Annotated[DataPropertyAssertionPattern, Tag("DataPropertyAssertionPattern")] | Annotated[NegativeDataPropertyAssertionPattern, Tag("NegativeDataPropertyAssertionPattern")] | Annotated[SameIndividualPattern, Tag("SameIndividualPattern")] | Annotated[DifferentIndividualsPattern, Tag("DifferentIndividualsPattern")], *tagged_union_meta(_get_pattern_tag)]
 
 ContainsExpr.model_rebuild()
 ContainsSlot.model_rebuild()

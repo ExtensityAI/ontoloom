@@ -42,9 +42,9 @@ def test_unordered_equality():
     assert Unordered() == Unordered()
 
 
-def test_axiom_type_classvar():
-    """type_ ClassVar resolves to the Literal default of the type field."""
+def test_axiom_tag_classmethod():
+    """tag() classmethod returns the class name."""
     from ontoloom.owl.axioms import Declaration, SubClassOf
 
-    assert Declaration.type_ == "Declaration"
-    assert SubClassOf.type_ == "SubClassOf"
+    assert Declaration.tag() == "Declaration"
+    assert SubClassOf.tag() == "SubClassOf"

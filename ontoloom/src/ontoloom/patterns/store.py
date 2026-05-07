@@ -66,7 +66,12 @@ def match_axioms(
 
 _EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
 
-_AXIOM_CLASSES: tuple[type, ...] = get_args(get_args(Axiom)[0])
+def _peel(member: object) -> type:
+    # Axiom union members are Annotated[Cls, Tag("...")] for callable-discriminator wiring.
+    return get_args(member)[0] if get_origin(member) is Annotated else member  # pyright: ignore[reportReturnType]
+
+
+_AXIOM_CLASSES: tuple[type, ...] = tuple(_peel(m) for m in get_args(get_args(Axiom)[0]))
 # The raw ClassExpression union (no Annotated wrapper). Annotated[ClassExpression, marker]
 # flattens via PEP 593, so checking args[0] is _EXPR_UNION is the correct identity test.
 _EXPR_UNION = get_args(ClassExpression)[0]
@@ -91,7 +96,7 @@ def _has_class_expression_field(cls: type) -> bool:
 
 
 _EXPRESSION_CONTAINER_TYPES = frozenset(
-    cls.type_ for cls in _AXIOM_CLASSES if _has_class_expression_field(cls)
+    cls.tag() for cls in _AXIOM_CLASSES if _has_class_expression_field(cls)
 )
 
 
@@ -119,7 +124,7 @@ def _iter_candidates(
         cond_params.extend(sorted(_EXPRESSION_CONTAINER_TYPES))
     else:
         conditions.append("a.type = ?")
-        cond_params.append(pattern.axiom_type)
+        cond_params.append(pattern.axiom_tag())
 
     concrete_iris = _extract_concrete_iris(pattern)
     for iri in concrete_iris[:3]:

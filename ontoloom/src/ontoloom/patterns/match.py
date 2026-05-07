@@ -10,7 +10,7 @@ from pydantic.fields import FieldInfo
 
 from ontoloom.canonical import SKIP
 from ontoloom.owl.axioms import BaseAxiom
-from ontoloom.owl.expressions import BaseClassExpression, NamedClass
+from ontoloom.owl.expressions import BaseClassExpression
 from ontoloom.owl.markers import is_unordered
 from ontoloom.patterns import ContainsExpr, ContainsSlot, ExpressionPattern
 from ontoloom.patterns.base import BasePattern
@@ -41,7 +41,7 @@ def _match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
         return results
 
     # Axiom-level pattern: type must match the axiom's type
-    if pattern.axiom_type == axiom.type_:
+    if pattern.axiom_tag() == axiom.tag():
         result = _match_model(pattern, axiom, {})
         return [result] if result is not None else []
 
@@ -54,10 +54,16 @@ def _match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
 
 
 def _match_model(
-    pattern: BasePattern, actual: BaseAxiom | BaseClassExpression, bindings: Bindings
+    pattern: BasePattern, actual: BaseAxiom | BaseClassExpression | str, bindings: Bindings
 ) -> Bindings | None:
     """Match a pattern model against an actual model, field by field."""
-    if pattern.axiom_type and pattern.axiom_type != actual.type_:
+    # Handle bare IRI strings: match pattern.iri against the string
+    if isinstance(actual, str):
+        if hasattr(pattern, "iri") and isinstance(getattr(pattern, "iri", None), Slot):
+            return _match_slot_vs_str(pattern.iri, actual, bindings)  # pyright: ignore[reportAttributeAccessIssue]
+        return None
+
+    if pattern.axiom_tag() != actual.tag():
         return None
 
     actual_fields = type(actual).model_fields
@@ -80,12 +86,12 @@ def _match_model(
     return bindings
 
 
-def _match_field(
+def _match_field(  # noqa: C901
     pattern_val: object,
     actual_val: object,
     bindings: Bindings,
     info: FieldInfo | None = None,
-):
+) -> Bindings | None:
     """Dispatch matching based on the pattern value's type."""
     # Slot against a class expression (shorthand semantics)
     if isinstance(pattern_val, Slot) and isinstance(actual_val, BaseClassExpression):
@@ -111,8 +117,11 @@ def _match_field(
         return _match_tuple(pattern_val, actual_val, bindings)
 
     # Nested model (expression pattern vs expression).
-    if isinstance(pattern_val, BasePattern) and isinstance(actual_val, BaseClassExpression):
-        return _match_model(pattern_val, actual_val, bindings)
+    if isinstance(pattern_val, BasePattern):
+        if isinstance(actual_val, BaseClassExpression):
+            return _match_model(pattern_val, actual_val, bindings)
+        if isinstance(actual_val, str):
+            return _match_model(pattern_val, actual_val, bindings)
 
     # Concrete value equality (enums, literals)
     if pattern_val == actual_val:
@@ -137,25 +146,26 @@ def _match_slot_vs_str(slot: Slot, actual: str, bindings: Bindings) -> Bindings 
 
 
 def _match_slot_vs_expression(
-    slot: Slot, expr: BaseClassExpression, bindings: Bindings
+    slot: Slot, expr: str | BaseClassExpression, bindings: Bindings
 ) -> Bindings | None:
-    """Match a Slot against a ClassExpression.
+    """Match a Slot against a ClassExpression or bare IRI string.
 
     Semantics:
     - Wildcard: matches any expression.
-    - Variable: binds to the IRI if expr is NamedClass, else to repr.
-    - Concrete IRI: shorthand for NamedClass(iri=X). Only matches NamedClass.
+    - Variable: binds to the IRI string for bare IRI, else to repr.
+    - Concrete IRI: matches a bare IRI string with the same value.
     """
     if slot.is_wildcard:
         return bindings
 
-    if slot.is_variable:
-        bound_value = str(expr.iri) if isinstance(expr, NamedClass) else repr(expr)
-        return _bind_variable(slot.var_name, bound_value, bindings)
+    if isinstance(expr, str):
+        if slot.is_variable:
+            return _bind_variable(slot.var_name, expr, bindings)
+        return bindings if str(slot) == expr else None
 
-    # Concrete IRI: only matches NamedClass with same IRI
-    if isinstance(expr, NamedClass) and str(expr.iri) == str(slot):
-        return bindings
+    if slot.is_variable:
+        return _bind_variable(slot.var_name, repr(expr), bindings)
+
     return None
 
 
@@ -216,7 +226,7 @@ def _match_contains(
 # ---------------------------------------------------------------------------
 
 
-def _iter_expressions(obj: BaseAxiom | BaseClassExpression) -> Iterator[BaseClassExpression]:
+def _iter_expressions(obj: BaseAxiom | BaseClassExpression) -> Iterator[BaseClassExpression | str]:
     """Recursively yield all ClassExpression nodes within an axiom or expression."""
     for field_name in type(obj).model_fields:
         if field_name in SKIP:
@@ -225,14 +235,20 @@ def _iter_expressions(obj: BaseAxiom | BaseClassExpression) -> Iterator[BaseClas
         yield from _iter_field_expressions(val)
 
 
-def _iter_field_expressions(val: object) -> Iterator[BaseClassExpression]:
+def _iter_field_expressions(val: object) -> Iterator[BaseClassExpression | str]:
     """Yield expressions from a single field value."""
     if isinstance(val, BaseClassExpression):
         yield val
         # Recurse into the expression's own fields
         yield from _iter_expressions(val)
+    elif isinstance(val, str):
+        # Bare IRI (subclass of str)
+        yield val
     elif isinstance(val, tuple):
         for item in val:
             if isinstance(item, BaseClassExpression):
                 yield item
                 yield from _iter_expressions(item)
+            elif isinstance(item, str):
+                # Bare IRI in tuple
+                yield item

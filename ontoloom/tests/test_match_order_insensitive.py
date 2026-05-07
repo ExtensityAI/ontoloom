@@ -1,19 +1,16 @@
 from ontoloom.owl.axioms import EquivalentClasses
-from ontoloom.owl.expressions import NamedClass
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns import EquivalentClassesPattern, NamedClassPattern
+from ontoloom.patterns import EquivalentClassesPattern
 from ontoloom.patterns.match import _match_pattern
 from ontoloom.patterns.slot import Slot
 
 
 def test_equivalent_classes_pattern_order_insensitive():
-    axiom = EquivalentClasses(
-        expressions=(NamedClass(iri=IRI("ex:Cat")), NamedClass(iri=IRI("ex:Dog")))
-    )
+    axiom = EquivalentClasses(equivalent_classes=(IRI("ex:Cat"), IRI("ex:Dog")))
     pattern = EquivalentClassesPattern(
-        expressions=(
-            NamedClassPattern(iri=Slot("ex:Dog")),
-            NamedClassPattern(iri=Slot("ex:Cat")),
+        equivalent_classes=(
+            Slot("ex:Dog"),
+            Slot("ex:Cat"),
         ),
     )
     bindings = _match_pattern(pattern, axiom)
@@ -23,16 +20,16 @@ def test_equivalent_classes_pattern_order_insensitive():
 def test_equivalent_classes_pattern_length_mismatch():
     """Unordered tuple match still requires equal lengths."""
     axiom = EquivalentClasses(
-        expressions=(
-            NamedClass(iri=IRI("ex:Cat")),
-            NamedClass(iri=IRI("ex:Dog")),
-            NamedClass(iri=IRI("ex:Bird")),
+        equivalent_classes=(
+            IRI("ex:Cat"),
+            IRI("ex:Dog"),
+            IRI("ex:Bird"),
         )
     )
     pattern = EquivalentClassesPattern(
-        expressions=(
-            NamedClassPattern(iri=Slot("ex:Dog")),
-            NamedClassPattern(iri=Slot("ex:Cat")),
+        equivalent_classes=(
+            Slot("ex:Dog"),
+            Slot("ex:Cat"),
         ),
     )
     assert _match_pattern(pattern, axiom) == []

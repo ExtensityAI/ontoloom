@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from ontoloom.entity_walker import _walk_model, iter_axiom_entities
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import EquivalentClasses, ObjectPropertyDomain
-from ontoloom.owl.expressions import NamedClass, ObjectSomeValuesFrom
+from ontoloom.owl.expressions import ObjectSomeValuesFrom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
 
@@ -62,9 +62,9 @@ def test_outer_field_marker_beats_alias_marker():
 def test_position_unchanged_equivalent_classes_with_restriction():
     """Outer Position.MEMBER on tuple, Position.FILLER inside the nested restriction."""
     ax = EquivalentClasses(
-        expressions=(
-            NamedClass(iri=IRI(":Parent")),
-            ObjectSomeValuesFrom(property=IRI(":hasChild"), filler=NamedClass(iri=IRI(":Person"))),
+        equivalent_classes=(
+            IRI(":Parent"),
+            ObjectSomeValuesFrom(property=IRI(":hasChild"), filler=IRI(":Person")),
         )
     )
     entries = list(iter_axiom_entities(ax))
@@ -76,8 +76,8 @@ def test_position_unchanged_equivalent_classes_with_restriction():
 
 
 def test_position_unchanged_object_property_domain():
-    """Domain Position propagates into the nested NamedClass."""
-    ax = ObjectPropertyDomain(property=IRI(":r"), domain=NamedClass(iri=IRI(":C")))
+    """Domain Position propagates to the bare IRI in domain position."""
+    ax = ObjectPropertyDomain(object_property=IRI(":r"), domain=IRI(":C"))
     entries = list(iter_axiom_entities(ax))
 
     pos_by_iri = {str(iri): pos for iri, _, pos in entries}

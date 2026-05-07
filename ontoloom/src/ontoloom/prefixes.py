@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from pydantic import ValidationError
 
 from ontoloom.connection import Metadata, Ontology, escape_like
@@ -10,6 +12,12 @@ class PrefixNotFoundError(OntoloomError):
     def __init__(self, name: str):
         self.name = name
         super().__init__(f"No prefix {name!r}.")
+
+
+@dataclass(frozen=True, slots=True)
+class SetPrefixResult:
+    previous_iri: str | None
+    in_use_count: int
 
 
 # A: prefixes are simple, we should just create a prefix table, then metadata can live in a metadata file and not with prefixes like here!
@@ -38,10 +46,29 @@ def list_prefixes(
     return _get_metadata(ont).prefixes
 
 
-def set_prefix(ont: Ontology, name: str, iri: str):
+def set_prefix(ont: Ontology, name: str, iri: str, *, force: bool = False) -> SetPrefixResult:
     with ont.conn:
         meta = _get_metadata(ont)
+        previous_iri = meta.prefixes.get(name)
+
+        in_use_count = 0
+        if previous_iri is not None and previous_iri != iri:
+            in_use_count = ont.conn.execute(
+                "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
+                "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
+                (escape_like(name),),
+            ).fetchone()[0]
+
+            if in_use_count > 0 and not force:
+                msg = (
+                    f"Cannot reassign prefix {name!r}: {in_use_count} entities still use it. "
+                    f"Pass force=true to override."
+                )
+                raise BadRequestError(msg)
+
         _save_metadata(ont, meta.model_copy(update={"prefixes": {**meta.prefixes, name: iri}}))
+
+        return SetPrefixResult(previous_iri=previous_iri, in_use_count=in_use_count)
 
 
 def remove_prefix(ont: Ontology, name: str) -> None:

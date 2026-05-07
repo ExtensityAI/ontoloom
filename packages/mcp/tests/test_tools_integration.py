@@ -8,7 +8,6 @@ import pytest
 from fastmcp.exceptions import ToolError
 from ontoloom.connection import Ontology
 from ontoloom.owl.axioms import Declaration, SubClassOf
-from ontoloom.owl.expressions import NamedClass
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.types import LockedSelection, SelectionName
@@ -36,8 +35,8 @@ def populated_db(empty_db):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
             SubClassOf(
-                sub_class=NamedClass(iri=IRI("ex:Dog")),
-                super_class=NamedClass(iri=IRI("ex:Animal")),
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
             ),
         ],
     )
@@ -115,10 +114,13 @@ def test_remove_axioms_stale_selection_translates(populated_db):
     # Create an axiom selection, then mutate it, then try to use the stale hash.
     search_entities(path=populated_db, into=SelectionName("dogs_ent"), query="Dog")
     # Manually create an axiom selection from those entities (use create_selection directly)
+    from ontoloom.selections.expr import AxiomsForExpr
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
     create_selection(
-        path=populated_db, name=SelectionName("dogs_ax"), axioms_for=SelectionName("dogs_ent")
+        path=populated_db,
+        name=SelectionName("dogs_ax"),
+        expr=AxiomsForExpr(axioms_for=SelectionName("dogs_ent")),
     )
     # Build a LockedSelection with a wrong hash to trigger StaleSelectionError.
     stale = LockedSelection("dogs_ax@deadbeef")

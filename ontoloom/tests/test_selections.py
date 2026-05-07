@@ -4,9 +4,15 @@ from ontoloom.connection import Ontology
 from ontoloom.errors import BadRequestError
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
-from ontoloom.owl.expressions import NamedClass
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.selections.expr import (
+    AxiomsForExpr,
+    DiffExpr,
+    EntitiesInExpr,
+    IntersectExpr,
+    UnionExpr,
+)
 from ontoloom.selections.store import (
     StaleSelectionError,
     create_selection,
@@ -33,9 +39,9 @@ def test_union_commutativity(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
-    _r = create_selection(ont, "u_ab", union=["a", "b"])
+    _r = create_selection(ont, "u_ab", UnionExpr(union=(SelectionName("a"), SelectionName("b"))))
     hash_ab, card_ab = _r.selection.hash, _r.selection.size
-    _r = create_selection(ont, "u_ba", union=["b", "a"])
+    _r = create_selection(ont, "u_ba", UnionExpr(union=(SelectionName("b"), SelectionName("a"))))
     hash_ba, card_ba = _r.selection.hash, _r.selection.size
 
     assert card_ab == 3
@@ -47,14 +53,18 @@ def test_intersection(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
-    card = create_selection(ont, "inter", intersection=["a", "b"]).selection.size
+    card = create_selection(
+        ont, "inter", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b")))
+    ).selection.size
     assert card == 1
 
     page = read_selection(ont, "inter")
     assert [item.key for item in page.items] == ["ex:Cat"]
 
     upsert_selection(ont, "c", SelectionKind.ENTITIES, ["ex:Fish"], "test")
-    card_disjoint = create_selection(ont, "inter_disjoint", intersection=["a", "c"]).selection.size
+    card_disjoint = create_selection(
+        ont, "inter_disjoint", IntersectExpr(intersect=(SelectionName("a"), SelectionName("c")))
+    ).selection.size
     assert card_disjoint == 0
 
 
@@ -62,26 +72,32 @@ def test_difference(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test")
     upsert_selection(ont, "b", SelectionKind.ENTITIES, ["ex:Cat"], "test")
 
-    card_a_minus_b = create_selection(ont, "diff_ab", difference=["a", "b"]).selection.size
+    card_a_minus_b = create_selection(
+        ont, "diff_ab", DiffExpr(diff=(SelectionName("a"), SelectionName("b")))
+    ).selection.size
     assert card_a_minus_b == 2
 
     page = read_selection(ont, "diff_ab")
     assert {item.key for item in page.items} == {"ex:Dog", "ex:Fish"}
 
-    card_b_minus_a = create_selection(ont, "diff_ba", difference=["b", "a"]).selection.size
+    card_b_minus_a = create_selection(
+        ont, "diff_ba", DiffExpr(diff=(SelectionName("b"), SelectionName("a")))
+    ).selection.size
     assert card_b_minus_a == 0
 
 
 def test_axioms_for(ont):
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     add_axioms(ont, [ax1, ax2])
 
     upsert_selection(ont, "ents", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    card = create_selection(ont, "ax_for_dog", axioms_for="ents").selection.size
+    card = create_selection(
+        ont, "ax_for_dog", AxiomsForExpr(axioms_for=SelectionName("ents"))
+    ).selection.size
 
     meta = get_selection(ont, "ax_for_dog")
     assert meta.kind == SelectionKind.AXIOMS
@@ -90,14 +106,16 @@ def test_axioms_for(ont):
 
 def test_entities_in(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     h = HashedAxiom.of(ax).hash
 
     upsert_selection(ont, "axsel", SelectionKind.AXIOMS, [h], "test")
-    _card = create_selection(ont, "ent_in", entities_in="axsel").selection.size
+    _card = create_selection(
+        ont, "ent_in", EntitiesInExpr(entities_in=SelectionName("axsel"))
+    ).selection.size
 
     meta = get_selection(ont, "ent_in")
     assert meta.kind == SelectionKind.ENTITIES
@@ -113,12 +131,37 @@ def test_mixed_kind_raises(ont):
     upsert_selection(ont, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
     with pytest.raises(BadRequestError):
-        create_selection(ont, "mixed_union", union=["ax_sel", "ent_sel"])
+        create_selection(
+            ont, "mixed_union", UnionExpr(union=(SelectionName("ax_sel"), SelectionName("ent_sel")))
+        )
 
 
 def test_empty_inputs_raises(ont):
     with pytest.raises(BadRequestError):
-        create_selection(ont, "x", union=[])
+        create_selection(ont, "x", UnionExpr(union=()))
+
+
+def test_nested_expression(ont):
+    """Nested tree: union of axioms_for(ents1) and axioms_for(ents2) in one call."""
+    ax1 = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+    )
+    ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
+    add_axioms(ont, [ax1, ax2])
+
+    upsert_selection(ont, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(ont, "cats", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+
+    expr = UnionExpr(
+        union=(
+            AxiomsForExpr(axioms_for=SelectionName("dogs")),
+            AxiomsForExpr(axioms_for=SelectionName("cats")),
+        )
+    )
+    result = create_selection(ont, "all_axs", expr)
+    assert result.selection.kind == SelectionKind.AXIOMS
+    assert result.selection.size == 2  # dog SubClassOf + cat Declaration
 
 
 def test_overwrite_produces_new_hash(ont):
@@ -155,18 +198,18 @@ def test_write_if_hash_missing_selection_raises(ont):
 def test_single_input_intersection_rejected(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(BadRequestError, match="at least two"):
-        create_selection(ont, "r", intersection=["a"])
+        create_selection(ont, "r", IntersectExpr(intersect=(SelectionName("a"),)))
 
 
 def test_single_input_difference_rejected(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(BadRequestError, match="at least two"):
-        create_selection(ont, "r", difference=["a"])
+        create_selection(ont, "r", DiffExpr(diff=(SelectionName("a"),)))
 
 
 def test_single_input_union_returns_copy(ont):
     upsert_selection(ont, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    card = create_selection(ont, "r", union=["a"]).selection.size
+    card = create_selection(ont, "r", UnionExpr(union=(SelectionName("a"),))).selection.size
     assert card == 2
 
 
@@ -209,8 +252,8 @@ def test_verify_hash_match_and_mismatch(ont):
 
 def test_read_with_show_filters(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     real_hash = HashedAxiom.of(ax).hash
@@ -279,3 +322,76 @@ def test_selection_hash_round_trip(ont):
     read_back = [item.key for item in page.items]
     result2 = upsert_selection(ont, "s2", SelectionKind.ENTITIES, read_back, "test")
     assert result1.selection.hash == result2.selection.hash
+
+
+# -- SetExpr validation from raw dicts (MCP transport path) --
+
+
+def test_set_expr_validates_union_dict():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python({"union": ["a", "b"]})
+    assert isinstance(result, UnionExpr)
+    assert result.union == (SelectionName("a"), SelectionName("b"))
+
+
+def test_set_expr_validates_intersect_dict():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python({"intersect": ["a", "b"]})
+    assert isinstance(result, IntersectExpr)
+
+
+def test_set_expr_validates_diff_dict():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python({"diff": ["a", "b"]})
+    assert isinstance(result, DiffExpr)
+
+
+def test_set_expr_validates_axioms_for_dict():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python({"axioms_for": "ents"})
+    assert isinstance(result, AxiomsForExpr)
+    assert result.axioms_for == SelectionName("ents")
+
+
+def test_set_expr_validates_entities_in_dict_with_field():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python({"entities_in": "axs", "field": "sub_class"})
+    assert isinstance(result, EntitiesInExpr)
+    assert result.entities_in == SelectionName("axs")
+
+
+def test_set_expr_validates_nested_compose():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetExpr).validate_python(
+        {"union": [{"axioms_for": "a"}, {"axioms_for": "b"}]}
+    )
+    assert isinstance(result, UnionExpr)
+    assert all(isinstance(o, AxiomsForExpr) for o in result.union)
+
+
+def test_set_operand_validates_bare_string():
+    from ontoloom.selections.expr import SetOperand
+    from pydantic import TypeAdapter
+
+    result = TypeAdapter(SetOperand).validate_python("my_sel")
+    assert result == SelectionName("my_sel")
+
+
+def test_set_expr_json_schema_marks_object_type():
+    from ontoloom.selections.expr import SetExpr
+    from pydantic import TypeAdapter
+
+    schema = TypeAdapter(SetExpr).json_schema()
+    assert schema.get("type") == "object"

@@ -21,7 +21,7 @@ def match_axioms(
     Pattern semantics:
     - Pattern objects mirror axiom structure, with `"?var"` for variables and `"*"`
       for wildcards in IRI positions. String IRIs in expression positions are
-      shorthand for `NamedClass(iri=X)`.
+      shorthand for `X`.
     - Axiom-level patterns (e.g., `SubClassOfPattern`) match whole axioms of that type.
     - Expression-level patterns (e.g., `ObjectSomeValuesFromPattern`) match any axiom
       containing that expression at any depth.

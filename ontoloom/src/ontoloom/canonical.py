@@ -16,8 +16,9 @@ from pydantic import BaseModel
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.markers import is_unordered
 
-# Discriminator + annotations are skipped: they aren't part of an axiom's logical content.
-SKIP = ("type", "annotations")
+# Annotations and the `negated` flag (Literal[True] tag on Negative*Assertion) aren't
+# part of an axiom's logical content.
+SKIP = ("annotations", "negated")
 
 
 def canonical_json(axiom: BaseAxiom):

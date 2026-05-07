@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal, TypeGuard, override
+from typing import Annotated, Any, TypeGuard, override
 
 from pydantic import Field
 
-from ontoloom.models import FrozenModel, tagged_union_meta
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import (
     DataRange,
@@ -21,25 +21,6 @@ def is_class_expression(x: object) -> TypeGuard[IRI | BaseClassExpression]:
     return isinstance(x, (IRI, BaseClassExpression))
 
 
-# -- Named class --
-
-
-class NamedClass(BaseClassExpression):
-    """A named (atomic) class. Wraps a Class entity IRI.
-
-    Also used for owl:Thing and owl:Nothing:
-        NamedClass(iri=IRI("owl:Thing"))
-        NamedClass(iri=IRI("owl:Nothing"))
-    """
-
-    type: Literal["NamedClass"] = "NamedClass"
-    iri: Annotated[IRI, EntityType.CLASS]
-
-    @override
-    def __str__(self) -> str:
-        return str(self.iri)
-
-
 # -- Object property restrictions --
 
 
@@ -50,7 +31,6 @@ class ObjectSomeValuesFrom(BaseClassExpression):
         -> every animal has some heart as a part
     """
 
-    type: Literal["ObjectSomeValuesFrom"] = "ObjectSomeValuesFrom"
     property: Annotated[
         IRI,
         EntityType.OBJECT_PROPERTY,
@@ -69,7 +49,6 @@ class ObjectIntersectionOf(BaseClassExpression):
     ObjectIntersectionOf([Woman, Parent]) -> female parents
     """
 
-    type: Literal["ObjectIntersectionOf"] = "ObjectIntersectionOf"
     operands: Annotated[
         tuple[ClassExpression, ...],
         Unordered(),
@@ -87,7 +66,6 @@ class ObjectOneOf(BaseClassExpression):
     EL restriction: only a single individual.
     """
 
-    type: Literal["ObjectOneOf"] = "ObjectOneOf"
     individual: Annotated[IRI, EntityType.NAMED_INDIVIDUAL]
 
     @override
@@ -103,7 +81,6 @@ class ObjectHasValue(BaseClassExpression):
     Syntactic sugar for ObjectSomeValuesFrom(r, ObjectOneOf({a})).
     """
 
-    type: Literal["ObjectHasValue"] = "ObjectHasValue"
     property: Annotated[
         IRI,
         EntityType.OBJECT_PROPERTY,
@@ -121,13 +98,9 @@ class ObjectHasValue(BaseClassExpression):
 
 
 class ObjectHasSelf(BaseClassExpression):
-    """∃r.Self -> things related to themselves by r.
+    """∃r.Self -> things related to themselves by r."""
 
-    ObjectHasSelf(likes) -> things that like themselves
-    """
-
-    type: Literal["ObjectHasSelf"] = "ObjectHasSelf"
-    property: Annotated[
+    self_property: Annotated[
         IRI,
         EntityType.OBJECT_PROPERTY,
         Position.RESTRICTION_PROPERTY,
@@ -135,7 +108,7 @@ class ObjectHasSelf(BaseClassExpression):
 
     @override
     def __str__(self) -> str:
-        return f"ObjectHasSelf({self.property})"
+        return f"ObjectHasSelf({self.self_property})"
 
 
 # -- Data property restrictions --
@@ -148,7 +121,6 @@ class DataSomeValuesFrom(BaseClassExpression):
         -> things that have an integer age
     """
 
-    type: Literal["DataSomeValuesFrom"] = "DataSomeValuesFrom"
     property: Annotated[
         IRI,
         EntityType.DATA_PROPERTY,
@@ -167,7 +139,6 @@ class DataHasValue(BaseClassExpression):
     DataHasValue(hasName, TypedLiteral("Alice"))
     """
 
-    type: Literal["DataHasValue"] = "DataHasValue"
     property: Annotated[
         IRI,
         EntityType.DATA_PROPERTY,
@@ -180,18 +151,37 @@ class DataHasValue(BaseClassExpression):
         return f"DataHasValue({self.property}, {self.value})"
 
 
+_resolve_class_expression = make_tag_resolver(
+    (
+        ObjectSomeValuesFrom,
+        ObjectIntersectionOf,
+        ObjectOneOf,
+        ObjectHasValue,
+        ObjectHasSelf,
+        DataSomeValuesFrom,
+        DataHasValue,
+    )
+)
+
+
+def _get_class_expression_tag(v: Any):
+    # Bare IRI strings (subclass of str) → "IRI" branch; other inputs delegate.
+    return IRI.tag() if isinstance(v, str) else _resolve_class_expression(v)
+
+
 ClassExpression = Annotated[
     (
-        NamedClass
-        | ObjectSomeValuesFrom
-        | ObjectIntersectionOf
-        | ObjectOneOf
-        | ObjectHasValue
-        | ObjectHasSelf
-        | DataSomeValuesFrom
-        | DataHasValue
+        tagged(IRI)
+        | tagged(ObjectSomeValuesFrom)
+        | tagged(ObjectIntersectionOf)
+        | tagged(ObjectOneOf)
+        | tagged(ObjectHasValue)
+        | tagged(ObjectHasSelf)
+        | tagged(DataSomeValuesFrom)
+        | tagged(DataHasValue)
     ),
-    *tagged_union_meta(),
+    *tagged_union_meta(_get_class_expression_tag, schema_type=("string", "object")),
+    EntityType.CLASS,
 ]
 
 ObjectSomeValuesFrom.model_rebuild()

@@ -3,9 +3,9 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal, override
 
-from pydantic import Field
+from pydantic import Field, Tag
 
-from ontoloom.models import FrozenModel, tagged_union_meta
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
 from ontoloom.owl.markers import Unordered
 
 
@@ -45,7 +45,6 @@ class DataType(StrEnum):
 class TypedLiteral(FrozenModel):
     """A value with a datatype: "42"^^xsd:integer"""
 
-    type: Literal["TypedLiteral"] = "TypedLiteral"
     value: str
     datatype: DataType = DataType.STRING
 
@@ -57,7 +56,6 @@ class TypedLiteral(FrozenModel):
 class LangLiteral(FrozenModel):
     """A value with a language tag: "Dog"@en"""
 
-    type: Literal["LangLiteral"] = "LangLiteral"
     value: str
     # Empty string is a valid sentinel meaning "no language tag". Prefer an
     # explicit tag (e.g. lang="en") whenever the language is known.
@@ -68,7 +66,13 @@ class LangLiteral(FrozenModel):
         return f'"{self.value}"@{self.lang}'
 
 
-LiteralValue = Annotated[TypedLiteral | LangLiteral, *tagged_union_meta()]
+_get_literal_value_tag = make_tag_resolver((TypedLiteral, LangLiteral))
+
+
+LiteralValue = Annotated[
+    Annotated[TypedLiteral, Tag(TypedLiteral.tag())] | Annotated[LangLiteral, Tag(LangLiteral.tag())],
+    *tagged_union_meta(_get_literal_value_tag),
+]
 
 
 # -- Data Range Expressions --
@@ -83,18 +87,16 @@ class DataTypeRef(FrozenModel):
     `feedback_no_nested_annotated_unions.md`.
     """
 
-    type: Literal["DataTypeRef"] = "DataTypeRef"
-    value: DataType
+    datatype: DataType
 
     @override
     def __str__(self) -> str:
-        return self.value.value
+        return self.datatype.value
 
 
 class DataIntersectionOf(FrozenModel):
     """Intersection of data ranges."""
 
-    type: Literal["DataIntersectionOf"] = "DataIntersectionOf"
     operands: Annotated[
         tuple[DataRange, ...],
         Unordered(),
@@ -109,7 +111,6 @@ class DataIntersectionOf(FrozenModel):
 class DataOneOf(FrozenModel):
     """A singleton literal value. OWL 2 EL restricts DataOneOf to exactly one value."""
 
-    type: Literal["DataOneOf"] = "DataOneOf"
     value: LiteralValue
 
     @override
@@ -117,9 +118,14 @@ class DataOneOf(FrozenModel):
         return f"{{{self.value}}}"
 
 
+_get_data_range_tag = make_tag_resolver((DataTypeRef, DataIntersectionOf, DataOneOf))
+
+
 DataRange = Annotated[
-    DataTypeRef | DataIntersectionOf | DataOneOf,
-    *tagged_union_meta(),
+    Annotated[DataTypeRef, Tag(DataTypeRef.tag())]
+    | Annotated[DataIntersectionOf, Tag(DataIntersectionOf.tag())]
+    | Annotated[DataOneOf, Tag(DataOneOf.tag())],
+    *tagged_union_meta(_get_data_range_tag),
 ]
 
 

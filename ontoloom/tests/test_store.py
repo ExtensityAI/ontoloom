@@ -39,7 +39,7 @@ from ontoloom.owl.axioms import (
     HasKey,
     SubClassOf,
 )
-from ontoloom.owl.expressions import NamedClass, ObjectSomeValuesFrom
+from ontoloom.owl.expressions import ObjectSomeValuesFrom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType, Position
@@ -50,6 +50,7 @@ from ontoloom.prefixes import (
     remove_prefix,
     set_prefix,
 )
+from ontoloom.selections.expr import EntitiesInExpr
 from ontoloom.selections.store import (
     SelectionKindError,
     create_selection,
@@ -58,7 +59,7 @@ from ontoloom.selections.store import (
     remove_selections_by_pattern,
     upsert_selection,
 )
-from ontoloom.selections.types import LockedSelection, SelectionKind
+from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
 from pydantic import TypeAdapter
 
 
@@ -91,8 +92,8 @@ def populated(ont):
                 value=LangLiteral(value="Cat"),
             ),
             SubClassOf(
-                sub_class=NamedClass(iri=IRI("ex:Dog")),
-                super_class=NamedClass(iri=IRI("ex:Animal")),
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
             ),
         ],
     )
@@ -104,12 +105,12 @@ def populated(ont):
 
 def test_annotations_do_not_affect_dedup(ont):
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note")),),
     )
     result1 = add_axioms(ont, [ax1])
@@ -122,8 +123,8 @@ def test_annotations_do_not_affect_dedup(ont):
 
 
 def test_set_semantic_dedup(ont):
-    ax1 = EquivalentClasses(expressions=(NamedClass(iri=IRI("ex:A")), NamedClass(iri=IRI("ex:B"))))
-    ax2 = EquivalentClasses(expressions=(NamedClass(iri=IRI("ex:B")), NamedClass(iri=IRI("ex:A"))))
+    ax1 = EquivalentClasses(equivalent_classes=(IRI("ex:A"), IRI("ex:B")))
+    ax2 = EquivalentClasses(equivalent_classes=(IRI("ex:B"), IRI("ex:A")))
     result = add_axioms(ont, [ax1, ax2])
     assert len(result.added) == 1
     assert len(result.skipped) == 1
@@ -134,8 +135,8 @@ def test_set_semantic_dedup(ont):
 
 def test_annotate_axiom_updates_in_place(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     result = add_axioms(ont, [ax])
     h = result.added[0].hash
@@ -153,8 +154,8 @@ def test_annotate_axiom_updates_in_place(ont):
 def test_annotate_axiom_remove(ont):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
     result = add_axioms(ont, [ax])
@@ -175,16 +176,16 @@ def test_annotate_nonexistent_raises(ont):
 def test_replace_preserves_old_annotations(ont):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
     old = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
     add_axioms(ont, [old])
     old_h = HashedAxiom.of(old).hash
 
     new = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Mammal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Mammal"),
     )
     result = replace_axiom(ont, old_h, new)
     assert not result.was_noop
@@ -198,15 +199,15 @@ def test_replace_preserves_old_annotations(ont):
 
 def test_replace_discards_new_axiom_annotations(ont):
     old = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [old])
     old_h = HashedAxiom.of(old).hash
 
     new = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Mammal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Mammal"),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="ignored")),),
     )
     result = replace_axiom(ont, old_h, new)
@@ -225,8 +226,8 @@ def test_rename_iri_rejects_entity_selection(ont):
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
             SubClassOf(
-                sub_class=NamedClass(iri=IRI("ex:Dog")),
-                super_class=NamedClass(iri=IRI("ex:Animal")),
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
             ),
         ],
     )
@@ -240,8 +241,8 @@ def test_rename_iri_rejects_entity_selection(ont):
 def test_rename_iri_preserves_annotations(ont):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
     add_axioms(ont, [ax])
@@ -356,8 +357,8 @@ def test_events_logged_on_remove(ont):
 
 def test_events_logged_on_annotate(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     result = add_axioms(ont, [ax])
     h = result.added[0].hash
@@ -396,9 +397,38 @@ def test_set_and_list_prefixes(ont):
     }
 
 
-def test_set_prefix_overwrites(ont):
+def test_set_prefix_overwrites_when_unused(ont):
     set_prefix(ont, "ex", "http://example.org/v1/")
     set_prefix(ont, "ex", "http://example.org/v2/")
+    assert list_prefixes(ont)["ex"] == "http://example.org/v2/"
+
+
+def test_set_prefix_idempotent(ont):
+    result = set_prefix(ont, "ex", "http://example.org/")
+    assert result.previous_iri is None
+
+    result = set_prefix(ont, "ex", "http://example.org/")
+    assert result.previous_iri == "http://example.org/"
+    assert result.in_use_count == 0
+
+
+def test_set_prefix_refuses_reassign_when_in_use(ont):
+    set_prefix(ont, "ex", "http://example.org/v1/")
+    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+
+    with pytest.raises(BadRequestError, match="1 entities still use it"):
+        set_prefix(ont, "ex", "http://example.org/v2/")
+
+    assert list_prefixes(ont)["ex"] == "http://example.org/v1/"
+
+
+def test_set_prefix_force_reassigns_when_in_use(ont):
+    set_prefix(ont, "ex", "http://example.org/v1/")
+    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+
+    result = set_prefix(ont, "ex", "http://example.org/v2/", force=True)
+    assert result.previous_iri == "http://example.org/v1/"
+    assert result.in_use_count == 1
     assert list_prefixes(ont)["ex"] == "http://example.org/v2/"
 
 
@@ -476,7 +506,8 @@ def test_export_jsonl(populated, tmp_path):
 
     for line in lines[1:]:
         obj = json.loads(line)
-        assert "type" in obj
+        # axioms serialize with their structural fields (no `type` discriminator field)
+        assert "annotations" in obj
 
 
 # -- entity_text cleanup regression --
@@ -486,14 +517,14 @@ def test_entity_text_survives_partial_removal(ont):
     """Removing one axiom that mentions an entity must not break search for that entity
     if other axioms still reference it."""
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     result = add_axioms(ont, [ax1, ax2])
 
     # Remove the SubClassOf but keep the Declaration
-    subclassof_hash = next(ha.hash for ha in result.added if ha.axiom.type_ == "SubClassOf")
+    subclassof_hash = next(ha.hash for ha in result.added if ha.axiom.tag() == "SubClassOf")
     remove_axioms_by_hash(ont, [subclassof_hash[:8]])
 
     # ex:Dog should still be searchable (Declaration still references it)
@@ -574,7 +605,7 @@ def test_export_jsonl_roundtrip(populated, tmp_path):
     assert imported.header.format == "ontoloom-jsonl"
     assert len(imported.axioms) == 8
     for axiom in imported.axioms:
-        assert hasattr(axiom, "type")
+        assert axiom.tag()
 
 
 # -- INSTR safety --
@@ -777,14 +808,14 @@ def axiom_selection(ont):
         ont,
         [
             SubClassOf(
-                sub_class=NamedClass(iri=IRI("ex:Dog")),
-                super_class=NamedClass(iri=IRI("ex:Animal")),
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
             ),
             SubClassOf(
-                sub_class=NamedClass(iri=IRI("ex:Cat")),
+                sub_class=IRI("ex:Cat"),
                 super_class=ObjectSomeValuesFrom(
                     property=IRI("ex:hasOwner"),
-                    filler=NamedClass(iri=IRI("ex:Person")),
+                    filler=IRI("ex:Person"),
                 ),
             ),
         ],
@@ -795,7 +826,11 @@ def axiom_selection(ont):
 
 
 def test_entities_in_with_field_sub_class(axiom_selection):
-    create_selection(axiom_selection, "sub_classes", entities_in="ax_sel", field=Position.SUB_CLASS)
+    create_selection(
+        axiom_selection,
+        "sub_classes",
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.SUB_CLASS),
+    )
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
@@ -807,7 +842,9 @@ def test_entities_in_with_field_sub_class(axiom_selection):
 
 def test_entities_in_with_field_super_class(axiom_selection):
     create_selection(
-        axiom_selection, "super_classes", entities_in="ax_sel", field=Position.SUPER_CLASS
+        axiom_selection,
+        "super_classes",
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.SUPER_CLASS),
     )
     items = [
         r[0]
@@ -821,7 +858,11 @@ def test_entities_in_with_field_super_class(axiom_selection):
 
 
 def test_entities_in_with_field_filler(axiom_selection):
-    create_selection(axiom_selection, "fillers", entities_in="ax_sel", field=Position.FILLER)
+    create_selection(
+        axiom_selection,
+        "fillers",
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.FILLER),
+    )
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
@@ -832,7 +873,9 @@ def test_entities_in_with_field_filler(axiom_selection):
 
 
 def test_entities_in_without_field(axiom_selection):
-    create_selection(axiom_selection, "all_ents", entities_in="ax_sel")
+    create_selection(
+        axiom_selection, "all_ents", EntitiesInExpr(entities_in=SelectionName("ax_sel"))
+    )
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
@@ -965,12 +1008,12 @@ def test_rename_iri_collision_with_existing(ont):
 
 def test_rename_iri_scoped_to_selection(ont):
     ax_in = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax_out = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Cat")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
     )
     result = add_axioms(ont, [ax_in, ax_out])
     h_in = next(ha.hash for ha in result.added if ha.axiom == ax_in)
@@ -991,12 +1034,12 @@ def test_rename_iri_scoped_to_selection(ont):
 
 def test_replace_to_existing_hash(ont):
     ax_a = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax_b = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Mammal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Mammal"),
     )
     add_axioms(ont, [ax_a, ax_b])
     h_a = HashedAxiom.of(ax_a).hash
@@ -1067,7 +1110,7 @@ def test_unicode_iri_roundtrip(ont, tmp_path):
 def test_has_key_neither_properties_rejected():
     with pytest.raises(ValueError, match="at least one"):
         HasKey(
-            class_expression=NamedClass(iri=IRI("ex:Person")),
+            class_expression=IRI("ex:Person"),
             object_properties=(),
             data_properties=(),
         )

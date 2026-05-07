@@ -8,8 +8,16 @@ from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.markers import Position
+from ontoloom.selections.expr import (
+    AxiomsForExpr,
+    DiffExpr,
+    EntitiesInExpr,
+    IntersectExpr,
+    SetExpr,
+    SetOperand,
+    UnionExpr,
+)
 from ontoloom.selections.types import (
-    ConversionOp,
     SelectionItem,
     SelectionKind,
     SelectionMeta,
@@ -240,7 +248,7 @@ def read_selection(
             "LEFT JOIN ("
             "  SELECT DISTINCT ae.entity_iri "
             "  FROM axiom_entities ae JOIN axioms a ON a.id = ae.axiom_id "
-            f"  WHERE a.type = '{Declaration.type_}'"
+            f"  WHERE a.type = '{Declaration.tag()}'"
             ") decl ON decl.entity_iri = si.item "
             "WHERE si.selection_name = ?"
         )
@@ -259,7 +267,7 @@ def read_selection(
             "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
             "JOIN axiom_entities ae ON ae.entity_iri = si.item "
             "JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE si.selection_name = ? AND a.type = '{Declaration.type_}'",
+            f"WHERE si.selection_name = ? AND a.type = '{Declaration.tag()}'",
             (name,),
         ).fetchone()[0]
         missing_count = sel.size - present_count
@@ -276,7 +284,7 @@ def read_selection(
                 ont.conn.execute(
                     f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
                     f"JOIN axioms a ON a.id = ae.axiom_id "
-                    f"WHERE a.type = '{Declaration.type_}' AND ae.entity_iri IN ({placeholders})",
+                    f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
                     present_iris,
                 ).fetchall()
             )
@@ -358,184 +366,125 @@ def remove_selections_by_pattern(ont: Ontology, pattern: str) -> list[DroppedSel
     return dropped
 
 
-def create_selection(
-    ont: Ontology,
-    name: str,
-    *,
-    # Flat kwargs rather than a discriminated op type for MCP JSON-schema compatibility.
-    union: Sequence[str] | None = None,
-    intersection: Sequence[str] | None = None,
-    difference: Sequence[str] | None = None,
-    axioms_for: str | None = None,
-    entities_in: str | None = None,
-    field: Position | None = None,
-    source: str = "",
-) -> UpsertResult:
-    # A: args are very unclear - is this a bit of a god function? why can we not do a discriminated op type for MCP JSON schema compatibility? seems complex and useless?
-    """Create a selection from set algebra or type conversion."""
-    ops = [
-        x for x in [union, intersection, difference, axioms_for, entities_in] if x is not None
-    ]  # A: what is this? this is horrible???
-    if len(ops) != 1:
-        msg = "Exactly one operation must be provided (union, intersection, difference, axioms_for, or entities_in)."
+def create_selection(ont: Ontology, name: str, expr: SetExpr, *, source: str = "") -> UpsertResult:
+    """Create a selection by evaluating a SetExpr tree."""
+    items, kind = _eval_expr(ont, expr)
+    auto_source = source or str(expr)
+    return upsert_selection(ont, name, kind, items, auto_source)
+
+
+def _eval_expr(ont: Ontology, expr: SetOperand) -> tuple[list[str], SelectionKind]:
+    if isinstance(expr, str):
+        sel = get_selection(ont, expr)
+        items = [
+            r[0]
+            for r in ont.conn.execute(
+                "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
+                (expr,),
+            )
+        ]
+        return items, sel.kind
+
+    if isinstance(expr, UnionExpr):
+        return _eval_set_op(ont, expr.union, SetOp.UNION)
+    if isinstance(expr, IntersectExpr):
+        return _eval_set_op(ont, expr.intersect, SetOp.INTERSECTION)
+    if isinstance(expr, DiffExpr):
+        return _eval_set_op(ont, expr.diff, SetOp.DIFFERENCE)
+
+    if isinstance(expr, AxiomsForExpr):
+        items, kind = _eval_expr(ont, expr.axioms_for)
+        if kind != SelectionKind.ENTITIES:
+            msg = f"`axioms_for` requires an entity expression; operand is {kind}."
+            raise BadRequestError(msg)
+        return _axioms_for(ont, items), SelectionKind.AXIOMS
+
+    if isinstance(expr, EntitiesInExpr):
+        items, kind = _eval_expr(ont, expr.entities_in)
+        if kind != SelectionKind.AXIOMS:
+            msg = f"`entities_in` requires an axiom expression; operand is {kind}."
+            raise BadRequestError(msg)
+        return _entities_in(ont, items, expr.field), SelectionKind.ENTITIES
+
+    msg = f"Unknown SetExpr variant: {type(expr).__name__}"
+    raise ValueError(msg)
+
+
+def _eval_set_op(
+    ont: Ontology, operands: Sequence[SetOperand], op: SetOp
+) -> tuple[list[str], SelectionKind]:
+    if not operands:
+        msg = f"'{op}' requires at least one operand."
+        raise BadRequestError(msg)
+    if op in (SetOp.INTERSECTION, SetOp.DIFFERENCE) and len(operands) < 2:
+        msg = f"'{op}' requires at least two operands; got {len(operands)}."
         raise BadRequestError(msg)
 
-    if field is not None and entities_in is None:
-        msg = "The 'field' parameter is only valid with 'entities_in'."  # A: does not provide any info on why or what etc
-        raise BadRequestError(msg)
-
-    if union is not None:
-        return _create_from_set_op(ont, SetOp.UNION, name, union, source)
-    if intersection is not None:
-        return _create_from_set_op(ont, SetOp.INTERSECTION, name, intersection, source)
-    if difference is not None:
-        return _create_from_set_op(ont, SetOp.DIFFERENCE, name, difference, source)
-    if axioms_for is not None:
-        return _create_from_conversion(ont, name, axioms_for, ConversionOp.AXIOMS_FOR, source)
-    assert entities_in is not None
-    return _create_from_conversion(
-        ont, name, entities_in, ConversionOp.ENTITIES_IN, source, field=field
-    )
-
-
-def _create_from_set_op(
-    ont: Ontology, op: SetOp, name: str, inputs: Sequence[str], source: str
-) -> UpsertResult:
-    if not inputs:
-        msg = f"'{op}' requires at least one selection name."
-        raise BadRequestError(msg)
-    if op in (SetOp.INTERSECTION, SetOp.DIFFERENCE) and len(inputs) < 2:
-        msg = f"'{op}' requires at least two selection names; got 1."
-        raise BadRequestError(msg)
-
-    # A: we need to look at this function. for this, talk to me, we will think through how this could be improved. this is horrible rn.
-
-    kind_map = {n: get_selection(ont, n).kind for n in inputs}
-    kinds = set(kind_map.values())
+    results = [_eval_expr(ont, sub) for sub in operands]
+    kinds = {kind for _, kind in results}
     if len(kinds) > 1:
-        details = ", ".join(f"{n!r} ({kind_map[n]})" for n in inputs)
-        msg = f"Cannot {op}: all inputs must be the same kind. Got: {details}"
+        msg = f"Cannot {op}: all operands must be the same kind. Got: {sorted(kinds)}"
         raise BadRequestError(msg)
     kind = kinds.pop()
 
     match op:
         case SetOp.UNION:
-            placeholders = ",".join("?" for _ in inputs)
-            # ORDER BY item: insertion order into selection_items.rowid is the
-            # pagination key for read_selection (see P-09-1).
-            items = [
-                r[0]
-                for r in ont.conn.execute(
-                    f"SELECT DISTINCT item FROM selection_items "
-                    f"WHERE selection_name IN ({placeholders}) ORDER BY item",
-                    inputs,
-                )
-            ]
+            items_set: set[str] = set()
+            for op_items, _ in results:
+                items_set |= set(op_items)
         case SetOp.INTERSECTION:
-            first, *rest = inputs
-            items_set = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT item FROM selection_items WHERE selection_name = ?", (first,)
-                )
-            }
-            for other in rest:
-                other_items = {
-                    r[0]
-                    for r in ont.conn.execute(
-                        "SELECT item FROM selection_items WHERE selection_name = ?", (other,)
-                    )
-                }
-                items_set &= other_items
-            items = sorted(items_set)
+            items_set = set(results[0][0])
+            for op_items, _ in results[1:]:
+                items_set &= set(op_items)
         case SetOp.DIFFERENCE:
-            first, *rest = inputs
-            items_set = {
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT item FROM selection_items WHERE selection_name = ?", (first,)
-                )
-            }
-            for other in rest:
-                other_items = {
-                    r[0]
-                    for r in ont.conn.execute(
-                        "SELECT item FROM selection_items WHERE selection_name = ?", (other,)
-                    )
-                }
-                items_set -= other_items
-            items = sorted(items_set)
+            items_set = set(results[0][0])
+            for op_items, _ in results[1:]:
+                items_set -= set(op_items)
         case _:
             msg = f"Unknown set operation: {op}"
             raise ValueError(msg)
 
-    auto_source = source or f"{op.value}({', '.join(repr(n) for n in inputs)})"
-    return upsert_selection(ont, name, kind, items, auto_source)
+    return sorted(items_set), kind
 
 
-def _create_from_conversion(
-    ont: Ontology,
-    name: str,
-    input_name: str,
-    op: ConversionOp,
-    source: str,
-    *,
-    field: Position | None = None,
-) -> UpsertResult:
-    sel = get_selection(ont, input_name)
-    # A: we also need to look at this function together, is also horrible.
-    # A global: is get(...) a good name? if we always import selections then yes, because of selections.get, but I feel like get_selection is still superior, as it is more clear. same for other funcs like that!
+def _axioms_for(ont: Ontology, entity_iris: Sequence[str]) -> list[str]:
+    if not entity_iris:
+        return []
+    placeholders = ",".join("?" for _ in entity_iris)
+    return [
+        r[0]
+        for r in ont.conn.execute(
+            f"SELECT DISTINCT a.hash FROM axioms a "
+            f"JOIN axiom_entities ae ON ae.axiom_id = a.id "
+            f"WHERE ae.entity_iri IN ({placeholders}) "
+            f"ORDER BY a.hash",
+            tuple(entity_iris),
+        )
+    ]
 
-    if op == ConversionOp.AXIOMS_FOR:
-        if sel.kind != SelectionKind.ENTITIES:
-            raise SelectionKindError(
-                name=input_name,
-                expected=SelectionKind.ENTITIES,
-                actual=sel.kind,
-                operation="create_selection",
-            )
-        items = [
+
+def _entities_in(ont: Ontology, axiom_hashes: Sequence[str], field: Position | None) -> list[str]:
+    if not axiom_hashes:
+        return []
+    placeholders = ",".join("?" for _ in axiom_hashes)
+    if field is not None:
+        return [
             r[0]
             for r in ont.conn.execute(
-                "SELECT DISTINCT a.hash FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "WHERE ae.entity_iri IN (SELECT item FROM selection_items WHERE selection_name = ?) "
-                "ORDER BY a.hash",
-                (input_name,),
+                f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+                f"JOIN axioms a ON a.id = ae.axiom_id "
+                f"WHERE a.hash IN ({placeholders}) AND ae.position = ? "
+                f"ORDER BY ae.entity_iri",
+                (*axiom_hashes, field),
             )
         ]
-        kind = SelectionKind.AXIOMS
-    else:  # entities_in
-        if sel.kind != SelectionKind.AXIOMS:
-            raise SelectionKindError(
-                name=input_name,
-                expected=SelectionKind.AXIOMS,
-                actual=sel.kind,
-                operation="create_selection",
-            )
-        if field is not None:
-            items = [
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                    "JOIN axioms a ON a.id = ae.axiom_id "
-                    "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?) "
-                    "AND ae.position = ? ORDER BY ae.entity_iri",
-                    (input_name, field),
-                )
-            ]
-        else:
-            items = [
-                r[0]
-                for r in ont.conn.execute(
-                    "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                    "JOIN axioms a ON a.id = ae.axiom_id "
-                    "WHERE a.hash IN (SELECT item FROM selection_items WHERE selection_name = ?) "
-                    "ORDER BY ae.entity_iri",
-                    (input_name,),
-                )
-            ]
-        kind = SelectionKind.ENTITIES
-
-    auto_source = source or f"{op}({input_name!r})"
-    return upsert_selection(ont, name, kind, items, auto_source)
+    return [
+        r[0]
+        for r in ont.conn.execute(
+            f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
+            f"JOIN axioms a ON a.id = ae.axiom_id "
+            f"WHERE a.hash IN ({placeholders}) "
+            f"ORDER BY ae.entity_iri",
+            tuple(axiom_hashes),
+        )
+    ]

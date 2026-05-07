@@ -78,9 +78,6 @@ from ontoloom.patterns._generated import (
     HasKeyPattern as HasKeyPattern,
 )
 from ontoloom.patterns._generated import (
-    NamedClassPattern as NamedClassPattern,
-)
-from ontoloom.patterns._generated import (
     NegativeDataPropertyAssertionPattern as NegativeDataPropertyAssertionPattern,
 )
 from ontoloom.patterns._generated import (

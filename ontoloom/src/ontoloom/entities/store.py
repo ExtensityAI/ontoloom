@@ -43,12 +43,12 @@ _TEXT_SCAN_CAP = 1000
 _DECLARED_EXISTS = (
     "EXISTS (SELECT 1 FROM axiom_entities ae_d "
     "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.type_}')"
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
 )
 _DECLARED_NOT_EXISTS = (
     "NOT EXISTS (SELECT 1 FROM axiom_entities ae_d "
     "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.type_}')"
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
 )
 _NOT_DEPRECATED = (
     "NOT EXISTS (SELECT 1 FROM entity_text et_dep "
@@ -147,7 +147,7 @@ def get_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityI
             SELECT a.type, COUNT(DISTINCT a.id)
             FROM axiom_entities ae
             JOIN axioms a ON ae.axiom_id = a.id{extra_join}
-            WHERE ae.entity_iri = ? AND a.type != '{AnnotationAssertion.type_}'
+            WHERE ae.entity_iri = ? AND a.type != '{AnnotationAssertion.tag()}'
             GROUP BY a.type
             """,
                 (*extra_params, iri_str),
@@ -592,7 +592,7 @@ def _filter_declared(
         for r in ont.conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.type_}'",
+            f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.tag()}'",
             iris,
         )
     }

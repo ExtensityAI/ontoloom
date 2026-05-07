@@ -13,7 +13,6 @@ from ontoloom.hashing import HashedAxiom
 from ontoloom.history import EventRecord, _group_into_batches, revert
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import SubClassOf
-from ontoloom.owl.expressions import NamedClass
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 
@@ -28,8 +27,8 @@ def ont(tmp_path):
 
 def test_revert_add(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     h = HashedAxiom.of(ax).hash
@@ -41,8 +40,8 @@ def test_revert_add(ont):
 
 def test_revert_del(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     h = HashedAxiom.of(ax).hash
@@ -61,8 +60,8 @@ def test_revert_del(ont):
 
 def test_revert_del_skip_when_already_exists(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     h = HashedAxiom.of(ax).hash
@@ -78,16 +77,16 @@ def test_revert_del_skip_when_already_exists(ont):
 def test_revert_replace(ont):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="original"))
     ax_old = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
     add_axioms(ont, [ax_old])
     old_h = HashedAxiom.of(ax_old).hash
 
     ax_new = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Mammal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Mammal"),
     )
     replace_axiom(ont, old_h[:8], ax_new)
     new_h = HashedAxiom.of(ax_new).hash
@@ -104,8 +103,8 @@ def test_revert_replace(ont):
 
 def test_revert_annotate(ont):
     ax = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax])
     h = HashedAxiom.of(ax).hash
@@ -129,12 +128,12 @@ def test_revert_annotate(ont):
 
 def test_revert_rename_iri_batch(ont):
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Cat")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax1, ax2])
     old_h1 = HashedAxiom.of(ax1).hash
@@ -151,12 +150,12 @@ def test_revert_rename_iri_batch(ont):
 
 def test_revert_two_operations(ont):
     ax1 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Dog")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
     )
     ax2 = SubClassOf(
-        sub_class=NamedClass(iri=IRI("ex:Cat")),
-        super_class=NamedClass(iri=IRI("ex:Animal")),
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
     )
     add_axioms(ont, [ax1])
     add_axioms(ont, [ax2])

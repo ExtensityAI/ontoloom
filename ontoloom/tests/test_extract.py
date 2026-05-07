@@ -31,7 +31,6 @@ from ontoloom.owl.axioms import (
 )
 from ontoloom.owl.expressions import (
     DataSomeValuesFrom,
-    NamedClass,
     ObjectHasSelf,
     ObjectHasValue,
     ObjectIntersectionOf,
@@ -49,7 +48,7 @@ from ontoloom.owl.markers import EntityType, Position
 
 
 def NC(iri: str):  # noqa: N802
-    return NamedClass(iri=IRI(iri))
+    return IRI(iri)
 
 
 P = Position
@@ -118,7 +117,7 @@ def test_object_has_value():
 
 
 def test_object_has_self():
-    ax = SubClassOf(sub_class=NC(":A"), super_class=ObjectHasSelf(property=IRI(":r")))
+    ax = SubClassOf(sub_class=NC(":A"), super_class=ObjectHasSelf(self_property=IRI(":r")))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.RESTRICTION_PROPERTY) in entities
 
@@ -127,7 +126,7 @@ def test_data_some_values_from():
     ax = SubClassOf(
         sub_class=NC(":A"),
         super_class=DataSomeValuesFrom(
-            property=IRI(":dp"), range=DataTypeRef(value=DataType.INTEGER)
+            property=IRI(":dp"), range=DataTypeRef(datatype=DataType.INTEGER)
         ),
     )
     entities = _entities(ax)
@@ -138,7 +137,7 @@ def test_data_some_values_from():
 
 
 def test_sub_object_property_of():
-    ax = SubObjectPropertyOf(sub_property=IRI(":r"), super_property=IRI(":s"))
+    ax = SubObjectPropertyOf(sub_object_property=IRI(":r"), super_object_property=IRI(":s"))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.SUB_PROPERTY) in entities
     assert (":s", EntityType.OBJECT_PROPERTY, P.SUPER_PROPERTY) in entities
@@ -153,26 +152,26 @@ def test_sub_object_property_of_chain():
 
 
 def test_equivalent_object_properties():
-    ax = EquivalentObjectProperties(properties=(IRI(":r"), IRI(":s")))
+    ax = EquivalentObjectProperties(object_properties=(IRI(":r"), IRI(":s")))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.MEMBER) in entities
     assert (":s", EntityType.OBJECT_PROPERTY, P.MEMBER) in entities
 
 
 def test_transitive_object_property():
-    ax = TransitiveObjectProperty(property=IRI(":r"))
+    ax = TransitiveObjectProperty(transitive_property=IRI(":r"))
     assert _entities(ax) == [(":r", EntityType.OBJECT_PROPERTY, P.PROPERTY)]
 
 
 def test_object_property_domain():
-    ax = ObjectPropertyDomain(property=IRI(":r"), domain=NC(":C"))
+    ax = ObjectPropertyDomain(object_property=IRI(":r"), domain=NC(":C"))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.PROPERTY) in entities
     assert (":C", EntityType.CLASS, P.DOMAIN) in entities
 
 
 def test_object_property_range():
-    ax = ObjectPropertyRange(property=IRI(":r"), range=NC(":C"))
+    ax = ObjectPropertyRange(object_property=IRI(":r"), range=NC(":C"))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.PROPERTY) in entities
     assert (":C", EntityType.CLASS, P.RANGE) in entities
@@ -182,27 +181,27 @@ def test_object_property_range():
 
 
 def test_sub_data_property_of():
-    ax = SubDataPropertyOf(sub_property=IRI(":dp1"), super_property=IRI(":dp2"))
+    ax = SubDataPropertyOf(sub_data_property=IRI(":dp1"), super_data_property=IRI(":dp2"))
     entities = _entities(ax)
     assert (":dp1", EntityType.DATA_PROPERTY, P.SUB_PROPERTY) in entities
     assert (":dp2", EntityType.DATA_PROPERTY, P.SUPER_PROPERTY) in entities
 
 
 def test_data_property_domain():
-    ax = DataPropertyDomain(property=IRI(":dp"), domain=NC(":C"))
+    ax = DataPropertyDomain(data_property=IRI(":dp"), domain=NC(":C"))
     entities = _entities(ax)
     assert (":dp", EntityType.DATA_PROPERTY, P.PROPERTY) in entities
     assert (":C", EntityType.CLASS, P.DOMAIN) in entities
 
 
 def test_data_property_range():
-    ax = DataPropertyRange(property=IRI(":dp"), range=DataTypeRef(value=DataType.INTEGER))
+    ax = DataPropertyRange(data_property=IRI(":dp"), range=DataTypeRef(datatype=DataType.INTEGER))
     entities = _entities(ax)
     assert (":dp", EntityType.DATA_PROPERTY, P.PROPERTY) in entities
 
 
 def test_functional_data_property():
-    ax = FunctionalDataProperty(property=IRI(":dp"))
+    ax = FunctionalDataProperty(functional_property=IRI(":dp"))
     assert _entities(ax) == [(":dp", EntityType.DATA_PROPERTY, P.PROPERTY)]
 
 
@@ -242,7 +241,8 @@ def test_annotation_assertion_with_iri_value():
 
 def test_sub_annotation_property_of():
     ax = SubAnnotationPropertyOf(
-        sub_property=IRI("skos:definition"), super_property=IRI("rdfs:comment")
+        sub_annotation_property=IRI("skos:definition"),
+        super_annotation_property=IRI("rdfs:comment"),
     )
     entities = _entities(ax)
     assert ("skos:definition", EntityType.ANNOTATION_PROPERTY, P.SUB_PROPERTY) in entities
@@ -250,14 +250,14 @@ def test_sub_annotation_property_of():
 
 
 def test_annotation_property_domain():
-    ax = AnnotationPropertyDomain(property=IRI("rdfs:label"), domain=IRI("owl:Thing"))
+    ax = AnnotationPropertyDomain(annotation_property=IRI("rdfs:label"), domain=IRI("owl:Thing"))
     entities = _entities(ax)
     assert ("rdfs:label", EntityType.ANNOTATION_PROPERTY, P.PROPERTY) in entities
     assert ("owl:Thing", None, P.DOMAIN) in entities
 
 
 def test_annotation_property_range():
-    ax = AnnotationPropertyRange(property=IRI("rdfs:label"), range=IRI("rdfs:Literal"))
+    ax = AnnotationPropertyRange(annotation_property=IRI("rdfs:label"), range=IRI("rdfs:Literal"))
     entities = _entities(ax)
     assert ("rdfs:label", EntityType.ANNOTATION_PROPERTY, P.PROPERTY) in entities
     assert ("rdfs:Literal", None, P.RANGE) in entities
@@ -303,14 +303,14 @@ def test_data_property_assertion():
 
 
 def test_same_individual():
-    ax = SameIndividual(individuals=(IRI(":Bob"), IRI(":Robert")))
+    ax = SameIndividual(same_individuals=(IRI(":Bob"), IRI(":Robert")))
     entities = _entities(ax)
     assert (":Bob", EntityType.NAMED_INDIVIDUAL, P.MEMBER) in entities
     assert (":Robert", EntityType.NAMED_INDIVIDUAL, P.MEMBER) in entities
 
 
 def test_different_individuals():
-    ax = DifferentIndividuals(individuals=(IRI(":Alice"), IRI(":Bob")))
+    ax = DifferentIndividuals(different_individuals=(IRI(":Alice"), IRI(":Bob")))
     entities = _entities(ax)
     assert (":Alice", EntityType.NAMED_INDIVIDUAL, P.MEMBER) in entities
     assert (":Bob", EntityType.NAMED_INDIVIDUAL, P.MEMBER) in entities
@@ -344,14 +344,14 @@ def test_axiom_level_annotation_iri_value_extracted():
 
 
 def test_equivalent_classes():
-    ax = EquivalentClasses(expressions=(NC(":A"), NC(":B")))
+    ax = EquivalentClasses(equivalent_classes=(NC(":A"), NC(":B")))
     entities = _entities(ax)
     assert (":A", EntityType.CLASS, P.MEMBER) in entities
     assert (":B", EntityType.CLASS, P.MEMBER) in entities
 
 
 def test_disjoint_classes():
-    ax = DisjointClasses(expressions=(NC(":A"), NC(":B")))
+    ax = DisjointClasses(disjoint_classes=(NC(":A"), NC(":B")))
     entities = _entities(ax)
     assert (":A", EntityType.CLASS, P.MEMBER) in entities
     assert (":B", EntityType.CLASS, P.MEMBER) in entities
@@ -417,7 +417,7 @@ class TestPositionEquivalentClassesWithRestriction:
 
     def test_exact_positions(self):
         ax = EquivalentClasses(
-            expressions=(
+            equivalent_classes=(
                 NC(":Parent"),
                 ObjectSomeValuesFrom(property=IRI(":hasChild"), filler=NC(":Person")),
             )

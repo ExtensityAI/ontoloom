@@ -452,7 +452,7 @@ def insert_axiom(ont: Ontology, axiom: BaseAxiom, *, ignore_existing: bool = Fal
     )  # A: when do we not IGNORE EXISTING? same hash = same axiom, so this is always idempotent. no need to change this. or is there a reason?
     cursor = ont.conn.execute(
         f"{verb} INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
-        (h, axiom.type_, json_data),
+        (h, axiom.tag(), json_data),
     )
     if ignore_existing and cursor.rowcount == 0:
         return None

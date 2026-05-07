@@ -7,12 +7,7 @@ from ontoloom_mcp.components.types import OntologyPath, PrefixName
 
 
 def remove_prefix(path: OntologyPath, name: PrefixName):
-    """Remove a prefix mapping.
-
-    Axioms that already reference `name:local_name` are not modified -> IRIs are
-    stored as-is, so the existing data still works. Only future prefix expansion
-    is affected.
-    """
+    """Remove a prefix mapping. Refuses if any entity still uses the prefix."""
     with Ontology(path) as ont:
         core_remove_prefix(ont, name)
         return f"Removed prefix `{name}:`"

@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
-from ontoloom.owl.markers import Position
+from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.store import create_selection as core_create_selection
 
 from ontoloom_mcp.components.tool import create_tool
@@ -10,50 +10,30 @@ from ontoloom_mcp.components.types import OntologyPath, SelectionName
 def create_selection(
     path: OntologyPath,
     name: SelectionName,
-    union: list[SelectionName] | None = None,
-    intersection: list[SelectionName] | None = None,
-    difference: list[SelectionName] | None = None,
-    axioms_for: SelectionName | None = None,
-    entities_in: SelectionName | None = None,
-    field: Position | None = None,
+    expr: SetExpr,
 ):
-    """Create a selection from set algebra or kind conversion.
+    """Create a selection by evaluating a set-expression tree.
 
-    Exactly one operation must be provided:
+    `expr` is an object with exactly one of:
 
-    Set algebra (all input selections must be the same kind):
-    - `union`: Combine items from these selections.
-    - `intersection`: Items present in ALL selections.
-    - `difference`: Items in first minus subsequent. Order: [A, B, C] = A - B - C.
+    - `{"union": [<operand>, ...]}` - items in any operand
+    - `{"intersect": [<operand>, ...]}` - items in all operands (>= 2)
+    - `{"diff": [<operand>, ...]}` - first operand minus the rest (>= 2)
+    - `{"axioms_for": <operand>}` - axioms mentioning entities in the operand
+    - `{"entities_in": <operand>, "field": <position>?}` - entities mentioned
+      by axioms in the operand, optionally restricted to a structural slot
+      (e.g. "sub_class", "filler")
 
-    Kind conversion (switch between entity and axiom selections):
-    - `axioms_for`: Given an entity selection, find all axioms mentioning those entities.
-      Use after entity search to shift focus to axiom-level operations.
-    - `entities_in`: Given an axiom selection, extract all entities mentioned in those axioms.
-      Use after axiom search to explore or annotate the involved entities.
-      Use `field` to extract only entities at a specific structural position
-      (e.g., field="sub_class" to get only subclasses, field="filler" for restriction fillers).
+    Each `<operand>` is either a saved selection name (bare string, e.g.
+    `"my_sel"`) or another expression object. Operands compose:
+    `{"union": [{"axioms_for": "ents1"}, {"axioms_for": "ents2"}]}` is one
+    call. Set ops require all operands to evaluate to the same kind (axioms
+    or entities); conversions (`axioms_for`, `entities_in`) transform kind.
 
-    Overwrites if name exists. Kind is inferred from the operation.
-
-    Composition patterns:
-    - "Everything except": search -> select "all", search -> select "exclude",
-      `create_selection(difference=["all", "exclude"])`
-    - "Narrow progressively": `search_entities` -> select, `create_selection(axioms_for=...)`,
-      then `match_axioms(within=...)` for further filtering
+    Overwrites if name exists.
     """
     with Ontology(path) as ont:
-        upserted = core_create_selection(
-            ont,
-            name,
-            union=union,
-            intersection=intersection,
-            difference=difference,
-            axioms_for=axioms_for,
-            entities_in=entities_in,
-            field=field,
-        )
-
+        upserted = core_create_selection(ont, name, expr)
         sel = upserted.selection
         parts = [f"Selection {sel.locked!r}: {sel.size} {sel.kind}"]
         if upserted.previous_size is not None:

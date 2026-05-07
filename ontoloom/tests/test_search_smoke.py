@@ -51,7 +51,6 @@ from ontoloom.owl.axioms import (
 from ontoloom.owl.expressions import (
     DataHasValue,
     DataSomeValuesFrom,
-    NamedClass,
     ObjectHasSelf,
     ObjectHasValue,
     ObjectIntersectionOf,
@@ -83,8 +82,8 @@ def ont():
 # ---------------------------------------------------------------------------
 
 
-def nc(iri: str) -> NamedClass:
-    return NamedClass(iri=IRI(iri))
+def nc(iri: str) -> IRI:
+    return IRI(iri)
 
 
 def _all_entity_iris(ont: Ontology) -> set[str]:
@@ -187,7 +186,7 @@ AXIOMS = [
     SubClassOf(
         sub_class=nc(":Person"),
         super_class=DataSomeValuesFrom(
-            property=IRI(":hasAge"), range=DataTypeRef(value=DataType.INTEGER)
+            property=IRI(":hasAge"), range=DataTypeRef(datatype=DataType.INTEGER)
         ),
     ),
     SubClassOf(
@@ -196,32 +195,36 @@ AXIOMS = [
     ),
     # --- EquivalentClasses ---
     EquivalentClasses(
-        expressions=(
+        equivalent_classes=(
             nc(":Mother"),
             ObjectIntersectionOf(operands=(nc(":Woman"), nc(":Parent"))),
         ),
     ),
     # --- DisjointClasses ---
-    DisjointClasses(expressions=(nc(":Dog"), nc(":Cat"))),
+    DisjointClasses(disjoint_classes=(nc(":Dog"), nc(":Cat"))),
     # --- Object property axioms ---
-    SubObjectPropertyOf(sub_property=IRI(":hasMother"), super_property=IRI(":hasParent")),
+    SubObjectPropertyOf(
+        sub_object_property=IRI(":hasMother"), super_object_property=IRI(":hasParent")
+    ),
     SubObjectPropertyOfChain(
         chain=(IRI(":hasParent"), IRI(":hasBrother")),
         super_property=IRI(":hasUncle"),
     ),
-    EquivalentObjectProperties(properties=(IRI(":owns"), IRI(":hasPet"))),
-    TransitiveObjectProperty(property=IRI(":hasPart")),
-    ReflexiveObjectProperty(property=IRI(":hasPart")),
-    ObjectPropertyDomain(property=IRI(":owns"), domain=nc(":Person")),
-    ObjectPropertyRange(property=IRI(":owns"), range=nc(":Animal")),
+    EquivalentObjectProperties(object_properties=(IRI(":owns"), IRI(":hasPet"))),
+    TransitiveObjectProperty(transitive_property=IRI(":hasPart")),
+    ReflexiveObjectProperty(reflexive_property=IRI(":hasPart")),
+    ObjectPropertyDomain(object_property=IRI(":owns"), domain=nc(":Person")),
+    ObjectPropertyRange(object_property=IRI(":owns"), range=nc(":Animal")),
     # --- Data property axioms ---
-    SubDataPropertyOf(sub_property=IRI(":hasWeight"), super_property=IRI(":hasMeasurement")),
-    EquivalentDataProperties(properties=(IRI(":hasName"), IRI(":fullName"))),
-    DataPropertyDomain(property=IRI(":hasAge"), domain=nc(":Person")),
-    DataPropertyRange(
-        property=IRI(":hasAge"), range=DataTypeRef(value=DataType.NON_NEGATIVE_INTEGER)
+    SubDataPropertyOf(
+        sub_data_property=IRI(":hasWeight"), super_data_property=IRI(":hasMeasurement")
     ),
-    FunctionalDataProperty(property=IRI(":hasAge")),
+    EquivalentDataProperties(data_properties=(IRI(":hasName"), IRI(":fullName"))),
+    DataPropertyDomain(data_property=IRI(":hasAge"), domain=nc(":Person")),
+    DataPropertyRange(
+        data_property=IRI(":hasAge"), range=DataTypeRef(datatype=DataType.NON_NEGATIVE_INTEGER)
+    ),
+    FunctionalDataProperty(functional_property=IRI(":hasAge")),
     # --- HasKey ---
     HasKey(
         class_expression=nc(":Person"),
@@ -230,11 +233,11 @@ AXIOMS = [
     ),
     # --- Annotation property axioms ---
     SubAnnotationPropertyOf(
-        sub_property=IRI("skos:definition"),
-        super_property=IRI("rdfs:comment"),
+        sub_annotation_property=IRI("skos:definition"),
+        super_annotation_property=IRI("rdfs:comment"),
     ),
-    AnnotationPropertyDomain(property=IRI("rdfs:label"), domain=IRI("owl:Thing")),
-    AnnotationPropertyRange(property=IRI("rdfs:label"), range=IRI("rdfs:Literal")),
+    AnnotationPropertyDomain(annotation_property=IRI("rdfs:label"), domain=IRI("owl:Thing")),
+    AnnotationPropertyRange(annotation_property=IRI("rdfs:label"), range=IRI("rdfs:Literal")),
     # --- DatatypeDefinition ---
     DatatypeDefinition(
         datatype=IRI("ex:PositiveAge"),
@@ -258,8 +261,8 @@ AXIOMS = [
         individual=IRI(":Alice"),
         value=TypedLiteral(value="99", datatype=DataType.INTEGER),
     ),
-    SameIndividual(individuals=(IRI(":Bob"), IRI(":Robert"))),
-    DifferentIndividuals(individuals=(IRI(":Alice"), IRI(":Bob"))),
+    SameIndividual(same_individuals=(IRI(":Bob"), IRI(":Robert"))),
+    DifferentIndividuals(different_individuals=(IRI(":Alice"), IRI(":Bob"))),
     # --- Axiom with axiom-level annotation ---
     SubClassOf(
         sub_class=nc(":Dog"),
@@ -285,7 +288,7 @@ AXIOMS = [
     # ObjectHasSelf
     SubClassOf(
         sub_class=nc(":Narcissist"),
-        super_class=ObjectHasSelf(property=IRI(":likes")),
+        super_class=ObjectHasSelf(self_property=IRI(":likes")),
     ),
     # DataHasValue
     SubClassOf(

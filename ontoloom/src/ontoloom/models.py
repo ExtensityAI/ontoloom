@@ -2,56 +2,112 @@
 
 from abc import abstractmethod
 from collections.abc import Callable
-from typing import Any, ClassVar, get_args, override
+from typing import Annotated, Any, ClassVar, Literal, override
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, GetCoreSchemaHandler
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, GetCoreSchemaHandler, Tag
 from pydantic_core import CoreSchema, core_schema
 
 
-# Pydantic emits `oneOf + discriminator` for tagged unions but no outer
-# `type` constraint (each branch carries its own). Claude Code's MCP client falls
-# back to JSON-string serialization when a param schema lacks an explicit `type`
-# at the top, so the server receives a string instead of a dict. The `type` schema
-# keyword is a no-op for validation but tells the client to send a structured
-# value (or string, if the union accepts both). Defaults preserve object-only behavior.
 def tagged_union_meta(
-    disc: str | Callable[[Any], str] = "type",
-    schema_type: str | list[str] = "object",
+    get_tag: Callable[[Any], str],
+    *,
+    schema_type: Literal["object"] | tuple[Literal["string"], Literal["object"]] = "object",
 ):
-    """Annotated metadata for a top-level discriminated union exposed as an MCP tool param.
+    """Annotated metadata for a discriminated union: discriminator + JSON-schema type marker.
 
-    Splat into Annotated: `Annotated[A | B, *tagged_union_meta()]`.
-
-    Args:
-        disc: Discriminator field name (string) or callable that extracts the tag
-              from raw input (string, dict, or model instance). Defaults to "type".
-        schema_type: JSON schema `type` value: "object" for object-only unions,
-                     ["string", "object"] for string-or-object unions, etc.
-                     Defaults to "object".
+    Splat into `Annotated[A | B, *tagged_union_meta(get_tag)]`. `schema_type`
+    is `"object"` for object-only unions, or `("string", "object")` for
+    unions that also accept a bare string.
     """
+    # Without the type marker the Claude Code MCP client serializes dicts as JSON-encoded strings.
     json_schema_extra: dict[str, Any] = {"type": schema_type}
-    return (Discriminator(disc), Field(json_schema_extra=json_schema_extra))
+    return (Discriminator(get_tag), Field(json_schema_extra=json_schema_extra))
 
 
 class FrozenModel(BaseModel):
-    """Frozen Pydantic base. Subclasses with a `type: Literal["X"] = "X"` field
-    automatically gain a `type_: ClassVar[str]` set to the literal value, used
-    as the discriminator key in SQL queries and dispatch tables."""
+    """Frozen Pydantic base. `cls.tag()` returns the class name — used as the
+    structural-discriminator value in SQL queries and dispatch tables."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    type_: ClassVar[str]
-
-    @override
     @classmethod
-    def __pydantic_init_subclass__(cls, **kwargs: Any) -> None:
-        super().__pydantic_init_subclass__(**kwargs)
-        field = cls.model_fields.get("type")
-        if field is None:
-            return
-        literal_args = get_args(field.annotation)
-        if literal_args and isinstance(literal_args[0], str):
-            cls.type_ = literal_args[0]
+    def tag(cls):
+        return cls.__name__
+
+
+def make_tag_resolver(
+    classes: tuple[type[FrozenModel], ...],
+    *,
+    exclude: tuple[str, ...] = ("annotations",),
+):
+    """Build a Pydantic discriminator callable that picks one of `classes`
+    based on which fields are present in the input.
+
+    The Pydantic-recommended pattern for callable discriminators
+    (https://docs.pydantic.dev/latest/concepts/unions/) is a hand-written
+    if-chain over dict keys. This helper is the same pattern, but derives
+    the dispatch from each class's `model_fields` so renaming a field can't
+    silently misroute raw-dict input.
+
+    A dict matches class `C` iff `required(C) ⊆ keys ⊆ full(C)` — i.e. the
+    input has every required field of `C` and no field that `C` doesn't
+    declare. If two classes match (e.g. `OPA` vs `NegativeOPA` when input
+    omits `negated`), the one with the smaller declared-field set wins —
+    "the most specific fit explains the input". Stable on ties: the first
+    class in `classes` order wins.
+
+    Raises `ValueError` on no match with the input's keys and each candidate
+    class's field signature, so the caller sees exactly why no branch fit.
+    Pydantic propagates the raise.
+    """
+    excluded = frozenset(exclude)
+
+    # Pre-compute (cls, required-fields, full-fields) per class once at module
+    # load time. The dispatch loop only does set operations against these.
+    sigs = tuple(
+        (
+            cls,
+            frozenset(
+                f
+                for f, info in cls.model_fields.items()
+                if info.is_required() and f not in excluded
+            ),
+            frozenset(cls.model_fields) - excluded,
+        )
+        for cls in classes
+    )
+
+    def get_tag(v: Any):
+        # Already-validated model instance: dispatch by class identity.
+        if not isinstance(v, dict):
+            return type(v).__name__
+
+        keys = frozenset(v) - excluded
+        matches = [(cls, full) for cls, req, full in sigs if req <= keys <= full]
+        if matches:
+            # Smallest full-field set = tightest fit for the input. Pydantic's
+            # `min` is stable, so identical-size matches resolve to the class
+            # listed first in `classes`.
+            cls, _ = min(matches, key=lambda m: len(m[1]))
+            return cls.tag()
+
+        # No class fits. Build a useful error showing input keys vs each
+        # candidate's required+optional signature so the caller can see what
+        # to add or remove. Pydantic propagates this ValueError unwrapped.
+        sig_lines = "\n".join(
+            f"  {cls.tag()}: required={sorted(req)} optional={sorted(full - req)}"
+            for cls, req, full in sigs
+        )
+        union_tags = [cls.tag() for cls, _, _ in sigs]
+        msg = (
+            f"could not dispatch input to any union member.\n"
+            f"  union members: {union_tags}\n"
+            f"  input keys: {sorted(keys)}\n"
+            f"  signatures:\n{sig_lines}"
+        )
+        raise ValueError(msg)
+
+    return get_tag
 
 
 class TypedStr(str):
@@ -66,6 +122,10 @@ class TypedStr(str):
     description: ClassVar[str] = ""
     pattern: ClassVar[str] = ""
     examples: ClassVar[tuple[str, ...]] = ()
+
+    @classmethod
+    def tag(cls):
+        return cls.__name__
 
     @classmethod
     @abstractmethod
@@ -104,3 +164,8 @@ class TypedStr(str):
             target.setdefault("examples", list(cls.examples))
 
         return json_schema
+
+
+def tagged[T: FrozenModel | TypedStr](cls: type[T], *extras: Any) -> type[T]:
+    """Build `Annotated[cls, Tag(cls.tag()), *extras]` — the per-member shape used inside discriminated unions."""
+    return Annotated[cls, Tag(cls.tag()), *extras]  # pyright: ignore[reportReturnType]

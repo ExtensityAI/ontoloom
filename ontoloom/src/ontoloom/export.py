@@ -17,7 +17,7 @@ from ontoloom.prefixes import list_prefixes
 from ontoloom.selections.store import SelectionKindError, get_selection
 from ontoloom.selections.types import SelectionKind
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 4
 
 
 class HeaderRecord(BaseModel, frozen=True):
