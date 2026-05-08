@@ -4,6 +4,7 @@ from collections import Counter
 from dataclasses import dataclass
 
 from ontoloom.hashing import HashedAxiom
+from ontoloom.owl.annotations import Annotation
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +44,20 @@ class ReplaceResult:
     @property
     def new_hash(self) -> str:
         return self.new.hash
+
+
+@dataclass(frozen=True, slots=True)
+class AnnotateResult:
+    """Result of `annotate_axiom`: the axiom plus the actually-applied deltas.
+
+    `added` and `removed` reflect storage-level changes after dedup against
+    existing annotations (so they may be smaller than the requested lists when
+    callers send duplicates or removals for absent annotations).
+    """
+
+    hashed: HashedAxiom
+    added: tuple[Annotation, ...]
+    removed: tuple[Annotation, ...]
 
 
 @dataclass(frozen=True, slots=True)

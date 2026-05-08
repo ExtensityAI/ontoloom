@@ -41,14 +41,14 @@ def annotate_axiom(
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )
-        iris = walk_unique_iris(result.axiom)
+        iris = walk_unique_iris(result.hashed.axiom)
         labels = core_lookup_entity_labels(s, iris)
-        listing = format_axiom_listing([result], labels=labels, iris_per_axiom=[iris])
-        n_add = len(add_annotations or [])
-        n_remove = len(remove_annotations or [])
+        listing = format_axiom_listing([result.hashed], labels=labels, iris_per_axiom=[iris])
+        n_added = len(result.added)
+        n_removed = len(result.removed)
         s.commit()
 
-    return f"Updated annotations (+{n_add}, -{n_remove}):\n\n{listing}"
+    return f"Applied annotation changes (+{n_added}, -{n_removed}):\n\n{listing}"
 
 
 tool_annotate_axiom = create_tool(

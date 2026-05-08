@@ -146,11 +146,13 @@ def test_annotate_axiom_updates_in_place(s):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="important"))
     updated = annotate_axiom(s, h, add_annotations=[ann])
 
-    assert updated.hash == h
-    assert len(updated.axiom.annotations) == 1
-    annotation_value = updated.axiom.annotations[0].value
+    assert updated.hashed.hash == h
+    assert len(updated.hashed.axiom.annotations) == 1
+    annotation_value = updated.hashed.axiom.annotations[0].value
     assert isinstance(annotation_value, LangLiteral)
     assert annotation_value.value == "important"
+    assert updated.added == (ann,)
+    assert updated.removed == ()
 
 
 def test_annotate_axiom_remove(s):
@@ -164,7 +166,40 @@ def test_annotate_axiom_remove(s):
     h = result.added[0].hash
 
     updated = annotate_axiom(s, h, remove_annotations=[ann])
-    assert len(updated.axiom.annotations) == 0
+    assert len(updated.hashed.axiom.annotations) == 0
+    assert updated.removed == (ann,)
+    assert updated.added == ()
+
+
+def test_annotate_axiom_dedup_against_existing(s):
+    """Adding an annotation that already exists is a no-op; reflected in `added`."""
+    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
+    ax = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(ann,),
+    )
+    result = add_axioms(s, [ax])
+    h = result.added[0].hash
+
+    updated = annotate_axiom(s, h, add_annotations=[ann])
+    # Already present; nothing new applied.
+    assert updated.added == ()
+    assert len(updated.hashed.axiom.annotations) == 1
+
+
+def test_annotate_axiom_remove_absent_is_noop(s):
+    """Removing an annotation that isn't there is a no-op; reflected in `removed`."""
+    ax = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+    )
+    result = add_axioms(s, [ax])
+    h = result.added[0].hash
+
+    absent = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="not there"))
+    updated = annotate_axiom(s, h, remove_annotations=[absent])
+    assert updated.removed == ()
 
 
 def test_annotate_nonexistent_raises(s):

@@ -51,22 +51,36 @@ def format_roles(roles: AbstractSet[EntityType]):
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
 
+def format_axiom_annotations(axiom):
+    """Indented Turtle-style `# prop value` lines for an axiom's metadata annotations.
+
+    Returns an empty list when the axiom carries no annotations. Callers
+    join with newlines to attach the block under the axiom's primary line.
+    Turtle-style (whitespace separator, no second colon) avoids visual
+    collision with the prefix's `:` in IRIs.
+    """
+    return [f"  # {ann.property} {ann.value}" for ann in axiom.annotations]
+
+
 def _format_axiom_line(
     ha: HashedAxiom,
     labels: dict[str, str | None],
     iris: list[str] | None = None,
 ):
-    """Format a single axiom line with inline label hints. `iris` precomputed avoids re-walking."""
-    line = f"[{ha.hash[:HASH_DISPLAY_LEN]}] {ha.axiom}"  # A: truncate_hash could also accept HashedAxiom (is there any reason it does not? where is it called? or maybe accept str and HashedAxiom?)
-    if not labels:
-        return line
-    # A: do not like that iris is optional and used if passed in - what could we do? same with labels, this seems bad? maybe have a custom type for this stuff as well? but we need to look deeply to figure out which one and all
-    if iris is None:
-        iris = walk_unique_iris(ha.axiom)
-    hints = [f'{iri} "{labels[iri]}"' for iri in iris if labels.get(iri)]
-    if hints:
-        line += "  # " + ", ".join(hints)
-    return line
+    """Format a single axiom block: head line + any annotation continuation lines."""
+    head = f"[{ha.hash[:HASH_DISPLAY_LEN]}] {ha.axiom}"  # A: truncate_hash could also accept HashedAxiom (is there any reason it does not? where is it called? or maybe accept str and HashedAxiom?)
+    if labels:
+        # A: do not like that iris is optional and used if passed in - what could we do? same with labels, this seems bad? maybe have a custom type for this stuff as well? but we need to look deeply to figure out which one and all
+        if iris is None:
+            iris = walk_unique_iris(ha.axiom)
+        hints = [f'{iri} "{labels[iri]}"' for iri in iris if labels.get(iri)]
+        if hints:
+            head += "  # " + ", ".join(hints)
+
+    annotation_lines = format_axiom_annotations(ha.axiom)
+    if annotation_lines:
+        return head + "\n" + "\n".join(annotation_lines)
+    return head
 
 
 def format_diff(
@@ -121,7 +135,7 @@ def format_entity_inspect(
 
     if info.annotations:
         lines.append("Annotations:")
-        lines.extend(f'  {ann.property}: "{ann.value}"' for ann in info.annotations)
+        lines.extend(f'  {ann.property} "{ann.value}"' for ann in info.annotations)
         lines.append("")
 
     total = sum(info.axiom_counts.values())
@@ -199,7 +213,7 @@ def format_entity_search_page(matches: Sequence[EntityMatch], total: int, offset
                 break
         lines.append(f"  {m.iri} ({role_str}){label}")
         lines.extend(
-            f'    {ann.property}: "{ann.value}"'
+            f'    {ann.property} "{ann.value}"'
             for ann in m.annotations
             if str(ann.property) != "rdfs:label"
         )

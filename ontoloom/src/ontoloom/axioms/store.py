@@ -7,6 +7,7 @@ from typing import cast
 
 from ontoloom.axioms.types import (
     AddResult,
+    AnnotateResult,
     AxiomSummary,
     RemoveBySelectionResult,
     RemoveResult,
@@ -191,9 +192,15 @@ def annotate_axiom(
     *,
     add_annotations: list[Annotation] | None = None,
     remove_annotations: list[Annotation] | None = None,
-) -> HashedAxiom:
+) -> AnnotateResult:
     # A: better name? annotate is kind of one-way toward adding
-    """Modify axiom-level metadata annotations. Accepts full hash or unambiguous prefix."""
+    """Modify axiom-level metadata annotations. Accepts full hash or unambiguous prefix.
+
+    Returns an `AnnotateResult` with the actually-applied add/remove sets:
+    duplicates against existing annotations are dropped from `added`, and
+    removals targeting absent annotations are dropped from `removed` (so the
+    counts reflect storage changes, not request size).
+    """
     add_annotations = add_annotations or []
     remove_annotations = remove_annotations or []
 
@@ -217,15 +224,24 @@ def annotate_axiom(
 
     original = set(axiom.annotations)
     final = set(current)
-    actually_added = [a.model_dump() for a in final - original]
-    actually_removed = [a.model_dump() for a in original - final]
-    if actually_added or actually_removed:
-        diff = json.dumps({"added": actually_added, "removed": actually_removed})
+    applied_added = tuple(a for a in add_annotations if a in final - original)
+    applied_removed = tuple(a for a in remove_annotations if a in original - final)
+    if applied_added or applied_removed:
+        diff = json.dumps(
+            {
+                "added": [a.model_dump() for a in applied_added],
+                "removed": [a.model_dump() for a in applied_removed],
+            }
+        )
         _log_event(s, "annotate", full_hash, annotation_diff=diff)
 
     repopulate_axiom_text(s, axiom_id, updated.annotations)
 
-    return HashedAxiom(axiom=updated, hash=full_hash)
+    return AnnotateResult(
+        hashed=HashedAxiom(axiom=updated, hash=full_hash),
+        added=applied_added,
+        removed=applied_removed,
+    )
 
 
 def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> ReplaceResult:

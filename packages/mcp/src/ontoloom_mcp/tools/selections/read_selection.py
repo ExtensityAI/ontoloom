@@ -5,6 +5,7 @@ from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.types import SelectionKind, ShowFilter
 from ontoloom.transactions import session
 
+from ontoloom_mcp.components.formatting import format_axiom_annotations
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath, SelectionName
 
@@ -48,10 +49,12 @@ def read_selection(
     if meta.kind == SelectionKind.AXIOMS:
         for item in result.items:
             h = item.key[:HASH_DISPLAY_LEN]
-            if item.missing:
+            if item.missing or item.axiom is None:
                 lines.append(f"[{h}] *missing*")
-            else:
-                lines.append(f"[{h}] {item.axiom}")
+                continue
+
+            lines.append(f"[{h}] {item.axiom}")
+            lines.extend(format_axiom_annotations(item.axiom))
     else:
         for item in result.items:
             if item.missing:
