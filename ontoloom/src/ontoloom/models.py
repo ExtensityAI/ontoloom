@@ -38,6 +38,7 @@ class FrozenModel(BaseModel):
 def make_tag_resolver(
     classes: tuple[type[FrozenModel], ...],
     *,
+    union_name: str,
     exclude: tuple[str, ...] = ("annotations",),
 ):
     """Build a Pydantic discriminator callable that picks one of `classes`
@@ -56,10 +57,15 @@ def make_tag_resolver(
     "the most specific fit explains the input". Stable on ties: the first
     class in `classes` order wins.
 
-    Raises `ValueError` on no match with the input's keys and each candidate
-    class's field signature, so the caller sees exactly why no branch fit.
-    Pydantic propagates the raise.
+    `union_name` labels the union in error messages (e.g. "Axiom", "Pattern").
+
+    Raises `UnionDispatchError` on no match, naming the best-fit variant and
+    the precise missing/unknown fields. The error is an `OntoloomError`, so
+    Pydantic propagates it untouched (only `ValueError`/`AssertionError` get
+    wrapped as `ValidationError`).
     """
+    from ontoloom.errors import UnionDispatchError
+
     excluded = frozenset(exclude)
 
     # Pre-compute (cls, required-fields, full-fields) per class once at module
@@ -91,21 +97,20 @@ def make_tag_resolver(
             cls, _ = min(matches, key=lambda m: len(m[1]))
             return cls.tag()
 
-        # No class fits. Build a useful error showing input keys vs each
-        # candidate's required+optional signature so the caller can see what
-        # to add or remove. Pydantic propagates this ValueError unwrapped.
-        sig_lines = "\n".join(
-            f"  {cls.tag()}: required={sorted(req)} optional={sorted(full - req)}"
-            for cls, req, full in sigs
+        # No class fits. Score each candidate by how close it is to `keys`:
+        # most required fields satisfied, then fewest unknown keys, then
+        # fewest missing required. Stable on ties (first-listed wins).
+        best_cls, best_req, best_full = max(
+            sigs,
+            key=lambda s: (len(s[1] & keys), -len(keys - s[2]), -len(s[1] - keys)),
         )
-        union_tags = [cls.tag() for cls, _, _ in sigs]
-        msg = (
-            f"could not dispatch input to any union member.\n"
-            f"  union members: {union_tags}\n"
-            f"  input keys: {sorted(keys)}\n"
-            f"  signatures:\n{sig_lines}"
+        raise UnionDispatchError(
+            union_name=union_name,
+            closest_variant=best_cls.tag(),
+            keys=keys,
+            missing=best_req - keys,
+            unknown=keys - best_full,
         )
-        raise ValueError(msg)
 
     return get_tag
 

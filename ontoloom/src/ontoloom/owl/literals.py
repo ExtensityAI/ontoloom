@@ -66,7 +66,7 @@ class LangLiteral(FrozenModel):
         return f'"{self.value}"@{self.lang}'
 
 
-_get_literal_value_tag = make_tag_resolver((TypedLiteral, LangLiteral))
+_get_literal_value_tag = make_tag_resolver((TypedLiteral, LangLiteral), union_name="LiteralValue")
 
 
 LiteralValue = Annotated[
@@ -119,7 +119,9 @@ class DataOneOf(FrozenModel):
         return f"{{{self.value}}}"
 
 
-_get_data_range_tag = make_tag_resolver((DataTypeRef, DataIntersectionOf, DataOneOf))
+_get_data_range_tag = make_tag_resolver(
+    (DataTypeRef, DataIntersectionOf, DataOneOf), union_name="DataRange"
+)
 
 
 DataRange = Annotated[

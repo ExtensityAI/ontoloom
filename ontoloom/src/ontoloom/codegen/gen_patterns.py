@@ -121,7 +121,7 @@ def generate() -> str:  # A GLOBAL: pylance can infer types. global todo!
         "_PATTERN_CLASSES = (",
         *(f"    {n}," for n in all_pattern_classes),
         ")",
-        "_get_pattern_tag = make_tag_resolver(_PATTERN_CLASSES)",
+        '_get_pattern_tag = make_tag_resolver(_PATTERN_CLASSES, union_name="Pattern")',
         f"Pattern = Annotated[{tagged_union}, *tagged_union_meta(_get_pattern_tag)]",
         "",
     ]

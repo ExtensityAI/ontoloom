@@ -12,6 +12,7 @@ from ontoloom.errors import (
     InternalError,
     OntoloomError,
     StoreCorruptionError,
+    UnionDispatchError,
 )
 from ontoloom.prefixes import PrefixNotFoundError
 from ontoloom.selections.store import (
@@ -57,7 +58,21 @@ _HINTS: dict[type[OntoloomError], Callable[..., str]] = {
     ),
     BadRequestError: lambda e: e.message,
     InternalError: lambda e: f"Internal error: {e.detail}. Please file a bug report.",
+    UnionDispatchError: lambda e: (
+        f"Input does not match any {e.union_name} variant. "
+        f"Closest variant: {e.closest_variant!r}."
+        + (f" Missing required field(s): {sorted(e.missing)}." if e.missing else "")
+        + (f" Unknown field(s): {sorted(e.unknown)}." if e.unknown else "")
+        + f" Check the schema for {e.closest_variant!r}, "
+        f"or pick a different {e.union_name} variant."
+    ),
 }
+
+
+def format_ontoloom_error(e: OntoloomError) -> str:
+    """Render an OntoloomError as a user-facing message via the hint dict."""
+    builder = _HINTS.get(type(e), str)
+    return builder(e)
 
 
 def translate_errors(fn):
@@ -75,7 +90,6 @@ def translate_errors(fn):
         except ToolError:
             raise
         except OntoloomError as e:
-            builder = _HINTS.get(type(e), str)
-            raise ToolError(builder(e)) from None
+            raise ToolError(format_ontoloom_error(e)) from None
 
     return wrapper

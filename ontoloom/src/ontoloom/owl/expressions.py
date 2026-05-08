@@ -160,7 +160,8 @@ _resolve_class_expression = make_tag_resolver(
         ObjectHasSelf,
         DataSomeValuesFrom,
         DataHasValue,
-    )
+    ),
+    union_name="ClassExpression",
 )
 
 

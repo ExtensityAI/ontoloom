@@ -65,7 +65,8 @@ class EntitiesInExpr(FrozenModel):
 
 
 _resolve_set_expr = make_tag_resolver(
-    (UnionExpr, IntersectExpr, DiffExpr, AxiomsForExpr, EntitiesInExpr)
+    (UnionExpr, IntersectExpr, DiffExpr, AxiomsForExpr, EntitiesInExpr),
+    union_name="SelectionExpr",
 )
 
 

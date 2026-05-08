@@ -11,6 +11,7 @@ from pydantic.fields import FieldInfo
 from ontoloom.canonical import SKIP
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.expressions import BaseClassExpression
+from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import is_unordered
 from ontoloom.patterns import ContainsExpr, ContainsSlot, ExpressionPattern
 from ontoloom.patterns.base import BasePattern
@@ -99,6 +100,12 @@ def _match_field(  # noqa: C901
 
     # Slot against a string (IRI or EntityType)
     if isinstance(pattern_val, Slot) and isinstance(actual_val, str):
+        return _match_slot_vs_str(pattern_val, str(actual_val), bindings)
+
+    # Slot against a typed/lang literal: bind to the canonical string repr
+    # (`"Dog"@en`, `"42"^^xsd:integer`) so cross-position equality holds and
+    # different literal shapes don't unify spuriously.
+    if isinstance(pattern_val, Slot) and isinstance(actual_val, TypedLiteral | LangLiteral):
         return _match_slot_vs_str(pattern_val, str(actual_val), bindings)
 
     # Contains{Expr,Slot}: partial-set match (any subset, any order). Two

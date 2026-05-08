@@ -580,7 +580,7 @@ _AXIOM_CLASSES = (
     SameIndividual,
     DifferentIndividuals,
 )
-_get_axiom_tag = make_tag_resolver(_AXIOM_CLASSES)
+_get_axiom_tag = make_tag_resolver(_AXIOM_CLASSES, union_name="Axiom")
 
 
 Axiom = Annotated[

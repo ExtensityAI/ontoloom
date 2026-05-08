@@ -3,14 +3,17 @@ from ontoloom.axioms.store import add_axioms
 from ontoloom.connection import Ontology
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import (
+    AnnotationAssertion,
     Declaration,
     EquivalentClasses,
     SubClassOf,
     SubObjectPropertyOfChain,
 )
 from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.patterns import (
+    AnnotationAssertionPattern,
     ContainsExpr,
     EquivalentClassesPattern,
     ObjectSomeValuesFromPattern,
@@ -200,3 +203,60 @@ def test_match_slot_vs_expression_variable_binds_iri_object():
     slot = Slot("?C")
     bindings = _match_slot_vs_expression(slot, IRI("ex:Dog"), {})
     assert bindings == {"C": "ex:Dog"}
+
+
+@pytest.fixture()
+def labeled(s):
+    add_axioms(
+        s,
+        [
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog", lang="en"),
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Cat"),
+                value=LangLiteral(value="Cat", lang="en"),
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:comment"),
+                subject=IRI("ex:Dog"),
+                value=TypedLiteral(value="A canine."),
+            ),
+        ],
+    )
+    return s
+
+
+def test_slot_variable_matches_lang_literal_value(labeled):
+    pattern = AnnotationAssertionPattern(
+        property=Slot("rdfs:label"),
+        subject=Slot("?s"),
+        value=Slot("?v"),
+    )
+    result = match_axioms(labeled, pattern)
+    assert result.total == 2
+
+
+def test_slot_wildcard_matches_typed_literal_value(labeled):
+    pattern = AnnotationAssertionPattern(
+        property=Slot("rdfs:comment"),
+        subject=Slot("*"),
+        value=Slot("*"),
+    )
+    result = match_axioms(labeled, pattern)
+    assert result.total == 1
+
+
+def test_slot_variable_against_literal_does_not_unify_with_iri_in_other_position(labeled):
+    # Same variable in subject (binds to "ex:Dog") and value (binds to '"Dog"@en')
+    # must NOT unify — different canonical strings, no match.
+    pattern = AnnotationAssertionPattern(
+        property=Slot("rdfs:label"),
+        subject=Slot("?x"),
+        value=Slot("?x"),
+    )
+    result = match_axioms(labeled, pattern)
+    assert result.total == 0

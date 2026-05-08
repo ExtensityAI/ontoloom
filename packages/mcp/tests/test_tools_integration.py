@@ -144,6 +144,29 @@ def test_remove_axioms_rejects_both_inputs():
         )
 
 
+def test_axiom_dispatch_failure_renders_focused_mcp_message():
+    """A bad axiom dict, validated through the Axiom union adapter, should
+    raise UnionDispatchError; the MCP-layer formatter renders it as a focused
+    single-line message — not the multi-KB union signature dump."""
+    from ontoloom.errors import UnionDispatchError
+    from ontoloom.owl.axioms import Axiom
+    from ontoloom_mcp.components.errors import format_ontoloom_error
+    from pydantic import TypeAdapter
+
+    adapter: TypeAdapter[Axiom] = TypeAdapter(Axiom)
+    with pytest.raises(UnionDispatchError) as exc_info:
+        adapter.validate_python({"sub_class": "ex:Dog"})
+
+    msg = format_ontoloom_error(exc_info.value)
+    assert "Axiom" in msg
+    assert "SubClassOf" in msg
+    assert "super_class" in msg
+    # No multi-line signature dump:
+    assert "required=" not in msg
+    assert "optional=" not in msg
+    assert "\n" not in msg
+
+
 # -- set_prefix confirmation flow --
 
 
