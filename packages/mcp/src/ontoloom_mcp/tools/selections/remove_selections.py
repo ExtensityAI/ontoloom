@@ -7,7 +7,7 @@ from ontoloom.selections.store import (
 from ontoloom.selections.store import (
     remove_selections_by_pattern,
 )
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName, SelectionPattern
@@ -30,15 +30,17 @@ def remove_selections(
         raise BadRequestError(msg)
 
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         if pattern is not None:
             dropped = remove_selections_by_pattern(s, pattern)
+            s.commit()
             if not dropped:
                 return f"No selections matched pattern {str(pattern)!r}."
             items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in dropped)
             return f"Removed {len(dropped)} selections matching {str(pattern)!r}: {items}."
 
         result = core_remove_selections(s, names)  # pyright: ignore[reportArgumentType]
+        s.commit()
 
     parts = []
     if result.dropped:

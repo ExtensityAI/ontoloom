@@ -207,10 +207,11 @@ def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
         )
     # State unchanged: ex still maps to its original IRI.
     from ontoloom.prefixes import list_prefixes
-    from ontoloom.transactions import dry_run
+    from ontoloom.transactions import session
 
-    with dry_run(Ontology(populated_db)) as s:
+    with session(Ontology(populated_db)) as s:
         prefixes = list_prefixes(s)
+        s.commit()
     assert prefixes["ex"] == "http://example.org/"
 
 

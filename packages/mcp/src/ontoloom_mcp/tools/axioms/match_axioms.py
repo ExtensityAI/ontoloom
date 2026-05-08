@@ -4,7 +4,7 @@ from ontoloom.patterns import Pattern
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
@@ -37,11 +37,12 @@ def match_axioms(
     - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = core_match(s, pattern, within=within, limit=limit)
         upserted = upsert_selection(
             s, into, SelectionKind.AXIOMS, result.axiom_hashes, "match_axioms"
         )
+        s.commit()
 
     truncated_hint = (
         f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""

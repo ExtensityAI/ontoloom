@@ -3,7 +3,7 @@ from ontoloom.axioms.store import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.types import LockedSelection
-from ontoloom.transactions import atomic, dry_run
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -38,24 +38,23 @@ def rename_iri(
       here to apply the change.
     """
     ont = Ontology(path)
-    with dry_run(ont) as s:
-        preview = core_rename_iri(s, old_iri, new_iri, within=within)
-
-    if preview.colliding_hashes:
-        token = confirmation_token(
-            "rename_iri", str(old_iri), str(new_iri), *sorted(preview.colliding_hashes)
-        )
-        if confirm != token:
-            msg = (
-                f"Renaming {old_iri} -> {new_iri} would merge "
-                f"{len(preview.colliding_hashes)} axiom(s) into existing axioms "
-                f"(annotations on the merged axioms may be lost). "
-                f"Colliding new hashes: {sorted(preview.colliding_hashes)}."
-            )
-            raise ConfirmationRequiredError(msg, token)
-
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = core_rename_iri(s, old_iri, new_iri, within=within)
+
+        if result.colliding_hashes:
+            token = confirmation_token(
+                "rename_iri", str(old_iri), str(new_iri), *sorted(result.colliding_hashes)
+            )
+            if confirm != token:
+                msg = (
+                    f"Renaming {old_iri} -> {new_iri} would merge "
+                    f"{len(result.colliding_hashes)} axiom(s) into existing axioms "
+                    f"(annotations on the merged axioms may be lost). "
+                    f"Colliding new hashes: {sorted(result.colliding_hashes)}."
+                )
+                raise ConfirmationRequiredError(msg, token)
+
+        s.commit()
 
     if not result.replaced:
         return f"No axioms found mentioning {old_iri}. No-op."

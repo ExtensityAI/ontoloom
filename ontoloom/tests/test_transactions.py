@@ -1,8 +1,9 @@
 import sqlite3
+import warnings
 
 import pytest
 from ontoloom.connection import Ontology
-from ontoloom.transactions import atomic, dry_run
+from ontoloom.transactions import session
 
 
 class BoomError(Exception):
@@ -31,54 +32,76 @@ def _set_prefix(s, value: str):
     )
 
 
-def test_atomic_commits_on_clean_exit(tmp_path):
+def test_commit_persists_writes(tmp_path):
     ont = _make_ont(tmp_path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         _set_prefix(s, "https://example.com/")
+        s.commit()
     assert _read_prefixes(ont.path) == "https://example.com/"
 
 
-def test_atomic_rolls_back_on_exception(tmp_path):
+def test_rollback_discards_writes(tmp_path):
     ont = _make_ont(tmp_path)
-    with pytest.raises(BoomError), atomic(ont) as s:
+    with session(ont) as s:
+        _set_prefix(s, "https://example.com/")
+        s.rollback()
+    assert _read_prefixes(ont.path) is None
+
+
+def test_exception_inside_block_rolls_back(tmp_path):
+    ont = _make_ont(tmp_path)
+    with pytest.raises(BoomError), session(ont) as s:
         _set_prefix(s, "https://example.com/")
         raise BoomError
     assert _read_prefixes(ont.path) is None
 
 
-def test_dry_run_rolls_back_on_clean_exit(tmp_path):
+def test_exception_after_commit_does_not_unwind(tmp_path):
     ont = _make_ont(tmp_path)
-    with dry_run(ont) as s:
+    with pytest.raises(BoomError), session(ont) as s:
         _set_prefix(s, "https://example.com/")
-    assert _read_prefixes(ont.path) is None
-
-
-def test_dry_run_rolls_back_on_exception(tmp_path):
-    ont = _make_ont(tmp_path)
-    with pytest.raises(BoomError), dry_run(ont) as s:
-        _set_prefix(s, "https://example.com/")
+        s.commit()
         raise BoomError
+    assert _read_prefixes(ont.path) == "https://example.com/"
+
+
+def test_forgot_commit_warns_and_rolls_back(tmp_path):
+    ont = _make_ont(tmp_path)
+    with pytest.warns(RuntimeWarning, match="without commit"), session(ont) as s:
+        _set_prefix(s, "https://example.com/")
     assert _read_prefixes(ont.path) is None
 
 
-def test_atomic_session_is_not_dry_run(tmp_path):
+def test_forgot_commit_with_no_writes_still_warns(tmp_path):
     ont = _make_ont(tmp_path)
-    with atomic(ont) as s:
-        assert s.is_dry_run is False
+    with pytest.warns(RuntimeWarning, match="without commit"), session(ont):
+        pass
 
 
-def test_dry_run_session_is_dry_run(tmp_path):
+def test_no_warning_after_explicit_commit(tmp_path):
     ont = _make_ont(tmp_path)
-    with dry_run(ont) as s:
-        assert s.is_dry_run is True
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with session(ont) as s:
+            _set_prefix(s, "https://example.com/")
+            s.commit()
+
+
+def test_no_warning_after_explicit_rollback(tmp_path):
+    ont = _make_ont(tmp_path)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with session(ont) as s:
+            _set_prefix(s, "https://example.com/")
+            s.rollback()
 
 
 def test_session_id_differs_across_calls(tmp_path):
     ont = _make_ont(tmp_path)
-    with atomic(ont) as s1:
+    with session(ont) as s1:
         id1 = s1.session_id
-    with atomic(ont) as s2:
+        s1.commit()
+    with session(ont) as s2:
         id2 = s2.session_id
-    with dry_run(ont) as s3:
-        id3 = s3.session_id
-    assert id1 != id2 != id3 != id1
+        s2.commit()
+    assert id1 != id2

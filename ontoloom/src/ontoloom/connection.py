@@ -143,9 +143,14 @@ class Ontology:
 
 @dataclass(frozen=True, slots=True)
 class Session:
-    """Active session. Returned by atomic and dry_run."""
+    """Active transactional session. Returned by `session()`."""
 
     ontology: Ontology
     conn: sqlite3.Connection
     session_id: str
-    is_dry_run: bool
+
+    def commit(self):
+        self.conn.execute("COMMIT")
+
+    def rollback(self):
+        self.conn.execute("ROLLBACK")

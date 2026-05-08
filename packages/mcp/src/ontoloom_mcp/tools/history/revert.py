@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
 from ontoloom.history import revert as core_revert
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -21,8 +21,9 @@ def revert(
     Selections are NOT restored -> they are snapshots; re-search to refresh.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         report = core_revert(s, n)
+        s.commit()
 
     parts = [f"Reverted {report.reverted} events across {n} batch(es)."]
     if report.skipped:

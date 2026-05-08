@@ -3,7 +3,7 @@ from ontoloom.connection import Ontology
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.types import SelectionKind, ShowFilter
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
@@ -27,8 +27,9 @@ def read_selection(
     subagent to paginate rather than reading everything into your context.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = core_read_selection(s, name, limit=limit, offset=offset, show=show)
+        s.commit()
 
     meta = result.meta
     header = (

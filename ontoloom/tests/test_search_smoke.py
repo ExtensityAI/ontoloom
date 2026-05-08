@@ -66,7 +66,7 @@ from ontoloom.owl.literals import (
     TypedLiteral,
 )
 from ontoloom.owl.markers import EntityType
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 
 @pytest.fixture
@@ -74,8 +74,9 @@ def s():
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "test.db"
         Ontology.create(path)
-        with atomic(Ontology(path)) as session:
-            yield session
+        with session(Ontology(path)) as s:
+            yield s
+            s.commit()
 
 
 # ---------------------------------------------------------------------------

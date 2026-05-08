@@ -15,15 +15,16 @@ from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 
 @pytest.fixture()
 def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with atomic(Ontology(path)) as session:
-        yield session
+    with session(Ontology(path)) as s:
+        yield s
+        s.commit()
 
 
 def test_revert_add(s):

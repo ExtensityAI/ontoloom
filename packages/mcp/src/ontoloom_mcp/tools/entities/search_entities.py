@@ -6,7 +6,7 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -48,7 +48,7 @@ def search_entities(
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         kwargs = {
             "query": query,
             "role": role,
@@ -66,6 +66,7 @@ def search_entities(
 
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties, within)
+            s.commit()
             return f"0 entities -> {sel.locked!r}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
@@ -77,7 +78,9 @@ def search_entities(
         if within is not None:
             result += "\n" + _within_metadata(s, within)
 
-        return result
+        s.commit()
+
+    return result
 
 
 def _within_metadata(s: Session, within: str):

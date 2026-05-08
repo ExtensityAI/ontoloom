@@ -4,7 +4,7 @@ from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -30,7 +30,7 @@ def find_duplicates(
     - `within`: Optional entity selection to restrict the check to.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = find_duplicate_entities(s, annotation_property, within=within)
 
         if not result.affected_iris:
@@ -43,6 +43,7 @@ def find_duplicates(
             s, into, SelectionKind.ENTITIES, result.affected_iris, source=source
         )
         sel = upserted.selection
+        s.commit()
 
     lines = [
         f"Found {result.total_groups} duplicate {annotation_property} values "

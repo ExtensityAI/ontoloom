@@ -3,7 +3,7 @@ from ontoloom.axioms.store import replace_axiom as core_replace_axiom
 from ontoloom.connection import Ontology
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.owl.axioms import Axiom
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -30,8 +30,9 @@ def replace_axiom(
       skipped (existing preserved with its annotations), event records mapping.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = core_replace_axiom(s, axiom_hash, new_axiom)
+        s.commit()
 
     if result.was_noop:
         return f"No-op: new axiom has same hash as old ({result.old_hash[:HASH_DISPLAY_LEN]})."

@@ -8,15 +8,16 @@ from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 
 @pytest.fixture()
 def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with atomic(Ontology(path)) as session:
-        yield session
+    with session(Ontology(path)) as s:
+        yield s
+        s.commit()
 
 
 def _add_label(s, subject: str, label: str):

@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
 from ontoloom.prefixes import set_prefix as core_set_prefix
-from ontoloom.transactions import atomic, dry_run
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -22,30 +22,25 @@ def set_prefix(path: OntologyPath, name: PrefixName, iri: str, confirm: str | No
     token as `confirm=` to apply the change.
     """
     ont = Ontology(path)
-    with dry_run(ont) as s:
-        preview = core_set_prefix(s, name, iri)
-
-    if preview.in_use_count > 0:
-        if preview.previous_iri is None:
-            msg = f"in_use_count={preview.in_use_count} but previous_iri is None"
-            raise RuntimeError(msg)
-
-        token = confirmation_token(
-            "set_prefix",
-            name,
-            iri,
-            preview.previous_iri,
-            str(preview.in_use_count),
-        )
-        if confirm != token:
-            msg = (
-                f"Reassigning prefix {name!r} from {preview.previous_iri!r} to {iri!r} "
-                f"would change the meaning of {preview.in_use_count} entities."
-            )
-            raise ConfirmationRequiredError(msg, token)
-
-    with atomic(ont) as s:
+    with session(ont) as s:
         result = core_set_prefix(s, name, iri)
+
+        if result.in_use_count > 0 and result.previous_iri is not None:
+            token = confirmation_token(
+                "set_prefix",
+                name,
+                iri,
+                result.previous_iri,
+                str(result.in_use_count),
+            )
+            if confirm != token:
+                msg = (
+                    f"Reassigning prefix {name!r} from {result.previous_iri!r} to {iri!r} "
+                    f"would change the meaning of {result.in_use_count} entities."
+                )
+                raise ConfirmationRequiredError(msg, token)
+
+        s.commit()
 
     if result.previous_iri is None:
         return f"Set prefix `{name}:` -> `{iri}`"

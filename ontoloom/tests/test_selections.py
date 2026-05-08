@@ -22,15 +22,16 @@ from ontoloom.selections.store import (
     verify_selection_hash,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName, ShowFilter
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 
 @pytest.fixture()
 def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with atomic(Ontology(path)) as session:
-        yield session
+    with session(Ontology(path)) as s:
+        yield s
+        s.commit()
 
 
 # -- P-03-3: Selection set algebra --

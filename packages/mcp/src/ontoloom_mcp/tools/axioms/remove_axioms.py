@@ -3,7 +3,7 @@ from ontoloom.axioms.store import remove_axioms_by_hash, remove_axioms_by_select
 from ontoloom.connection import Ontology
 from ontoloom.errors import BadRequestError
 from ontoloom.selections.types import LockedSelection
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -32,9 +32,10 @@ def remove_axioms(
         raise BadRequestError(msg)
 
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         if within is not None:
             sel_result = remove_axioms_by_selection(s, within)
+            s.commit()
             return (
                 f"Removed {len(sel_result.removed)} axioms ({sel_result.absent} already absent). "
                 f"Selection {str(within.name)!r} retained."
@@ -42,7 +43,9 @@ def remove_axioms(
 
         result = remove_axioms_by_hash(s, axiom_hashes)  # pyright: ignore[reportArgumentType]
         entries = [("-", ha) for ha in result.removed]
-        return format_diff(entries, f"Removed {len(result.removed)} axioms.")
+        s.commit()
+
+    return format_diff(entries, f"Removed {len(result.removed)} axioms.")
 
 
 tool_remove_axioms = create_tool(

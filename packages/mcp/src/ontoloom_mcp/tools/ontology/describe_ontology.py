@@ -11,7 +11,7 @@ from ontoloom.entities.store import (
 )
 from ontoloom.prefixes import list_prefixes, prefix_usage_counts
 from ontoloom.selections.store import get_selection
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import (
     format_axiom_summary,
@@ -33,7 +33,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
     Use `within` to restrict to a named selection.
     """
     ont = Ontology(path)
-    with atomic(ont) as s:
+    with session(ont) as s:
         ax_summary = compute_axiom_summary(s, within=within)
         ent_summary = compute_entity_summary(s, within=within)
         prefix_map = list_prefixes(s)
@@ -78,7 +78,9 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
             else:
                 parts.append("No prefixes defined.")
 
-        return "\n\n".join(parts)
+        s.commit()
+
+    return "\n\n".join(parts)
 
 
 tool_describe_ontology = create_tool(

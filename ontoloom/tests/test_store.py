@@ -59,7 +59,7 @@ from ontoloom.selections.store import (
     upsert_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
-from ontoloom.transactions import atomic
+from ontoloom.transactions import session
 from pydantic import TypeAdapter
 
 
@@ -67,8 +67,9 @@ from pydantic import TypeAdapter
 def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with atomic(Ontology(path)) as session:
-        yield session
+    with session(Ontology(path)) as s:
+        yield s
+        s.commit()
 
 
 @pytest.fixture()
@@ -720,16 +721,18 @@ def test_workspace_root_allows_inside(tmp_path, monkeypatch):
 
     inside = workspace / "ok.db"
     Ontology.create(inside)
-    with atomic(Ontology(inside)) as session:
-        assert session.conn is not None
+    with session(Ontology(inside)) as s:
+        assert s.conn is not None
+        s.commit()
 
 
 def test_workspace_root_unset_unrestricted(tmp_path, monkeypatch):
     monkeypatch.setattr("ontoloom.connection.WORKSPACE_ROOT", None)
     path = tmp_path / "anywhere.db"
     Ontology.create(path)
-    with atomic(Ontology(path)) as session:
-        assert session.conn is not None
+    with session(Ontology(path)) as s:
+        assert s.conn is not None
+        s.commit()
 
 
 def test_open_non_ontoloom_db_raises(tmp_path):
@@ -740,7 +743,7 @@ def test_open_non_ontoloom_db_raises(tmp_path):
     conn.execute("CREATE TABLE foo (id INTEGER)")
     conn.close()
 
-    with pytest.raises(OntologySchemaError), atomic(Ontology(path)):
+    with pytest.raises(OntologySchemaError), session(Ontology(path)):
         pass
 
 
