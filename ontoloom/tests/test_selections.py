@@ -221,9 +221,18 @@ def test_validate_selection_name_empty():
         SelectionName("")
 
 
-def test_validate_selection_name_with_at():
-    with pytest.raises(ValueError):
-        SelectionName("name@hash")
+def test_selection_name_strips_locked_hash_suffix():
+    assert SelectionName("my_sel@a3f1b2c4") == "my_sel"
+
+
+def test_selection_name_rejects_short_hash_suffix():
+    with pytest.raises(ValueError, match="at least"):
+        SelectionName("my_sel@abc12")
+
+
+def test_selection_name_rejects_non_hex_hash_suffix():
+    with pytest.raises(ValueError, match="at least"):
+        SelectionName("my_sel@hashvalue")
 
 
 def test_validate_selection_name_too_long():

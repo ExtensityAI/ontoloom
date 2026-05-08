@@ -74,16 +74,21 @@ def format_diff(
     summary: str,
     labels: dict[str, str | None] | None = None,
     iris_per_entry: list[list[str] | None] | None = None,
+    max_rows: int | None = None,
 ):
     lb = labels or {}
+    capped = entries if max_rows is None else entries[:max_rows]
     # A: this is weird do not like it at all, need to reason through please
     iris_list: list[list[str] | None] = (
-        iris_per_entry if iris_per_entry is not None else [None] * len(entries)
+        iris_per_entry[: len(capped)] if iris_per_entry is not None else [None] * len(capped)
     )
-    changes = "\n".join(
+    lines = [
         f"{tag} {_format_axiom_line(ha, lb, iris)}"
-        for (tag, ha), iris in zip(entries, iris_list, strict=True)
-    )
+        for (tag, ha), iris in zip(capped, iris_list, strict=True)
+    ]
+    if max_rows is not None and len(entries) > max_rows:
+        lines.append(f"... and {len(entries) - max_rows} more")
+    changes = "\n".join(lines)
     return f"{summary}\n\n```diff\n{changes}\n```"
 
 

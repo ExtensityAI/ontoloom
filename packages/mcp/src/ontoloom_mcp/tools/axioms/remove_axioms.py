@@ -36,10 +36,12 @@ def remove_axioms(
         if within is not None:
             sel_result = remove_axioms_by_selection(s, within)
             s.commit()
-            return (
+            entries = [("-", ha) for ha in sel_result.removed]
+            summary = (
                 f"Removed {len(sel_result.removed)} axioms ({sel_result.absent} already absent). "
                 f"Selection {str(within.name)!r} retained."
             )
+            return format_diff(entries, summary, max_rows=20)
 
         result = remove_axioms_by_hash(s, axiom_hashes)  # pyright: ignore[reportArgumentType]
         entries = [("-", ha) for ha in result.removed]

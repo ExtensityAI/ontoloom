@@ -2,7 +2,8 @@ from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.types import LockedSelection
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import LockedSelection, SelectionKind
 from ontoloom.transactions import session
 
 from ontoloom_mcp.components.confirmation import (
@@ -10,7 +11,7 @@ from ontoloom_mcp.components.confirmation import (
     confirmation_token,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.types import OntologyPath, SelectionName
 
 
 def rename_iri(
@@ -18,6 +19,7 @@ def rename_iri(
     old_iri: IRI,
     new_iri: IRI,
     within: LockedSelection | None = None,
+    into: SelectionName | None = None,
     confirm: str | None = None,
 ):
     """Rename an IRI across all (or restricted) axioms.
@@ -32,6 +34,9 @@ def rename_iri(
     - `within`: Optional `name@hash_prefix` reference (e.g. "my_sel@a3f1") to
       restrict the rename to an axiom selection. The hash prefix verifies the
       selection hasn't changed since you last observed it.
+    - `into`: Optional axiom selection name to populate with the post-rename
+      hashes of every replaced axiom. Use to inspect or further operate on the
+      affected axioms without re-querying.
     - `confirm`: When the rename would merge axioms into existing ones (hash
       collision => annotations on the merged axioms may be lost), the first
       call raises `ConfirmationRequiredError` with a token. Pass that token
@@ -54,6 +59,17 @@ def rename_iri(
                 )
                 raise ConfirmationRequiredError(msg, token)
 
+        upserted = None
+        if into is not None:
+            new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
+            upserted = upsert_selection(
+                s,
+                into,
+                SelectionKind.AXIOMS,
+                new_hashes,
+                f"rename_iri({old_iri} -> {new_iri})",
+            )
+
         s.commit()
 
     if not result.replaced:
@@ -65,6 +81,9 @@ def rename_iri(
     if merged:
         parts.append(f"{len(merged)} merged into existing axioms.")
     parts.append(f"Batch: {result.batch_id}")
+    if upserted is not None:
+        sel = upserted.selection
+        parts.append(f"Saved to {sel.locked!r} ({sel.size} items).")
     return " ".join(parts)
 
 

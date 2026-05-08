@@ -69,16 +69,32 @@ def _validate_name(value: str):
 
 
 class SelectionName(TypedStr):
-    """A validated selection name -> no '@', no control chars, max 64 chars, non-empty."""
+    """A normalized selection name. Inputs may include a `@hash_prefix` suffix
+    (e.g. `my_sel@a3f1b2c4`); it is stripped and the stored value is always
+    the bare name.
 
-    description = "Selection name"
-    examples = ("my_selection", "candidates_v2")
+    Used for `within=` on read tools, where the hash is informational only and
+    reads always reflect current state. Write tools that need optimistic
+    locking on the scoped selection use `LockedSelection`, which requires the
+    hash and enforces it.
+    """
+
+    description = "Selection name; an optional '@hash_prefix' suffix is accepted and ignored"
+    examples = ("my_selection", "my_selection@a3f1b2c4")
 
     @override
     @classmethod
     def parse(cls, value: str):
-        _validate_name(value)
-        return value
+        name, sep, hash_prefix = value.partition("@")
+
+        if sep and not _LOCKED_PATTERN.match(hash_prefix):
+            msg = (
+                f"Hash prefix in {value!r} must be at least {LOCKED_PREFIX_MIN} hex chars; "
+                f"omit '@hash' to refer to the selection by name only."
+            )
+            raise ValueError(msg)
+        _validate_name(name)
+        return name
 
 
 class LockedSelection(TypedStr):
