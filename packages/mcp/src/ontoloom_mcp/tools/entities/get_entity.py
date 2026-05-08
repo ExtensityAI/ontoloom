@@ -5,6 +5,7 @@ from ontoloom.entities.store import get_entity as core_get_entity
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.formatting import format_entity_inspect
 from ontoloom_mcp.components.tool import create_tool
@@ -28,12 +29,13 @@ def get_entity(
       "I want to work on this entity's axioms" -> then use `match_axioms(within=...)`
       or `remove_axioms(within=...)` on the result.
     """
-    with Ontology(path) as ont:
-        info = core_get_entity(ont, iri, within=within)
+    ont = Ontology(path)
+    with atomic(ont) as s:
+        info = core_get_entity(s, iri, within=within)
         result = format_entity_inspect(iri, info)
 
         if within:
-            sel = get_selection(ont, within)
+            sel = get_selection(s, within)
             if sel.kind == SelectionKind.ENTITIES:
                 result += (
                     "\n\nNote: `within` with an entity selection has no filtering effect "
@@ -41,9 +43,9 @@ def get_entity(
                 )
 
         if into is not None:
-            hashes = axiom_hashes_for_entity(ont, iri, within=within)
+            hashes = axiom_hashes_for_entity(s, iri, within=within)
             source = f"get_entity(iri={str(iri)!r})"
-            upserted = upsert_selection(ont, into, SelectionKind.AXIOMS, hashes, source)
+            upserted = upsert_selection(s, into, SelectionKind.AXIOMS, hashes, source)
             sel = upserted.selection
             sel_msg = f"\n\n{sel.size} axiom hashes -> {sel.locked!r}."
             if upserted.previous_size is not None:

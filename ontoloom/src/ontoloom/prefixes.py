@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
-from ontoloom.connection import Metadata, Ontology, escape_like
+from ontoloom.connection import Metadata, Session, escape_like
 from ontoloom.errors import BadRequestError, OntoloomError, StoreCorruptionError
 
 
@@ -20,13 +20,8 @@ class SetPrefixResult:
     in_use_count: int
 
 
-# A: prefixes are simple, we should just create a prefix table, then metadata can live in a metadata file and not with prefixes like here!
-
-
-def _get_metadata(
-    ont: Ontology,
-) -> Metadata:  # A global: again, return type hitns not needed for simple stuff like this
-    row = ont.conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
+def _get_metadata(s: Session) -> Metadata:
+    row = s.conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
     try:
         return Metadata.model_validate_json(row[0])
     except ValidationError as e:
@@ -34,76 +29,55 @@ def _get_metadata(
         raise StoreCorruptionError(msg, e) from e
 
 
-def _save_metadata(ont: Ontology, meta: Metadata) -> None:
-    ont.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
+def _save_metadata(s: Session, meta: Metadata):
+    s.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
 
 
-def list_prefixes(
-    ont: Ontology,
-) -> dict[
-    str, str
-]:  # A global: list_all is ambiguous if you import * from prefixes, so make sure it looks similar to all other prefixes functions.
-    return _get_metadata(ont).prefixes
+def list_prefixes(s: Session) -> dict[str, str]:
+    return _get_metadata(s).prefixes
 
 
-def set_prefix(ont: Ontology, name: str, iri: str, *, force: bool = False) -> SetPrefixResult:
-    with ont.conn:
-        meta = _get_metadata(ont)
-        previous_iri = meta.prefixes.get(name)
+def set_prefix(s: Session, name: str, iri: str) -> SetPrefixResult:
+    """Save a prefix mapping. Reports the previous IRI and how many entities used it."""
+    meta = _get_metadata(s)
+    previous_iri = meta.prefixes.get(name)
+    in_use_count = 0
 
-        in_use_count = 0
-        if previous_iri is not None and previous_iri != iri:
-            in_use_count = ont.conn.execute(
-                "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
-                "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
-                (escape_like(name),),
-            ).fetchone()[0]
-
-            if in_use_count > 0 and not force:
-                msg = (
-                    f"Cannot reassign prefix {name!r}: {in_use_count} entities still use it. "
-                    f"Pass force=true to override."
-                )
-                raise BadRequestError(msg)
-
-        _save_metadata(ont, meta.model_copy(update={"prefixes": {**meta.prefixes, name: iri}}))
-
-        return SetPrefixResult(previous_iri=previous_iri, in_use_count=in_use_count)
-
-
-def remove_prefix(ont: Ontology, name: str) -> None:
-    with ont.conn:
-        meta = _get_metadata(ont)
-        if name not in meta.prefixes:
-            raise PrefixNotFoundError(name)
-
-        # A: there should be a function we can use for this! why do we manually query again here?
-
-        count = ont.conn.execute(
+    if previous_iri is not None and previous_iri != iri:
+        in_use_count = s.conn.execute(
             "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
             "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
             (escape_like(name),),
         ).fetchone()[0]
-        if count > 0:
-            msg = f"Cannot remove prefix {name!r}: {count} entities still use it."
-            raise BadRequestError(msg)
 
-        new_prefixes = {k: v for k, v in meta.prefixes.items() if k != name}
-        _save_metadata(ont, meta.model_copy(update={"prefixes": new_prefixes}))
+    _save_metadata(s, meta.model_copy(update={"prefixes": {**meta.prefixes, name: iri}}))
+    return SetPrefixResult(previous_iri=previous_iri, in_use_count=in_use_count)
 
 
-def prefix_usage_counts(ont: Ontology) -> dict[str, int]:
-    # A: usage_counts is a bad name, also dict[str, int] is kinda bad. not sure what else to use tho!
-    """Count how many distinct entities use each registered prefix namespace.
+def remove_prefix(s: Session, name: str):
+    meta = _get_metadata(s)
+    if name not in meta.prefixes:
+        raise PrefixNotFoundError(name)
 
-    Entity IRIs are stored as CURIEs (prefix:local_name); a single GROUP BY on
-    the substring before the first colon avoids the per-prefix N+1.
-    Unregistered prefixes appearing in the DB are dropped on the join.
-    """
-    registered = list_prefixes(ont)
-    db_counts = {  # A global: consider if it makes sense to include iri in axiom_entities as well? like iri and local_name field? talk with me
+    count = s.conn.execute(
+        "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
+        "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
+        (escape_like(name),),
+    ).fetchone()[0]
+    if count > 0:
+        msg = f"Cannot remove prefix {name!r}: {count} entities still use it."
+        raise BadRequestError(msg)
+
+    new_prefixes = {k: v for k, v in meta.prefixes.items() if k != name}
+    _save_metadata(s, meta.model_copy(update={"prefixes": new_prefixes}))
+
+
+def prefix_usage_counts(s: Session) -> dict[str, int]:
+    """Count how many distinct entities use each registered prefix namespace."""
+    registered = list_prefixes(s)
+    db_counts = {
         row[0]: row[1]
-        for row in ont.conn.execute(
+        for row in s.conn.execute(
             "SELECT substr(entity_iri, 1, instr(entity_iri, ':') - 1) AS prefix, "
             "COUNT(DISTINCT entity_iri) "
             "FROM axiom_entities WHERE instr(entity_iri, ':') > 0 "

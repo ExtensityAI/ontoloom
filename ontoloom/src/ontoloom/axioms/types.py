@@ -51,3 +51,8 @@ class RenameResult:
     new_iri: str
     replaced: tuple[ReplaceResult, ...]
     batch_id: str
+
+    @property
+    def colliding_hashes(self) -> tuple[str, ...]:
+        """New hashes whose insertion was a no-op because an axiom with that hash already existed."""
+        return tuple(sorted(r.new.hash for r in self.replaced if r.was_merged_into_existing))

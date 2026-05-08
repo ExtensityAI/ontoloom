@@ -30,6 +30,7 @@ from ontoloom.owl.literals import (
 )
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
+from ontoloom.transactions import atomic
 
 # -- Annotation exclusion --
 
@@ -174,13 +175,19 @@ def test_data_intersection_operand_order_irrelevant():
     ax1 = DataPropertyRange(
         data_property=IRI("ex:hasAge"),
         range=DataIntersectionOf(
-            operands=(DataTypeRef(datatype=DataType.INTEGER), DataTypeRef(datatype=DataType.DECIMAL))
+            operands=(
+                DataTypeRef(datatype=DataType.INTEGER),
+                DataTypeRef(datatype=DataType.DECIMAL),
+            )
         ),
     )
     ax2 = DataPropertyRange(
         data_property=IRI("ex:hasAge"),
         range=DataIntersectionOf(
-            operands=(DataTypeRef(datatype=DataType.DECIMAL), DataTypeRef(datatype=DataType.INTEGER))
+            operands=(
+                DataTypeRef(datatype=DataType.DECIMAL),
+                DataTypeRef(datatype=DataType.INTEGER),
+            )
         ),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
@@ -270,12 +277,12 @@ def test_canonical_idempotent():
 def test_selection_hash_order_independent(tmp_path):
     path = tmp_path / "test.db"
     Ontology.create(path)
-    with Ontology(path) as ont:
+    with atomic(Ontology(path)) as s:
         h1 = upsert_selection(
-            ont, "s1", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
+            s, "s1", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
         ).selection.hash
         h2 = upsert_selection(
-            ont, "s2", SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
+            s, "s2", SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
         ).selection.hash
         assert h1 == h2
 
@@ -299,14 +306,15 @@ def test_selection_pagination_stable_across_processes(tmp_path):
         from ontoloom.selections.store import create_selection, read_selection, upsert_selection
         from ontoloom.selections.types import SelectionKind, SelectionName
         from ontoloom.connection import Ontology
+        from ontoloom.transactions import atomic
 
-        with Ontology(Path({str(db_path)!r})) as ont:
-            upsert_selection(ont, "a", SelectionKind.ENTITIES,
+        with atomic(Ontology(Path({str(db_path)!r}))) as s:
+            upsert_selection(s, "a", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
-            upsert_selection(ont, "b", SelectionKind.ENTITIES,
+            upsert_selection(s, "b", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
-            create_selection(ont, "r", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
-            page = read_selection(ont, "r", limit=5)
+            create_selection(s, "r", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
+            page = read_selection(s, "r", limit=5)
             print(",".join(item.key for item in page.items))
     """)
 

@@ -1,6 +1,7 @@
 from ontoloom.connection import Ontology
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.history import show_changes as core_show_changes
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -15,8 +16,9 @@ def show_changes(
     Lists all mutation events: adds, deletes, replaces, annotation edits.
     Replace events show old->new hash mapping. Grouped by batch where applicable.
     """
-    with Ontology(path) as ont:
-        events = core_show_changes(ont, session_id=session)
+    ont = Ontology(path)
+    with atomic(ont) as s:
+        events = core_show_changes(s, session_id=session)
 
     if not events:
         return "No changes in this session."

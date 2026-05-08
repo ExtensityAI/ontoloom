@@ -16,7 +16,6 @@ from ontoloom.connection import (
     OntologyExistsError,
     OntologyNotFoundError,
     OntologySchemaError,
-    StoreNotOpenError,
 )
 from ontoloom.entities.store import (
     EntityNotFoundError,
@@ -60,21 +59,22 @@ from ontoloom.selections.store import (
     upsert_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.transactions import atomic
 from pydantic import TypeAdapter
 
 
 @pytest.fixture()
-def ont(tmp_path):
+def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with Ontology(path) as o:
-        yield o
+    with atomic(Ontology(path)) as session:
+        yield session
 
 
 @pytest.fixture()
-def populated(ont):
+def populated(s):
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
@@ -97,13 +97,13 @@ def populated(ont):
             ),
         ],
     )
-    return ont
+    return s
 
 
 # -- Logical hashing --
 
 
-def test_annotations_do_not_affect_dedup(ont):
+def test_annotations_do_not_affect_dedup(s):
     ax1 = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -113,19 +113,19 @@ def test_annotations_do_not_affect_dedup(ont):
         super_class=IRI("ex:Animal"),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note")),),
     )
-    result1 = add_axioms(ont, [ax1])
+    result1 = add_axioms(s, [ax1])
     assert len(result1.added) == 1
 
-    result2 = add_axioms(ont, [ax2])
+    result2 = add_axioms(s, [ax2])
     assert len(result2.skipped) == 1
     assert len(result2.added) == 0
     assert result1.added[0].hash == result2.skipped[0].hash
 
 
-def test_set_semantic_dedup(ont):
+def test_set_semantic_dedup(s):
     ax1 = EquivalentClasses(equivalent_classes=(IRI("ex:A"), IRI("ex:B")))
     ax2 = EquivalentClasses(equivalent_classes=(IRI("ex:B"), IRI("ex:A")))
-    result = add_axioms(ont, [ax1, ax2])
+    result = add_axioms(s, [ax1, ax2])
     assert len(result.added) == 1
     assert len(result.skipped) == 1
 
@@ -133,16 +133,16 @@ def test_set_semantic_dedup(ont):
 # -- Annotate axiom --
 
 
-def test_annotate_axiom_updates_in_place(ont):
+def test_annotate_axiom_updates_in_place(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    result = add_axioms(ont, [ax])
+    result = add_axioms(s, [ax])
     h = result.added[0].hash
 
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="important"))
-    updated = annotate_axiom(ont, h, add_annotations=[ann])
+    updated = annotate_axiom(s, h, add_annotations=[ann])
 
     assert updated.hash == h
     assert len(updated.axiom.annotations) == 1
@@ -151,58 +151,58 @@ def test_annotate_axiom_updates_in_place(ont):
     assert annotation_value.value == "important"
 
 
-def test_annotate_axiom_remove(ont):
+def test_annotate_axiom_remove(s):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
-    result = add_axioms(ont, [ax])
+    result = add_axioms(s, [ax])
     h = result.added[0].hash
 
-    updated = annotate_axiom(ont, h, remove_annotations=[ann])
+    updated = annotate_axiom(s, h, remove_annotations=[ann])
     assert len(updated.axiom.annotations) == 0
 
 
-def test_annotate_nonexistent_raises(ont):
+def test_annotate_nonexistent_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        annotate_axiom(ont, "deadbeef", add_annotations=[])
+        annotate_axiom(s, "deadbeef", add_annotations=[])
 
 
 # -- Annotation preservation across content-hash changes --
 
 
-def test_replace_preserves_old_annotations(ont):
+def test_replace_preserves_old_annotations(s):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
     old = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
-    add_axioms(ont, [old])
+    add_axioms(s, [old])
     old_h = HashedAxiom.of(old).hash
 
     new = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Mammal"),
     )
-    result = replace_axiom(ont, old_h, new)
+    result = replace_axiom(s, old_h, new)
     assert not result.was_noop
 
-    row = ont.conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
     ).fetchone()
     stored = json.loads(row[0])
     assert stored["annotations"] == [ann.model_dump(mode="json")]
 
 
-def test_replace_discards_new_axiom_annotations(ont):
+def test_replace_discards_new_axiom_annotations(s):
     old = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [old])
+    add_axioms(s, [old])
     old_h = HashedAxiom.of(old).hash
 
     new = SubClassOf(
@@ -210,9 +210,9 @@ def test_replace_discards_new_axiom_annotations(ont):
         super_class=IRI("ex:Mammal"),
         annotations=(Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="ignored")),),
     )
-    result = replace_axiom(ont, old_h, new)
+    result = replace_axiom(s, old_h, new)
 
-    row = ont.conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -220,9 +220,9 @@ def test_replace_discards_new_axiom_annotations(ont):
     assert stored["annotations"] == []
 
 
-def test_rename_iri_rejects_entity_selection(ont):
+def test_rename_iri_rejects_entity_selection(s):
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
             SubClassOf(
@@ -231,34 +231,34 @@ def test_rename_iri_rejects_entity_selection(ont):
             ),
         ],
     )
-    h = upsert_selection(ont, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
+    h = upsert_selection(s, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
     locked = LockedSelection(f"dogs@{h}")
 
     with pytest.raises(SelectionKindError):
-        rename_iri(ont, "ex:Animal", "ex:Mammal", within=locked)
+        rename_iri(s, "ex:Animal", "ex:Mammal", within=locked)
 
 
-def test_rename_iri_preserves_annotations(ont):
+def test_rename_iri_preserves_annotations(s):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="kept"))
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
 
-    result = rename_iri(ont, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, "ex:Animal", "ex:Mammal")
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    row = ont.conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
     ).fetchone()
     stored = json.loads(row[0])
     assert stored["annotations"] == [ann.model_dump(mode="json")]
 
 
-def test_rename_iri_does_not_corrupt_literal_values(ont):
+def test_rename_iri_does_not_corrupt_literal_values(s):
     # AnnotationAssertion whose subject IS the renamed IRI and whose value string
     # coincidentally equals it. Only the IRI-typed subject field must be rewritten.
     ax = AnnotationAssertion(
@@ -266,12 +266,12 @@ def test_rename_iri_does_not_corrupt_literal_values(ont):
         subject=IRI("ex:Animal"),
         value=LangLiteral(value="ex:Animal"),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
 
-    result = rename_iri(ont, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, "ex:Animal", "ex:Mammal")
     assert len(result.replaced) == 1
 
-    row = ont.conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -279,32 +279,32 @@ def test_rename_iri_does_not_corrupt_literal_values(ont):
     assert stored["value"]["value"] == "ex:Animal"  # literal value unchanged
 
 
-def test_rename_iri_noop_when_iri_absent(ont):
+def test_rename_iri_noop_when_iri_absent(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
 
-    result = rename_iri(ont, "ex:Cat", "ex:Kitten")
+    result = rename_iri(s, "ex:Cat", "ex:Kitten")
     assert result.replaced == ()
 
 
 # -- Entity selection present_count --
 
 
-def test_entity_selection_present_count_punned_entity(ont):
+def test_entity_selection_present_count_punned_entity(s):
     # A punned entity has two Declaration axioms (Class + NamedIndividual).
     # present_count must be 1 (one entity in the selection), not 2.
     from ontoloom.owl.axioms import Declaration
 
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Pun")),
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:Pun")),
         ],
     )
-    upsert_selection(ont, "punned", SelectionKind.ENTITIES, ["ex:Pun"], "test")
+    upsert_selection(s, "punned", SelectionKind.ENTITIES, ["ex:Pun"], "test")
 
-    page = read_selection(ont, "punned")
+    page = read_selection(s, "punned")
     assert page.present >= 0
     assert page.missing >= 0
     assert page.present + page.missing == page.meta.size
@@ -328,11 +328,11 @@ def test_locked_selection_min_prefix_length():
 # -- Event log --
 
 
-def test_events_logged_on_add(ont):
+def test_events_logged_on_add(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
 
-    cur = ont.conn.cursor()
+    cur = s.conn.cursor()
     cur.execute("SELECT op, axiom_hash FROM events")
     events = cur.fetchall()
     assert len(events) == 1
@@ -340,14 +340,14 @@ def test_events_logged_on_add(ont):
     assert events[0][1] == HashedAxiom.of(ax).hash
 
 
-def test_events_logged_on_remove(ont):
+def test_events_logged_on_remove(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    result = add_axioms(ont, [ax])
+    result = add_axioms(s, [ax])
     h = result.added[0].hash
 
-    remove_axioms_by_hash(ont, [h[:8]])
+    remove_axioms_by_hash(s, [h[:8]])
 
-    cur = ont.conn.cursor()
+    cur = s.conn.cursor()
     cur.execute("SELECT op, axiom_hash FROM events ORDER BY sequence_id")
     events = cur.fetchall()
     assert len(events) == 2
@@ -355,18 +355,18 @@ def test_events_logged_on_remove(ont):
     assert events[1] == ("del", h)
 
 
-def test_events_logged_on_annotate(ont):
+def test_events_logged_on_annotate(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    result = add_axioms(ont, [ax])
+    result = add_axioms(s, [ax])
     h = result.added[0].hash
 
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
-    annotate_axiom(ont, h, add_annotations=[ann])
+    annotate_axiom(s, h, add_annotations=[ann])
 
-    cur = ont.conn.cursor()
+    cur = s.conn.cursor()
     cur.execute("SELECT op, axiom_hash FROM events ORDER BY sequence_id")
     events = cur.fetchall()
     assert len(events) == 2
@@ -374,11 +374,11 @@ def test_events_logged_on_annotate(ont):
     assert events[1] == ("annotate", h)
 
 
-def test_session_id_set(ont):
+def test_session_id_set(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
 
-    cur = ont.conn.cursor()
+    cur = s.conn.cursor()
     cur.execute("SELECT session_id FROM events")
     session_id = cur.fetchone()[0]
     assert session_id is not None
@@ -388,62 +388,52 @@ def test_session_id_set(ont):
 # -- Prefix management --
 
 
-def test_set_and_list_prefixes(ont):
-    set_prefix(ont, "ex", "http://example.org/")
-    set_prefix(ont, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
-    assert list_prefixes(ont) == {
+def test_set_and_list_prefixes(s):
+    set_prefix(s, "ex", "http://example.org/")
+    set_prefix(s, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+    assert list_prefixes(s) == {
         "ex": "http://example.org/",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     }
 
 
-def test_set_prefix_overwrites_when_unused(ont):
-    set_prefix(ont, "ex", "http://example.org/v1/")
-    set_prefix(ont, "ex", "http://example.org/v2/")
-    assert list_prefixes(ont)["ex"] == "http://example.org/v2/"
+def test_set_prefix_overwrites_when_unused(s):
+    set_prefix(s, "ex", "http://example.org/v1/")
+    set_prefix(s, "ex", "http://example.org/v2/")
+    assert list_prefixes(s)["ex"] == "http://example.org/v2/"
 
 
-def test_set_prefix_idempotent(ont):
-    result = set_prefix(ont, "ex", "http://example.org/")
+def test_set_prefix_idempotent(s):
+    result = set_prefix(s, "ex", "http://example.org/")
     assert result.previous_iri is None
 
-    result = set_prefix(ont, "ex", "http://example.org/")
+    result = set_prefix(s, "ex", "http://example.org/")
     assert result.previous_iri == "http://example.org/"
     assert result.in_use_count == 0
 
 
-def test_set_prefix_refuses_reassign_when_in_use(ont):
-    set_prefix(ont, "ex", "http://example.org/v1/")
-    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+def test_set_prefix_reassigns_and_reports_in_use_count(s):
+    set_prefix(s, "ex", "http://example.org/v1/")
+    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
 
-    with pytest.raises(BadRequestError, match="1 entities still use it"):
-        set_prefix(ont, "ex", "http://example.org/v2/")
-
-    assert list_prefixes(ont)["ex"] == "http://example.org/v1/"
-
-
-def test_set_prefix_force_reassigns_when_in_use(ont):
-    set_prefix(ont, "ex", "http://example.org/v1/")
-    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-
-    result = set_prefix(ont, "ex", "http://example.org/v2/", force=True)
+    result = set_prefix(s, "ex", "http://example.org/v2/")
     assert result.previous_iri == "http://example.org/v1/"
     assert result.in_use_count == 1
-    assert list_prefixes(ont)["ex"] == "http://example.org/v2/"
+    assert list_prefixes(s)["ex"] == "http://example.org/v2/"
 
 
-def test_remove_prefix(ont):
-    set_prefix(ont, "ex", "http://example.org/")
-    set_prefix(ont, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
-    remove_prefix(ont, "ex")
-    result = list_prefixes(ont)
+def test_remove_prefix(s):
+    set_prefix(s, "ex", "http://example.org/")
+    set_prefix(s, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+    remove_prefix(s, "ex")
+    result = list_prefixes(s)
     assert "ex" not in result
     assert "rdfs" in result
 
 
-def test_remove_nonexistent_prefix_raises(ont):
+def test_remove_nonexistent_prefix_raises(s):
     with pytest.raises(PrefixNotFoundError):
-        remove_prefix(ont, "nonexistent")
+        remove_prefix(s, "nonexistent")
 
 
 # -- search_entities --
@@ -513,7 +503,7 @@ def test_export_jsonl(populated, tmp_path):
 # -- entity_text cleanup regression --
 
 
-def test_entity_text_survives_partial_removal(ont):
+def test_entity_text_survives_partial_removal(s):
     """Removing one axiom that mentions an entity must not break search for that entity
     if other axioms still reference it."""
     ax1 = SubClassOf(
@@ -521,14 +511,14 @@ def test_entity_text_survives_partial_removal(ont):
         super_class=IRI("ex:Animal"),
     )
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    result = add_axioms(ont, [ax1, ax2])
+    result = add_axioms(s, [ax1, ax2])
 
     # Remove the SubClassOf but keep the Declaration
     subclassof_hash = next(ha.hash for ha in result.added if ha.axiom.tag() == "SubClassOf")
-    remove_axioms_by_hash(ont, [subclassof_hash[:8]])
+    remove_axioms_by_hash(s, [subclassof_hash[:8]])
 
     # ex:Dog should still be searchable (Declaration still references it)
-    page = search_entities(ont, query="Dog", limit=10)
+    page = search_entities(s, query="Dog", limit=10)
     iris = [m.iri for m in page.matches]
     assert IRI("ex:Dog") in iris
 
@@ -552,10 +542,10 @@ def test_get_entity_found(populated):
     assert "SubClassOf" in info.axiom_counts
 
 
-def test_get_entity_not_found(ont):
+def test_get_entity_not_found(s):
 
     with pytest.raises(EntityNotFoundError):
-        get_entity(ont, IRI("ex:NonExistent"))
+        get_entity(s, IRI("ex:NonExistent"))
 
 
 def test_get_entity_not_found_includes_near_matches(populated):
@@ -569,15 +559,15 @@ def test_get_entity_not_found_includes_near_matches(populated):
 # -- remove error cases --
 
 
-def test_remove_not_found_raises(ont):
+def test_remove_not_found_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        remove_axioms_by_hash(ont, ["deadbeef"])
+        remove_axioms_by_hash(s, ["deadbeef"])
 
 
-def test_remove_ambiguous_prefix_raises(ont):
+def test_remove_ambiguous_prefix_raises(s):
     """An empty prefix is rejected as invalid hex."""
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B")),
@@ -585,7 +575,7 @@ def test_remove_ambiguous_prefix_raises(ont):
     )
     # Empty prefix matches everything via GLOB '*'
     with pytest.raises(InvalidHashError):
-        remove_axioms_by_hash(ont, [""])
+        remove_axioms_by_hash(s, [""])
 
 
 # -- annotate searchability --
@@ -611,46 +601,46 @@ def test_export_jsonl_roundtrip(populated, tmp_path):
 # -- INSTR safety --
 
 
-def test_search_with_like_wildcards(ont):
+def test_search_with_like_wildcards(s):
     """Search queries containing % and _ should match literally, not as wildcards."""
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Rate100Percent")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Rate100Points")),
         ],
     )
     # "100%" should NOT match "100Points" -> the % must be literal
-    page = search_entities(ont, query="100%", limit=10)
+    page = search_entities(s, query="100%", limit=10)
     for m in page.matches:
         assert "100%" in str(m.iri) or "100%" in m.iri.local_name
 
 
-def test_namespace_filter_escapes_underscore(ont):
+def test_namespace_filter_escapes_underscore(s):
     """Underscore in a prefix must be matched literally, not as SQL LIKE wildcard."""
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("a_b:X")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("aXb:Y")),
         ],
     )
-    iris = collect_entity_iris(ont, namespace="a_b")
+    iris = collect_entity_iris(s, namespace="a_b")
     # Without ESCAPE, `a_b:%` would match `aXb:Y` because `_` is a LIKE wildcard.
     assert "a_b:X" in iris
     assert "aXb:Y" not in iris
 
 
-def test_remove_selections_by_pattern(ont):
-    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    upsert_selection(ont, "audit_one", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    upsert_selection(ont, "audit_two", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    upsert_selection(ont, "keep", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+def test_remove_selections_by_pattern(s):
+    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+    upsert_selection(s, "audit_one", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, "audit_two", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, "keep", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
-    dropped = remove_selections_by_pattern(ont, "audit_*")
+    dropped = remove_selections_by_pattern(s, "audit_*")
     names = [d.name for d in dropped]
     assert names == ["audit_one", "audit_two"]
-    assert {s.name for s in list_selections(ont)} == {"keep"}
+    assert {s.name for s in list_selections(s)} == {"keep"}
 
 
 # -- IRI validation --
@@ -708,14 +698,6 @@ def test_open_nonexistent_raises(tmp_path):
         Ontology(path)
 
 
-def test_conn_outside_context_raises(tmp_path):
-    path = tmp_path / "test.db"
-    Ontology.create(path)
-    o = Ontology(path)
-    with pytest.raises(StoreNotOpenError):
-        _ = o.conn
-
-
 def test_workspace_root_blocks_outside(tmp_path, monkeypatch):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
@@ -738,16 +720,16 @@ def test_workspace_root_allows_inside(tmp_path, monkeypatch):
 
     inside = workspace / "ok.db"
     Ontology.create(inside)
-    with Ontology(inside) as ont:
-        assert ont.conn is not None
+    with atomic(Ontology(inside)) as session:
+        assert session.conn is not None
 
 
 def test_workspace_root_unset_unrestricted(tmp_path, monkeypatch):
     monkeypatch.setattr("ontoloom.connection.WORKSPACE_ROOT", None)
     path = tmp_path / "anywhere.db"
     Ontology.create(path)
-    with Ontology(path) as ont:
-        assert ont.conn is not None
+    with atomic(Ontology(path)) as session:
+        assert session.conn is not None
 
 
 def test_open_non_ontoloom_db_raises(tmp_path):
@@ -758,54 +740,54 @@ def test_open_non_ontoloom_db_raises(tmp_path):
     conn.execute("CREATE TABLE foo (id INTEGER)")
     conn.close()
 
-    with pytest.raises(OntologySchemaError), Ontology(path):
+    with pytest.raises(OntologySchemaError), atomic(Ontology(path)):
         pass
 
 
 # -- Batch remove atomicity --
 
 
-def test_batch_remove_multiple(ont):
+def test_batch_remove_multiple(s):
     ax1 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B"))
-    result = add_axioms(ont, [ax1, ax2])
+    result = add_axioms(s, [ax1, ax2])
     h1 = result.added[0].hash
     h2 = result.added[1].hash
 
-    removed = remove_axioms_by_hash(ont, [h1[:8], h2[:8]])
+    removed = remove_axioms_by_hash(s, [h1[:8], h2[:8]])
     assert len(removed.removed) == 2
 
 
-def test_batch_remove_rollback_on_failure(ont):
+def test_batch_remove_rollback_on_failure(s):
     """If one prefix in a batch fails, none should be removed."""
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
-    result = add_axioms(ont, [ax])
+    result = add_axioms(s, [ax])
     h = result.added[0].hash
 
     with pytest.raises(AxiomNotFoundError):
-        remove_axioms_by_hash(ont, [h[:8], "deadbeef"])
+        remove_axioms_by_hash(s, [h[:8], "deadbeef"])
 
     # The first axiom should still exist (rollback)
-    count = ont.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
+    count = s.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
     assert count == 1
 
 
 # -- Hash prefix validation --
 
 
-def test_remove_rejects_non_hex_prefix(ont):
+def test_remove_rejects_non_hex_prefix(s):
     with pytest.raises(InvalidHashError):
-        remove_axioms_by_hash(ont, ["not*hex"])
+        remove_axioms_by_hash(s, ["not*hex"])
 
 
 # -- Selection: entities_in with field (position filter) --
 
 
 @pytest.fixture()
-def axiom_selection(ont):
+def axiom_selection(s):
     """Create an axiom selection containing SubClassOf and ObjectSomeValuesFrom axioms."""
     result = add_axioms(
-        ont,
+        s,
         [
             SubClassOf(
                 sub_class=IRI("ex:Dog"),
@@ -821,8 +803,8 @@ def axiom_selection(ont):
         ],
     )
     hashes = [ha.hash for ha in result.added]
-    upsert_selection(ont, "ax_sel", SelectionKind.AXIOMS, hashes, "test")
-    return ont
+    upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, hashes, "test")
+    return s
 
 
 def test_entities_in_with_field_sub_class(axiom_selection):
@@ -893,13 +875,13 @@ def test_entities_in_without_field(axiom_selection):
 # -- Prefix usage counts --
 
 
-def test_prefix_usage_counts(ont):
-    set_prefix(ont, "ex", "http://example.org/")
-    set_prefix(ont, "other", "http://other.org/")
-    set_prefix(ont, "unused", "http://unused.org/")
+def test_prefix_usage_counts(s):
+    set_prefix(s, "ex", "http://example.org/")
+    set_prefix(s, "other", "http://other.org/")
+    set_prefix(s, "unused", "http://unused.org/")
 
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
@@ -907,7 +889,7 @@ def test_prefix_usage_counts(ont):
         ],
     )
 
-    counts = prefix_usage_counts(ont)
+    counts = prefix_usage_counts(s)
     assert counts["ex"] == 2
     assert counts["other"] == 1
     assert counts["unused"] == 0
@@ -916,35 +898,33 @@ def test_prefix_usage_counts(ont):
 # -- P-03-5: AmbiguousHashError and StoreCorruptionError --
 
 
-def test_ambiguous_hash_error(ont):
+def test_ambiguous_hash_error(s):
     prefix = "aaaa"
     h1 = prefix + "0" * 60
     h2 = prefix + "1" + "0" * 59
-    with ont.conn:
-        ont.conn.execute(
-            "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-            (h1, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
-        )
-        ont.conn.execute(
-            "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-            (h2, '{"type":"Declaration","iri":"ex:Y","entity_type":"Class","annotations":[]}'),
-        )
+    s.conn.execute(
+        "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
+        (h1, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+    )
+    s.conn.execute(
+        "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
+        (h2, '{"type":"Declaration","iri":"ex:Y","entity_type":"Class","annotations":[]}'),
+    )
 
     with pytest.raises(AmbiguousHashError) as exc_info:
-        remove_axioms_by_hash(ont, [prefix])
+        remove_axioms_by_hash(s, [prefix])
     assert exc_info.value.count == 2
     assert exc_info.value.prefix == prefix
 
 
-def test_store_corruption_error(ont):
+def test_store_corruption_error(s):
     h = "b" * 64
-    with ont.conn:
-        ont.conn.execute(
-            "INSERT INTO axioms (hash, type, data) VALUES (?, 'Unknown', jsonb(?))",
-            (h, '{"type":"UnknownAxiomType","garbage":true}'),
-        )
+    s.conn.execute(
+        "INSERT INTO axioms (hash, type, data) VALUES (?, 'Unknown', jsonb(?))",
+        (h, '{"type":"UnknownAxiomType","garbage":true}'),
+    )
 
-    row = ont.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     assert row is not None
     with pytest.raises(StoreCorruptionError):
         load_axiom(row[0], "test context")
@@ -980,33 +960,58 @@ def test_export_jsonl_byte_identical(populated, tmp_path):
 # -- P-03-7: rename_iri edge cases --
 
 
-def test_rename_iri_noop_same_iri(ont):
+def test_rename_iri_noop_same_iri(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
 
-    result = rename_iri(ont, "ex:Dog", "ex:Dog")
+    result = rename_iri(s, "ex:Dog", "ex:Dog")
     assert len(result.replaced) == 1
     assert result.replaced[0].was_noop is True
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
 
 
-def test_rename_iri_collision_with_existing(ont):
+def test_rename_iri_collision_with_existing(s):
     ax_old = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
     ax_new = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Mammal"))
-    add_axioms(ont, [ax_old, ax_new])
+    add_axioms(s, [ax_old, ax_new])
     old_h = HashedAxiom.of(ax_old).hash
     new_h = HashedAxiom.of(ax_new).hash
 
-    result = rename_iri(ont, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, "ex:Animal", "ex:Mammal")
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
 
 
-def test_rename_iri_scoped_to_selection(ont):
+def test_rename_iri_collision_sets_merged_flag_and_colliding_hashes(s):
+    ax_old = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    ax_new = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Mammal"))
+    add_axioms(s, [ax_old, ax_new])
+    new_h = HashedAxiom.of(ax_new).hash
+
+    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+
+    assert len(result.replaced) == 1
+    rep = result.replaced[0]
+    assert rep.was_merged_into_existing is True
+    assert result.colliding_hashes == (new_h,)
+
+
+def test_rename_iri_no_collision_has_empty_colliding_hashes(s):
+    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    add_axioms(s, [ax])
+
+    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+
+    assert len(result.replaced) == 1
+    assert result.replaced[0].was_merged_into_existing is False
+    assert result.colliding_hashes == ()
+
+
+def test_rename_iri_scoped_to_selection(s):
     ax_in = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -1015,24 +1020,24 @@ def test_rename_iri_scoped_to_selection(ont):
         sub_class=IRI("ex:Cat"),
         super_class=IRI("ex:Animal"),
     )
-    result = add_axioms(ont, [ax_in, ax_out])
+    result = add_axioms(s, [ax_in, ax_out])
     h_in = next(ha.hash for ha in result.added if ha.axiom == ax_in)
     h_out = HashedAxiom.of(ax_out).hash
 
-    sel_hash = upsert_selection(ont, "scope", SelectionKind.AXIOMS, [h_in], "test").selection.hash
+    sel_hash = upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test").selection.hash
     locked = LockedSelection(f"scope@{sel_hash[:8]}")
 
-    renamed = rename_iri(ont, "ex:Animal", "ex:Mammal", within=locked)
+    renamed = rename_iri(s, "ex:Animal", "ex:Mammal", within=locked)
     assert len(renamed.replaced) == 1
 
     # ax_out is outside the scope -> its hash should be unchanged
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
 
 
 # -- P-03-11: Additional small coverage gaps --
 
 
-def test_replace_to_existing_hash(ont):
+def test_replace_to_existing_hash(s):
     ax_a = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -1041,32 +1046,32 @@ def test_replace_to_existing_hash(ont):
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Mammal"),
     )
-    add_axioms(ont, [ax_a, ax_b])
+    add_axioms(s, [ax_a, ax_b])
     h_a = HashedAxiom.of(ax_a).hash
     h_b = HashedAxiom.of(ax_b).hash
 
-    result = replace_axiom(ont, h_a[:8], ax_b)
+    result = replace_axiom(s, h_a[:8], ax_b)
     assert not result.was_noop
     assert result.new_hash == h_b
 
     # Old axiom gone; new (pre-existing) axiom survives unmodified
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
 
 
-def test_prefix_remove_while_in_use(ont):
-    set_prefix(ont, "ex", "http://example.org/")
-    add_axioms(ont, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+def test_prefix_remove_while_in_use(s):
+    set_prefix(s, "ex", "http://example.org/")
+    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
 
     with pytest.raises(BadRequestError, match="Cannot remove prefix"):
-        remove_prefix(ont, "ex")
+        remove_prefix(s, "ex")
 
-    assert "ex" in list_prefixes(ont)
+    assert "ex" in list_prefixes(s)
 
 
-def test_find_duplicates_tie_break_order(ont):
+def test_find_duplicates_tie_break_order(s):
     add_axioms(
-        ont,
+        s,
         [
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B")),
@@ -1087,19 +1092,19 @@ def test_find_duplicates_tie_break_order(ont):
         ],
     )
 
-    result = find_duplicate_entities(ont, "rdfs:label")
+    result = find_duplicate_entities(s, "rdfs:label")
     assert result.total_groups == 2
     # Groups have equal count; stable sort preserves SQL text order → "Alpha" < "Beta"
     assert [g.value for g in result.groups] == ["Alpha", "Beta"]
 
 
-def test_unicode_iri_roundtrip(ont, tmp_path):
+def test_unicode_iri_roundtrip(s, tmp_path):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Ångström"))
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
 
     export_path = tmp_path / "uni.jsonl"
-    export_to_jsonl(ont, export_path)
+    export_to_jsonl(s, export_path)
 
     adapter = TypeAdapter(Axiom)
     lines = export_path.read_text().strip().split("\n")
@@ -1116,23 +1121,23 @@ def test_has_key_neither_properties_rejected():
         )
 
 
-def test_list_all_selections_order(ont):
+def test_list_all_selections_order(s):
     # Force identical created_at on two selections; tiebreaker by name must sort a_sel first.
-    upsert_selection(ont, "z_sel", SelectionKind.ENTITIES, ["ex:A"], "test")
-    upsert_selection(ont, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
-    ont.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
+    upsert_selection(s, "z_sel", SelectionKind.ENTITIES, ["ex:A"], "test")
+    upsert_selection(s, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
+    s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
-    names = [s.name for s in list_selections(ont)]
+    names = [s.name for s in list_selections(s)]
     assert names == ["a_sel", "z_sel"]
 
 
-def test_show_changes_sequence_id_order(ont):
+def test_show_changes_sequence_id_order(s):
     ax1 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B"))
-    add_axioms(ont, [ax1])
-    add_axioms(ont, [ax2])
+    add_axioms(s, [ax1])
+    add_axioms(s, [ax2])
 
-    events = show_changes(ont)
+    events = show_changes(s)
     assert len(events) >= 2
     seq_ids = [e.sequence_id for e in events]
     assert seq_ids == sorted(seq_ids)

@@ -2,7 +2,7 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ontoloom.connection import Ontology
+from ontoloom.connection import Session
 from ontoloom.errors import BadRequestError, OntoloomError
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.load import load_axiom
@@ -91,10 +91,10 @@ def _selection_hash(items: list[str]):
 
 
 def get_selection(
-    ont: Ontology, name: str
+    s: Session, name: str
 ) -> SelectionMeta:  # A global: again, return type can be inferred
     """Get selection metadata. Raises SelectionNotFoundError if not found."""
-    row = ont.conn.execute(
+    row = s.conn.execute(
         "SELECT kind, hash, size, source FROM selections WHERE name = ?", (name,)
     ).fetchone()
     if row is None:
@@ -109,16 +109,16 @@ def get_selection(
 
 
 # A: function is weird, verifies stuff but returns a selection meta? this is not good
-def verify_selection_hash(ont: Ontology, name: str, hash_prefix: str) -> SelectionMeta:
+def verify_selection_hash(s: Session, name: str, hash_prefix: str) -> SelectionMeta:
     """Verify selection hasn't changed. Raises StaleSelectionError on mismatch."""
-    sel = get_selection(ont, name)
+    sel = get_selection(s, name)
     if not sel.hash.startswith(hash_prefix):
         raise StaleSelectionError(name, hash_prefix, sel.hash)
     return sel
 
 
 def upsert_selection(
-    ont: Ontology,
+    s: Session,
     name: str,
     kind: SelectionKind,
     items: Sequence[str],
@@ -144,26 +144,25 @@ def upsert_selection(
     content_hash = _selection_hash(items)
     size = len(items)
 
-    with ont.conn:
-        existing = ont.conn.execute(  # A: same problem as with axioms, we may have unfortunate hash collision, so select all and if multiple error, just like with the axioms
-            "SELECT size, hash FROM selections WHERE name = ?", (name,)
-        ).fetchone()
+    existing = s.conn.execute(  # A: same problem as with axioms, we may have unfortunate hash collision, so select all and if multiple error, just like with the axioms
+        "SELECT size, hash FROM selections WHERE name = ?", (name,)
+    ).fetchone()
 
-        # A global: we need proper spacing, e.g. here, we have this condition (also, stuff like this requires a comment, else hard to understand)
-        if if_hash is not None and (existing is None or not existing[1].startswith(if_hash)):
-            raise StaleSelectionError(name, if_hash, existing[1] if existing else None)
-        # A global: I feel like these should be utility methods or sth? not sure, if only used here fine, but I feel like the delete op on the db could be moved out if used in multiple locations. in this way, do a pass for SQL that is used in multiple places, good candidates! also for code simplicity!
-        ont.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
-        ont.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
-        ont.conn.execute(
-            "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
-            (name, kind, content_hash, size, source),
+    if if_hash is not None and (existing is None or not existing[1].startswith(if_hash)):
+        raise StaleSelectionError(name, if_hash, existing[1] if existing else None)
+
+    s.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
+    s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+    s.conn.execute(
+        "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
+        (name, kind, content_hash, size, source),
+    )
+
+    if items:
+        s.conn.executemany(
+            "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
+            [(name, item) for item in items],
         )
-        if items:
-            ont.conn.executemany(
-                "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
-                [(name, item) for item in items],
-            )
 
     return UpsertResult(
         selection=SelectionMeta(
@@ -177,7 +176,7 @@ def upsert_selection(
     )
 
 
-def list_selections(ont: Ontology) -> list[SelectionMeta]:
+def list_selections(s: Session) -> list[SelectionMeta]:
     return [
         SelectionMeta(
             name=r[0],
@@ -186,20 +185,20 @@ def list_selections(ont: Ontology) -> list[SelectionMeta]:
             size=r[3],
             source=r[4],
         )
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             "SELECT name, kind, hash, size, source FROM selections ORDER BY created_at, name"
         )
     ]
 
 
 def read_selection(
-    ont: Ontology, name: str, *, limit: int = 20, offset: int = 0, show: ShowFilter = ShowFilter.ALL
+    s: Session, name: str, *, limit: int = 20, offset: int = 0, show: ShowFilter = ShowFilter.ALL
 ) -> SelectionPage:
     # A: judgement call, is there any better way to dynamic SQL building? this is a bit meh
     if limit < 1:
         msg = f"limit must be >= 1, got {limit}."
         raise BadRequestError(msg)
-    sel = get_selection(ont, name)
+    sel = get_selection(s, name)
 
     if sel.kind == SelectionKind.AXIOMS:
         base = (
@@ -212,13 +211,13 @@ def read_selection(
         elif show == ShowFilter.MISSING:
             base += " AND a.id IS NULL"
 
-        total = ont.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
-        rows = ont.conn.execute(
+        total = s.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
+        rows = s.conn.execute(
             f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
             (name, limit, offset),
         ).fetchall()
 
-        present_count = ont.conn.execute(
+        present_count = s.conn.execute(
             "SELECT COUNT(*) FROM selection_items si "
             "JOIN axioms a ON a.hash = si.item "
             "WHERE si.selection_name = ?",
@@ -257,13 +256,13 @@ def read_selection(
         elif show == ShowFilter.MISSING:
             base += " AND decl.entity_iri IS NULL"
 
-        total = ont.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
-        rows = ont.conn.execute(
+        total = s.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
+        rows = s.conn.execute(
             f"SELECT si.item, decl.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
             (name, limit, offset),
         ).fetchall()
 
-        present_count = ont.conn.execute(
+        present_count = s.conn.execute(
             "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
             "JOIN axiom_entities ae ON ae.entity_iri = si.item "
             "JOIN axioms a ON a.id = ae.axiom_id "
@@ -281,7 +280,7 @@ def read_selection(
         if present_iris:
             placeholders = ",".join("?" for _ in present_iris)
             roles_map.update(
-                ont.conn.execute(
+                s.conn.execute(
                     f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
                     f"JOIN axioms a ON a.id = ae.axiom_id "
                     f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
@@ -291,7 +290,7 @@ def read_selection(
             from ontoloom.entities.store import lookup_entity_labels as _lookup_labels
 
             labels_map.update(
-                {k: v for k, v in _lookup_labels(ont, present_iris).items() if v is not None}
+                {k: v for k, v in _lookup_labels(s, present_iris).items() if v is not None}
             )
 
         items = [
@@ -314,20 +313,20 @@ def read_selection(
     )
 
 
-def remove_selections(ont: Ontology, names: list[str]) -> RemoveSelectionsResult:
+def remove_selections(s: Session, names: list[str]) -> RemoveSelectionsResult:
     """Best-effort remove. Duplicate names in the input are de-duplicated."""
     # A: something feels off here, not sure what it is.
     names = list(dict.fromkeys(names))
     dropped: list[DroppedSelection] = []
     not_found: list[str] = []
-    with ont.conn:
-        for name in names:
-            row = ont.conn.execute("SELECT size FROM selections WHERE name = ?", (name,)).fetchone()
-            if row is None:
-                not_found.append(name)
-            else:
-                ont.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
-                dropped.append(DroppedSelection(name=name, size=row[0]))
+
+    for name in names:
+        row = s.conn.execute("SELECT size FROM selections WHERE name = ?", (name,)).fetchone()
+        if row is None:
+            not_found.append(name)
+        else:
+            s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+            dropped.append(DroppedSelection(name=name, size=row[0]))
     return RemoveSelectionsResult(dropped=tuple(dropped), not_found=tuple(not_found))
 
 
@@ -347,7 +346,7 @@ def _glob_to_like(pattern: str):
     return "".join(out)
 
 
-def remove_selections_by_pattern(ont: Ontology, pattern: str) -> list[DroppedSelection]:
+def remove_selections_by_pattern(s: Session, pattern: str) -> list[DroppedSelection]:
     # A: do we even need remove_by_pattern? I guess we do, but it seems to be complciated AND we have duplicate code here with the other remove/delete stuff?
     """Remove every selection whose name matches a glob pattern.
 
@@ -355,30 +354,29 @@ def remove_selections_by_pattern(ont: Ontology, pattern: str) -> list[DroppedSel
     removed selection in name order.
     """
     sql_pattern = _glob_to_like(pattern)
-    with ont.conn:
-        rows = ont.conn.execute(
-            "SELECT name, size FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
-            (sql_pattern,),
-        ).fetchall()
-        dropped = [DroppedSelection(name=r[0], size=r[1]) for r in rows]
-        for d in dropped:
-            ont.conn.execute("DELETE FROM selections WHERE name = ?", (d.name,))
+    rows = s.conn.execute(
+        "SELECT name, size FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
+        (sql_pattern,),
+    ).fetchall()
+    dropped = [DroppedSelection(name=r[0], size=r[1]) for r in rows]
+    for d in dropped:
+        s.conn.execute("DELETE FROM selections WHERE name = ?", (d.name,))
     return dropped
 
 
-def create_selection(ont: Ontology, name: str, expr: SetExpr, *, source: str = "") -> UpsertResult:
+def create_selection(s: Session, name: str, expr: SetExpr, *, source: str = "") -> UpsertResult:
     """Create a selection by evaluating a SetExpr tree."""
-    items, kind = _eval_expr(ont, expr)
+    items, kind = _eval_expr(s, expr)
     auto_source = source or str(expr)
-    return upsert_selection(ont, name, kind, items, auto_source)
+    return upsert_selection(s, name, kind, items, auto_source)
 
 
-def _eval_expr(ont: Ontology, expr: SetOperand) -> tuple[list[str], SelectionKind]:
+def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
     if isinstance(expr, str):
-        sel = get_selection(ont, expr)
+        sel = get_selection(s, expr)
         items = [
             r[0]
-            for r in ont.conn.execute(
+            for r in s.conn.execute(
                 "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
                 (expr,),
             )
@@ -386,32 +384,32 @@ def _eval_expr(ont: Ontology, expr: SetOperand) -> tuple[list[str], SelectionKin
         return items, sel.kind
 
     if isinstance(expr, UnionExpr):
-        return _eval_set_op(ont, expr.union, SetOp.UNION)
+        return _eval_set_op(s, expr.union, SetOp.UNION)
     if isinstance(expr, IntersectExpr):
-        return _eval_set_op(ont, expr.intersect, SetOp.INTERSECTION)
+        return _eval_set_op(s, expr.intersect, SetOp.INTERSECTION)
     if isinstance(expr, DiffExpr):
-        return _eval_set_op(ont, expr.diff, SetOp.DIFFERENCE)
+        return _eval_set_op(s, expr.diff, SetOp.DIFFERENCE)
 
     if isinstance(expr, AxiomsForExpr):
-        items, kind = _eval_expr(ont, expr.axioms_for)
+        items, kind = _eval_expr(s, expr.axioms_for)
         if kind != SelectionKind.ENTITIES:
             msg = f"`axioms_for` requires an entity expression; operand is {kind}."
             raise BadRequestError(msg)
-        return _axioms_for(ont, items), SelectionKind.AXIOMS
+        return _axioms_for(s, items), SelectionKind.AXIOMS
 
     if isinstance(expr, EntitiesInExpr):
-        items, kind = _eval_expr(ont, expr.entities_in)
+        items, kind = _eval_expr(s, expr.entities_in)
         if kind != SelectionKind.AXIOMS:
             msg = f"`entities_in` requires an axiom expression; operand is {kind}."
             raise BadRequestError(msg)
-        return _entities_in(ont, items, expr.field), SelectionKind.ENTITIES
+        return _entities_in(s, items, expr.field), SelectionKind.ENTITIES
 
     msg = f"Unknown SetExpr variant: {type(expr).__name__}"
     raise ValueError(msg)
 
 
 def _eval_set_op(
-    ont: Ontology, operands: Sequence[SetOperand], op: SetOp
+    s: Session, operands: Sequence[SetOperand], op: SetOp
 ) -> tuple[list[str], SelectionKind]:
     if not operands:
         msg = f"'{op}' requires at least one operand."
@@ -420,7 +418,7 @@ def _eval_set_op(
         msg = f"'{op}' requires at least two operands; got {len(operands)}."
         raise BadRequestError(msg)
 
-    results = [_eval_expr(ont, sub) for sub in operands]
+    results = [_eval_expr(s, sub) for sub in operands]
     kinds = {kind for _, kind in results}
     if len(kinds) > 1:
         msg = f"Cannot {op}: all operands must be the same kind. Got: {sorted(kinds)}"
@@ -447,13 +445,13 @@ def _eval_set_op(
     return sorted(items_set), kind
 
 
-def _axioms_for(ont: Ontology, entity_iris: Sequence[str]) -> list[str]:
+def _axioms_for(s: Session, entity_iris: Sequence[str]) -> list[str]:
     if not entity_iris:
         return []
     placeholders = ",".join("?" for _ in entity_iris)
     return [
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT a.hash FROM axioms a "
             f"JOIN axiom_entities ae ON ae.axiom_id = a.id "
             f"WHERE ae.entity_iri IN ({placeholders}) "
@@ -463,14 +461,14 @@ def _axioms_for(ont: Ontology, entity_iris: Sequence[str]) -> list[str]:
     ]
 
 
-def _entities_in(ont: Ontology, axiom_hashes: Sequence[str], field: Position | None) -> list[str]:
+def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None) -> list[str]:
     if not axiom_hashes:
         return []
     placeholders = ",".join("?" for _ in axiom_hashes)
     if field is not None:
         return [
             r[0]
-            for r in ont.conn.execute(
+            for r in s.conn.execute(
                 f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
                 f"JOIN axioms a ON a.id = ae.axiom_id "
                 f"WHERE a.hash IN ({placeholders}) AND ae.position = ? "
@@ -480,7 +478,7 @@ def _entities_in(ont: Ontology, axiom_hashes: Sequence[str], field: Position | N
         ]
     return [
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
             f"WHERE a.hash IN ({placeholders}) "

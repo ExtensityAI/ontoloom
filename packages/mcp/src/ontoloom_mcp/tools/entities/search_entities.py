@@ -1,11 +1,12 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, Session
 from ontoloom.entities.store import collect_entity_iris
 from ontoloom.entities.store import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -46,7 +47,8 @@ def search_entities(
       those entities; an axiom selection restricts to entities mentioned in those axioms.
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
-    with Ontology(path) as ont:
+    ont = Ontology(path)
+    with atomic(ont) as s:
         kwargs = {
             "query": query,
             "role": role,
@@ -57,9 +59,9 @@ def search_entities(
             "exclude_deprecated": exclude_deprecated,
         }
 
-        iris = collect_entity_iris(ont, **kwargs)
+        iris = collect_entity_iris(s, **kwargs)
         source = _build_source(query, role, namespace, declared, properties, within)
-        upserted = upsert_selection(ont, into, SelectionKind.ENTITIES, iris, source)
+        upserted = upsert_selection(s, into, SelectionKind.ENTITIES, iris, source)
         sel = upserted.selection
 
         if not iris:
@@ -67,19 +69,19 @@ def search_entities(
             return f"0 entities -> {sel.locked!r}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = core_search_entities(ont, **kwargs, limit=limit_n, offset=0)
+        page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
         page_text = format_entity_search_page(page.matches, sel.size, 0)
 
         result = format_selection_result("entities", upserted, page_text)
 
         if within is not None:
-            result += "\n" + _within_metadata(ont, within)
+            result += "\n" + _within_metadata(s, within)
 
         return result
 
 
-def _within_metadata(ont: Ontology, within: str):
-    sel = get_selection(ont, within)
+def _within_metadata(s: Session, within: str):
+    sel = get_selection(s, within)
     return f"\nWithin selection {sel.locked!r} ({sel.kind}, {sel.size} items)"
 
 

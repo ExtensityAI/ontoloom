@@ -13,7 +13,7 @@ from ontoloom.axioms.types import (
     RenameResult,
     ReplaceResult,
 )
-from ontoloom.connection import Ontology
+from ontoloom.connection import Session
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError, OntoloomError
 from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom, disambiguating_prefixes
@@ -76,11 +76,11 @@ def is_valid_hex(s: str):
     return _HEX_RE.match(s) is not None
 
 
-def _resolve_unique_axiom(ont: Ontology, prefix: str) -> tuple[int, str, str]:
+def _resolve_unique_axiom(s: Session, prefix: str) -> tuple[int, str, str]:
     """Look up an axiom by hash prefix; raise on missing or ambiguous match. Returns (id, full_hash, json_data)."""
     if not is_valid_hex(prefix):
         raise InvalidHashError(prefix)
-    rows = ont.conn.execute(
+    rows = s.conn.execute(
         "SELECT id, hash, json(data) FROM axioms WHERE hash LIKE ? || '%'",
         (prefix,),
     ).fetchall()
@@ -94,7 +94,7 @@ def _resolve_unique_axiom(ont: Ontology, prefix: str) -> tuple[int, str, str]:
 
 def _log_event(
     # A: why is this not in history? also, I feel like we need multiple funcs to log events, just like we would have multiple event types? these optional args are hard to get right, so make multiple funcs, and why do we take both hash and json? just take the obj, we even have HashedAxiom
-    ont: Ontology,
+    s: Session,
     op: str,
     axiom_hash: str,
     axiom_json: str | None = None,
@@ -103,58 +103,56 @@ def _log_event(
     annotation_diff: str | None = None,
     batch_id: str | None = None,
 ):
-    ont.conn.execute(
+    s.conn.execute(
         "INSERT INTO events (session_id, op, axiom_hash, axiom_json, replaces_hash, annotation_diff, batch_id)"
         " VALUES (?, ?, ?, jsonb(?), ?, ?, ?)",
-        (ont.session_id, op, axiom_hash, axiom_json, replaces_hash, annotation_diff, batch_id),
+        (s.session_id, op, axiom_hash, axiom_json, replaces_hash, annotation_diff, batch_id),
     )
 
 
-def add_axioms(ont: Ontology, axioms: Sequence[BaseAxiom]) -> AddResult:
+def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
     added: list[HashedAxiom] = []
     skipped: list[HashedAxiom] = []
 
-    with ont.conn:
-        for axiom in axioms:
-            h = HashedAxiom.of(axiom).hash  # inline into ha creation
-            json_data = (
-                axiom.model_dump_json()
-            )  # A: should be computed where actually needed, this is noise here
-            ha = HashedAxiom(axiom=axiom, hash=h)
-            if insert_axiom(ont, axiom, ignore_existing=True) is None:
-                skipped.append(ha)
-                continue
-            added.append(ha)
-            _log_event(ont, "add", h, json_data)
+    for axiom in axioms:
+        h = HashedAxiom.of(axiom).hash  # inline into ha creation
+        json_data = (
+            axiom.model_dump_json()
+        )  # A: should be computed where actually needed, this is noise here
+        ha = HashedAxiom(axiom=axiom, hash=h)
+        if insert_axiom(s, axiom, ignore_existing=True) is None:
+            skipped.append(ha)
+            continue
+        added.append(ha)
+        _log_event(s, "add", h, json_data)
 
     return AddResult(added=tuple(added), skipped=tuple(skipped))
 
 
-def remove_axioms_by_hash(ont: Ontology, hash_prefixes: list[str]) -> RemoveResult:
+def remove_axioms_by_hash(s: Session, hash_prefixes: list[str]) -> RemoveResult:
     # A: name is bad, remove_by_hashes, but then again, I am not sure whether removal by hash prefixes should be done here! is this not a MCP concern? this would also apply to search, so it is not as easy, because if we only allow remove of Axiom instances here, then search would also not allow prefixes? or could it still? what do you think?
     for prefix in hash_prefixes:
         if not is_valid_hex(prefix):
             raise InvalidHashError(prefix)
 
-    with ont.conn:
-        to_remove: list[HashedAxiom] = []
-        for prefix in hash_prefixes:
-            _, full_hash, json_data = _resolve_unique_axiom(ont, prefix)
-            axiom = load_axiom(json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in remove_by_hash")
-            to_remove.append(HashedAxiom(axiom=axiom, hash=full_hash))
+    to_remove: list[HashedAxiom] = []
+    for prefix in hash_prefixes:
+        _, full_hash, json_data = _resolve_unique_axiom(s, prefix)
+        axiom = load_axiom(json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in remove_by_hash")
+        to_remove.append(HashedAxiom(axiom=axiom, hash=full_hash))
 
-        for ha in to_remove:
-            # A: again, unclean because of events, already discussed in detail
-            _log_event(ont, "del", ha.hash, ha.axiom.model_dump_json())
-            ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (ha.hash,))
+    for ha in to_remove:
+        # A: again, unclean because of events, already discussed in detail
+        _log_event(s, "del", ha.hash, ha.axiom.model_dump_json())
+        s.conn.execute("DELETE FROM axioms WHERE hash = ?", (ha.hash,))
 
     return RemoveResult(removed=tuple(to_remove))
 
 
-def remove_axioms_by_selection(ont: Ontology, within: LockedSelection) -> RemoveBySelectionResult:
+def remove_axioms_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectionResult:
     # A: I feel like this function should resolve axioms, then use remove_axioms as mentioned above (not with prefix. at least if we keep the remove by prefix, then make a authoritative remove_axioms func s.t. remove by prefix first resolves then calls that, same as this one. saves us a lot of code and ugliness.) might even unify results? or if not, compose or inherit RemoveResult in RemoveBySelectionResult or sth
     """Remove axioms referenced by an axiom selection. Best-effort: skips missing."""
-    sel = verify_selection_hash(ont, within.name, within.hash_prefix)
+    sel = verify_selection_hash(s, within.name, within.hash_prefix)
     if sel.kind != SelectionKind.AXIOMS:
         raise SelectionKindError(
             name=within.name,
@@ -165,33 +163,30 @@ def remove_axioms_by_selection(ont: Ontology, within: LockedSelection) -> Remove
 
     removed: list[HashedAxiom] = []
     absent = 0
-    with ont.conn:
-        items = [
-            r[0]
-            for r in ont.conn.execute(
-                "SELECT item FROM selection_items WHERE selection_name = ?", (within.name,)
-            )
-        ]
-        for h in items:
-            row = ont.conn.execute(
-                "SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)
-            ).fetchone()
-            if row is None:
-                absent += 1
-                continue
-            full_hash, json_data = row
-            axiom = load_axiom(
-                json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in remove_by_selection"
-            )
-            _log_event(ont, "del", full_hash, json_data)
-            ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (full_hash,))
-            removed.append(HashedAxiom(axiom=axiom, hash=full_hash))
+    items = [
+        r[0]
+        for r in s.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", (within.name,)
+        )
+    ]
+    for h in items:
+        row = s.conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+        if row is None:
+            absent += 1
+            continue
+        full_hash, json_data = row
+        axiom = load_axiom(
+            json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in remove_by_selection"
+        )
+        _log_event(s, "del", full_hash, json_data)
+        s.conn.execute("DELETE FROM axioms WHERE hash = ?", (full_hash,))
+        removed.append(HashedAxiom(axiom=axiom, hash=full_hash))
 
     return RemoveBySelectionResult(removed=tuple(removed), absent=absent)
 
 
 def annotate_axiom(
-    ont: Ontology,
+    s: Session,
     hash_prefix: str,
     *,
     add_annotations: list[Annotation] | None = None,
@@ -204,37 +199,36 @@ def annotate_axiom(
 
     # A: look at this again, maybe add comments, or at least make it clearer what is going on here
 
-    with ont.conn:
-        axiom_id, full_hash, json_data = _resolve_unique_axiom(ont, hash_prefix)
-        axiom = load_axiom(json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in annotate")
+    axiom_id, full_hash, json_data = _resolve_unique_axiom(s, hash_prefix)
+    axiom = load_axiom(json_data, f"axiom {full_hash[:HASH_DISPLAY_LEN]} in annotate")
 
-        current = list(axiom.annotations)
-        for ann in remove_annotations:
-            if ann in current:
-                current.remove(ann)
-        for ann in add_annotations:
-            if ann not in current:
-                current.append(ann)
+    current = list(axiom.annotations)
+    for ann in remove_annotations:
+        if ann in current:
+            current.remove(ann)
+    for ann in add_annotations:
+        if ann not in current:
+            current.append(ann)
 
-        updated = axiom.model_copy(update={"annotations": tuple(current)})
-        new_json = updated.model_dump_json()
+    updated = axiom.model_copy(update={"annotations": tuple(current)})
+    new_json = updated.model_dump_json()
 
-        ont.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, axiom_id))
+    s.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, axiom_id))
 
-        original = set(axiom.annotations)
-        final = set(current)
-        actually_added = [a.model_dump() for a in final - original]
-        actually_removed = [a.model_dump() for a in original - final]
-        if actually_added or actually_removed:
-            diff = json.dumps({"added": actually_added, "removed": actually_removed})
-            _log_event(ont, "annotate", full_hash, annotation_diff=diff)
+    original = set(axiom.annotations)
+    final = set(current)
+    actually_added = [a.model_dump() for a in final - original]
+    actually_removed = [a.model_dump() for a in original - final]
+    if actually_added or actually_removed:
+        diff = json.dumps({"added": actually_added, "removed": actually_removed})
+        _log_event(s, "annotate", full_hash, annotation_diff=diff)
 
-        repopulate_axiom_text(ont, axiom_id, updated.annotations)
+    repopulate_axiom_text(s, axiom_id, updated.annotations)
 
     return HashedAxiom(axiom=updated, hash=full_hash)
 
 
-def replace_axiom(ont: Ontology, old_hash_prefix: str, new_axiom: BaseAxiom) -> ReplaceResult:
+def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> ReplaceResult:
     """Atomic delete+add with event tracking.
 
     Old axiom-level annotations are carried forward onto the new axiom -> annotations
@@ -253,39 +247,38 @@ def replace_axiom(ont: Ontology, old_hash_prefix: str, new_axiom: BaseAxiom) -> 
 
     new_h = HashedAxiom.of(new_axiom).hash
 
-    with ont.conn:
-        old_id, old_full_hash, old_json = _resolve_unique_axiom(ont, old_hash_prefix)
-        old_axiom = load_axiom(old_json, f"axiom {old_full_hash[:HASH_DISPLAY_LEN]} in replace")
-        old_hashed = HashedAxiom(axiom=old_axiom, hash=old_full_hash)
+    old_id, old_full_hash, old_json = _resolve_unique_axiom(s, old_hash_prefix)
+    old_axiom = load_axiom(old_json, f"axiom {old_full_hash[:HASH_DISPLAY_LEN]} in replace")
+    old_hashed = HashedAxiom(axiom=old_axiom, hash=old_full_hash)
 
-        if new_h == old_full_hash:
-            return ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True)
+    if new_h == old_full_hash:
+        return ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True)
 
-        # Delete old, then attempt to insert new. If new_h collides with a
-        # different existing axiom, INSERT OR IGNORE skips and that axiom keeps
-        # its own annotations -> the carry-forward is irrelevant in that case.
-        ont.conn.execute("DELETE FROM axioms WHERE id = ?", (old_id,))
-        new_axiom_id = insert_axiom(ont, new_axiom, ignore_existing=True)
-        merged = new_axiom_id is None
+    # Delete old, then attempt to insert new. If new_h collides with a
+    # different existing axiom, INSERT OR IGNORE skips and that axiom keeps
+    # its own annotations -> the carry-forward is irrelevant in that case.
+    s.conn.execute("DELETE FROM axioms WHERE id = ?", (old_id,))
+    new_axiom_id = insert_axiom(s, new_axiom, ignore_existing=True)
+    merged = new_axiom_id is None
 
-        if not merged:
-            # Carry old axiom-level annotations onto the new axiom; annotations
-            # don't enter the canonical hash so new_h is unchanged.
-            new_axiom = new_axiom.model_copy(update={"annotations": old_axiom.annotations})
-            ont.conn.execute(
-                "UPDATE axioms SET data = jsonb(?) WHERE id = ?",
-                (new_axiom.model_dump_json(), new_axiom_id),
-            )
-            repopulate_axiom_text(ont, new_axiom_id, new_axiom.annotations)
-        new_json = new_axiom.model_dump_json()
-
-        _log_event(
-            ont,
-            "replace",
-            new_h,
-            new_json,
-            replaces_hash=old_full_hash,
+    if not merged:
+        # Carry old axiom-level annotations onto the new axiom; annotations
+        # don't enter the canonical hash so new_h is unchanged.
+        new_axiom = new_axiom.model_copy(update={"annotations": old_axiom.annotations})
+        s.conn.execute(
+            "UPDATE axioms SET data = jsonb(?) WHERE id = ?",
+            (new_axiom.model_dump_json(), new_axiom_id),
         )
+        repopulate_axiom_text(s, new_axiom_id, new_axiom.annotations)
+    new_json = new_axiom.model_dump_json()
+
+    _log_event(
+        s,
+        "replace",
+        new_h,
+        new_json,
+        replaces_hash=old_full_hash,
+    )
 
     return ReplaceResult(
         old=old_hashed,
@@ -324,7 +317,7 @@ def _sub(value: object, old_iri: str, new_iri: str):
 
 
 def rename_iri(
-    ont: Ontology,
+    s: Session,
     old_iri: str,
     new_iri: str,
     *,
@@ -341,75 +334,81 @@ def rename_iri(
     results: list[ReplaceResult] = []
     # A global: what is this batch thing here? can we do anything here, like at least do manual batch id generation? or make it also hex like everything else?
 
-    with ont.conn:
-        # Candidate reads are inside the transaction to avoid TOCTOU.
-        # A global: comment above reads like it was written after I fixed something
-        if within is not None:
-            sel = verify_selection_hash(ont, within.name, within.hash_prefix)
-            # A: this kind of call and all seems bad, could we not unify or extract to a func to make it easier to understand?
-            if sel.kind != SelectionKind.AXIOMS:
-                raise SelectionKindError(
-                    name=within.name,
-                    expected=SelectionKind.AXIOMS,
-                    actual=sel.kind,
-                    operation="rename_iri",
-                )
-            # ORDER BY a.hash: candidate iteration order determines event-log
-            # insertion order; revert(n=1) replays the last batch in reverse.
-            rows = ont.conn.execute(
-                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-                "WHERE ae.entity_iri = ? ORDER BY a.hash",
-                (within.name, old_iri),
-            ).fetchall()
-        else:
-            rows = ont.conn.execute(
-                "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "WHERE ae.entity_iri = ? ORDER BY a.hash",
-                (old_iri,),
-            ).fetchall()
-
-        for old_full_hash, old_json_data in rows:
-            old_axiom = load_axiom(old_json_data, f"rename {old_iri} -> {new_iri}")
-            new_axiom = _substitute_iri(old_axiom, old_iri, new_iri)
-            new_h = HashedAxiom.of(new_axiom).hash
-            new_json = new_axiom.model_dump_json()
-            old_hashed = HashedAxiom(axiom=old_axiom, hash=old_full_hash)
-            new_hashed = HashedAxiom(axiom=new_axiom, hash=new_h)
-
-            if new_h == old_full_hash:
-                results.append(ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True))
-                continue
-
-            ont.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
-            insert_axiom(ont, new_axiom, ignore_existing=True)
-
-            _log_event(
-                ont,
-                "replace",
-                new_h,
-                new_json,
-                replaces_hash=old_full_hash,
-                batch_id=batch,
+    # Candidate reads are inside the transaction to avoid TOCTOU.
+    # A global: comment above reads like it was written after I fixed something
+    if within is not None:
+        sel = verify_selection_hash(s, within.name, within.hash_prefix)
+        # A: this kind of call and all seems bad, could we not unify or extract to a func to make it easier to understand?
+        if sel.kind != SelectionKind.AXIOMS:
+            raise SelectionKindError(
+                name=within.name,
+                expected=SelectionKind.AXIOMS,
+                actual=sel.kind,
+                operation="rename_iri",
             )
-            results.append(ReplaceResult(old=old_hashed, new=new_hashed, was_noop=False))
+        # ORDER BY a.hash: candidate iteration order determines event-log
+        # insertion order; revert(n=1) replays the last batch in reverse.
+        rows = s.conn.execute(
+            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
+            "WHERE ae.entity_iri = ? ORDER BY a.hash",
+            (within.name, old_iri),
+        ).fetchall()
+    else:
+        rows = s.conn.execute(
+            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
+            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
+            "WHERE ae.entity_iri = ? ORDER BY a.hash",
+            (old_iri,),
+        ).fetchall()
+
+    for old_full_hash, old_json_data in rows:
+        old_axiom = load_axiom(old_json_data, f"rename {old_iri} -> {new_iri}")
+        new_axiom = _substitute_iri(old_axiom, old_iri, new_iri)
+        new_h = HashedAxiom.of(new_axiom).hash
+        new_json = new_axiom.model_dump_json()
+        old_hashed = HashedAxiom(axiom=old_axiom, hash=old_full_hash)
+        new_hashed = HashedAxiom(axiom=new_axiom, hash=new_h)
+
+        if new_h == old_full_hash:
+            results.append(ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True))
+            continue
+
+        s.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
+        merged = insert_axiom(s, new_axiom, ignore_existing=True) is None
+
+        _log_event(
+            s,
+            "replace",
+            new_h,
+            new_json,
+            replaces_hash=old_full_hash,
+            batch_id=batch,
+        )
+        results.append(
+            ReplaceResult(
+                old=old_hashed,
+                new=new_hashed,
+                was_noop=False,
+                was_merged_into_existing=merged,
+            )
+        )
 
     return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
 
 
-def axiom_summary(ont: Ontology, *, within: str | None = None) -> AxiomSummary:
+def axiom_summary(s: Session, *, within: str | None = None) -> AxiomSummary:
     # A: I feel like by_type = Counter(dict(...)) could be factored out and just have a res or cursor = ... and then return the summary in the end.
     # A global: also, within should point to a SelectionName, no? I guess they are in MCP tools - is there any use case to moving them into? or maybe if we inherit from str, we could also add the validation directly into that inherited type, no? then it would work everywhere? or what could we do? please talk to me about this
     if within is None:
-        by_type = Counter(dict(ont.conn.execute("SELECT type, COUNT(*) FROM axioms GROUP BY type")))
+        by_type = Counter(dict(s.conn.execute("SELECT type, COUNT(*) FROM axioms GROUP BY type")))
     else:
-        sel = get_selection(ont, within)
+        sel = get_selection(s, within)
         if sel.kind == SelectionKind.AXIOMS:
             by_type = Counter(
                 dict(
-                    ont.conn.execute(
+                    s.conn.execute(
                         "SELECT a.type, COUNT(*) FROM axioms a "
                         "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
                         "GROUP BY a.type",
@@ -420,7 +419,7 @@ def axiom_summary(ont: Ontology, *, within: str | None = None) -> AxiomSummary:
         else:  # entities: count axioms mentioning those entities
             by_type = Counter(
                 dict(
-                    ont.conn.execute(
+                    s.conn.execute(
                         "SELECT a.type, COUNT(DISTINCT a.id) FROM axioms a "
                         "JOIN axiom_entities ae ON ae.axiom_id = a.id "
                         "JOIN selection_items si ON si.item = ae.entity_iri "
@@ -443,14 +442,14 @@ def _extract_annotation_value(value: IRI | TypedLiteral | LangLiteral):
     return value.value
 
 
-def insert_axiom(ont: Ontology, axiom: BaseAxiom, *, ignore_existing: bool = False) -> int | None:
+def insert_axiom(s: Session, axiom: BaseAxiom, *, ignore_existing: bool = False) -> int | None:
     """INSERT axiom row and populate indexes. Returns axiom_id, or None if already existed (ignore_existing=True only)."""
     h = HashedAxiom.of(axiom).hash
     json_data = axiom.model_dump_json()
     verb = (
         "INSERT OR IGNORE" if ignore_existing else "INSERT"
     )  # A: when do we not IGNORE EXISTING? same hash = same axiom, so this is always idempotent. no need to change this. or is there a reason?
-    cursor = ont.conn.execute(
+    cursor = s.conn.execute(
         f"{verb} INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
         (h, axiom.tag(), json_data),
     )
@@ -460,27 +459,25 @@ def insert_axiom(ont: Ontology, axiom: BaseAxiom, *, ignore_existing: bool = Fal
     if axiom_id is None:
         msg = "INSERT succeeded but lastrowid is None"  # A: can this ever happen?
         raise InternalError(msg)
-    populate(ont, axiom, axiom_id)
+    populate(s, axiom, axiom_id)
     return axiom_id
 
 
-def repopulate_axiom_text(
-    ont: Ontology, axiom_id: int, annotations: tuple[Annotation, ...]
-) -> None:
+def repopulate_axiom_text(s: Session, axiom_id: int, annotations: tuple[Annotation, ...]) -> None:
     # A: is axiom_id best way to refer to axiom here? why is this not done via hash? any good reason? is it because hash takes a lot of space?
     """Rebuild axiom_text index rows for a single axiom after an annotation change."""
-    ont.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
+    s.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
     rows = [
         (axiom_id, _extract_annotation_value(ann.value), str(ann.property)) for ann in annotations
     ]
     if rows:
-        ont.conn.executemany(
+        s.conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             rows,
         )
 
 
-def populate(ont: Ontology, axiom: BaseAxiom, axiom_id: int) -> None:
+def populate(s: Session, axiom: BaseAxiom, axiom_id: int) -> None:
     # A: again, naming is bad, return type hints, what does this do, is this internal only?
     """Populate index tables (axiom_entities, entity_text, axiom_text) for a new axiom."""
     entity_rows = []
@@ -508,11 +505,11 @@ def populate(ont: Ontology, axiom: BaseAxiom, axiom_id: int) -> None:
             )
         )
 
-    ont.conn.executemany(
+    s.conn.executemany(
         "INSERT INTO axiom_entities (axiom_id, entity_iri, role, position) VALUES (?, ?, ?, ?)",
         entity_rows,
     )
-    ont.conn.executemany(
+    s.conn.executemany(
         "INSERT INTO entity_text (axiom_id, entity_iri, text, property) VALUES (?, ?, ?, ?)",
         text_rows,
     )
@@ -522,7 +519,7 @@ def populate(ont: Ontology, axiom: BaseAxiom, axiom_id: int) -> None:
         for ann in axiom.annotations
     ]
     if axiom_text_rows:
-        ont.conn.executemany(
+        s.conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             axiom_text_rows,
         )

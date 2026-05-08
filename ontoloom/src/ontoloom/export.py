@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from ontoloom.connection import (
     CURRENT_SCHEMA_VERSION,
-    Ontology,
+    Session,
     assert_within_workspace,
 )
 from ontoloom.errors import BadRequestError
@@ -34,12 +34,12 @@ class ImportJsonlResult:
     axioms: list[Axiom]
 
 
-def export_to_jsonl(ont: Ontology, output_path: Path, *, within: str | None = None) -> int:
+def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None) -> int:
     """Export axioms as JSONL with a header line. Returns count of exported axioms."""
     assert_within_workspace(output_path)
     # A global: we need more space, like empty lines and all. else, this is crammed and hard to understand. usual heuristic is a space before an if or else or try or for, but NOT if it is preceded by another if or else or try or for, you know what I mean? make this a general principle maybe! also, usually if an if or for or else block is long and there is more code after, then also add an empty line. VERY IMPORTANT, should be in your global python memory.
     if within is not None:
-        sel = get_selection(ont, within)
+        sel = get_selection(s, within)
         if sel.kind != SelectionKind.AXIOMS:
             raise SelectionKindError(
                 name=within,
@@ -67,14 +67,14 @@ def export_to_jsonl(ont: Ontology, output_path: Path, *, within: str | None = No
         format_version=FORMAT_VERSION,
         schema_version=CURRENT_SCHEMA_VERSION,
         exported_at=datetime.now(UTC).isoformat(),
-        prefixes=list_prefixes(ont),
+        prefixes=list_prefixes(s),
     )
 
     count = 0
     with output_path.open("w") as f:
         f.write(header.model_dump_json())
         f.write("\n")
-        for (json_text,) in ont.conn.execute(query, params):
+        for (json_text,) in s.conn.execute(query, params):
             f.write(json_text)
             f.write("\n")
             count += 1

@@ -1,11 +1,10 @@
-from pydantic import TypeAdapter
-
 from ontoloom.canonical import canonical_json
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.owl.axioms import AnnotationAssertion, SubClassOf
 from ontoloom.owl.expressions import ClassExpression, ObjectHasSelf, is_class_expression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
+from pydantic import TypeAdapter
 
 
 def test_iri_instance_returns_true():

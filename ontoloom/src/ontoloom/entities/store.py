@@ -1,6 +1,6 @@
 from collections import Counter, defaultdict
 
-from ontoloom.connection import Ontology, escape_like
+from ontoloom.connection import Session, escape_like
 from ontoloom.entities.types import (
     AnnotationRow,
     DuplicateGroup,
@@ -57,13 +57,13 @@ _NOT_DEPRECATED = (
 )
 
 
-def _axiom_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str]]:
+def _axiom_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
     """Join clause for queries already in axiom-context (alias `a` for axioms).
     Silently no-op for ENTITIES selections -> these reads only respect axiom selections.
     """
     if within is None:
         return "", []
-    sel = get_selection(ont, within)
+    sel = get_selection(s, within)
     if sel.kind != SelectionKind.AXIOMS:
         return "", []
     return (
@@ -72,13 +72,13 @@ def _axiom_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str]
     )
 
 
-def _entity_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str]]:
+def _entity_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
     """Join clause for queries in axiom_entities-context (alias `ae`).
     Handles both AXIOMS (via a_w) and ENTITIES (via ae.entity_iri) selection kinds.
     """
     if within is None:
         return "", []
-    sel = get_selection(ont, within)
+    sel = get_selection(s, within)
     if sel.kind == SelectionKind.ENTITIES:
         return (
             " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?",
@@ -91,19 +91,19 @@ def _entity_scope_join(ont: Ontology, within: str | None) -> tuple[str, list[str
     )
 
 
-def _entity_scope_allowed(ont: Ontology, within: str) -> set[str]:
+def _entity_scope_allowed(s: Session, within: str) -> set[str]:
     """Allowed entity IRIs under `within`, as a set for in-Python post-filtering."""
-    sel = get_selection(ont, within)
+    sel = get_selection(s, within)
     if sel.kind == SelectionKind.ENTITIES:
         return {
             r[0]
-            for r in ont.conn.execute(
+            for r in s.conn.execute(
                 "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
             )
         }
     return {
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             "JOIN axioms a ON a.id = ae.axiom_id "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
@@ -115,13 +115,13 @@ def _entity_scope_allowed(ont: Ontology, within: str) -> set[str]:
 _NEAR_MATCH_LIMIT = 3
 
 
-def get_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityInfo:
+def get_entity(s: Session, iri: IRI, *, within: str | None = None) -> EntityInfo:
     """Return entity details. Raises EntityNotFoundError (with near matches) on miss."""
     iri_str = str(iri)
 
     roles = {
         EntityType(r[0])
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             "SELECT DISTINCT role FROM axiom_entities WHERE entity_iri = ? AND role IS NOT NULL",
             (iri_str,),
         )
@@ -129,7 +129,7 @@ def get_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityI
 
     annotations = [
         AnnotationRow(property=IRI(r[0]), value=r[1])
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             "SELECT DISTINCT property, text FROM entity_text "
             "WHERE entity_iri = ? AND property != ? "
             "ORDER BY property, text",
@@ -137,12 +137,12 @@ def get_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityI
         )
     ]
 
-    extra_join, extra_params = _axiom_scope_join(ont, within)
+    extra_join, extra_params = _axiom_scope_join(s, within)
 
     axiom_counts = Counter(
         {
             r[0]: r[1]
-            for r in ont.conn.execute(
+            for r in s.conn.execute(
                 f"""
             SELECT a.type, COUNT(DISTINCT a.id)
             FROM axiom_entities ae
@@ -156,21 +156,21 @@ def get_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> EntityI
     )
 
     if not roles and not annotations and not axiom_counts:
-        near = search_entities(ont, query=iri.local_name, limit=_NEAR_MATCH_LIMIT)
+        near = search_entities(s, query=iri.local_name, limit=_NEAR_MATCH_LIMIT)
         raise EntityNotFoundError(iri_str, [str(m.iri) for m in near.matches])
     return EntityInfo(
         roles=frozenset(roles), annotations=tuple(annotations), axiom_counts=axiom_counts
     )
 
 
-def axiom_hashes_for_entity(ont: Ontology, iri: IRI, *, within: str | None = None) -> list[str]:
+def axiom_hashes_for_entity(s: Session, iri: IRI, *, within: str | None = None) -> list[str]:
     """Return all axiom hashes for an entity."""
     iri_str = str(iri)
-    extra_join, extra_params = _axiom_scope_join(ont, within)
+    extra_join, extra_params = _axiom_scope_join(s, within)
 
     return [
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT a.hash FROM axiom_entities ae "
             f"JOIN axioms a ON ae.axiom_id = a.id{extra_join} "
             f"WHERE ae.entity_iri = ? ORDER BY a.hash",
@@ -180,7 +180,7 @@ def axiom_hashes_for_entity(ont: Ontology, iri: IRI, *, within: str | None = Non
 
 
 def search_entities(
-    ont: Ontology,
+    s: Session,
     *,
     query: str | None = None,
     role: str | None = None,
@@ -203,7 +203,7 @@ def search_entities(
     """
     if query is None:
         return _list_entities(
-            ont,
+            s,
             role=role,
             namespace=namespace,
             within=within,
@@ -214,7 +214,7 @@ def search_entities(
             offset=offset,
         )
     return _text_search_entities(
-        ont,
+        s,
         query=query,
         role=role,
         namespace=namespace,
@@ -228,7 +228,7 @@ def search_entities(
 
 
 def collect_entity_iris(
-    ont: Ontology,
+    s: Session,
     *,
     query: str | None = None,
     role: str | None = None,
@@ -241,11 +241,11 @@ def collect_entity_iris(
     """Return all matching entity IRIs (no display data). For select workflows."""
     if query is None:
         joins, where, params = _build_entity_filter(
-            ont, role, namespace, within, declared, properties, exclude_deprecated
+            s, role, namespace, within, declared, properties, exclude_deprecated
         )
         return [
             r[0]
-            for r in ont.conn.execute(
+            for r in s.conn.execute(
                 f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} "
                 f"WHERE {where} ORDER BY ae.entity_iri",
                 params,
@@ -253,40 +253,38 @@ def collect_entity_iris(
         ]
 
     # Text search path
-    matches = _find_text_matches(ont, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
     matches.update(
-        _find_text_matches(ont, query, None, MatchSource.ANNOTATION, properties=properties)
+        _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
-    matches = _apply_text_filters(
-        ont, matches, role, namespace, within, declared, exclude_deprecated
-    )
+    matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
     return list(matches.keys())
 
 
-def entity_summary(ont: Ontology, *, within: str | None = None) -> EntitySummary:
+def entity_summary(s: Session, *, within: str | None = None) -> EntitySummary:
     if within is None:
-        total = ont.conn.execute(
-            "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities"
-        ).fetchone()[0]
+        total = s.conn.execute("SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities").fetchone()[
+            0
+        ]
         by_role = Counter(
             dict(
-                ont.conn.execute(
+                s.conn.execute(
                     "SELECT role, COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE role IS NOT NULL GROUP BY role"
                 )
             )
         )
         return EntitySummary(total=total, by_role=by_role)
 
-    sel = get_selection(ont, within)
+    sel = get_selection(s, within)
     if sel.kind == SelectionKind.ENTITIES:
-        total = ont.conn.execute(
+        total = s.conn.execute(
             "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
             "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ?",
             (within,),
         ).fetchone()[0]
         by_role = Counter(
             dict(
-                ont.conn.execute(
+                s.conn.execute(
                     "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
                     "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
                     "WHERE ae.role IS NOT NULL GROUP BY ae.role",
@@ -295,7 +293,7 @@ def entity_summary(ont: Ontology, *, within: str | None = None) -> EntitySummary
             )
         )
     else:  # axioms
-        total = ont.conn.execute(
+        total = s.conn.execute(
             "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
             "JOIN axioms a ON a.id = ae.axiom_id "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
@@ -303,7 +301,7 @@ def entity_summary(ont: Ontology, *, within: str | None = None) -> EntitySummary
         ).fetchone()[0]
         by_role = Counter(
             dict(
-                ont.conn.execute(
+                s.conn.execute(
                     "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
                     "JOIN axioms a ON a.id = ae.axiom_id "
                     "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
@@ -316,7 +314,7 @@ def entity_summary(ont: Ontology, *, within: str | None = None) -> EntitySummary
 
 
 def find_duplicate_entities(
-    ont: Ontology,
+    s: Session,
     annotation_property: str,
     *,
     within: str | None = None,
@@ -337,7 +335,7 @@ def find_duplicate_entities(
     # EXISTS variant of the previous CTE: for each (text, iri) row in the
     # property/scope, keep it iff some *other* entity has the same text.
     # Lets SQLite use idx_entity_text_prop_text directly without a temp table.
-    rows = ont.conn.execute(
+    rows = s.conn.execute(
         f"SELECT et.text, et.entity_iri"
         f" FROM entity_text et{sel_join_outer}"
         f" WHERE et.property = ?"
@@ -375,7 +373,7 @@ def find_duplicate_entities(
 
 
 def _build_entity_filter(
-    ont: Ontology,
+    s: Session,
     role: str | None,
     namespace: str | None,
     within: str | None,
@@ -385,7 +383,7 @@ def _build_entity_filter(
 ) -> tuple[str, str, list[str | int]]:
     """Build (joins, where_clause, params) for entity queries against `axiom_entities ae`."""
     conditions = ["ae.role IS NOT NULL"]
-    joins, scope_params = _entity_scope_join(ont, within)
+    joins, scope_params = _entity_scope_join(s, within)
     params: list[str | int] = list(scope_params)
 
     if role is not None:
@@ -414,7 +412,7 @@ def _build_entity_filter(
 
 
 def _apply_text_filters(
-    ont: Ontology,
+    s: Session,
     matches: dict[str, tuple[MatchSource, MatchQuality]],
     role: str | None,
     namespace: str | None,
@@ -424,26 +422,26 @@ def _apply_text_filters(
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
     """Apply post-text-search filters to candidate matches."""
     if within is not None and matches:
-        allowed = _entity_scope_allowed(ont, within)
+        allowed = _entity_scope_allowed(s, within)
         matches = {k: v for k, v in matches.items() if k in allowed}
 
     if role is not None and matches:
-        role_iris = _batch_check_roles(ont, list(matches.keys()), role)
+        role_iris = _batch_check_roles(s, list(matches.keys()), role)
         matches = {k: v for k, v in matches.items() if k in role_iris}
     if namespace is not None:
         prefix = f"{namespace}:"
         matches = {k: v for k, v in matches.items() if k.startswith(prefix)}
 
     if declared is not None and matches:
-        matches = _filter_declared(ont, matches, declared)
+        matches = _filter_declared(s, matches, declared)
     if exclude_deprecated and matches:
-        matches = _filter_deprecated(ont, matches)
+        matches = _filter_deprecated(s, matches)
 
     return matches
 
 
 def _list_entities(
-    ont: Ontology,
+    s: Session,
     role: str | None,
     namespace: str | None,
     within: str | None,
@@ -454,17 +452,17 @@ def _list_entities(
     offset: int,
 ) -> EntitySearchPage:
     joins, where, params = _build_entity_filter(
-        ont, role, namespace, within, declared, properties, exclude_deprecated
+        s, role, namespace, within, declared, properties, exclude_deprecated
     )
 
-    total = ont.conn.execute(
+    total = s.conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{joins} WHERE {where}",
         params,
     ).fetchone()[0]
 
     page_iris = [
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} WHERE {where} ORDER BY ae.entity_iri LIMIT ? OFFSET ?",
             [*params, limit, offset],
         )
@@ -472,7 +470,7 @@ def _list_entities(
     if not page_iris:
         return EntitySearchPage(matches=(), total=total)
 
-    display = _batch_fetch_entity_display(ont, page_iris)
+    display = _batch_fetch_entity_display(s, page_iris)
     return EntitySearchPage(
         matches=tuple(
             EntityMatch(
@@ -489,7 +487,7 @@ def _list_entities(
 
 
 def _text_search_entities(
-    ont: Ontology,
+    s: Session,
     query: str,
     role: str | None,
     namespace: str | None,
@@ -500,13 +498,11 @@ def _text_search_entities(
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    matches = _find_text_matches(ont, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
     matches.update(
-        _find_text_matches(ont, query, None, MatchSource.ANNOTATION, properties=properties)
+        _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
-    matches = _apply_text_filters(
-        ont, matches, role, namespace, within, declared, exclude_deprecated
-    )
+    matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
 
     quality_order = {MatchQuality.EXACT: 0, MatchQuality.SUBSTRING: 1}
     source_order = {MatchSource.IRI: 0, MatchSource.ANNOTATION: 1}
@@ -524,7 +520,7 @@ def _text_search_entities(
     if not page_iris:
         return EntitySearchPage(matches=(), total=total)
 
-    display = _batch_fetch_entity_display(ont, page_iris)
+    display = _batch_fetch_entity_display(s, page_iris)
     return EntitySearchPage(
         matches=tuple(
             EntityMatch(
@@ -540,18 +536,18 @@ def _text_search_entities(
     )
 
 
-def _batch_fetch_entity_display(ont: Ontology, iris: list[str]):
+def _batch_fetch_entity_display(s: Session, iris: list[str]):
     placeholders = ",".join("?" for _ in iris)
 
     roles_by_iri: dict[str, set[EntityType]] = {}
-    for iri_str, role_val in ont.conn.execute(
+    for iri_str, role_val in s.conn.execute(
         f"SELECT entity_iri, role FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role IS NOT NULL",
         iris,
     ):
         roles_by_iri.setdefault(iri_str, set()).add(EntityType(role_val))
 
     anns_by_iri: dict[str, list[AnnotationRow]] = {}
-    for iri_str, prop, text in ont.conn.execute(
+    for iri_str, prop, text in s.conn.execute(
         f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
         f"WHERE entity_iri IN ({placeholders}) AND property != ? "
         f"ORDER BY entity_iri, property, text",
@@ -568,11 +564,11 @@ def _batch_fetch_entity_display(ont: Ontology, iris: list[str]):
     }
 
 
-def _batch_check_roles(ont: Ontology, iris: list[str], role: str) -> set[str]:
+def _batch_check_roles(s: Session, iris: list[str], role: str) -> set[str]:
     placeholders = ",".join("?" for _ in iris)
     return {
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT entity_iri FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role = ?",
             [*iris, role],
         )
@@ -580,7 +576,7 @@ def _batch_check_roles(ont: Ontology, iris: list[str], role: str) -> set[str]:
 
 
 def _filter_declared(
-    ont: Ontology,
+    s: Session,
     matches: dict[str, tuple[MatchSource, MatchQuality]],
     declared: bool,
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
@@ -589,7 +585,7 @@ def _filter_declared(
     placeholders = ",".join("?" for _ in iris)
     declared_iris = {
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
             f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.tag()}'",
@@ -602,7 +598,7 @@ def _filter_declared(
 
 
 def _filter_deprecated(
-    ont: Ontology,
+    s: Session,
     matches: dict[str, tuple[MatchSource, MatchQuality]],
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
     """Remove deprecated entities from text-search matches."""
@@ -610,7 +606,7 @@ def _filter_deprecated(
     placeholders = ",".join("?" for _ in iris)
     deprecated_iris = {
         r[0]
-        for r in ont.conn.execute(
+        for r in s.conn.execute(
             f"SELECT DISTINCT entity_iri FROM entity_text "
             f"WHERE entity_iri IN ({placeholders}) "
             f"AND property LIKE '%deprecated%' AND LOWER(text) = 'true'",
@@ -621,7 +617,7 @@ def _filter_deprecated(
 
 
 def _find_text_matches(
-    ont: Ontology,
+    s: Session,
     query: str,
     property_filter: str | None,
     source_label: MatchSource,
@@ -652,14 +648,14 @@ def _find_text_matches(
     matches: dict[str, tuple[MatchSource, MatchQuality]] = {}
     query_lower = query.lower()
 
-    for (iri_str,) in ont.conn.execute(
+    for (iri_str,) in s.conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND LOWER(text) = ? ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
         if iri_str not in matches:
             matches[iri_str] = (source_label, MatchQuality.EXACT)
 
-    for (iri_str,) in ont.conn.execute(
+    for (iri_str,) in s.conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0 ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
@@ -669,14 +665,14 @@ def _find_text_matches(
     return matches
 
 
-def lookup_entity_labels(ont: Ontology, iris: list[str]) -> dict[str, str | None]:
+def lookup_entity_labels(s: Session, iris: list[str]) -> dict[str, str | None]:
     """Return {iri: rdfs:label | None} for each IRI in the list."""
     result: dict[str, str | None] = dict.fromkeys(iris)
     for i in range(0, len(iris), _LABEL_BATCH_SIZE):
         batch = iris[i : i + _LABEL_BATCH_SIZE]
         ph = ",".join("?" for _ in batch)
         result.update(
-            ont.conn.execute(
+            s.conn.execute(
                 f"SELECT entity_iri, text FROM entity_text "
                 f"WHERE entity_iri IN ({ph}) AND property = 'rdfs:label'",
                 batch,
@@ -685,11 +681,11 @@ def lookup_entity_labels(ont: Ontology, iris: list[str]) -> dict[str, str | None
     return result
 
 
-def top_entities_by_axiom_count(ont: Ontology, n: int) -> list[tuple[IRI, int]]:
+def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     """Top n entities by number of distinct axioms they appear in."""
     return [
         (IRI(row[0]), row[1])
-        for row in ont.conn.execute(
+        for row in s.conn.execute(
             "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
             "FROM axiom_entities ae "
             "GROUP BY ae.entity_iri "
@@ -700,10 +696,10 @@ def top_entities_by_axiom_count(ont: Ontology, n: int) -> list[tuple[IRI, int]]:
     ]
 
 
-def declared_entity_count(ont: Ontology, within: str | None = None) -> int:
+def declared_entity_count(s: Session, within: str | None = None) -> int:
     """Count distinct entities that have a Declaration axiom, optionally scoped to a selection."""
-    scope_join, scope_params = _entity_scope_join(ont, within)
-    return ont.conn.execute(
+    scope_join, scope_params = _entity_scope_join(s, within)
+    return s.conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {_DECLARED_EXISTS}",
         scope_params,
     ).fetchone()[0]

@@ -22,22 +22,23 @@ from ontoloom.patterns.slot import Slot
 from ontoloom.patterns.store import match_axioms
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
+from ontoloom.transactions import atomic
 
 
 @pytest.fixture()
-def ont(tmp_path):
+def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with Ontology(path) as o:
-        yield o
+    with atomic(Ontology(path)) as session:
+        yield session
 
 
 @pytest.fixture()
-def populated(ont):
+def populated(s):
     from ontoloom.owl.axioms import ObjectPropertyDomain
 
     add_axioms(
-        ont,
+        s,
         [
             SubClassOf(
                 sub_class=IRI("ex:Dog"),
@@ -51,7 +52,7 @@ def populated(ont):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
         ],
     )
-    return ont
+    return s
 
 
 def test_axiom_type_filter(populated):
@@ -69,7 +70,14 @@ def test_expression_level_hits_container_types_not_declarations(populated):
 
     add_axioms(
         populated,
-        [SubClassOf(sub_class=IRI("ex:Dog"), super_class=ObjectSomeValuesFrom(property=IRI("ex:hasPart"), filler=IRI("ex:Heart")))],
+        [
+            SubClassOf(
+                sub_class=IRI("ex:Dog"),
+                super_class=ObjectSomeValuesFrom(
+                    property=IRI("ex:hasPart"), filler=IRI("ex:Heart")
+                ),
+            )
+        ],
     )
     pattern = ObjectSomeValuesFromPattern(property=Slot("*"), filler=Slot("*"))
     result = match_axioms(populated, pattern)
@@ -139,9 +147,7 @@ def test_contains_partial_set_match(populated):
     )
     add_axioms(populated, [ec_ax])
 
-    pattern = EquivalentClassesPattern(
-        equivalent_classes=ContainsExpr(contains=(Slot("ex:A"),))
-    )
+    pattern = EquivalentClassesPattern(equivalent_classes=ContainsExpr(contains=(Slot("ex:A"),)))
     result = match_axioms(populated, pattern)
     assert result.total >= 1
     assert HashedAxiom.of(ec_ax).hash in result.axiom_hashes

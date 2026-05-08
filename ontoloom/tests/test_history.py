@@ -15,118 +15,119 @@ from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
+from ontoloom.transactions import atomic
 
 
 @pytest.fixture()
-def ont(tmp_path):
+def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    with Ontology(path) as o:
-        yield o
+    with atomic(Ontology(path)) as session:
+        yield session
 
 
-def test_revert_add(ont):
+def test_revert_add(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
 
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted == 1
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is None
 
 
-def test_revert_del(ont):
+def test_revert_del(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
-    remove_axioms_by_hash(ont, [h[:8]])
+    remove_axioms_by_hash(s, [h[:8]])
 
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted == 1
 
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
-    entity_count = ont.conn.execute(
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
+    entity_count = s.conn.execute(
         "SELECT COUNT(*) FROM axiom_entities WHERE axiom_id IN (SELECT id FROM axioms WHERE hash = ?)",
         (h,),
     ).fetchone()[0]
     assert entity_count > 0
 
 
-def test_revert_del_skip_when_already_exists(ont):
+def test_revert_del_skip_when_already_exists(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
-    remove_axioms_by_hash(ont, [h[:8]])
-    add_axioms(ont, [ax])  # re-add; now exists again
+    remove_axioms_by_hash(s, [h[:8]])
+    add_axioms(s, [ax])  # re-add; now exists again
 
     # revert(1) reverts the second "add" → deletes it
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted == 1
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is None
 
 
-def test_revert_replace(ont):
+def test_revert_replace(s):
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="original"))
     ax_old = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
         annotations=(ann,),
     )
-    add_axioms(ont, [ax_old])
+    add_axioms(s, [ax_old])
     old_h = HashedAxiom.of(ax_old).hash
 
     ax_new = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Mammal"),
     )
-    replace_axiom(ont, old_h[:8], ax_new)
+    replace_axiom(s, old_h[:8], ax_new)
     new_h = HashedAxiom.of(ax_new).hash
 
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted == 1
 
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is None
-    row = ont.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (old_h,)).fetchone()
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is None
+    row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (old_h,)).fetchone()
     assert row is not None
     stored = json.loads(row[0])
     assert len(stored.get("annotations", [])) == 1
 
 
-def test_revert_annotate(ont):
+def test_revert_annotate(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax])
+    add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
     ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="hello"))
-    annotate_axiom(ont, h[:8], add_annotations=[ann])
+    annotate_axiom(s, h[:8], add_annotations=[ann])
 
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted == 1
 
-    row = ont.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     assert row is not None
     stored = json.loads(row[0])
     assert stored.get("annotations") == []
 
-    text_count = ont.conn.execute(
+    text_count = s.conn.execute(
         "SELECT COUNT(*) FROM axiom_text WHERE axiom_id IN (SELECT id FROM axioms WHERE hash = ?)",
         (h,),
     ).fetchone()[0]
     assert text_count == 0
 
 
-def test_revert_rename_iri_batch(ont):
+def test_revert_rename_iri_batch(s):
     ax1 = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -135,20 +136,20 @@ def test_revert_rename_iri_batch(ont):
         sub_class=IRI("ex:Cat"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax1, ax2])
+    add_axioms(s, [ax1, ax2])
     old_h1 = HashedAxiom.of(ax1).hash
     old_h2 = HashedAxiom.of(ax2).hash
 
-    rename_iri(ont, "ex:Animal", "ex:Organism")
+    rename_iri(s, "ex:Animal", "ex:Organism")
 
-    report = revert(ont, n=1)
+    report = revert(s, n=1)
     assert report.reverted >= 1
 
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h1,)).fetchone() is not None
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h2,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h1,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h2,)).fetchone() is not None
 
 
-def test_revert_two_operations(ont):
+def test_revert_two_operations(s):
     ax1 = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -157,16 +158,16 @@ def test_revert_two_operations(ont):
         sub_class=IRI("ex:Cat"),
         super_class=IRI("ex:Animal"),
     )
-    add_axioms(ont, [ax1])
-    add_axioms(ont, [ax2])
+    add_axioms(s, [ax1])
+    add_axioms(s, [ax2])
     h1 = HashedAxiom.of(ax1).hash
     h2 = HashedAxiom.of(ax2).hash
 
-    report = revert(ont, n=2)
+    report = revert(s, n=2)
     assert report.reverted >= 2
 
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h1,)).fetchone() is None
-    assert ont.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h2,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h1,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h2,)).fetchone() is None
 
 
 def test_group_into_batches_interleaved():

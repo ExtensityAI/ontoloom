@@ -2,6 +2,7 @@ from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import add_axioms as core_add_axioms
 from ontoloom.connection import Ontology
 from ontoloom.owl.axioms import Axiom
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -10,8 +11,9 @@ from ontoloom_mcp.components.types import OntologyPath
 
 def add_axioms(path: OntologyPath, axioms: list[Axiom]):
     """Add axioms to an existing ontology. Duplicates are skipped. Returns a diff: `+` = added, `=` = skipped."""
-    with Ontology(path) as ont:
-        result = core_add_axioms(ont, axioms)
+    ont = Ontology(path)
+    with atomic(ont) as s:
+        result = core_add_axioms(s, axioms)
         entries = [("+", ha) for ha in result.added] + [("=", ha) for ha in result.skipped]
         return format_diff(
             entries,

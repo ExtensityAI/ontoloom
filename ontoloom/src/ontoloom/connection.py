@@ -1,9 +1,8 @@
 import importlib.resources
 import os
 import sqlite3
-import uuid
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Self
 
 from ontoloom.errors import BadRequestError, OntoloomError
 from ontoloom.models import FrozenModel
@@ -22,7 +21,6 @@ _env = os.environ.get("ONTOLOOM_WORKSPACE_ROOT")
 WORKSPACE_ROOT = Path(_env).resolve() if _env else None
 
 
-# A: add small doc
 def assert_within_workspace(path: Path):
     if WORKSPACE_ROOT is None:
         return
@@ -31,7 +29,6 @@ def assert_within_workspace(path: Path):
         raise BadRequestError(msg)
 
 
-# A: maybe add a sentinel value or sth, s.t. we know that this is unambiguously ontoloom into the schema? then we can drop all the required tables and other machinery, I do not like it.
 class Metadata(FrozenModel):
     """Typed shape of the singleton row in the `metadata` table."""
 
@@ -56,7 +53,6 @@ _REQUIRED_TABLES = frozenset(
 LIKE_ESCAPE = "\\"
 
 
-# A: do we really need to escape like and other meta chars? is this secure?
 def escape_like(value: str):
     """Escape SQL LIKE metacharacters (`\\`, `%`, `_`) so a parameter is matched literally.
     Use with `LIKE ? ESCAPE '\\'`.
@@ -68,14 +64,10 @@ def escape_like(value: str):
     )
 
 
-# A: inline
 def _apply_pragmas(conn: sqlite3.Connection):
-    # executescript handles SQL parsing (multi-line statements, comments) properly;
-    # the previous line-by-line splitter would silently break on either.
     conn.executescript(_PRAGMAS)
 
 
-# A: drop after adding the sentinel as seen above, we can then just check if metadata contains it and else error
 def _validate_schema(conn: sqlite3.Connection):
     existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     missing = _REQUIRED_TABLES - existing
@@ -117,25 +109,17 @@ class OntologySchemaError(OntoloomError):
         super().__init__(detail)
 
 
-# A: need a doc
-class StoreNotOpenError(RuntimeError):
-    pass
-
-
+@dataclass(frozen=True, slots=True)
 class Ontology:
-    # A: should only explain what this is, doc seems more like it should be a comment!
-    """Context manager for an open ontology database.
+    """Reference to an ontology file. A value type — has a path, no resources."""
 
-    Single-use within one thread. `__enter__`/`__exit__` may be called multiple
-    times sequentially on the same instance, but concurrent use across threads
-    is not supported (sqlite3 default `check_same_thread=True`). MCP tools
-    construct a fresh `Ontology(path)` per call, which is the intended pattern.
-    """
+    path: Path
 
     @classmethod
-    def create(cls, path: Path) -> Self:
-        """Create a new empty ontology database. Returns an unopened instance."""
+    def create(cls, path: Path):
+        """Create a new empty ontology database. Returns a reference to it."""
         assert_within_workspace(path)
+
         if path.exists():
             raise OntologyExistsError(path)
         conn = sqlite3.connect(str(path), autocommit=True)
@@ -148,44 +132,20 @@ class Ontology:
             )
         finally:
             conn.close()
-        return cls(path)
+        return cls(path=path)
 
-    # A: when do we ever supply a session_id?
-    def __init__(self, path: Path, *, session_id: str | None = None):
-        """Reference an existing ontology. Raises OntologyNotFoundError if missing."""
-        assert_within_workspace(path)
-        if not path.exists():
-            raise OntologyNotFoundError(path)
-        self._path = path
-        self._session_id = session_id or uuid.uuid4().hex
-        self._conn: sqlite3.Connection | None = None
+    def __post_init__(self):
+        assert_within_workspace(self.path)
 
-    @property
-    def conn(self) -> sqlite3.Connection:
-        # A: why do we need a StoreNotOpenError? this is an actual bug, never usefully surfaced to MCP user?
-        """Active connection. Internal to ontoloom.store.*; MCP tools must not access this directly."""
-        if self._conn is None:
-            msg = "Store is not open. Use `with Ontology(path) as ont:`."
-            raise StoreNotOpenError(msg)
-        return self._conn
+        if not self.path.exists():
+            raise OntologyNotFoundError(self.path)
 
-    @property
-    def session_id(self) -> str:
-        return self._session_id
 
-    def __enter__(self) -> Self:
-        conn = sqlite3.connect(str(self._path), autocommit=True)
-        try:
-            _apply_pragmas(conn)
-            conn.autocommit = False
-            _validate_schema(conn)  # A: should only do that once on open ontology, no?
-        except Exception:
-            conn.close()
-            raise
-        self._conn = conn
-        return self
+@dataclass(frozen=True, slots=True)
+class Session:
+    """Active session. Returned by atomic and dry_run."""
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
+    ontology: Ontology
+    conn: sqlite3.Connection
+    session_id: str
+    is_dry_run: bool

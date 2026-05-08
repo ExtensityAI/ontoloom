@@ -1,30 +1,60 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
 from ontoloom.prefixes import set_prefix as core_set_prefix
+from ontoloom.transactions import atomic, dry_run
 
+from ontoloom_mcp.components.confirmation import (
+    ConfirmationRequiredError,
+    confirmation_token,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, PrefixName
 
 
-def set_prefix(path: OntologyPath, name: PrefixName, iri: str, force: bool = False):
+def set_prefix(path: OntologyPath, name: PrefixName, iri: str, confirm: str | None = None):
     """Add or update a prefix mapping (e.g. name="ex", iri="http://example.org/").
 
     Prefixes expand the `prefix:local_name` shorthand used in entity IRIs (e.g.
-    `ex:Dog` -> `http://example.org/Dog`). Refuses to reassign a prefix already
-    used by stored axioms (which would silently change their meaning); pass
-    `force=true` to override.
+    `ex:Dog` -> `http://example.org/Dog`).
+
+    Reassigning an in-use prefix changes the meaning of every entity using it.
+    The first call raises `ConfirmationRequiredError` with a token; pass that
+    token as `confirm=` to apply the change.
     """
-    with Ontology(path) as ont:
-        result = core_set_prefix(ont, name, iri, force=force)
+    ont = Ontology(path)
+    with dry_run(ont) as s:
+        preview = core_set_prefix(s, name, iri)
 
-        if result.previous_iri is None:
-            return f"Set prefix `{name}:` -> `{iri}`"
+    if preview.in_use_count > 0:
+        if preview.previous_iri is None:
+            msg = f"in_use_count={preview.in_use_count} but previous_iri is None"
+            raise RuntimeError(msg)
 
-        if result.previous_iri == iri:
-            return f"Set prefix `{name}:` -> `{iri}` (unchanged)"
+        token = confirmation_token(
+            "set_prefix",
+            name,
+            iri,
+            preview.previous_iri,
+            str(preview.in_use_count),
+        )
+        if confirm != token:
+            msg = (
+                f"Reassigning prefix {name!r} from {preview.previous_iri!r} to {iri!r} "
+                f"would change the meaning of {preview.in_use_count} entities."
+            )
+            raise ConfirmationRequiredError(msg, token)
 
-        suffix = f"; {result.in_use_count} entities affected" if result.in_use_count > 0 else ""
-        return f"Set prefix `{name}:` -> `{iri}` (was `{result.previous_iri}`{suffix})"
+    with atomic(ont) as s:
+        result = core_set_prefix(s, name, iri)
+
+    if result.previous_iri is None:
+        return f"Set prefix `{name}:` -> `{iri}`"
+
+    if result.previous_iri == iri:
+        return f"Set prefix `{name}:` -> `{iri}` (unchanged)"
+
+    suffix = f"; {result.in_use_count} entities affected" if result.in_use_count > 0 else ""
+    return f"Set prefix `{name}:` -> `{iri}` (was `{result.previous_iri}`{suffix})"
 
 
 tool_set_prefix = create_tool(

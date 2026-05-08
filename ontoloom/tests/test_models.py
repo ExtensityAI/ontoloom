@@ -1,12 +1,11 @@
 """Tests for `make_tag_resolver` — the structural dispatcher used by every
 discriminated union in the codebase."""
 
-from typing import Annotated, Any
+from typing import Annotated
 
 import pytest
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
 from pydantic import Tag, TypeAdapter
-
 
 # -- fixtures ---------------------------------------------------------------
 

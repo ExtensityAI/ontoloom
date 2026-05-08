@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Annotated, get_args, get_origin
 
 from ontoloom.canonical import SKIP
-from ontoloom.connection import Ontology
+from ontoloom.connection import Session
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
@@ -36,7 +36,7 @@ class MatchResult:
 
 
 def match_axioms(
-    ont: Ontology,
+    s: Session,
     pattern: BasePattern,
     *,
     within: str | None = None,
@@ -50,7 +50,7 @@ def match_axioms(
     """
     matched_hashes: list[str] = []
     truncated = False
-    for h, json_data in _iter_candidates(ont, pattern, within):
+    for h, json_data in _iter_candidates(s, pattern, within):
         axiom = load_axiom(json_data, f"match {h[:HASH_DISPLAY_LEN]}")
         if _match_pattern(pattern, axiom):
             matched_hashes.append(h)
@@ -65,6 +65,7 @@ def match_axioms(
 
 
 _EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
+
 
 def _peel(member: object) -> type:
     # Axiom union members are Annotated[Cls, Tag("...")] for callable-discriminator wiring.
@@ -101,7 +102,7 @@ _EXPRESSION_CONTAINER_TYPES = frozenset(
 
 
 def _iter_candidates(
-    ont: Ontology,
+    s: Session,
     pattern: BasePattern,
     within: str | None,
 ) -> Iterator[tuple[str, str]]:
@@ -135,7 +136,7 @@ def _iter_candidates(
         join_params.append(iri)
 
     if within is not None:
-        sel = get_selection(ont, within)
+        sel = get_selection(s, within)
         if sel.kind == SelectionKind.AXIOMS:
             joins.append(
                 "JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
@@ -153,7 +154,7 @@ def _iter_candidates(
 
     # ORDER BY a.hash: candidate order determines which axioms hit the
     # match-and-limit cap; without it page-1 results drift across runs.
-    yield from ont.conn.execute(
+    yield from s.conn.execute(
         f"SELECT DISTINCT a.hash, json(a.data) FROM axioms a{join_clause}{where_clause} "
         "ORDER BY a.hash",
         join_params + cond_params,

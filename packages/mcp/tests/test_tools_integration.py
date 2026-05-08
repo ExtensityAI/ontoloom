@@ -11,12 +11,15 @@ from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.types import LockedSelection, SelectionName
+from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
 from ontoloom_mcp.tools.axioms.remove_axioms import remove_axioms
+from ontoloom_mcp.tools.axioms.rename_iri import rename_iri
 from ontoloom_mcp.tools.entities.get_entity import get_entity
 from ontoloom_mcp.tools.entities.search_entities import search_entities
 from ontoloom_mcp.tools.ontology.create_ontology import create_ontology
+from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
 from ontoloom_mcp.tools.selections.read_selection import read_selection
 
 
@@ -138,4 +141,124 @@ def test_remove_axioms_rejects_both_inputs():
             path="dummy",
             axiom_hashes=["abc"],
             within=LockedSelection("foo@deadbeef"),
+        )
+
+
+# -- set_prefix confirmation flow --
+
+
+def test_set_prefix_new_prefix_succeeds_without_confirm(empty_db):
+    result = set_prefix(path=empty_db, name="myns", iri="http://example.org/myns/")
+    assert "myns" in result
+    assert "http://example.org/myns/" in result
+
+
+def test_set_prefix_same_iri_returns_unchanged(empty_db):
+    set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
+    result = set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
+    assert "(unchanged)" in result
+
+
+def test_set_prefix_reassign_unused_prefix_no_confirm_required(empty_db):
+    # Set a fresh prefix, then reassign before any entity uses it.
+    set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
+    result = set_prefix(path=empty_db, name="foo", iri="http://example.org/foo2/")
+    assert "foo" in result
+    assert "http://example.org/foo2/" in result
+
+
+def test_set_prefix_reassign_in_use_without_confirm_raises(populated_db):
+    # populated_db has ex:Dog, ex:Animal, etc. as entities. After registering 'ex'
+    # as a prefix mapping, those entities count as "in use" of that prefix.
+    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        set_prefix(path=populated_db, name="ex", iri="http://other.example.org/")
+    assert exc_info.value.token
+    assert "confirm=" in str(exc_info.value)
+
+
+def test_set_prefix_reassign_in_use_with_correct_token_succeeds(populated_db):
+    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        set_prefix(path=populated_db, name="ex", iri="http://other.example.org/")
+    token = exc_info.value.token
+
+    result = set_prefix(
+        path=populated_db,
+        name="ex",
+        iri="http://other.example.org/",
+        confirm=token,
+    )
+    assert "ex" in result
+    assert "http://other.example.org/" in result
+
+
+def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
+    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+
+    with pytest.raises(ConfirmationRequiredError):
+        set_prefix(
+            path=populated_db,
+            name="ex",
+            iri="http://other.example.org/",
+            confirm="00000000",
+        )
+    # State unchanged: ex still maps to its original IRI.
+    from ontoloom.prefixes import list_prefixes
+    from ontoloom.transactions import dry_run
+
+    with dry_run(Ontology(populated_db)) as s:
+        prefixes = list_prefixes(s)
+    assert prefixes["ex"] == "http://example.org/"
+
+
+# -- rename_iri confirmation flow --
+
+
+def test_rename_iri_no_collision_succeeds_without_confirm(populated_db):
+    result = rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Puppy"))
+    assert "ex:Dog" in result
+    assert "ex:Puppy" in result
+    assert "replaced" in result
+
+
+def test_rename_iri_no_op_when_iri_absent(populated_db):
+    result = rename_iri(path=populated_db, old_iri=IRI("ex:NotPresent"), new_iri=IRI("ex:Other"))
+    assert "No-op" in result
+
+
+def test_rename_iri_collision_without_confirm_raises(populated_db):
+    # Both ex:Dog (Class) declaration and ex:Animal (Class) declaration exist.
+    # Renaming ex:Dog -> ex:Animal collides on the Declaration axiom.
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Animal"))
+    assert exc_info.value.token
+    assert "confirm=" in str(exc_info.value)
+
+
+def test_rename_iri_collision_with_correct_token_succeeds(populated_db):
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Animal"))
+    token = exc_info.value.token
+
+    result = rename_iri(
+        path=populated_db,
+        old_iri=IRI("ex:Dog"),
+        new_iri=IRI("ex:Animal"),
+        confirm=token,
+    )
+    assert "ex:Dog" in result
+    assert "ex:Animal" in result
+    assert "merged" in result
+
+
+def test_rename_iri_collision_with_wrong_token_raises(populated_db):
+    with pytest.raises(ConfirmationRequiredError):
+        rename_iri(
+            path=populated_db,
+            old_iri=IRI("ex:Dog"),
+            new_iri=IRI("ex:Animal"),
+            confirm="00000000",
         )

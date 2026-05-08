@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Literal, override
+from typing import Annotated, override
 
 from pydantic import Field, Tag
 
@@ -70,7 +70,8 @@ _get_literal_value_tag = make_tag_resolver((TypedLiteral, LangLiteral))
 
 
 LiteralValue = Annotated[
-    Annotated[TypedLiteral, Tag(TypedLiteral.tag())] | Annotated[LangLiteral, Tag(LangLiteral.tag())],
+    Annotated[TypedLiteral, Tag(TypedLiteral.tag())]
+    | Annotated[LangLiteral, Tag(LangLiteral.tag())],
     *tagged_union_meta(_get_literal_value_tag),
 ]
 

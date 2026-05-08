@@ -4,6 +4,7 @@ from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -28,8 +29,9 @@ def find_duplicates(
       (e.g. "rdfs:label").
     - `within`: Optional entity selection to restrict the check to.
     """
-    with Ontology(path) as ont:
-        result = find_duplicate_entities(ont, annotation_property, within=within)
+    ont = Ontology(path)
+    with atomic(ont) as s:
+        result = find_duplicate_entities(s, annotation_property, within=within)
 
         if not result.affected_iris:
             return f"No duplicate {annotation_property} values found."
@@ -38,7 +40,7 @@ def find_duplicates(
         if within:
             source += f", within={str(within)!r}"
         upserted = upsert_selection(
-            ont, into, SelectionKind.ENTITIES, result.affected_iris, source=source
+            s, into, SelectionKind.ENTITIES, result.affected_iris, source=source
         )
         sel = upserted.selection
 

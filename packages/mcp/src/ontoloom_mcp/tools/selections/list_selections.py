@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
 from ontoloom.selections.store import list_selections as core_list_selections
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -8,8 +9,9 @@ from ontoloom_mcp.components.types import OntologyPath
 
 def list_selections(path: OntologyPath):
     """List all named selections in the ontology."""
-    with Ontology(path) as ont:
-        sels = core_list_selections(ont)
+    ont = Ontology(path)
+    with atomic(ont) as s:
+        sels = core_list_selections(s)
 
     if not sels:
         return "No selections."

@@ -3,6 +3,7 @@ from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
 from ontoloom.connection import Ontology
 from ontoloom.entities.store import lookup_entity_labels as core_lookup_entity_labels
 from ontoloom.owl.annotations import Annotation
+from ontoloom.transactions import atomic
 
 from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
@@ -25,15 +26,16 @@ def annotate_axiom(
     - `add_annotations`: Annotations to add (deduplicated against existing).
     - `remove_annotations`: Annotations to remove (no-op if absent).
     """
-    with Ontology(path) as ont:
+    ont = Ontology(path)
+    with atomic(ont) as s:
         result = core_annotate_axiom(
-            ont,
+            s,
             axiom_hash,
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )
         iris = walk_unique_iris(result.axiom)
-        labels = core_lookup_entity_labels(ont, iris)
+        labels = core_lookup_entity_labels(s, iris)
         listing = format_axiom_listing([result], labels=labels, iris_per_axiom=[iris])
         n_add = len(add_annotations or [])
         n_remove = len(remove_annotations or [])
