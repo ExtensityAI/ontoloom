@@ -13,7 +13,7 @@ from ontoloom.entities.types import (
     MatchSource,
 )
 from ontoloom.errors import OntoloomError
-from ontoloom.owl.axioms import AnnotationAssertion, Declaration
+from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import get_selection
@@ -147,7 +147,7 @@ def get_entity(s: Session, iri: IRI, *, within: str | None = None) -> EntityInfo
             SELECT a.type, COUNT(DISTINCT a.id)
             FROM axiom_entities ae
             JOIN axioms a ON ae.axiom_id = a.id{extra_join}
-            WHERE ae.entity_iri = ? AND a.type != '{AnnotationAssertion.tag()}'
+            WHERE ae.entity_iri = ?
             GROUP BY a.type
             """,
                 (*extra_params, iri_str),

@@ -566,12 +566,15 @@ class TestGetEntityComprehensive:
         with pytest.raises(EntityNotFoundError):
             get_entity(s, IRI(":Nonexistent"))
 
-    def test_annotation_counts_exclude_annotation_assertions(self, s):
+    def test_axiom_counts_include_annotation_assertions(self, s):
+        # get_entity now reports the full axiom-type breakdown including
+        # AnnotationAssertion, matching describe_ontology's top-by-axiom-count.
+        # The Annotations section of the rendered output still shows the values
+        # explicitly; the count is informational here.
         add_axioms(s, AXIOMS)
-        # get_entity axiom_counts should NOT include AnnotationAssertion
         info = get_entity(s, IRI(":Dog"))
         assert info is not None
-        assert "AnnotationAssertion" not in info.axiom_counts
+        assert info.axiom_counts.get("AnnotationAssertion", 0) > 0
 
 
 class TestEnhancedEntitySearch:

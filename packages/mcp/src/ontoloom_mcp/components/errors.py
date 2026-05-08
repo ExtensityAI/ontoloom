@@ -20,6 +20,19 @@ from ontoloom.selections.store import (
     SelectionNotFoundError,
     StaleSelectionError,
 )
+from pydantic import ValidationError
+
+
+def _format_validation_error(e: ValidationError) -> str:
+    errors = e.errors()
+    if len(errors) == 1:
+        err = errors[0]
+        loc = ".".join(str(x) for x in err["loc"]) or "input"
+        return f"Invalid input ({loc}): {err['msg']}"
+    lines = [
+        f"  - {'.'.join(str(x) for x in err['loc']) or 'input'}: {err['msg']}" for err in errors
+    ]
+    return "Invalid input:\n" + "\n".join(lines)
 
 
 class MutuallyExclusiveError(ToolError):
@@ -95,6 +108,7 @@ _HINTS: dict[type[Exception], Callable[..., str]] = {
     ),
     FileNotFoundError: lambda e: f"File or directory not found: {e}",
     PermissionError: lambda e: f"Access denied: {e}",
+    ValidationError: _format_validation_error,
 }
 
 # Exception types we translate at MCP boundaries (decorator and middleware).
@@ -102,6 +116,7 @@ _TRANSLATABLE: tuple[type[Exception], ...] = (
     OntoloomError,
     FileNotFoundError,
     PermissionError,
+    ValidationError,
 )
 
 

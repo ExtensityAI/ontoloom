@@ -138,6 +138,14 @@ def format_entity_summary(summary: EntitySummary):
     # A global: generally consider: which funcs to put on data types, which to keep free? I guess pure functions can in theory be on the data types, but please talk through with me, very important
 
     lines = [f"{summary.total} entities total"]
+    role_total = sum(summary.by_role.values())
+    if role_total != summary.total:
+        # Per-role counts can sum higher (an entity punned across roles is counted
+        # in each) or lower (an entity with no role is omitted). Flag so the LLM
+        # doesn't expect strict arithmetic.
+        lines.append("By role (entities can have multiple roles, e.g. punning):")
+    else:
+        lines.append("By role:")
     for role, count in summary.by_role.most_common():
         lines.append(f"  {count} {role}")
     return "\n".join(lines)
