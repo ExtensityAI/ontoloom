@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ontoloom.connection import Session
-from ontoloom.errors import BadRequestError, OntoloomError
+from ontoloom.errors import OntoloomError
 from ontoloom.hashing import HASH_DISPLAY_LEN
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Declaration
@@ -59,6 +59,15 @@ class SelectionKindError(OntoloomError):
             f"'{operation}' requires an {expected} selection, "
             f"but {name!r} is an {actual} selection."
         )
+
+
+class SelectionExprError(OntoloomError):
+    """Set-expression evaluation precondition violated.
+
+    Covers operand-cardinality issues (no operands, too few for intersect/diff)
+    and kind mismatches (axioms_for over an axiom expression, mixed-kind operands
+    of a set op).
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -197,7 +206,7 @@ def read_selection(
     # A: judgement call, is there any better way to dynamic SQL building? this is a bit meh
     if limit < 1:
         msg = f"limit must be >= 1, got {limit}."
-        raise BadRequestError(msg)
+        raise ValueError(msg)
     sel = get_selection(s, name)
 
     if sel.kind == SelectionKind.AXIOMS:
@@ -394,14 +403,14 @@ def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
         items, kind = _eval_expr(s, expr.axioms_for)
         if kind != SelectionKind.ENTITIES:
             msg = f"`axioms_for` requires an entity expression; operand is {kind}."
-            raise BadRequestError(msg)
+            raise SelectionExprError(msg)
         return _axioms_for(s, items), SelectionKind.AXIOMS
 
     if isinstance(expr, EntitiesInExpr):
         items, kind = _eval_expr(s, expr.entities_in)
         if kind != SelectionKind.AXIOMS:
             msg = f"`entities_in` requires an axiom expression; operand is {kind}."
-            raise BadRequestError(msg)
+            raise SelectionExprError(msg)
         return _entities_in(s, items, expr.field), SelectionKind.ENTITIES
 
     msg = f"Unknown SetExpr variant: {type(expr).__name__}"
@@ -413,16 +422,16 @@ def _eval_set_op(
 ) -> tuple[list[str], SelectionKind]:
     if not operands:
         msg = f"'{op}' requires at least one operand."
-        raise BadRequestError(msg)
+        raise SelectionExprError(msg)
     if op in (SetOp.INTERSECTION, SetOp.DIFFERENCE) and len(operands) < 2:
         msg = f"'{op}' requires at least two operands; got {len(operands)}."
-        raise BadRequestError(msg)
+        raise SelectionExprError(msg)
 
     results = [_eval_expr(s, sub) for sub in operands]
     kinds = {kind for _, kind in results}
     if len(kinds) > 1:
         msg = f"Cannot {op}: all operands must be the same kind. Got: {sorted(kinds)}"
-        raise BadRequestError(msg)
+        raise SelectionExprError(msg)
     kind = kinds.pop()
 
     match op:

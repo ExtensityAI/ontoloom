@@ -1,3 +1,6 @@
+from typing import Annotated
+
+from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, Session
 from ontoloom.entities.store import collect_entity_iris
@@ -21,11 +24,11 @@ from ontoloom_mcp.components.types import OntologyPath, PrefixName, SelectionNam
 def search_entities(
     path: OntologyPath,
     into: SelectionName,
-    query: str | None = None,
+    query: Annotated[str, MinLen(1)] | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
     declared: bool | None = None,
-    properties: list[IRI] | None = None,
+    properties: Annotated[list[IRI], MinLen(1)] | None = None,
     within: SelectionName | None = None,
     exclude_deprecated: bool = True,
 ):

@@ -1,7 +1,11 @@
+from typing import Annotated
+
+from annotated_types import Ge
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
 from ontoloom.history import revert as core_revert
 from ontoloom.transactions import session
+from pydantic import Field
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -9,7 +13,7 @@ from ontoloom_mcp.components.types import OntologyPath
 
 def revert(
     path: OntologyPath,
-    n: int = 1,
+    n: Annotated[int, Ge(1), Field(description="Number of operations to undo")] = 1,
 ):
     """Undo the last N operations (batches) in the current session.
 

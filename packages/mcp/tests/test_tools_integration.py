@@ -150,14 +150,14 @@ def test_axiom_dispatch_failure_renders_focused_mcp_message():
     single-line message — not the multi-KB union signature dump."""
     from ontoloom.errors import UnionDispatchError
     from ontoloom.owl.axioms import Axiom
-    from ontoloom_mcp.components.errors import format_ontoloom_error
+    from ontoloom_mcp.components.errors import format_error
     from pydantic import TypeAdapter
 
     adapter: TypeAdapter[Axiom] = TypeAdapter(Axiom)
     with pytest.raises(UnionDispatchError) as exc_info:
         adapter.validate_python({"sub_class": "ex:Dog"})
 
-    msg = format_ontoloom_error(exc_info.value)
+    msg = format_error(exc_info.value)
     assert "Axiom" in msg
     assert "SubClassOf" in msg
     assert "super_class" in msg

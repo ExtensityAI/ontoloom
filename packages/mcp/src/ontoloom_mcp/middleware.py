@@ -6,9 +6,8 @@ from typing import override
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
-from ontoloom.errors import OntoloomError
 
-from ontoloom_mcp.components.errors import format_ontoloom_error
+from ontoloom_mcp.components.errors import _TRANSLATABLE, format_error
 
 logger = logging.getLogger("ontoloom")
 
@@ -29,10 +28,11 @@ class TimingMiddleware(Middleware):
 class LastResortMiddleware(Middleware):
     """Catch unhandled exceptions so clients get a clean error instead of a crash.
 
-    Routes `OntoloomError` through the project's hint formatters (so domain
-    errors raised during input validation, before the per-tool decorator
-    runs, still get a focused message). Other exceptions are logged and
-    surfaced with a generic prefix.
+    Routes translatable exceptions (OntoloomError, FileNotFoundError,
+    PermissionError) through the project's hint formatters so errors raised
+    during input validation, before the per-tool decorator runs, still get a
+    focused message. Other exceptions are logged and surfaced with a generic
+    prefix.
     """
 
     @override
@@ -41,8 +41,8 @@ class LastResortMiddleware(Middleware):
             return await call_next(context)
         except ToolError:
             raise
-        except OntoloomError as e:
-            raise ToolError(format_ontoloom_error(e)) from None
+        except _TRANSLATABLE as e:
+            raise ToolError(format_error(e)) from None
         except Exception as e:
             logger.exception("Unhandled exception in tool %s", context.message.name)
             msg = f"Internal error: {type(e).__name__}: {e}"

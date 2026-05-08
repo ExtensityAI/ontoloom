@@ -4,12 +4,12 @@ from ontoloom.history import show_changes as core_show_changes
 from ontoloom.transactions import session as open_session
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath
+from ontoloom_mcp.components.types import OntologyPath, SessionId
 
 
 def show_changes(
     path: OntologyPath,
-    session: str | None = None,
+    session: SessionId | None = None,
 ):
     """Show what changed in the current session (or a specified session).
 

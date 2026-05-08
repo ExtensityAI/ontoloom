@@ -1,3 +1,6 @@
+from typing import Annotated
+
+from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import add_axioms as core_add_axioms
 from ontoloom.connection import Ontology
@@ -9,7 +12,10 @@ from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def add_axioms(path: OntologyPath, axioms: list[Axiom]):
+def add_axioms(
+    path: OntologyPath,
+    axioms: Annotated[list[Axiom], MinLen(1)],
+):
     """Add axioms to an existing ontology. Duplicates are skipped. Returns a diff: `+` = added, `=` = skipped."""
     ont = Ontology(path)
     with session(ont) as s:

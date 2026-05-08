@@ -4,7 +4,7 @@ import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
 
-from ontoloom.errors import BadRequestError, OntoloomError
+from ontoloom.errors import OntoloomError
 from ontoloom.models import FrozenModel
 
 _SQL = importlib.resources.files("ontoloom").joinpath("sql")
@@ -26,7 +26,7 @@ def assert_within_workspace(path: Path):
         return
     if not path.resolve().is_relative_to(WORKSPACE_ROOT):
         msg = f"Path {path!s} is outside the configured workspace ({WORKSPACE_ROOT})."
-        raise BadRequestError(msg)
+        raise PermissionError(msg)
 
 
 class Metadata(FrozenModel):

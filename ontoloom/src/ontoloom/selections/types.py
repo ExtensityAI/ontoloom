@@ -14,8 +14,13 @@ from ontoloom.owl.axioms import BaseAxiom
 MAX_SELECTION_NAME_LEN = 64
 LOCKED_PREFIX_MIN = 8
 
-_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
-_LOCKED_PATTERN = re.compile(rf"^[0-9a-fA-F]{{{LOCKED_PREFIX_MIN},}}$")
+# Pattern fragments — single source of truth, composed by SelectionName /
+# LockedSelection regexes and JSON-schema patterns.
+_NAME_FRAGMENT = rf"[a-zA-Z][a-zA-Z0-9._/:-]{{0,{MAX_SELECTION_NAME_LEN - 1}}}"
+_HASH_FRAGMENT = rf"[0-9a-fA-F]{{{LOCKED_PREFIX_MIN},}}"
+
+_NAME_PATTERN = re.compile(rf"^{_NAME_FRAGMENT}$")
+_LOCKED_PATTERN = re.compile(rf"^{_HASH_FRAGMENT}$")
 
 
 class SelectionKind(StrEnum):
@@ -54,17 +59,12 @@ class ConversionOp(StrEnum):
 
 
 def _validate_name(value: str):
-    if not value:
-        msg = "Selection name must not be empty."
-        raise ValueError(msg)
-    if "@" in value:
-        msg = "Selection name must not contain '@'."
-        raise ValueError(msg)
-    if _CONTROL_CHARS.search(value):
-        msg = "Selection name must not contain control characters (NUL, newline, tab, etc.)."
-        raise ValueError(msg)
-    if len(value) > MAX_SELECTION_NAME_LEN:
-        msg = f"Selection name too long ({len(value)} chars, max {MAX_SELECTION_NAME_LEN})."
+    if not _NAME_PATTERN.match(value):
+        msg = (
+            f"Selection name must start with a letter and contain only letters, "
+            f"digits, '_', '-', '.', '/', ':' (max {MAX_SELECTION_NAME_LEN} chars), "
+            f"got {value!r}"
+        )
         raise ValueError(msg)
 
 
@@ -80,6 +80,7 @@ class SelectionName(TypedStr):
     """
 
     description = "Selection name; an optional '@hash_prefix' suffix is accepted and ignored"
+    pattern = rf"^{_NAME_FRAGMENT}(?:@{_HASH_FRAGMENT})?$"
     examples = ("my_selection", "my_selection@a3f1b2c4")
 
     @override
@@ -111,7 +112,7 @@ class LockedSelection(TypedStr):
     """
 
     description = "Selection reference with optimistic locking, in 'name@hash_prefix' format"
-    pattern = rf"^[^@]+@[0-9a-fA-F]{{{LOCKED_PREFIX_MIN},}}$"
+    pattern = rf"^{_NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
     examples = ("my_selection@a3f1b2c4",)
 
     @override

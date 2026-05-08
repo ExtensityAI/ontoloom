@@ -1,6 +1,5 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology
-from ontoloom.errors import BadRequestError
 from ontoloom.selections.store import (
     remove_selections as core_remove_selections,
 )
@@ -9,6 +8,7 @@ from ontoloom.selections.store import (
 )
 from ontoloom.transactions import session
 
+from ontoloom_mcp.components.errors import MissingRequiredError, MutuallyExclusiveError
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName, SelectionPattern
 
@@ -25,9 +25,10 @@ def remove_selections(
     - `pattern`: Glob (`*` matches any sequence, `?` matches one character),
       e.g. `audit_*`. Removes every selection whose name matches.
     """
-    if (names is None) == (pattern is None):
-        msg = "Provide exactly one of 'names' or 'pattern'."
-        raise BadRequestError(msg)
+    if names is not None and pattern is not None:
+        raise MutuallyExclusiveError(("names", "pattern"))
+    if names is None and pattern is None:
+        raise MissingRequiredError(("names", "pattern"))
 
     ont = Ontology(path)
     with session(ont) as s:

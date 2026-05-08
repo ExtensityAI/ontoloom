@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError
 
 from ontoloom.connection import Metadata, Session, escape_like
-from ontoloom.errors import BadRequestError, OntoloomError, StoreCorruptionError
+from ontoloom.errors import OntoloomError, StoreCorruptionError
 
 
 class PrefixNotFoundError(OntoloomError):
@@ -12,6 +12,15 @@ class PrefixNotFoundError(OntoloomError):
     def __init__(self, name: str):
         self.name = name
         super().__init__(f"No prefix {name!r}.")
+
+
+class PrefixInUseError(OntoloomError):
+    """Prefix removal refused because entities still reference it."""
+
+    def __init__(self, name: str, count: int):
+        self.name = name
+        self.count = count
+        super().__init__(f"Prefix {name!r} is still used by {count} entities.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,8 +74,7 @@ def remove_prefix(s: Session, name: str):
         (escape_like(name),),
     ).fetchone()[0]
     if count > 0:
-        msg = f"Cannot remove prefix {name!r}: {count} entities still use it."
-        raise BadRequestError(msg)
+        raise PrefixInUseError(name, count)
 
     new_prefixes = {k: v for k, v in meta.prefixes.items() if k != name}
     _save_metadata(s, meta.model_copy(update={"prefixes": new_prefixes}))

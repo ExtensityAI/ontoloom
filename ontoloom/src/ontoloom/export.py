@@ -10,7 +10,6 @@ from ontoloom.connection import (
     Session,
     assert_within_workspace,
 )
-from ontoloom.errors import BadRequestError
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Axiom
 from ontoloom.prefixes import list_prefixes
@@ -60,7 +59,7 @@ def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None)
     if not output_path.parent.exists():
         # A: should check this in the beginning. maybe make this an expect or validate function - like validate_directory_exists or ensure or sth?
         msg = f"Directory '{output_path.parent}' does not exist."
-        raise BadRequestError(msg)
+        raise FileNotFoundError(msg)
 
     header = HeaderRecord(
         format="ontoloom-jsonl",

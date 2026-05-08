@@ -8,10 +8,15 @@ from ontoloom_mcp.components.confirmation import (
     confirmation_token,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, PrefixName
+from ontoloom_mcp.components.types import NamespaceIRI, OntologyPath, PrefixName
 
 
-def set_prefix(path: OntologyPath, name: PrefixName, iri: str, confirm: str | None = None):
+def set_prefix(
+    path: OntologyPath,
+    name: PrefixName,
+    iri: NamespaceIRI,
+    confirm: str | None = None,
+):
     """Add or update a prefix mapping (e.g. name="ex", iri="http://example.org/").
 
     Prefixes expand the `prefix:local_name` shorthand used in entity IRIs (e.g.

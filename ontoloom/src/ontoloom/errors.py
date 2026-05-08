@@ -9,20 +9,6 @@ class OntoloomError(Exception):
     """Base for all ontoloom domain errors."""
 
 
-class BadRequestError(OntoloomError):
-    """User-input precondition failed at a core API boundary.
-
-    Raise at user-facing entry points when arguments are individually well-typed
-    but the combination violates a precondition (e.g. mismatched selection
-    kinds, non-positive limits, prefix still in use). Use ValueError for
-    programming errors that signal a bug in calling code.
-    """
-
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(message)
-
-
 class StoreCorruptionError(OntoloomError):
     """Stored data failed deserialization. Indicates schema drift or corruption."""
 

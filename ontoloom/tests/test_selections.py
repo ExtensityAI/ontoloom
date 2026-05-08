@@ -1,7 +1,6 @@
 import pytest
 from ontoloom.axioms.store import add_axioms
 from ontoloom.connection import Ontology
-from ontoloom.errors import BadRequestError
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
@@ -14,6 +13,7 @@ from ontoloom.selections.expr import (
     UnionExpr,
 )
 from ontoloom.selections.store import (
+    SelectionExprError,
     StaleSelectionError,
     create_selection,
     get_selection,
@@ -132,14 +132,14 @@ def test_mixed_kind_raises(s):
     upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
     upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
-    with pytest.raises(BadRequestError):
+    with pytest.raises(SelectionExprError):
         create_selection(
             s, "mixed_union", UnionExpr(union=(SelectionName("ax_sel"), SelectionName("ent_sel")))
         )
 
 
 def test_empty_inputs_raises(s):
-    with pytest.raises(BadRequestError):
+    with pytest.raises(SelectionExprError):
         create_selection(s, "x", UnionExpr(union=()))
 
 
@@ -197,13 +197,13 @@ def test_write_if_hash_missing_selection_raises(s):
 
 def test_single_input_intersection_rejected(s):
     upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    with pytest.raises(BadRequestError, match="at least two"):
+    with pytest.raises(SelectionExprError, match="at least two"):
         create_selection(s, "r", IntersectExpr(intersect=(SelectionName("a"),)))
 
 
 def test_single_input_difference_rejected(s):
     upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    with pytest.raises(BadRequestError, match="at least two"):
+    with pytest.raises(SelectionExprError, match="at least two"):
         create_selection(s, "r", DiffExpr(diff=(SelectionName("a"),)))
 
 
@@ -240,14 +240,45 @@ def test_validate_selection_name_too_long():
         SelectionName("a" * 65)
 
 
-@pytest.mark.parametrize("bad", ["foo\x00bar", "foo\nbar", "foo\tbar", "foo\x7fbar"])
-def test_validate_selection_name_rejects_control_chars(bad):
-    with pytest.raises(ValueError, match="control characters"):
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "foo bar",  # whitespace
+        "foo\tbar",  # tab
+        "foo\nbar",  # newline
+        "foo\x00bar",  # control
+        "1abc",  # leading digit
+        "_abc",  # leading underscore
+        "-abc",  # leading dash
+        ".abc",  # leading dot
+        "/abc",  # leading slash
+        ":abc",  # leading colon
+        "foo+bar",  # plus
+        "foo*bar",  # star
+        "café",  # non-ASCII
+    ],
+)
+def test_selection_name_rejects_disallowed_shapes(bad):
+    with pytest.raises(ValueError, match="must start with a letter"):
         SelectionName(bad)
 
 
-def test_validate_selection_name_valid():
-    assert SelectionName("my_sel") == "my_sel"
+@pytest.mark.parametrize(
+    "good",
+    [
+        "a",
+        "my_sel",
+        "Candidates_v2",
+        "ax-2026",
+        "X9",
+        "ns:dogs",  # colon (e.g. namespace-style)
+        "v1.0",  # dot (e.g. version-style)
+        "snomed/concepts",  # slash (e.g. path-style)
+        "ex:Dogs.v2-rc1",  # mixed
+    ],
+)
+def test_selection_name_accepts_valid_shapes(good):
+    assert SelectionName(good) == good
 
 
 def test_verify_hash_match_and_mismatch(s):

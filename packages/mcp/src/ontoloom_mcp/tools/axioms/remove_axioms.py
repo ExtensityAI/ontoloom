@@ -1,10 +1,13 @@
+from typing import Annotated
+
+from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import remove_axioms_by_hash, remove_axioms_by_selection
 from ontoloom.connection import Ontology
-from ontoloom.errors import BadRequestError
 from ontoloom.selections.types import LockedSelection
 from ontoloom.transactions import session
 
+from ontoloom_mcp.components.errors import MissingRequiredError, MutuallyExclusiveError
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import HexPrefix, OntologyPath
@@ -12,7 +15,7 @@ from ontoloom_mcp.components.types import HexPrefix, OntologyPath
 
 def remove_axioms(
     path: OntologyPath,
-    axiom_hashes: list[HexPrefix] | None = None,
+    axiom_hashes: Annotated[list[HexPrefix], MinLen(1)] | None = None,
     within: LockedSelection | None = None,
 ):
     """Remove axioms by hash prefix or by selection.
@@ -25,11 +28,9 @@ def remove_axioms(
       Mutually exclusive with axiom_hashes.
     """
     if within is not None and axiom_hashes is not None:
-        msg = "Cannot use both 'within' and 'axiom_hashes'. Choose one."
-        raise BadRequestError(msg)
+        raise MutuallyExclusiveError(("axiom_hashes", "within"))
     if within is None and axiom_hashes is None:
-        msg = "Provide either 'axiom_hashes' or 'within'."
-        raise BadRequestError(msg)
+        raise MissingRequiredError(("axiom_hashes", "within"))
 
     ont = Ontology(path)
     with session(ont) as s:

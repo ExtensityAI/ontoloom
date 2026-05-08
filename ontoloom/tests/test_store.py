@@ -24,7 +24,7 @@ from ontoloom.entities.store import (
     get_entity,
     search_entities,
 )
-from ontoloom.errors import BadRequestError, StoreCorruptionError
+from ontoloom.errors import StoreCorruptionError
 from ontoloom.export import HeaderRecord, export_to_jsonl, import_jsonl
 from ontoloom.hashing import HashedAxiom
 from ontoloom.history import show_changes
@@ -43,6 +43,7 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes import (
+    PrefixInUseError,
     PrefixNotFoundError,
     list_prefixes,
     prefix_usage_counts,
@@ -706,11 +707,10 @@ def test_workspace_root_blocks_outside(tmp_path, monkeypatch):
     Ontology.create(outside)
 
     monkeypatch.setattr("ontoloom.connection.WORKSPACE_ROOT", workspace.resolve())
-    from ontoloom.errors import BadRequestError
 
-    with pytest.raises(BadRequestError, match="outside the configured workspace"):
+    with pytest.raises(PermissionError, match="outside the configured workspace"):
         Ontology(outside)
-    with pytest.raises(BadRequestError, match="outside the configured workspace"):
+    with pytest.raises(PermissionError, match="outside the configured workspace"):
         Ontology.create(workspace.parent / "another.db")
 
 
@@ -1066,8 +1066,10 @@ def test_prefix_remove_while_in_use(s):
     set_prefix(s, "ex", "http://example.org/")
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
 
-    with pytest.raises(BadRequestError, match="Cannot remove prefix"):
+    with pytest.raises(PrefixInUseError) as exc:
         remove_prefix(s, "ex")
+    assert exc.value.name == "ex"
+    assert exc.value.count == 1
 
     assert "ex" in list_prefixes(s)
 

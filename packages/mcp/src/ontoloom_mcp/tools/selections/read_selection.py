@@ -6,14 +6,14 @@ from ontoloom.selections.types import SelectionKind, ShowFilter
 from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
+from ontoloom_mcp.components.types import Limit, Offset, OntologyPath, SelectionName
 
 
 def read_selection(
     path: OntologyPath,
     name: SelectionName,
     limit: Limit = 20,
-    offset: int = 0,
+    offset: Offset = 0,
     show: ShowFilter = ShowFilter.ALL,
 ):
     """Paginated view of a selection's contents with missing-item visibility.

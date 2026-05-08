@@ -1,3 +1,6 @@
+from typing import Annotated
+
+from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
 from ontoloom.connection import Ontology
@@ -5,6 +8,7 @@ from ontoloom.entities.store import lookup_entity_labels as core_lookup_entity_l
 from ontoloom.owl.annotations import Annotation
 from ontoloom.transactions import session
 
+from ontoloom_mcp.components.errors import MissingRequiredError
 from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
     walk_unique_iris,
@@ -16,8 +20,8 @@ from ontoloom_mcp.components.types import HexPrefix, OntologyPath
 def annotate_axiom(
     path: OntologyPath,
     axiom_hash: HexPrefix,
-    add_annotations: list[Annotation] | None = None,
-    remove_annotations: list[Annotation] | None = None,
+    add_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
+    remove_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
 ):
     """Add or remove annotations on an existing axiom. The axiom's hash does not change.
 
@@ -26,6 +30,9 @@ def annotate_axiom(
     - `add_annotations`: Annotations to add (deduplicated against existing).
     - `remove_annotations`: Annotations to remove (no-op if absent).
     """
+    if add_annotations is None and remove_annotations is None:
+        raise MissingRequiredError(("add_annotations", "remove_annotations"))
+
     ont = Ontology(path)
     with session(ont) as s:
         result = core_annotate_axiom(
