@@ -19,6 +19,10 @@ from ontoloom.owl.axioms import BaseAxiom
 HASH_DISPLAY_LEN = 12
 
 
+def short_hash(h: str) -> str:
+    return h[:HASH_DISPLAY_LEN]
+
+
 class AxiomHashPrefix(TypedStr):
     """Hex prefix of an axiom content hash. Lowercased on construction; may be ambiguous."""
 
@@ -54,7 +58,7 @@ class HashedAxiom:
 
     @property
     def short(self):
-        return AxiomHashPrefix(self.hash[:HASH_DISPLAY_LEN])
+        return short_hash(self.hash)
 
 
 def disambiguating_prefixes(hashes: Sequence[str]) -> list[str]:

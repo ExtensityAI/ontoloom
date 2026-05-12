@@ -1,10 +1,10 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -31,6 +31,8 @@ def find_duplicates(
     """
     ont = Ontology(path)
     with session(ont) as s:
+        if within is not None:
+            get_selection(s, within)
         result = find_duplicate_entities(s, annotation_property, within=within)
 
         if not result.affected_iris:
@@ -54,7 +56,7 @@ def find_duplicates(
     lines.append("")
 
     lines.extend(
-        f'  "{group.value}" ({len(group.iris)} entities): {", ".join(group.iris)}'
+        f"  {dquoted(group.value)} ({len(group.iris)} entities): {', '.join(group.iris)}"
         for group in result.groups[:_PREVIEW_GROUPS]
     )
 

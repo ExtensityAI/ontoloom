@@ -1,9 +1,8 @@
 from pathlib import Path
 
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.export import export_to_jsonl
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -19,12 +18,16 @@ def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionName | 
     """
     ont = Ontology(path)
     with session(ont) as s:
-        count = export_to_jsonl(s, output_path, within=within)
+        result = export_to_jsonl(s, output_path, within=within)
         s.commit()
 
     if within:
-        return f"Exported {count} axioms from selection {str(within)!r} to `{output_path}`."
-    return f"Exported {count} axioms to `{output_path}`."
+        skipped_note = f" (skipped {result.skipped} missing items)" if result.skipped > 0 else ""
+        return (
+            f"Exported {result.exported} axioms from selection {str(within)!r}"
+            f"{skipped_note} to `{output_path}`."
+        )
+    return f"Exported {result.exported} axioms to `{output_path}`."
 
 
 tool_export_jsonl = create_tool(

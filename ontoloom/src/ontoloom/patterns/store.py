@@ -9,7 +9,7 @@ from typing import Annotated, get_args, get_origin
 
 from ontoloom.canonical import SKIP
 from ontoloom.connection import Session
-from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.hashing import short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
@@ -20,7 +20,7 @@ from ontoloom.patterns.base import BasePattern
 from ontoloom.patterns.match import _match_pattern
 from ontoloom.patterns.slot import Slot
 from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import SelectionKind, SelectionName
 
 
 @dataclass
@@ -39,7 +39,7 @@ def match_axioms(
     s: Session,
     pattern: BasePattern,
     *,
-    within: str | None = None,
+    within: SelectionName | None = None,
     limit: int | None = None,
 ) -> MatchResult:
     """Find axioms matching a pattern. Returns matched hashes.
@@ -51,7 +51,7 @@ def match_axioms(
     matched_hashes: list[str] = []
     truncated = False
     for h, json_data in _iter_candidates(s, pattern, within):
-        axiom = load_axiom(json_data, f"match {h[:HASH_DISPLAY_LEN]}")
+        axiom = load_axiom(json_data, f"match {short_hash(h)}")
         if _match_pattern(pattern, axiom):
             matched_hashes.append(h)
             if limit is not None and len(matched_hashes) >= limit:
@@ -104,7 +104,7 @@ _EXPRESSION_CONTAINER_TYPES = frozenset(
 def _iter_candidates(
     s: Session,
     pattern: BasePattern,
-    within: str | None,
+    within: SelectionName | None,
 ) -> Iterator[tuple[str, str]]:
     """Stream candidate axioms from DB, narrowed by type and scope.
 

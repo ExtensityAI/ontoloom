@@ -1,22 +1,21 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import axiom_summary as compute_axiom_summary
-from ontoloom.connection import Ontology
-from ontoloom.entities.store import (
-    declared_entity_count,
-    lookup_entity_labels,
-    top_entities_by_axiom_count,
-)
+from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import (
     entity_summary as compute_entity_summary,
 )
+from ontoloom.entities.store import (
+    top_entities_by_axiom_count,
+    undeclared_entity_count,
+)
 from ontoloom.prefixes import list_prefixes, prefix_usage_counts
 from ontoloom.selections.store import get_selection
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import (
+    build_refs,
     format_axiom_summary,
     format_entity_summary,
-    format_iri_with_label,
+    format_ref,
 )
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath, SelectionName
@@ -48,22 +47,27 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
         parts.append(format_entity_summary(ent_summary))
         parts.append(format_axiom_summary(ax_summary))
 
-        # Undeclared reference count
-        declared = declared_entity_count(s, within)
-        undeclared = ent_summary.total - declared
-        if undeclared > 0:
-            parts.append(
-                f"Undeclared references: {undeclared} entities appear in axioms without Declaration axioms."
+        # Undeclared reference count.
+        # `excl` matches `search_entities(declared=False)`'s default
+        # (exclude_deprecated=True); `incl` is the raw count for transparency.
+        undeclared_excl = undeclared_entity_count(s, within, exclude_deprecated=True)
+        undeclared_incl = undeclared_entity_count(s, within, exclude_deprecated=False)
+        if undeclared_incl > 0:
+            base = (
+                f"Undeclared references: {undeclared_excl} entities appear in axioms "
+                f"without Declaration axioms"
             )
+            if undeclared_incl != undeclared_excl:
+                base += f" ({undeclared_incl} including deprecated)"
+            parts.append(base + ".")
 
         # Top entities by axiom count
         top_rows = top_entities_by_axiom_count(s, _TOP_ENTITIES)
         if top_rows:
-            top_iris = [str(iri) for iri, _ in top_rows]
-            labels = lookup_entity_labels(s, top_iris)
+            top_refs = build_refs(s, [iri for iri, _ in top_rows])
             top_lines = [f"Top {len(top_rows)} entities by axiom count:"]
-            for iri, cnt in top_rows:
-                top_lines.append(f"  {format_iri_with_label(str(iri), labels)}: {cnt} axioms")
+            for ref, (_, cnt) in zip(top_refs, top_rows, strict=True):
+                top_lines.append(f"  {format_ref(ref)}: {cnt} axioms")
             parts.append("\n".join(top_lines))
 
         # Prefixes with usage counts

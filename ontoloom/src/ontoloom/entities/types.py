@@ -55,6 +55,7 @@ class EntityMatch:
 class EntitySearchPage:
     matches: tuple[EntityMatch, ...]
     total: int
+    offset: int
 
 
 @dataclass(frozen=True, slots=True)

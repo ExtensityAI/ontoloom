@@ -3,23 +3,23 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
-from ontoloom.connection import Ontology
-from ontoloom.entities.store import lookup_entity_labels as core_lookup_entity_labels
+from ontoloom.connection import Ontology, session
+from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.owl.annotations import Annotation
-from ontoloom.transactions import session
+from ontoloom.utils import dedupe
 
 from ontoloom_mcp.components.errors import MissingRequiredError
 from ontoloom_mcp.components.formatting import (
+    build_refs_per_axiom,
     format_axiom_listing,
-    walk_unique_iris,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import HexPrefix, OntologyPath
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def annotate_axiom(
     path: OntologyPath,
-    axiom_hash: HexPrefix,
+    axiom_hash: AxiomHashPrefix,
     add_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
     remove_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
 ):
@@ -41,14 +41,23 @@ def annotate_axiom(
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )
-        iris = walk_unique_iris(result.hashed.axiom)
-        labels = core_lookup_entity_labels(s, iris)
-        listing = format_axiom_listing([result.hashed], labels=labels, iris_per_axiom=[iris])
+        refs_per_axiom = build_refs_per_axiom(s, [result.hashed])
+        listing = format_axiom_listing([result.hashed], refs_per_axiom=refs_per_axiom)
         n_added = len(result.added)
         n_removed = len(result.removed)
+        already_present = len(dedupe(add_annotations or [])) - n_added
+        absent = len(dedupe(remove_annotations or [])) - n_removed
         s.commit()
 
-    return f"Applied annotation changes (+{n_added}, -{n_removed}):\n\n{listing}"
+    summary = f"+{n_added} added, {n_removed} removed"
+    skipped: list[str] = []
+    if already_present:
+        skipped.append(f"{already_present} already present")
+    if absent:
+        skipped.append(f"{absent} absent")
+    if skipped:
+        summary += f" ({', '.join(skipped)})"
+    return f"{summary}:\n\n{listing}"
 
 
 tool_annotate_axiom = create_tool(

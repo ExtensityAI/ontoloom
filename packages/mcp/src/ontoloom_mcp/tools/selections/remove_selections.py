@@ -1,12 +1,11 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.selections.store import (
     remove_selections as core_remove_selections,
 )
 from ontoloom.selections.store import (
     remove_selections_by_pattern,
 )
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.errors import MissingRequiredError, MutuallyExclusiveError
 from ontoloom_mcp.components.tool import create_tool

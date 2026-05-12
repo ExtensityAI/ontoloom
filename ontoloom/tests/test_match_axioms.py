@@ -1,6 +1,6 @@
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import (
     AnnotationAssertion,
@@ -25,7 +25,6 @@ from ontoloom.patterns.slot import Slot
 from ontoloom.patterns.store import match_axioms
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
 
 
 @pytest.fixture()

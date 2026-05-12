@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
-from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.hashing import short_hash
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.markers import Position
@@ -18,17 +18,21 @@ from ontoloom.selections.expr import (
     UnionExpr,
 )
 from ontoloom.selections.types import (
+    LockedSelection,
     SelectionItem,
     SelectionKind,
+    SelectionListing,
     SelectionMeta,
+    SelectionName,
     SelectionPage,
     SetOp,
     ShowFilter,
 )
+from ontoloom.utils import dedupe
 
 
 class SelectionNotFoundError(OntoloomError):
-    def __init__(self, name: str):
+    def __init__(self, name: SelectionName):
         self.name = name
         super().__init__(f"Selection {name!r} does not exist.")
 
@@ -36,10 +40,17 @@ class SelectionNotFoundError(OntoloomError):
 class StaleSelectionError(OntoloomError):
     """Selection has changed since the caller last observed it."""
 
-    def __init__(self, name: str, supplied_prefix: str, current_hash: str | None):
+    def __init__(
+        self,
+        name: SelectionName,
+        supplied_prefix: str,
+        current_hash: str | None,
+        current_size: int | None = None,
+    ):
         self.name = name
         self.supplied_prefix = supplied_prefix
         self.current_hash = current_hash
+        self.current_size = current_size
         current = current_hash[:12] if current_hash else "<absent>"
         super().__init__(
             f"Selection {name!r} has changed (your prefix: {supplied_prefix!r}, "
@@ -50,7 +61,13 @@ class StaleSelectionError(OntoloomError):
 class SelectionKindError(OntoloomError):
     """Wrong selection kind for the requested operation."""
 
-    def __init__(self, name: str, expected: SelectionKind, actual: SelectionKind, operation: str):
+    def __init__(
+        self,
+        name: SelectionName,
+        expected: SelectionKind,
+        actual: SelectionKind,
+        operation: str,
+    ):
         self.name = name
         self.expected = expected
         self.actual = actual
@@ -78,18 +95,17 @@ class UpsertResult:
 
 @dataclass(frozen=True, slots=True)
 class DroppedSelection:
-    name: str
+    name: SelectionName
     size: int
 
 
 @dataclass(frozen=True, slots=True)
 class RemoveSelectionsResult:
     dropped: tuple[DroppedSelection, ...]
-    not_found: tuple[str, ...]
+    not_found: tuple[SelectionName, ...]
 
 
-# A global: wrong name, should be _hash_selection. why is this applied to a list of str and not to a Selection object?
-def _selection_hash(items: list[str]):
+def _hash_selection_items(items: list[str]):
     # Use ASCII Record Separator (\x1e) -> control char that cannot appear in
     # valid IRIs/CURIEs/hashes, so two distinct item sets never collide.
     # Empty `items` always produces the same hash (SHA-256 of ""). This is
@@ -99,9 +115,7 @@ def _selection_hash(items: list[str]):
     return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
-def get_selection(
-    s: Session, name: str
-) -> SelectionMeta:  # A global: again, return type can be inferred
+def get_selection(s: Session, name: SelectionName):
     """Get selection metadata. Raises SelectionNotFoundError if not found."""
     row = s.conn.execute(
         "SELECT kind, hash, size, source FROM selections WHERE name = ?", (name,)
@@ -117,18 +131,46 @@ def get_selection(
     )
 
 
-# A: function is weird, verifies stuff but returns a selection meta? this is not good
-def verify_selection_hash(s: Session, name: str, hash_prefix: str) -> SelectionMeta:
-    """Verify selection hasn't changed. Raises StaleSelectionError on mismatch."""
+def get_locked_selection(s: Session, name: SelectionName, hash_prefix: str):
+    """Fetch a selection, requiring its current hash to start with `hash_prefix`.
+
+    Raises StaleSelectionError if the lock doesn't match.
+    """
     sel = get_selection(s, name)
+
     if not sel.hash.startswith(hash_prefix):
-        raise StaleSelectionError(name, hash_prefix, sel.hash)
+        raise StaleSelectionError(name, hash_prefix, sel.hash, sel.size)
+
+    return sel
+
+
+def require_locked_selection(
+    s: Session,
+    within: LockedSelection,
+    expected_kind: SelectionKind,
+    operation: str,
+) -> SelectionMeta:
+    """Lock-check `within` and require its kind matches.
+
+    Raises:
+        StaleSelectionError: if `within.hash_prefix` no longer matches.
+        SelectionKindError: if the selection exists but is the wrong kind.
+    """
+    sel = get_locked_selection(s, within.name, within.hash_prefix)
+
+    if sel.kind != expected_kind:
+        raise SelectionKindError(
+            name=within.name,
+            expected=expected_kind,
+            actual=sel.kind,
+            operation=operation,
+        )
     return sel
 
 
 def upsert_selection(
     s: Session,
-    name: str,
+    name: SelectionName,
     kind: SelectionKind,
     items: Sequence[str],
     source: str,
@@ -149,16 +191,21 @@ def upsert_selection(
     given prefix; otherwise `StaleSelectionError` is raised. Use this when the
     caller has a lock-and-update flow and wants to detect concurrent overwrites.
     """
-    items = list(dict.fromkeys(items))  # A global: use list(set(...)) isntead
-    content_hash = _selection_hash(items)
+    items = dedupe(items)
+    content_hash = _hash_selection_items(items)
     size = len(items)
 
-    existing = s.conn.execute(  # A: same problem as with axioms, we may have unfortunate hash collision, so select all and if multiple error, just like with the axioms
+    existing = s.conn.execute(
         "SELECT size, hash FROM selections WHERE name = ?", (name,)
     ).fetchone()
 
     if if_hash is not None and (existing is None or not existing[1].startswith(if_hash)):
-        raise StaleSelectionError(name, if_hash, existing[1] if existing else None)
+        raise StaleSelectionError(
+            name,
+            if_hash,
+            existing[1] if existing else None,
+            existing[0] if existing else None,
+        )
 
     s.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
     s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
@@ -185,10 +232,17 @@ def upsert_selection(
     )
 
 
-def list_selections(s: Session) -> list[SelectionMeta]:
-    return [
+def list_selections(s: Session) -> list[SelectionListing]:
+    """Return all selections paired with their current present-item count.
+
+    Drift detection: `missing_count = meta.size - present_count`. Item is
+    "present" iff it still resolves — for axiom selections, the hash exists in
+    `axioms`; for entity selections, the IRI is referenced by any axiom
+    (declared or not).
+    """
+    metas = [
         SelectionMeta(
-            name=r[0],
+            name=SelectionName(r[0]),
             kind=SelectionKind(r[1]),
             hash=r[2],
             size=r[3],
@@ -199,149 +253,215 @@ def list_selections(s: Session) -> list[SelectionMeta]:
         )
     ]
 
+    if not metas:
+        return []
+
+    # Batched present-count queries — one per kind. Selections with zero items
+    # produce count=0 via the LEFT JOIN's NULL row.
+    axiom_present: dict[str, int] = dict(
+        s.conn.execute(
+            "SELECT s.name, COUNT(a.hash) "
+            "FROM selections s "
+            "LEFT JOIN selection_items si ON si.selection_name = s.name "
+            "LEFT JOIN axioms a ON a.hash = si.item "
+            "WHERE s.kind = ? "
+            "GROUP BY s.name",
+            (SelectionKind.AXIOMS.value,),
+        )
+    )
+    entity_present: dict[str, int] = dict(
+        s.conn.execute(
+            "SELECT s.name, COUNT(DISTINCT CASE WHEN ae.entity_iri IS NOT NULL THEN si.item END) "
+            "FROM selections s "
+            "LEFT JOIN selection_items si ON si.selection_name = s.name "
+            "LEFT JOIN axiom_entities ae ON ae.entity_iri = si.item "
+            "WHERE s.kind = ? "
+            "GROUP BY s.name",
+            (SelectionKind.ENTITIES.value,),
+        )
+    )
+
+    return [
+        SelectionListing(
+            meta=meta,
+            present_count=(
+                axiom_present.get(meta.name, 0)
+                if meta.kind == SelectionKind.AXIOMS
+                else entity_present.get(meta.name, 0)
+            ),
+        )
+        for meta in metas
+    ]
+
 
 def read_selection(
-    s: Session, name: str, *, limit: int = 20, offset: int = 0, show: ShowFilter = ShowFilter.ALL
+    s: Session,
+    name: SelectionName,
+    *,
+    limit: int = 20,
+    offset: int = 0,
+    show: ShowFilter = ShowFilter.ALL,
 ) -> SelectionPage:
-    # A: judgement call, is there any better way to dynamic SQL building? this is a bit meh
     if limit < 1:
         msg = f"limit must be >= 1, got {limit}."
         raise ValueError(msg)
     sel = get_selection(s, name)
 
     if sel.kind == SelectionKind.AXIOMS:
-        base = (
-            "FROM selection_items si "
-            "LEFT JOIN axioms a ON a.hash = si.item "
-            "WHERE si.selection_name = ?"
+        return _read_axiom_selection(s, sel, limit=limit, offset=offset, show=show)
+    return _read_entity_selection(s, sel, limit=limit, offset=offset, show=show)
+
+
+def _read_axiom_selection(
+    s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
+) -> SelectionPage:
+    base = (
+        "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item WHERE si.selection_name = ?"
+    )
+    if show == ShowFilter.PRESENT:
+        base += " AND a.id IS NOT NULL"
+    elif show == ShowFilter.MISSING:
+        base += " AND a.id IS NULL"
+
+    total = s.conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
+    rows = s.conn.execute(
+        f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
+        (sel.name, limit, offset),
+    ).fetchall()
+
+    present_count = s.conn.execute(
+        "SELECT COUNT(*) FROM selection_items si "
+        "JOIN axioms a ON a.hash = si.item "
+        "WHERE si.selection_name = ?",
+        (sel.name,),
+    ).fetchone()[0]
+
+    items = [
+        SelectionItem(
+            key=item_hash,
+            missing=data is None,
+            axiom=(
+                load_axiom(data, f"axiom {short_hash(item_hash)} in read_selection")
+                if data is not None
+                else None
+            ),
         )
-        if show == ShowFilter.PRESENT:
-            base += " AND a.id IS NOT NULL"
-        elif show == ShowFilter.MISSING:
-            base += " AND a.id IS NULL"
-
-        total = s.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
-        rows = s.conn.execute(
-            f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
-            (name, limit, offset),
-        ).fetchall()
-
-        present_count = s.conn.execute(
-            "SELECT COUNT(*) FROM selection_items si "
-            "JOIN axioms a ON a.hash = si.item "
-            "WHERE si.selection_name = ?",
-            (name,),
-        ).fetchone()[0]
-        missing_count = sel.size - present_count
-
-        items = []
-        # A global: important!!! do we load axioms one by one here? if yes, horrible, why not do a simple `IN` query and then append items based on if they are found or not? this does N queries for N axioms???
-        for item_hash, data in rows:
-            if data is None:
-                items.append(SelectionItem(key=item_hash, missing=True, axiom=None))
-            else:
-                items.append(
-                    SelectionItem(
-                        key=item_hash,
-                        missing=False,
-                        axiom=load_axiom(
-                            data, f"axiom {item_hash[:HASH_DISPLAY_LEN]} in read_selection"
-                        ),
-                    )
-                )
-
-    else:  # entities
-        base = (
-            "FROM selection_items si "
-            "LEFT JOIN ("
-            "  SELECT DISTINCT ae.entity_iri "
-            "  FROM axiom_entities ae JOIN axioms a ON a.id = ae.axiom_id "
-            f"  WHERE a.type = '{Declaration.tag()}'"
-            ") decl ON decl.entity_iri = si.item "
-            "WHERE si.selection_name = ?"
-        )
-        if show == ShowFilter.PRESENT:
-            base += " AND decl.entity_iri IS NOT NULL"
-        elif show == ShowFilter.MISSING:
-            base += " AND decl.entity_iri IS NULL"
-
-        total = s.conn.execute(f"SELECT COUNT(*) {base}", (name,)).fetchone()[0]
-        rows = s.conn.execute(
-            f"SELECT si.item, decl.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
-            (name, limit, offset),
-        ).fetchall()
-
-        present_count = s.conn.execute(
-            "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
-            "JOIN axiom_entities ae ON ae.entity_iri = si.item "
-            "JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE si.selection_name = ? AND a.type = '{Declaration.tag()}'",
-            (name,),
-        ).fetchone()[0]
-        missing_count = sel.size - present_count
-
-        # A: this function is unclean and complicated in general - what is all this? this is incredibly complicated and should probably be split in proper utility methods, no?
-
-        # Batch-fetch roles and labels for present items
-        present_iris = [iri for iri, is_present in rows if is_present]
-        roles_map: dict[str, str] = {}
-        labels_map: dict[str, str] = {}
-        if present_iris:
-            placeholders = ",".join("?" for _ in present_iris)
-            roles_map.update(
-                s.conn.execute(
-                    f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
-                    f"JOIN axioms a ON a.id = ae.axiom_id "
-                    f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
-                    present_iris,
-                ).fetchall()
-            )
-            from ontoloom.entities.store import lookup_entity_labels as _lookup_labels
-
-            labels_map.update(
-                {k: v for k, v in _lookup_labels(s, present_iris).items() if v is not None}
-            )
-
-        items = [
-            SelectionItem(
-                key=iri,
-                missing=not is_present,
-                role=roles_map.get(iri) if is_present else None,
-                label=labels_map.get(iri) if is_present else None,
-            )
-            for iri, is_present in rows
-        ]
+        for item_hash, data in rows
+    ]
 
     return SelectionPage(
         meta=sel,
         items=items,
         total_filtered=total,
         present=present_count,
-        missing=missing_count,
+        missing=sel.size - present_count,
         show=show,
     )
 
 
-def remove_selections(s: Session, names: list[str]) -> RemoveSelectionsResult:
-    """Best-effort remove. Duplicate names in the input are de-duplicated."""
-    # A: something feels off here, not sure what it is.
-    names = list(dict.fromkeys(names))
-    dropped: list[DroppedSelection] = []
-    not_found: list[str] = []
+def _read_entity_selection(
+    s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
+) -> SelectionPage:
+    base = (
+        "FROM selection_items si "
+        "LEFT JOIN ("
+        "  SELECT DISTINCT ae.entity_iri FROM axiom_entities ae"
+        ") refd ON refd.entity_iri = si.item "
+        "WHERE si.selection_name = ?"
+    )
+    if show == ShowFilter.PRESENT:
+        base += " AND refd.entity_iri IS NOT NULL"
+    elif show == ShowFilter.MISSING:
+        base += " AND refd.entity_iri IS NULL"
 
-    for name in names:
-        row = s.conn.execute("SELECT size FROM selections WHERE name = ?", (name,)).fetchone()
-        if row is None:
-            not_found.append(name)
-        else:
-            s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
-            dropped.append(DroppedSelection(name=name, size=row[0]))
-    return RemoveSelectionsResult(dropped=tuple(dropped), not_found=tuple(not_found))
+    total = s.conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
+    rows = s.conn.execute(
+        f"SELECT si.item, refd.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
+        (sel.name, limit, offset),
+    ).fetchall()
+
+    present_count = s.conn.execute(
+        "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
+        "JOIN axiom_entities ae ON ae.entity_iri = si.item "
+        "WHERE si.selection_name = ?",
+        (sel.name,),
+    ).fetchone()[0]
+
+    # Batch-fetch roles and labels for present items.
+    present_iris = [iri for iri, is_present in rows if is_present]
+    roles_map: dict[str, str] = {}
+    labels_map: dict[str, str] = {}
+
+    if present_iris:
+        placeholders = ",".join("?" for _ in present_iris)
+        roles_map.update(
+            s.conn.execute(
+                f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
+                f"JOIN axioms a ON a.id = ae.axiom_id "
+                f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
+                present_iris,
+            ).fetchall()
+        )
+        from ontoloom.entities.store import lookup_entity_labels as _lookup_labels
+
+        labels_map.update(
+            {k: v for k, v in _lookup_labels(s, present_iris).items() if v is not None}
+        )
+
+    items = [
+        SelectionItem(
+            key=iri,
+            missing=not is_present,
+            role=roles_map.get(iri) if is_present else None,
+            label=labels_map.get(iri) if is_present else None,
+        )
+        for iri, is_present in rows
+    ]
+
+    return SelectionPage(
+        meta=sel,
+        items=items,
+        total_filtered=total,
+        present=present_count,
+        missing=sel.size - present_count,
+        show=show,
+    )
+
+
+def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[DroppedSelection]:
+    """Delete the named selections in one batch; return what was actually dropped."""
+    if not names:
+        return []
+    placeholders = ",".join("?" for _ in names)
+    dropped = [
+        DroppedSelection(name=SelectionName(r[0]), size=r[1])
+        for r in s.conn.execute(
+            f"SELECT name, size FROM selections WHERE name IN ({placeholders}) ORDER BY name",
+            tuple(names),
+        )
+    ]
+    if dropped:
+        s.conn.execute(
+            f"DELETE FROM selections WHERE name IN ({placeholders})",
+            tuple(names),
+        )
+    return dropped
+
+
+def remove_selections(s: Session, names: list[SelectionName]) -> RemoveSelectionsResult:
+    """Best-effort remove. Duplicate names in the input are de-duplicated."""
+    deduped = dedupe(names)
+    dropped = _remove_by_names(s, deduped)
+    found = {d.name for d in dropped}
+    not_found = tuple(n for n in deduped if n not in found)
+    return RemoveSelectionsResult(dropped=tuple(dropped), not_found=not_found)
 
 
 def _glob_to_like(pattern: str):
-    # A: why do we need this?????
-    """Translate a glob (`*`, `?`) into a SQL LIKE pattern with `\\` escape."""
+    """Translate a glob (`*`, `?`) into a SQL LIKE pattern with `\\` escape.
+
+    SQL `LIKE` uses `%`/`_` as wildcards and has no native single-char glob;
+    this translation lets callers pass familiar `*`/`?` semantics."""
     out: list[str] = []
     for c in pattern:
         if c == "*":
@@ -356,24 +476,25 @@ def _glob_to_like(pattern: str):
 
 
 def remove_selections_by_pattern(s: Session, pattern: str) -> list[DroppedSelection]:
-    # A: do we even need remove_by_pattern? I guess we do, but it seems to be complciated AND we have duplicate code here with the other remove/delete stuff?
     """Remove every selection whose name matches a glob pattern.
 
     `pattern` uses `*` (any sequence) and `?` (one character). Returns each
     removed selection in name order.
     """
     sql_pattern = _glob_to_like(pattern)
-    rows = s.conn.execute(
-        "SELECT name, size FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
-        (sql_pattern,),
-    ).fetchall()
-    dropped = [DroppedSelection(name=r[0], size=r[1]) for r in rows]
-    for d in dropped:
-        s.conn.execute("DELETE FROM selections WHERE name = ?", (d.name,))
-    return dropped
+    matching = [
+        SelectionName(r[0])
+        for r in s.conn.execute(
+            "SELECT name FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
+            (sql_pattern,),
+        )
+    ]
+    return _remove_by_names(s, matching)
 
 
-def create_selection(s: Session, name: str, expr: SetExpr, *, source: str = "") -> UpsertResult:
+def create_selection(
+    s: Session, name: SelectionName, expr: SetExpr, *, source: str = ""
+) -> UpsertResult:
     """Create a selection by evaluating a SetExpr tree."""
     items, kind = _eval_expr(s, expr)
     auto_source = source or str(expr)
@@ -382,7 +503,7 @@ def create_selection(s: Session, name: str, expr: SetExpr, *, source: str = "") 
 
 def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
     if isinstance(expr, str):
-        sel = get_selection(s, expr)
+        sel = get_selection(s, SelectionName(expr))
         items = [
             r[0]
             for r in s.conn.execute(

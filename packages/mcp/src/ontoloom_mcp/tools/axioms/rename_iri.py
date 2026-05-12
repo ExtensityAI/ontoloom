@@ -1,10 +1,9 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import rename_iri as core_rename_iri
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import LockedSelection, SelectionKind
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,

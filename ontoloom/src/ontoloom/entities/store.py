@@ -14,10 +14,10 @@ from ontoloom.entities.types import (
 )
 from ontoloom.errors import OntoloomError
 from ontoloom.owl.axioms import Declaration
-from ontoloom.owl.iri import IRI
+from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import SelectionKind, SelectionName
 
 
 class EntityNotFoundError(OntoloomError):
@@ -36,7 +36,7 @@ class EntityNotFoundError(OntoloomError):
 # A: this file is huge. we need to look at it separately
 
 _LABEL_BATCH_SIZE = 500
-_LOCAL_NAME = "local_name"
+_LOCAL_NAME_PROPERTY = "local_name"
 _TEXT_SCAN_CAP = 1000
 
 # SQL fragments for declared/deprecated filters (reference ae.entity_iri from outer query)
@@ -57,7 +57,7 @@ _NOT_DEPRECATED = (
 )
 
 
-def _axiom_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
+def _axiom_scope_join(s: Session, within: SelectionName | None) -> tuple[str, list[str]]:
     """Join clause for queries already in axiom-context (alias `a` for axioms).
     Silently no-op for ENTITIES selections -> these reads only respect axiom selections.
     """
@@ -72,7 +72,7 @@ def _axiom_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
     )
 
 
-def _entity_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
+def _entity_scope_join(s: Session, within: SelectionName | None) -> tuple[str, list[str]]:
     """Join clause for queries in axiom_entities-context (alias `ae`).
     Handles both AXIOMS (via a_w) and ENTITIES (via ae.entity_iri) selection kinds.
     """
@@ -91,7 +91,7 @@ def _entity_scope_join(s: Session, within: str | None) -> tuple[str, list[str]]:
     )
 
 
-def _entity_scope_allowed(s: Session, within: str) -> set[str]:
+def _entity_scope_allowed(s: Session, within: SelectionName) -> set[str]:
     """Allowed entity IRIs under `within`, as a set for in-Python post-filtering."""
     sel = get_selection(s, within)
     if sel.kind == SelectionKind.ENTITIES:
@@ -115,7 +115,7 @@ def _entity_scope_allowed(s: Session, within: str) -> set[str]:
 _NEAR_MATCH_LIMIT = 3
 
 
-def get_entity(s: Session, iri: IRI, *, within: str | None = None) -> EntityInfo:
+def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> EntityInfo:
     """Return entity details. Raises EntityNotFoundError (with near matches) on miss."""
     iri_str = str(iri)
 
@@ -133,7 +133,7 @@ def get_entity(s: Session, iri: IRI, *, within: str | None = None) -> EntityInfo
             "SELECT DISTINCT property, text FROM entity_text "
             "WHERE entity_iri = ? AND property != ? "
             "ORDER BY property, text",
-            (iri_str, _LOCAL_NAME),
+            (iri_str, _LOCAL_NAME_PROPERTY),
         )
     ]
 
@@ -163,7 +163,9 @@ def get_entity(s: Session, iri: IRI, *, within: str | None = None) -> EntityInfo
     )
 
 
-def axiom_hashes_for_entity(s: Session, iri: IRI, *, within: str | None = None) -> list[str]:
+def axiom_hashes_for_entity(
+    s: Session, iri: IRI, *, within: SelectionName | None = None
+) -> list[str]:
     """Return all axiom hashes for an entity."""
     iri_str = str(iri)
     extra_join, extra_params = _axiom_scope_join(s, within)
@@ -185,7 +187,7 @@ def search_entities(
     query: str | None = None,
     role: str | None = None,
     namespace: str | None = None,
-    within: str | None = None,
+    within: SelectionName | None = None,
     declared: bool | None = None,
     properties: list[str] | None = None,
     exclude_deprecated: bool = True,
@@ -233,7 +235,7 @@ def collect_entity_iris(
     query: str | None = None,
     role: str | None = None,
     namespace: str | None = None,
-    within: str | None = None,
+    within: SelectionName | None = None,
     declared: bool | None = None,
     properties: list[str] | None = None,
     exclude_deprecated: bool = True,
@@ -253,7 +255,7 @@ def collect_entity_iris(
         ]
 
     # Text search path
-    matches = _find_text_matches(s, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, _LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -261,7 +263,7 @@ def collect_entity_iris(
     return list(matches.keys())
 
 
-def entity_summary(s: Session, *, within: str | None = None) -> EntitySummary:
+def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
     if within is None:
         total = s.conn.execute("SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities").fetchone()[
             0
@@ -317,7 +319,7 @@ def find_duplicate_entities(
     s: Session,
     annotation_property: str,
     *,
-    within: str | None = None,
+    within: SelectionName | None = None,
 ) -> DuplicateResult:
     """Find annotation values shared by multiple entities."""
     sel_join_outer = ""
@@ -376,7 +378,7 @@ def _build_entity_filter(
     s: Session,
     role: str | None,
     namespace: str | None,
-    within: str | None,
+    within: SelectionName | None,
     declared: bool | None,
     properties: list[str] | None,
     exclude_deprecated: bool,
@@ -416,7 +418,7 @@ def _apply_text_filters(
     matches: dict[str, tuple[MatchSource, MatchQuality]],
     role: str | None,
     namespace: str | None,
-    within: str | None,
+    within: SelectionName | None,
     declared: bool | None,
     exclude_deprecated: bool,
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
@@ -444,7 +446,7 @@ def _list_entities(
     s: Session,
     role: str | None,
     namespace: str | None,
-    within: str | None,
+    within: SelectionName | None,
     declared: bool | None,
     properties: list[str] | None,
     exclude_deprecated: bool,
@@ -468,7 +470,7 @@ def _list_entities(
         )
     ]
     if not page_iris:
-        return EntitySearchPage(matches=(), total=total)
+        return EntitySearchPage(matches=(), total=total, offset=offset)
 
     display = _batch_fetch_entity_display(s, page_iris)
     return EntitySearchPage(
@@ -483,6 +485,7 @@ def _list_entities(
             for iri_str in page_iris
         ),
         total=total,
+        offset=offset,
     )
 
 
@@ -491,14 +494,14 @@ def _text_search_entities(
     query: str,
     role: str | None,
     namespace: str | None,
-    within: str | None,
+    within: SelectionName | None,
     declared: bool | None,
     properties: list[str] | None,
     exclude_deprecated: bool,
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    matches = _find_text_matches(s, query, _LOCAL_NAME, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, _LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -518,7 +521,7 @@ def _text_search_entities(
     total = len(sorted_iris)
     page_iris = sorted_iris[offset : offset + limit]
     if not page_iris:
-        return EntitySearchPage(matches=(), total=total)
+        return EntitySearchPage(matches=(), total=total, offset=offset)
 
     display = _batch_fetch_entity_display(s, page_iris)
     return EntitySearchPage(
@@ -533,6 +536,7 @@ def _text_search_entities(
             for iri_str in page_iris
         ),
         total=total,
+        offset=offset,
     )
 
 
@@ -551,7 +555,7 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
         f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
         f"WHERE entity_iri IN ({placeholders}) AND property != ? "
         f"ORDER BY entity_iri, property, text",
-        [*iris, _LOCAL_NAME],
+        [*iris, _LOCAL_NAME_PROPERTY],
     ):
         anns_by_iri.setdefault(iri_str, []).append(AnnotationRow(property=IRI(prop), value=text))
 
@@ -639,7 +643,7 @@ def _find_text_matches(
         params.extend(properties)
     else:
         prop_cond = "property != ?"
-        params.append(_LOCAL_NAME)
+        params.append(_LOCAL_NAME_PROPERTY)
 
     # ORDER BY entity_iri: insertion order determines `_text_search_entities`
     # pagination output. Without it, page-1 contents drift across runs.
@@ -674,8 +678,8 @@ def lookup_entity_labels(s: Session, iris: list[str]) -> dict[str, str | None]:
         result.update(
             s.conn.execute(
                 f"SELECT entity_iri, text FROM entity_text "
-                f"WHERE entity_iri IN ({ph}) AND property = 'rdfs:label'",
-                batch,
+                f"WHERE entity_iri IN ({ph}) AND property = ?",
+                (*batch, RDFS_LABEL),
             ).fetchall()
         )
     return result
@@ -696,10 +700,31 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     ]
 
 
-def declared_entity_count(s: Session, within: str | None = None) -> int:
+def declared_entity_count(s: Session, within: SelectionName | None = None) -> int:
     """Count distinct entities that have a Declaration axiom, optionally scoped to a selection."""
     scope_join, scope_params = _entity_scope_join(s, within)
     return s.conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {_DECLARED_EXISTS}",
+        scope_params,
+    ).fetchone()[0]
+
+
+def undeclared_entity_count(
+    s: Session,
+    within: SelectionName | None = None,
+    *,
+    exclude_deprecated: bool = True,
+) -> int:
+    """Count distinct entities that lack a Declaration axiom.
+
+    `exclude_deprecated=True` matches `search_entities(declared=False)` defaults.
+    Set False to count every undeclared entity including deprecated ones.
+    """
+    scope_join, scope_params = _entity_scope_join(s, within)
+    where = _DECLARED_NOT_EXISTS
+    if exclude_deprecated:
+        where = f"{where} AND {_NOT_DEPRECATED}"
+    return s.conn.execute(
+        f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {where}",
         scope_params,
     ).fetchone()[0]

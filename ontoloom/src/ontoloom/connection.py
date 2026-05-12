@@ -1,11 +1,36 @@
 import importlib.resources
 import os
+import re
 import sqlite3
+import uuid
+import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ontoloom.errors import OntoloomError
-from ontoloom.models import FrozenModel
+from ontoloom.models import FrozenModel, TypedStr
+
+_SESSION_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+
+
+class SessionId(TypedStr):
+    """A 32-character lowercase hex session identifier (UUID4 hex)."""
+
+    description = "32-character hex session id (UUID4 hex, lowercase)."
+    pattern = r"^[0-9a-f]{32}$"
+    examples = ("a3f1b2c4d5e6f70809a1b2c3d4e5f607",)
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        if not _SESSION_ID_PATTERN.match(value):
+            msg = f"SessionId must be 32 lowercase hex chars, got {value!r}"
+            raise ValueError(msg)
+        return value
+
 
 _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
@@ -36,19 +61,6 @@ class Metadata(FrozenModel):
     schema_version: int
 
 
-_REQUIRED_TABLES = frozenset(
-    {
-        "axiom_entities",
-        "axiom_text",
-        "axioms",
-        "entity_text",
-        "events",
-        "metadata",
-        "selection_items",
-        "selections",
-    }
-)
-
 # Backslash chosen as the LIKE-ESCAPE character; pair every use with `ESCAPE '\\'`.
 LIKE_ESCAPE = "\\"
 
@@ -69,19 +81,23 @@ def _apply_pragmas(conn: sqlite3.Connection):
 
 
 def _validate_schema(conn: sqlite3.Connection):
-    existing = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
-    missing = _REQUIRED_TABLES - existing
-    if missing:
-        msg = (
-            f"Not an ontoloom database or schema is incomplete (missing tables: {sorted(missing)})"
-        )
+    try:
+        row = conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
+    except sqlite3.OperationalError as e:
+        msg = f"Not an ontoloom database: {e}"
+        raise OntologySchemaError(msg) from e
+
+    if row is None:
+        msg = "Not an ontoloom database: metadata row missing"
         raise OntologySchemaError(msg)
-    row = conn.execute(
-        "SELECT json_extract(data, '$.schema_version') FROM metadata WHERE id = 1"
-    ).fetchone()
-    stored = row[0] if row else None
-    if stored != CURRENT_SCHEMA_VERSION:
-        msg = f"Schema version mismatch: expected {CURRENT_SCHEMA_VERSION}, got {stored!r}"
+
+    metadata = Metadata.model_validate_json(row[0])
+
+    if metadata.schema_version != CURRENT_SCHEMA_VERSION:
+        msg = (
+            f"Schema version mismatch: "
+            f"expected {CURRENT_SCHEMA_VERSION}, got {metadata.schema_version!r}"
+        )
         raise OntologySchemaError(msg)
 
 
@@ -122,7 +138,14 @@ class Ontology:
 
         if path.exists():
             raise OntologyExistsError(path)
-        conn = sqlite3.connect(str(path), autocommit=True)
+        if not path.parent.exists():
+            msg = f"Parent directory {str(path.parent)!r} does not exist."
+            raise FileNotFoundError(msg)
+        try:
+            conn = sqlite3.connect(str(path), autocommit=True)
+        except sqlite3.OperationalError as e:
+            msg = f"Cannot open database at {str(path)!r}: {e}"
+            raise OntoloomError(msg) from e
         try:
             _apply_pragmas(conn)
             conn.executescript(_SCHEMA)
@@ -147,10 +170,52 @@ class Session:
 
     ontology: Ontology
     conn: sqlite3.Connection
-    session_id: str
+    session_id: SessionId
 
     def commit(self):
         self.conn.execute("COMMIT")
 
     def rollback(self):
         self.conn.execute("ROLLBACK")
+
+
+@contextmanager
+def session(ont: Ontology) -> Iterator[Session]:
+    """Open a transactional session against the ontology.
+
+    The caller must end the session with `s.commit()` or `s.rollback()`.
+    Exceptions inside the `with` block roll back automatically and propagate.
+    Exiting without committing or rolling back emits a `RuntimeWarning` and
+    rolls back; the project's `filterwarnings = ["error"]` pytest config
+    promotes this to a hard test failure.
+    """
+    try:
+        raw = sqlite3.connect(str(ont.path), autocommit=True)
+    except sqlite3.OperationalError as e:
+        msg = f"Cannot open database at {str(ont.path)!r}: {e}"
+        raise OntoloomError(msg) from e
+    try:
+        try:
+            _apply_pragmas(raw)
+        except sqlite3.DatabaseError as e:
+            msg = f"Cannot read database at {str(ont.path)!r}: {e}"
+            raise OntoloomError(msg) from e
+        _validate_schema(raw)
+        raw.execute("BEGIN")
+        s = Session(ontology=ont, conn=raw, session_id=SessionId(uuid.uuid4().hex))
+        try:
+            yield s
+        except:
+            if raw.in_transaction:
+                raw.execute("ROLLBACK")
+            raise
+        else:
+            if raw.in_transaction:
+                warnings.warn(
+                    "session exited without commit() or rollback() — rolling back",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                raw.execute("ROLLBACK")
+    finally:
+        raw.close()

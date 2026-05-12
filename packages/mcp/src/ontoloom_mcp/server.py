@@ -10,8 +10,6 @@ from ontoloom_mcp.tools.axioms.replace_axiom import tool_replace_axiom
 from ontoloom_mcp.tools.entities.find_duplicates import tool_find_duplicates
 from ontoloom_mcp.tools.entities.get_entity import tool_get_entity
 from ontoloom_mcp.tools.entities.search_entities import tool_search_entities
-from ontoloom_mcp.tools.history.revert import tool_revert
-from ontoloom_mcp.tools.history.show_changes import tool_show_changes
 from ontoloom_mcp.tools.ontology.create_ontology import tool_create_ontology
 from ontoloom_mcp.tools.ontology.describe_ontology import tool_describe_ontology
 from ontoloom_mcp.tools.ontology.export_jsonl import tool_export_jsonl
@@ -54,8 +52,6 @@ mcp.add_tool(tool_match_axioms)
 mcp.add_tool(tool_set_prefix)
 mcp.add_tool(tool_remove_prefix)
 mcp.add_tool(tool_export_jsonl)
-mcp.add_tool(tool_show_changes)
-mcp.add_tool(tool_revert)
 mcp.add_tool(tool_create_selection)
 mcp.add_tool(tool_read_selection)
 mcp.add_tool(tool_list_selections)

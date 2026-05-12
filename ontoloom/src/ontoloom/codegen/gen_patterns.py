@@ -5,10 +5,9 @@ via get_type_hints (preserves alias identity), and emits the parallel pattern
 hierarchy by substituting IRI->Slot, ClassExpression->ExprSlot, DataRange->DataRange|Slot,
 and appending |Contains to Unordered tuple fields.
 
-Run: uv run python -m ontoloom.codegen.gen_patterns
+Run: uv run ontoloom-gen-patterns
 """
 
-# A: make a script in the pyproject instead of doing it like this (are there dev-env only scripts?)
 # A: consider splitting it up, into an analysis pass that generates structured fields, and a codegen pass that then generates code from the fields - easier to verify, no? but low priority
 
 from __future__ import annotations
@@ -16,6 +15,7 @@ from __future__ import annotations
 import sys
 import types
 import typing
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, get_args, get_origin
 
@@ -76,7 +76,7 @@ from ontoloom.patterns.base import BasePattern
 from ontoloom.patterns.slot import Slot"""
 
 
-def generate() -> str:  # A GLOBAL: pylance can infer types. global todo!
+def generate():
     lines: list[str] = [_HEADER, _IMPORTS, ""]
     # Two Contains variants -> one per inner element type. Splitting them prevents
     # a Slot-tuple Contains from being silently accepted on an ExprSlot-tuple
@@ -95,20 +95,20 @@ def generate() -> str:  # A GLOBAL: pylance can infer types. global todo!
     needs_rebuild: list[str] = ["ContainsExpr", "ContainsSlot"]
 
     for cls in _EXPR_CLASSES:
-        class_lines, rebuild = _emit_class(cls)
-        lines.extend(class_lines)
+        emitted = _emit_class(cls)
+        lines.extend(emitted.lines)
         lines.append("")
-        if rebuild:
+        if emitted.needs_rebuild:
             needs_rebuild.append(cls.__name__ + "Pattern")
 
     lines.append(f"ExprSlot = Slot | {' | '.join(c.__name__ + 'Pattern' for c in _EXPR_CLASSES)}")
     lines.append("")
 
     for cls in _AXIOM_CLASSES:
-        class_lines, rebuild = _emit_class(cls)
-        lines.extend(class_lines)
+        emitted = _emit_class(cls)
+        lines.extend(emitted.lines)
         lines.append("")
-        if rebuild:
+        if emitted.needs_rebuild:
             needs_rebuild.append(cls.__name__ + "Pattern")
 
     expr_names = " | ".join(c.__name__ + "Pattern" for c in _EXPR_CLASSES)
@@ -130,11 +130,13 @@ def generate() -> str:  # A GLOBAL: pylance can infer types. global todo!
     return "\n".join(lines) + "\n"
 
 
-def _emit_class(
-    cls: type,
-) -> tuple[
-    list[str], bool
-]:  # A global: return type should be a dataclass or named tuple at the least
+@dataclass(frozen=True, slots=True)
+class EmittedClass:
+    lines: tuple[str, ...]
+    needs_rebuild: bool
+
+
+def _emit_class(cls: type):
     pattern_name = cls.__name__ + "Pattern"
     lines: list[str] = [f"class {pattern_name}(BasePattern):"]
     needs_rebuild = False
@@ -147,7 +149,7 @@ def _emit_class(
         if "ExprSlot" in field_type or "ContainsExpr" in field_type or "ContainsSlot" in field_type:
             needs_rebuild = True
 
-    return lines, needs_rebuild
+    return EmittedClass(lines=tuple(lines), needs_rebuild=needs_rebuild)
 
 
 def _leaf_pattern(t: object) -> str | None:
@@ -214,15 +216,17 @@ def _union_member(t: object) -> str:
     return getattr(t, "__name__", repr(t))
 
 
-if __name__ == "__main__":
+def main() -> None:
     out = generate()
     if "--check" in sys.argv:
         existing = _TARGET.read_text()
         if existing != out:
-            sys.stderr.write(
-                "_generated.py is out of sync. Run: uv run python -m ontoloom.codegen.gen_patterns\n"
-            )
+            sys.stderr.write("_generated.py is out of sync. Run: uv run ontoloom-gen-patterns\n")
             sys.exit(1)
     else:
         _TARGET.write_text(out)
         print(f"Wrote {_TARGET}")  # noqa: T201
+
+
+if __name__ == "__main__":
+    main()

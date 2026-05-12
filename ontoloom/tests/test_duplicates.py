@@ -1,6 +1,6 @@
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI
@@ -8,7 +8,6 @@ from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
 
 
 @pytest.fixture()

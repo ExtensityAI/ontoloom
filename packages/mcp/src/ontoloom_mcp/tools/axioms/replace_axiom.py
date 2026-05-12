@@ -1,18 +1,17 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import replace_axiom as core_replace_axiom
-from ontoloom.connection import Ontology
-from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.connection import Ontology, session
+from ontoloom.hashing import AxiomHashPrefix, short_hash
 from ontoloom.owl.axioms import Axiom
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import HexPrefix, OntologyPath
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def replace_axiom(
     path: OntologyPath,
-    axiom_hash: HexPrefix,
+    axiom_hash: AxiomHashPrefix,
     new_axiom: Axiom,
 ):
     """Replace one axiom with a new one (atomic delete + add, single event).
@@ -35,9 +34,9 @@ def replace_axiom(
         s.commit()
 
     if result.was_noop:
-        return f"No-op: new axiom has same hash as old ({result.old_hash[:HASH_DISPLAY_LEN]})."
+        return f"No-op: new axiom has same hash as old ({short_hash(result.old_hash)})."
 
-    summary = f"Replaced [{result.old_hash[:HASH_DISPLAY_LEN]}] with [{result.new_hash[:HASH_DISPLAY_LEN]}]."
+    summary = f"Replaced [{short_hash(result.old_hash)}] with [{short_hash(result.new_hash)}]."
     if result.was_merged_into_existing:
         summary += " New hash already existed; merged into existing axiom."
     return format_diff([("-", result.old), ("+", result.new)], summary)

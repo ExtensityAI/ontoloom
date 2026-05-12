@@ -12,9 +12,9 @@ from ontoloom.connection import (
 )
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Axiom
-from ontoloom.prefixes import list_prefixes
+from ontoloom.prefixes import NamespaceIRI, PrefixName, list_prefixes
 from ontoloom.selections.store import SelectionKindError, get_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import SelectionKind, SelectionName
 
 FORMAT_VERSION = 4
 
@@ -24,7 +24,7 @@ class HeaderRecord(BaseModel, frozen=True):
     format_version: int
     schema_version: int
     exported_at: str
-    prefixes: dict[str, str]
+    prefixes: dict[PrefixName, NamespaceIRI]
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,10 +33,27 @@ class ImportJsonlResult:
     axioms: list[Axiom]
 
 
-def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None) -> int:
-    """Export axioms as JSONL with a header line. Returns count of exported axioms."""
+@dataclass(frozen=True, slots=True)
+class ExportResult:
+    """Outcome of `export_to_jsonl`. `skipped` is non-zero only when scoping by
+    a selection that contains hashes no longer in the store."""
+
+    exported: int
+    skipped: int
+
+
+def export_to_jsonl(
+    s: Session, output_path: Path, *, within: SelectionName | None = None
+) -> ExportResult:
+    """Export axioms as JSONL with a header line."""
     assert_within_workspace(output_path)
-    # A global: we need more space, like empty lines and all. else, this is crammed and hard to understand. usual heuristic is a space before an if or else or try or for, but NOT if it is preceded by another if or else or try or for, you know what I mean? make this a general principle maybe! also, usually if an if or for or else block is long and there is more code after, then also add an empty line. VERY IMPORTANT, should be in your global python memory.
+
+    if not output_path.parent.exists():
+        msg = f"Directory '{output_path.parent}' does not exist."
+        raise FileNotFoundError(msg)
+
+    selection_size: int | None = None
+
     if within is not None:
         sel = get_selection(s, within)
         if sel.kind != SelectionKind.AXIOMS:
@@ -46,6 +63,7 @@ def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None)
                 actual=sel.kind,
                 operation="export_jsonl",
             )
+        selection_size = sel.size
         query = (
             "SELECT json(a.data) FROM axioms a "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
@@ -55,11 +73,6 @@ def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None)
     else:
         query = "SELECT json(data) FROM axioms ORDER BY hash"
         params = ()
-
-    if not output_path.parent.exists():
-        # A: should check this in the beginning. maybe make this an expect or validate function - like validate_directory_exists or ensure or sth?
-        msg = f"Directory '{output_path.parent}' does not exist."
-        raise FileNotFoundError(msg)
 
     header = HeaderRecord(
         format="ontoloom-jsonl",
@@ -77,7 +90,9 @@ def export_to_jsonl(s: Session, output_path: Path, *, within: str | None = None)
             f.write(json_text)
             f.write("\n")
             count += 1
-    return count
+
+    skipped = 0 if selection_size is None else selection_size - count
+    return ExportResult(exported=count, skipped=skipped)
 
 
 def import_jsonl(path: Path) -> ImportJsonlResult:

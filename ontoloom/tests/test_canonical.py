@@ -1,5 +1,5 @@
 from ontoloom.canonical import canonical_json
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom, disambiguating_prefixes
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
@@ -30,7 +30,6 @@ from ontoloom.owl.literals import (
 )
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
 
 # -- Annotation exclusion --
 
@@ -307,7 +306,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
         from ontoloom.selections.store import create_selection, read_selection, upsert_selection
         from ontoloom.selections.types import SelectionKind, SelectionName
         from ontoloom.connection import Ontology
-        from ontoloom.transactions import session
+        from ontoloom.connection import session
 
         with session(Ontology(Path({str(db_path)!r}))) as s:
             upsert_selection(s, "a", SelectionKind.ENTITIES,

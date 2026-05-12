@@ -1,6 +1,6 @@
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
@@ -16,13 +16,12 @@ from ontoloom.selections.store import (
     SelectionExprError,
     StaleSelectionError,
     create_selection,
+    get_locked_selection,
     get_selection,
     read_selection,
     upsert_selection,
-    verify_selection_hash,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName, ShowFilter
-from ontoloom.transactions import session
 
 
 @pytest.fixture()
@@ -221,18 +220,14 @@ def test_validate_selection_name_empty():
         SelectionName("")
 
 
-def test_selection_name_strips_locked_hash_suffix():
-    assert SelectionName("my_sel@a3f1b2c4") == "my_sel"
+def test_selection_name_rejects_any_at_suffix():
+    """Core SelectionName is strict and rejects any `@hash` suffix.
 
-
-def test_selection_name_rejects_short_hash_suffix():
-    with pytest.raises(ValueError, match="at least"):
-        SelectionName("my_sel@abc12")
-
-
-def test_selection_name_rejects_non_hex_hash_suffix():
-    with pytest.raises(ValueError, match="at least"):
-        SelectionName("my_sel@hashvalue")
+    Lenient stripping is the MCP boundary's job — see
+    `packages/mcp/.../tools/test_selection_name_strips_locked_hash_suffix`.
+    """
+    with pytest.raises(ValueError):
+        SelectionName("my_sel@a3f1b2c4")
 
 
 def test_validate_selection_name_too_long():
@@ -284,10 +279,10 @@ def test_selection_name_accepts_valid_shapes(good):
 def test_verify_hash_match_and_mismatch(s):
     hash1 = upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
 
-    verify_selection_hash(s, "sel", hash1[:8])  # should not raise
+    get_locked_selection(s, "sel", hash1[:8])  # should not raise
 
     with pytest.raises(StaleSelectionError):
-        verify_selection_hash(s, "sel", "00000000")
+        get_locked_selection(s, "sel", "00000000")
 
 
 def test_read_with_show_filters(s):

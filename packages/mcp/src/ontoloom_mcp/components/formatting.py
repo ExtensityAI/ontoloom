@@ -1,53 +1,75 @@
 from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
+from dataclasses import dataclass
 
 from ontoloom.axioms.types import AxiomSummary
-from ontoloom.entities.types import EntityInfo, EntityMatch, EntitySummary
+from ontoloom.connection import Session
+from ontoloom.entities.store import lookup_entity_labels
+from ontoloom.entities.types import EntityInfo, EntitySearchPage, EntitySummary
 from ontoloom.entity_walker import iter_axiom_entities
-from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom
-from ontoloom.owl.iri import IRI
+from ontoloom.hashing import HashedAxiom, short_hash
+from ontoloom.owl.axioms import BaseAxiom
+from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import UpsertResult
+from ontoloom.utils import dquoted
 
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
 
 
-def walk_unique_iris(axiom):  # A global: we are missing a param type here
+@dataclass(frozen=True, slots=True)
+class Ref:
+    """An IRI paired with its rdfs:label (if any) for display."""
+
+    iri: IRI
+    label: str | None
+
+
+def unique_iris_in(axiom: BaseAxiom) -> list[IRI]:
     """Ordered unique IRIs referenced by an axiom (single walk, dedup preserved)."""
-    seen: set[str] = set()
-    out: list[str] = []
-    for iri, _role, _pos in iter_axiom_entities(axiom):  # A: ignored params can be _
-        s = str(
-            iri
-        )  # A global: why return str(IRI)? no reason! use IRI wherever possible, is much easier to understand - if you get IRI and there is no reason to stringify, DON'T!
-        if s not in seen:
-            seen.add(s)
-            out.append(s)
+    seen: set[IRI] = set()
+    out: list[IRI] = []
+    for iri, _, _ in iter_axiom_entities(axiom):
+        if iri not in seen:
+            seen.add(iri)
+            out.append(iri)
     return out
 
 
-def collect_axiom_iris(axioms: list[HashedAxiom]):
+def unique_iris_across(axioms: Sequence[HashedAxiom]) -> list[IRI]:
     """Extract unique entity IRIs from a list of hashed axioms (insertion-ordered)."""
-    # A: inconsistent with name of single axiom walk?
-    seen: set[str] = set()
-    out: list[str] = []
+    seen: set[IRI] = set()
+    out: list[IRI] = []
     for ha in axioms:
-        for iri_str in walk_unique_iris(ha.axiom):
-            if iri_str not in seen:
-                seen.add(iri_str)
-                out.append(iri_str)
+        for iri in unique_iris_in(ha.axiom):
+            if iri not in seen:
+                seen.add(iri)
+                out.append(iri)
     return out
 
 
-def format_iri_with_label(iri: str, labels: dict[str, str | None]):
-    # A: this function is horrible - why do we need it? why is this to be done like this? like, what is labels, and why do we need to check if labels contains iri here? seems like it should be somewhere else, and done differently
-    label = labels.get(iri)
-    return f'{iri} "{label}"' if label else iri
+def build_refs(s: Session, iris: Sequence[IRI]) -> list[Ref]:
+    """Look up rdfs:labels for `iris` and pair each with its label."""
+    labels = lookup_entity_labels(s, list(iris))
+    return [Ref(iri=iri, label=labels.get(iri)) for iri in iris]
+
+
+def build_refs_per_axiom(s: Session, axioms: Sequence[HashedAxiom]) -> list[list[Ref]]:
+    """Build per-axiom Ref lists, sharing one label lookup across all axioms."""
+    all_iris = unique_iris_across(axioms)
+    labels = lookup_entity_labels(s, list(all_iris))
+    return [
+        [Ref(iri=iri, label=labels.get(iri)) for iri in unique_iris_in(ha.axiom)] for ha in axioms
+    ]
+
+
+def format_ref(ref: Ref) -> str:
+    """Render an IRI with its label as `iri "label"`, or just the IRI if no label."""
+    return f"{ref.iri} {dquoted(ref.label)}" if ref.label else str(ref.iri)
 
 
 def format_roles(roles: AbstractSet[EntityType]):
-    # A: good func
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
 
@@ -62,22 +84,15 @@ def format_axiom_annotations(axiom):
     return [f"  # {ann.property} {ann.value}" for ann in axiom.annotations]
 
 
-def _format_axiom_line(
-    ha: HashedAxiom,
-    labels: dict[str, str | None],
-    iris: list[str] | None = None,
-):
+def _format_axiom_line(ha: HashedAxiom, refs: Sequence[Ref] = ()):
     """Format a single axiom block: head line + any annotation continuation lines."""
-    head = f"[{ha.hash[:HASH_DISPLAY_LEN]}] {ha.axiom}"  # A: truncate_hash could also accept HashedAxiom (is there any reason it does not? where is it called? or maybe accept str and HashedAxiom?)
-    if labels:
-        # A: do not like that iris is optional and used if passed in - what could we do? same with labels, this seems bad? maybe have a custom type for this stuff as well? but we need to look deeply to figure out which one and all
-        if iris is None:
-            iris = walk_unique_iris(ha.axiom)
-        hints = [f'{iri} "{labels[iri]}"' for iri in iris if labels.get(iri)]
-        if hints:
-            head += "  # " + ", ".join(hints)
+    head = f"[{short_hash(ha.hash)}] {ha.axiom}"
+    hints = [format_ref(r) for r in refs if r.label]
 
+    if hints:
+        head += "  # " + ", ".join(hints)
     annotation_lines = format_axiom_annotations(ha.axiom)
+
     if annotation_lines:
         return head + "\n" + "\n".join(annotation_lines)
     return head
@@ -86,19 +101,16 @@ def _format_axiom_line(
 def format_diff(
     entries: list[tuple[str, HashedAxiom]],
     summary: str,
-    labels: dict[str, str | None] | None = None,
-    iris_per_entry: list[list[str] | None] | None = None,
+    refs_per_entry: Sequence[Sequence[Ref]] = (),
     max_rows: int | None = None,
 ):
-    lb = labels or {}
     capped = entries if max_rows is None else entries[:max_rows]
-    # A: this is weird do not like it at all, need to reason through please
-    iris_list: list[list[str] | None] = (
-        iris_per_entry[: len(capped)] if iris_per_entry is not None else [None] * len(capped)
+    refs_list: Sequence[Sequence[Ref]] = (
+        refs_per_entry[: len(capped)] if refs_per_entry else [()] * len(capped)
     )
     lines = [
-        f"{tag} {_format_axiom_line(ha, lb, iris)}"
-        for (tag, ha), iris in zip(capped, iris_list, strict=True)
+        f"{tag} {_format_axiom_line(ha, refs)}"
+        for (tag, ha), refs in zip(capped, refs_list, strict=True)
     ]
     if max_rows is not None and len(entries) > max_rows:
         lines.append(f"... and {len(entries) - max_rows} more")
@@ -108,34 +120,22 @@ def format_diff(
 
 def format_axiom_listing(
     axioms: list[HashedAxiom],
-    labels: dict[str, str | None] | None = None,
-    iris_per_axiom: list[list[str] | None] | None = None,
+    refs_per_axiom: Sequence[Sequence[Ref]] = (),
 ):
     if not axioms:
         return ""
-    lb = labels or {}  # A: very much duplicated code with above, do not like, reason please
-    iris_list: list[list[str] | None] = (
-        iris_per_axiom if iris_per_axiom is not None else [None] * len(axioms)
-    )
+    refs_list: Sequence[Sequence[Ref]] = refs_per_axiom or [()] * len(axioms)
     return "\n".join(
-        _format_axiom_line(ha, lb, iris) for ha, iris in zip(axioms, iris_list, strict=True)
+        _format_axiom_line(ha, refs) for ha, refs in zip(axioms, refs_list, strict=True)
     )
 
 
-def format_entity_inspect(
-    iri: IRI,
-    info: EntityInfo,
-    labels: dict[str, str | None] | None = None,
-):
-    lb = labels or {}
-    header = format_iri_with_label(
-        str(iri), lb
-    )  # A global: again, passing labels not good like that, what could we do?
-    lines = [f"{header} ({format_roles(info.roles)})", ""]
+def format_entity_inspect(ref: Ref, info: EntityInfo):
+    lines = [f"{format_ref(ref)} ({format_roles(info.roles)})", ""]
 
     if info.annotations:
         lines.append("Annotations:")
-        lines.extend(f'  {ann.property} "{ann.value}"' for ann in info.annotations)
+        lines.extend(f"  {ann.property} {dquoted(ann.value)}" for ann in info.annotations)
         lines.append("")
 
     total = sum(info.axiom_counts.values())
@@ -148,9 +148,6 @@ def format_entity_inspect(
 
 
 def format_entity_summary(summary: EntitySummary):
-    # A: consider, should this be a func on EntitySummary? maybe, is pure, right?
-    # A global: generally consider: which funcs to put on data types, which to keep free? I guess pure functions can in theory be on the data types, but please talk through with me, very important
-
     lines = [f"{summary.total} entities total"]
     role_total = sum(summary.by_role.values())
     if role_total != summary.total:
@@ -166,7 +163,6 @@ def format_entity_summary(summary: EntitySummary):
 
 
 def format_axiom_summary(summary: AxiomSummary):
-    # A: see above func
     lines = [f"{summary.total} axioms total"]
     for typ, count in summary.by_type.most_common():
         lines.append(f"  {count} {typ}")
@@ -197,24 +193,21 @@ def format_selection_result(
     return "\n".join(parts)
 
 
-def format_entity_search_page(matches: Sequence[EntityMatch], total: int, offset: int):
-    # A: again, need a type for this - EntitySearchPage or sth, derived from SearchPage that contains like total and offset or sth, and then matches on EntitySearchPage and all!!
-    end = offset + len(matches)
-    lines = [f"Showing {offset + 1}-{end} of {total} entities:"]
+def format_entity_search_page(page: EntitySearchPage):
+    end = page.offset + len(page.matches)
+    lines = [f"Showing {page.offset + 1}-{end} of {page.total} entities:"]
     lines.append("")
-    for m in matches:
+    for m in page.matches:
         role_str = format_roles(m.roles)
         label = ""
         for ann in m.annotations:
-            if (
-                str(ann.property) == "rdfs:label"
-            ):  # A global: rdfs:label is a constant, so let's make it a constant somewhere, sth like RDFS_LABEL = IRI(...) in this way we also get free validation in case we have typos and we can scrap the str(...) here.
-                label = f' "{ann.value}"'
+            if ann.property == RDFS_LABEL:
+                label = f" {dquoted(ann.value)}"
                 break
         lines.append(f"  {m.iri} ({role_str}){label}")
         lines.extend(
-            f'    {ann.property} "{ann.value}"'
+            f"    {ann.property} {dquoted(ann.value)}"
             for ann in m.annotations
-            if str(ann.property) != "rdfs:label"
+            if ann.property != RDFS_LABEL
         )
     return "\n".join(lines)

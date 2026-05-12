@@ -1,14 +1,14 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
+from ontoloom.prefixes import NamespaceIRI, PrefixName
 from ontoloom.prefixes import set_prefix as core_set_prefix
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import NamespaceIRI, OntologyPath, PrefixName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def set_prefix(
@@ -40,8 +40,9 @@ def set_prefix(
             )
             if confirm != token:
                 msg = (
-                    f"Reassigning prefix {name!r} from {result.previous_iri!r} to {iri!r} "
-                    f"would change the meaning of {result.in_use_count} entities."
+                    f"Reassigning prefix {str(name)!r} from {str(result.previous_iri)!r} "
+                    f"to {str(iri)!r} would change the meaning of "
+                    f"{result.in_use_count} entities."
                 )
                 raise ConfirmationRequiredError(msg, token)
 

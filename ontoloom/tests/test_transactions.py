@@ -2,8 +2,7 @@ import sqlite3
 import warnings
 
 import pytest
-from ontoloom.connection import Ontology
-from ontoloom.transactions import session
+from ontoloom.connection import Ontology, session
 
 
 class BoomError(Exception):

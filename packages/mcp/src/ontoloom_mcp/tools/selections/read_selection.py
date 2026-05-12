@@ -1,9 +1,9 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
-from ontoloom.hashing import HASH_DISPLAY_LEN
+from ontoloom.connection import Ontology, session
+from ontoloom.hashing import short_hash
 from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.types import SelectionKind, ShowFilter
-from ontoloom.transactions import session
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_axiom_annotations
 from ontoloom_mcp.components.tool import create_tool
@@ -48,7 +48,7 @@ def read_selection(
 
     if meta.kind == SelectionKind.AXIOMS:
         for item in result.items:
-            h = item.key[:HASH_DISPLAY_LEN]
+            h = short_hash(item.key)
             if item.missing or item.axiom is None:
                 lines.append(f"[{h}] *missing*")
                 continue
@@ -61,7 +61,7 @@ def read_selection(
                 lines.append(f"{item.key} *missing*")
             else:
                 role_str = f" ({item.role})" if item.role else ""
-                label_str = f' "{item.label}"' if item.label else ""
+                label_str = f" {dquoted(item.label)}" if item.label else ""
                 lines.append(f"{item.key}{role_str}{label_str}")
 
     return "\n".join(lines)

@@ -11,5 +11,5 @@ class BasePattern(FrozenModel):
     """
 
     @classmethod
-    def axiom_tag(cls) -> str:
+    def axiom_tag(cls):
         return cls.__name__.removesuffix("Pattern")

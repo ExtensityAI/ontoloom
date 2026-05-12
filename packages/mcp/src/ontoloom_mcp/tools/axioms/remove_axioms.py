@@ -2,20 +2,20 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import remove_axioms_by_hash, remove_axioms_by_selection
-from ontoloom.connection import Ontology
+from ontoloom.axioms.store import remove_by_hash, remove_by_selection
+from ontoloom.connection import Ontology, session
+from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.selections.types import LockedSelection
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.errors import MissingRequiredError, MutuallyExclusiveError
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import HexPrefix, OntologyPath
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def remove_axioms(
     path: OntologyPath,
-    axiom_hashes: Annotated[list[HexPrefix], MinLen(1)] | None = None,
+    axiom_hashes: Annotated[list[AxiomHashPrefix], MinLen(1)] | None = None,
     within: LockedSelection | None = None,
 ):
     """Remove axioms by hash prefix or by selection.
@@ -35,7 +35,7 @@ def remove_axioms(
     ont = Ontology(path)
     with session(ont) as s:
         if within is not None:
-            sel_result = remove_axioms_by_selection(s, within)
+            sel_result = remove_by_selection(s, within)
             s.commit()
             entries = [("-", ha) for ha in sel_result.removed]
             summary = (
@@ -44,7 +44,7 @@ def remove_axioms(
             )
             return format_diff(entries, summary, max_rows=20)
 
-        result = remove_axioms_by_hash(s, axiom_hashes)  # pyright: ignore[reportArgumentType]
+        result = remove_by_hash(s, axiom_hashes)  # pyright: ignore[reportArgumentType]
         entries = [("-", ha) for ha in result.removed]
         s.commit()
 

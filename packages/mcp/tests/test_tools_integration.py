@@ -27,6 +27,7 @@ from ontoloom_mcp.tools.selections.read_selection import read_selection
 def empty_db(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
+    set_prefix(path=path, name="ex", iri="http://example.org/")
     return path
 
 
@@ -92,6 +93,162 @@ def test_create_ontology_existing_file_raises(empty_db):
     assert "already exists" in str(exc_info.value)
 
 
+def test_create_ontology_missing_parent_dir_echoes_path(tmp_path):
+    wrapped = translate_errors(create_ontology)
+    target = tmp_path / "no_such" / "nested" / "x.db"
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=target)
+    msg = str(exc_info.value)
+    assert "does not exist" in msg
+    assert str(target.parent) in msg
+
+
+def test_session_against_non_database_file_echoes_path(tmp_path):
+    from ontoloom.connection import Ontology, session
+
+    not_a_db = tmp_path / "garbage.db"
+    not_a_db.write_bytes(b"this is not a sqlite database")
+    ont = Ontology(path=not_a_db)
+    with pytest.raises(Exception) as exc_info, session(ont):
+        pass
+    msg = str(exc_info.value)
+    assert str(not_a_db) in msg
+
+
+def test_add_axioms_rejects_undeclared_prefix(empty_db):
+    wrapped = translate_errors(add_axioms)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(
+            path=empty_db,
+            axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ghost:NoSuchPrefix"))],
+        )
+    msg = str(exc_info.value)
+    assert "ghost" in msg
+    assert "Undeclared prefix" in msg
+    assert "set_prefix" in msg
+
+
+def test_add_axioms_accepts_builtin_prefixes(empty_db):
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+        ],
+    )
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom.owl.literals import LangLiteral
+
+    result = add_axioms(
+        path=empty_db,
+        axioms=[
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            )
+        ],
+    )
+    assert "Added 1" in result
+
+
+def test_find_duplicates_within_missing_selection_translates(populated_db):
+    from ontoloom_mcp.tools.entities.find_duplicates import find_duplicates
+
+    wrapped = translate_errors(find_duplicates)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(
+            path=populated_db,
+            into=SelectionName("dups"),
+            annotation_property=IRI("rdfs:label"),
+            within=SelectionName("nonexistent"),
+        )
+    msg = str(exc_info.value)
+    assert "nonexistent" in msg
+    assert "search_entities" in msg or "match_axioms" in msg
+
+
+def test_annotate_axiom_reports_applied_counts(populated_db):
+    from ontoloom.owl.annotations import Annotation
+    from ontoloom.owl.literals import LangLiteral
+    from ontoloom_mcp.tools.axioms.annotate_axiom import annotate_axiom
+
+    note = LangLiteral(value="A subclass relation.")
+    add_ann = Annotation(property=IRI("rdfs:comment"), value=note)
+    # Find the SubClassOf axiom hash
+    from ontoloom.owl.axioms import SubClassOf as _SubClassOf
+
+    sub_axiom = _SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    from ontoloom.hashing import HashedAxiom
+
+    target_hash = HashedAxiom.of(sub_axiom).hash
+
+    # Fresh add: +1 added, no skipped
+    fresh = annotate_axiom(path=populated_db, axiom_hash=target_hash[:8], add_annotations=[add_ann])
+    assert "+1 added, 0 removed" in fresh
+    assert "already present" not in fresh
+    assert "absent" not in fresh
+
+    # Duplicate adds: applied 0 fresh, 1 already present
+    dup = annotate_axiom(
+        path=populated_db,
+        axiom_hash=target_hash[:8],
+        add_annotations=[add_ann, add_ann],
+    )
+    assert "+0 added, 0 removed" in dup
+    assert "1 already present" in dup
+
+    # Remove an absent annotation: 0 removed, 1 absent
+    absent = LangLiteral(value="not present")
+    absent_ann = Annotation(property=IRI("rdfs:comment"), value=absent)
+    res = annotate_axiom(
+        path=populated_db,
+        axiom_hash=target_hash[:8],
+        remove_annotations=[absent_ann],
+    )
+    assert "+0 added, 0 removed" in res
+    assert "1 absent" in res
+
+
+def test_undeclared_entity_selection_reads_back_present(empty_db):
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Wolf"), super_class=IRI("ex:Animal")),
+        ],
+    )
+    search_entities(path=empty_db, into=SelectionName("undeclared"), declared=False)
+    page = read_selection(path=empty_db, name=SelectionName("undeclared"))
+    assert "0 missing" in page
+    assert "ex:Wolf" in page
+    assert "*missing*" not in page
+
+
+def test_pattern_mismatch_error_includes_description():
+    from ontoloom.owl.literals import LangLiteral
+    from ontoloom_mcp.components.errors import _format_validation_error
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError) as exc_info:
+        LangLiteral(value="x", lang="invalid lang!")
+    msg = _format_validation_error(exc_info.value)
+    assert "BCP 47" in msg
+    assert "must match" in msg
+    assert "'invalid lang!'" in msg
+
+
+def test_selection_pattern_accepts_glob_chars():
+    from ontoloom_mcp.components.types import SelectionPattern
+    from pydantic import TypeAdapter, ValidationError
+
+    adapter: TypeAdapter[str] = TypeAdapter(SelectionPattern)
+    assert adapter.validate_python("audit_*") == "audit_*"
+    assert adapter.validate_python("foo?bar") == "foo?bar"
+    assert adapter.validate_python("*") == "*"
+    with pytest.raises(ValidationError):
+        adapter.validate_python("has space")
+
+
 def test_get_entity_not_found_includes_suggestion(populated_db):
     # IRI that doesn't exist but whose local name is a substring of an existing
     # entity's text should produce a ToolError with a "did you mean" suggestion.
@@ -131,7 +288,10 @@ def test_remove_axioms_stale_selection_translates(populated_db):
     wrapped = translate_errors(remove_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=populated_db, within=stale)
-    assert "changed" in str(exc_info.value)
+    msg = str(exc_info.value)
+    assert "changed" in msg
+    assert "Current: dogs_ax@" in msg
+    assert "items)" in msg
 
 
 def test_remove_axioms_rejects_both_inputs():
@@ -229,8 +389,8 @@ def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
             confirm="00000000",
         )
     # State unchanged: ex still maps to its original IRI.
+    from ontoloom.connection import session
     from ontoloom.prefixes import list_prefixes
-    from ontoloom.transactions import session
 
     with session(Ontology(populated_db)) as s:
         prefixes = list_prefixes(s)
@@ -286,3 +446,21 @@ def test_rename_iri_collision_with_wrong_token_raises(populated_db):
             new_iri=IRI("ex:Animal"),
             confirm="00000000",
         )
+
+
+def test_mcp_selection_name_strips_locked_hash_suffix():
+    from ontoloom_mcp.components.types import SelectionName as McpSelectionName
+    from pydantic import TypeAdapter
+
+    adapter = TypeAdapter(McpSelectionName)
+    assert adapter.validate_python("my_sel@a3f1b2c4") == "my_sel"
+    assert adapter.validate_python("my_sel") == "my_sel"
+
+
+def test_mcp_selection_name_rejects_invalid_name_after_strip():
+    from ontoloom_mcp.components.types import SelectionName as McpSelectionName
+    from pydantic import TypeAdapter, ValidationError
+
+    adapter = TypeAdapter(McpSelectionName)
+    with pytest.raises(ValidationError):
+        adapter.validate_python("1bad@a3f1b2c4")  # leading digit invalid

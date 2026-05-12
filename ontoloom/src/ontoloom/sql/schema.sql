@@ -61,23 +61,6 @@ CREATE INDEX IF NOT EXISTS idx_axiom_text_axiom ON axiom_text(axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_text ON axiom_text(text);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_property ON axiom_text(property);
 
--- Append-only event log of all mutations, tagged by session. `axiom_json`
--- is stored on add, del, and replace so events are self-contained for revert.
--- `replaces_hash` links replace events to the axiom they replaced.
--- `annotation_diff` stores JSON diff for annotate events.
--- `batch_id` groups related events (e.g., rename_iri) for atomic revert.
-CREATE TABLE IF NOT EXISTS events (
-    sequence_id INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT,
-    op TEXT NOT NULL CHECK (op IN ('add', 'del', 'replace', 'annotate')),
-    axiom_hash TEXT NOT NULL,
-    axiom_json BLOB,
-    replaces_hash TEXT,
-    annotation_diff TEXT,
-    batch_id TEXT,
-    timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-);
-
 -- Named selections: persistent sets of axiom hashes or entity IRIs.
 -- Kind is inferred from the producing operation. Content hash enables
 -- optimistic locking (write ops require name@hash_prefix).

@@ -1,11 +1,19 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
+from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns import Pattern
 from ontoloom.patterns.store import match_axioms as core_match
+from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
 
+from ontoloom_mcp.components.formatting import (
+    SELECT_INLINE_MAX,
+    SELECT_PREVIEW,
+    build_refs_per_axiom,
+    format_axiom_listing,
+    format_selection_result,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
 
@@ -42,16 +50,29 @@ def match_axioms(
         upserted = upsert_selection(
             s, into, SelectionKind.AXIOMS, result.axiom_hashes, "match_axioms"
         )
+        sel = upserted.selection
+
+        truncated_hint = (
+            f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
+        )
+        header = f"{result.total} axioms matched{truncated_hint}"
+
+        if not result.axiom_hashes:
+            s.commit()
+            return f"{header} -> {sel.locked!r}."
+
+        page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
+        page = core_read_selection(s, into, limit=page_size, offset=0)
+        page_axioms = [
+            HashedAxiom(axiom=item.axiom, hash=item.key)
+            for item in page.items
+            if item.axiom is not None
+        ]
+        refs_per_axiom = build_refs_per_axiom(s, page_axioms)
+        page_text = format_axiom_listing(page_axioms, refs_per_axiom=refs_per_axiom)
         s.commit()
 
-    truncated_hint = (
-        f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
-    )
-    sel = upserted.selection
-    msg = f"{result.total} axioms matched{truncated_hint} -> {sel.locked!r} ({sel.size} items)"
-    if upserted.previous_size is not None:
-        msg += f" (was {upserted.previous_size})"
-    return msg
+    return f"{header}. " + format_selection_result("axioms", upserted, page_text)
 
 
 tool_match_axioms = create_tool(

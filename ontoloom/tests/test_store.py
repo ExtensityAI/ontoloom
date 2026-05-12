@@ -7,7 +7,7 @@ from ontoloom.axioms.store import (
     InvalidHashError,
     add_axioms,
     annotate_axiom,
-    remove_axioms_by_hash,
+    remove_by_hash,
     rename_iri,
     replace_axiom,
 )
@@ -16,6 +16,7 @@ from ontoloom.connection import (
     OntologyExistsError,
     OntologyNotFoundError,
     OntologySchemaError,
+    session,
 )
 from ontoloom.entities.store import (
     EntityNotFoundError,
@@ -27,7 +28,6 @@ from ontoloom.entities.store import (
 from ontoloom.errors import StoreCorruptionError
 from ontoloom.export import HeaderRecord, export_to_jsonl, import_jsonl
 from ontoloom.hashing import HashedAxiom
-from ontoloom.history import show_changes
 from ontoloom.load import load_axiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
@@ -60,7 +60,6 @@ from ontoloom.selections.store import (
     upsert_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
-from ontoloom.transactions import session
 from pydantic import TypeAdapter
 
 
@@ -362,66 +361,6 @@ def test_locked_selection_min_prefix_length():
     LockedSelection("sel@" + "a" * 16)
 
 
-# -- Event log --
-
-
-def test_events_logged_on_add(s):
-    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(s, [ax])
-
-    cur = s.conn.cursor()
-    cur.execute("SELECT op, axiom_hash FROM events")
-    events = cur.fetchall()
-    assert len(events) == 1
-    assert events[0][0] == "add"
-    assert events[0][1] == HashedAxiom.of(ax).hash
-
-
-def test_events_logged_on_remove(s):
-    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    result = add_axioms(s, [ax])
-    h = result.added[0].hash
-
-    remove_axioms_by_hash(s, [h[:8]])
-
-    cur = s.conn.cursor()
-    cur.execute("SELECT op, axiom_hash FROM events ORDER BY sequence_id")
-    events = cur.fetchall()
-    assert len(events) == 2
-    assert events[0] == ("add", h)
-    assert events[1] == ("del", h)
-
-
-def test_events_logged_on_annotate(s):
-    ax = SubClassOf(
-        sub_class=IRI("ex:Dog"),
-        super_class=IRI("ex:Animal"),
-    )
-    result = add_axioms(s, [ax])
-    h = result.added[0].hash
-
-    ann = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="note"))
-    annotate_axiom(s, h, add_annotations=[ann])
-
-    cur = s.conn.cursor()
-    cur.execute("SELECT op, axiom_hash FROM events ORDER BY sequence_id")
-    events = cur.fetchall()
-    assert len(events) == 2
-    assert events[0] == ("add", h)
-    assert events[1] == ("annotate", h)
-
-
-def test_session_id_set(s):
-    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
-    add_axioms(s, [ax])
-
-    cur = s.conn.cursor()
-    cur.execute("SELECT session_id FROM events")
-    session_id = cur.fetchone()[0]
-    assert session_id is not None
-    assert len(session_id) > 0
-
-
 # -- Prefix management --
 
 
@@ -521,8 +460,9 @@ def test_search_entities_no_filters(populated):
 
 def test_export_jsonl(populated, tmp_path):
     export_path = tmp_path / "export.jsonl"
-    count = export_to_jsonl(populated, export_path)
-    assert count == 8
+    result = export_to_jsonl(populated, export_path)
+    assert result.exported == 8
+    assert result.skipped == 0
 
     lines = export_path.read_text().strip().split("\n")
     assert len(lines) == 9  # 1 header + 8 axioms
@@ -552,7 +492,7 @@ def test_entity_text_survives_partial_removal(s):
 
     # Remove the SubClassOf but keep the Declaration
     subclassof_hash = next(ha.hash for ha in result.added if ha.axiom.tag() == "SubClassOf")
-    remove_axioms_by_hash(s, [subclassof_hash[:8]])
+    remove_by_hash(s, [subclassof_hash[:8]])
 
     # ex:Dog should still be searchable (Declaration still references it)
     page = search_entities(s, query="Dog", limit=10)
@@ -598,7 +538,7 @@ def test_get_entity_not_found_includes_near_matches(populated):
 
 def test_remove_not_found_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        remove_axioms_by_hash(s, ["deadbeef"])
+        remove_by_hash(s, ["deadbeef"])
 
 
 def test_remove_ambiguous_prefix_raises(s):
@@ -612,7 +552,7 @@ def test_remove_ambiguous_prefix_raises(s):
     )
     # Empty prefix matches everything via GLOB '*'
     with pytest.raises(InvalidHashError):
-        remove_axioms_by_hash(s, [""])
+        remove_by_hash(s, [""])
 
 
 # -- annotate searchability --
@@ -677,7 +617,7 @@ def test_remove_selections_by_pattern(s):
     dropped = remove_selections_by_pattern(s, "audit_*")
     names = [d.name for d in dropped]
     assert names == ["audit_one", "audit_two"]
-    assert {s.name for s in list_selections(s)} == {"keep"}
+    assert {ls.meta.name for ls in list_selections(s)} == {"keep"}
 
 
 # -- IRI validation --
@@ -710,6 +650,13 @@ def test_iri_rejects_control_chars():
         IRI("ex:foo\nbar")
     with pytest.raises(ValueError):
         IRI("ex:foo\x00bar")
+
+
+def test_iri_rejects_whitespace_in_local_name():
+    with pytest.raises(ValueError, match="prefix:local_name"):
+        IRI("ex:foo bar")
+    with pytest.raises(ValueError, match="prefix:local_name"):
+        IRI("ex:foo\tbar")
 
 
 def test_iri_rejects_invalid_prefix():
@@ -792,7 +739,7 @@ def test_batch_remove_multiple(s):
     h1 = result.added[0].hash
     h2 = result.added[1].hash
 
-    removed = remove_axioms_by_hash(s, [h1[:8], h2[:8]])
+    removed = remove_by_hash(s, [h1[:8], h2[:8]])
     assert len(removed.removed) == 2
 
 
@@ -803,7 +750,7 @@ def test_batch_remove_rollback_on_failure(s):
     h = result.added[0].hash
 
     with pytest.raises(AxiomNotFoundError):
-        remove_axioms_by_hash(s, [h[:8], "deadbeef"])
+        remove_by_hash(s, [h[:8], "deadbeef"])
 
     # The first axiom should still exist (rollback)
     count = s.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
@@ -815,7 +762,7 @@ def test_batch_remove_rollback_on_failure(s):
 
 def test_remove_rejects_non_hex_prefix(s):
     with pytest.raises(InvalidHashError):
-        remove_axioms_by_hash(s, ["not*hex"])
+        remove_by_hash(s, ["not*hex"])
 
 
 # -- Selection: entities_in with field (position filter) --
@@ -950,7 +897,7 @@ def test_ambiguous_hash_error(s):
     )
 
     with pytest.raises(AmbiguousHashError) as exc_info:
-        remove_axioms_by_hash(s, [prefix])
+        remove_by_hash(s, [prefix])
     assert exc_info.value.count == 2
     assert exc_info.value.prefix == prefix
 
@@ -1167,17 +1114,5 @@ def test_list_all_selections_order(s):
     upsert_selection(s, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
     s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
-    names = [s.name for s in list_selections(s)]
+    names = [ls.meta.name for ls in list_selections(s)]
     assert names == ["a_sel", "z_sel"]
-
-
-def test_show_changes_sequence_id_order(s):
-    ax1 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
-    ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B"))
-    add_axioms(s, [ax1])
-    add_axioms(s, [ax2])
-
-    events = show_changes(s)
-    assert len(events) >= 2
-    seq_ids = [e.sequence_id for e in events]
-    assert seq_ids == sorted(seq_ids)

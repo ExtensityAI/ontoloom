@@ -3,7 +3,7 @@ from typing import override
 
 from ontoloom.models import TypedStr
 
-IRI_PATTERN = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\x00-\x1f]+$")
+IRI_PATTERN = re.compile(r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\s\x00-\x1f]+$")
 
 
 class IRI(TypedStr):
@@ -16,7 +16,7 @@ class IRI(TypedStr):
     """
 
     description = "IRI in `prefix:local_name` format"
-    pattern = r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:.+$"
+    pattern = r"^([a-zA-Z_][a-zA-Z0-9_.-]*)?:[^\s\x00-\x1f]+$"
     examples = (":Dog", "owl:Thing", "rdfs:label")
 
     @override
@@ -34,3 +34,6 @@ class IRI(TypedStr):
     @property
     def local_name(self):
         return self.split(":", 1)[1]
+
+
+RDFS_LABEL = IRI("rdfs:label")

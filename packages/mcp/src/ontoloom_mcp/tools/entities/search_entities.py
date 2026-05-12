@@ -2,14 +2,14 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology, Session
+from ontoloom.connection import Ontology, Session, session
 from ontoloom.entities.store import collect_entity_iris
 from ontoloom.entities.store import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes import PrefixName
 from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -18,7 +18,7 @@ from ontoloom_mcp.components.formatting import (
     format_selection_result,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, PrefixName, SelectionName
+from ontoloom_mcp.components.types import OntologyPath, SelectionName
 
 
 def search_entities(
@@ -74,7 +74,7 @@ def search_entities(
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
-        page_text = format_entity_search_page(page.matches, sel.size, 0)
+        page_text = format_entity_search_page(page)
 
         result = format_selection_result("entities", upserted, page_text)
 
@@ -86,7 +86,7 @@ def search_entities(
     return result
 
 
-def _within_metadata(s: Session, within: str):
+def _within_metadata(s: Session, within: SelectionName):
     sel = get_selection(s, within)
     return f"\nWithin selection {sel.locked!r} ({sel.kind}, {sel.size} items)"
 

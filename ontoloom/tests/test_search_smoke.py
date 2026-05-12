@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology, Session
+from ontoloom.connection import Ontology, Session, session
 from ontoloom.entities.store import (
     EntityNotFoundError,
     collect_entity_iris,
@@ -66,7 +66,6 @@ from ontoloom.owl.literals import (
     TypedLiteral,
 )
 from ontoloom.owl.markers import EntityType
-from ontoloom.transactions import session
 
 
 @pytest.fixture

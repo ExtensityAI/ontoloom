@@ -1,10 +1,10 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
+from ontoloom.prefixes import PrefixName
 from ontoloom.prefixes import remove_prefix as core_remove_prefix
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, PrefixName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def remove_prefix(path: OntologyPath, name: PrefixName):

@@ -1,26 +1,32 @@
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
 from ontoloom.selections.store import list_selections as core_list_selections
-from ontoloom.transactions import session
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
 def list_selections(path: OntologyPath):
-    """List all named selections in the ontology."""
+    """List all named selections in the ontology.
+
+    Each row reports total items, missing-count (items that no longer resolve),
+    and the source string recorded when the selection was created.
+    """
     ont = Ontology(path)
     with session(ont) as s:
-        sels = core_list_selections(s)
+        listings = core_list_selections(s)
         s.commit()
 
-    if not sels:
+    if not listings:
         return "No selections."
 
     lines = ["Selections:"]
-    for sel in sels:
-        lines.append(f"  {sel.locked!r} ({sel.kind}) -> {sel.size} items")
-        lines.append(f"    source: {sel.source}")
+    for listing in listings:
+        meta = listing.meta
+        missing = listing.missing_count
+        missing_note = f", {missing} missing" if missing > 0 else ""
+        lines.append(f"  {meta.locked!r} ({meta.kind}) -> {meta.size} items{missing_note}")
+        lines.append(f"    source: {meta.source}")
     return "\n".join(lines)
 
 

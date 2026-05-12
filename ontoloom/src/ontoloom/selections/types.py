@@ -69,33 +69,27 @@ def _validate_name(value: str):
 
 
 class SelectionName(TypedStr):
-    """A normalized selection name. Inputs may include a `@hash_prefix` suffix
-    (e.g. `my_sel@a3f1b2c4`); it is stripped and the stored value is always
-    the bare name.
+    """A bare selection name. Rejects any `@hash` suffix.
 
-    Used for `within=` on read tools, where the hash is informational only and
-    reads always reflect current state. Write tools that need optimistic
-    locking on the scoped selection use `LockedSelection`, which requires the
-    hash and enforces it.
+    Used for `within=` on read tools, where reads always reflect current state.
+    Write tools that need optimistic locking on the scoped selection use
+    `LockedSelection`, which carries the hash and enforces it.
+
+    Core construction is strict. At the MCP boundary a Pydantic
+    before-validator strips any `@hash` suffix so the LLM may pass the
+    locked-form (`my_sel@a3f1b2c4`) returned by other tools — see
+    `ontoloom_mcp.components.types.SelectionName`.
     """
 
-    description = "Selection name; an optional '@hash_prefix' suffix is accepted and ignored"
-    pattern = rf"^{_NAME_FRAGMENT}(?:@{_HASH_FRAGMENT})?$"
-    examples = ("my_selection", "my_selection@a3f1b2c4")
+    description = "Selection name"
+    pattern = rf"^{_NAME_FRAGMENT}$"
+    examples = ("my_selection",)
 
     @override
     @classmethod
     def parse(cls, value: str):
-        name, sep, hash_prefix = value.partition("@")
-
-        if sep and not _LOCKED_PATTERN.match(hash_prefix):
-            msg = (
-                f"Hash prefix in {value!r} must be at least {LOCKED_PREFIX_MIN} hex chars; "
-                f"omit '@hash' to refer to the selection by name only."
-            )
-            raise ValueError(msg)
-        _validate_name(name)
-        return name
+        _validate_name(value)
+        return value
 
 
 class LockedSelection(TypedStr):
@@ -140,7 +134,7 @@ class LockedSelection(TypedStr):
 
 @dataclass(frozen=True, slots=True)
 class SelectionMeta:
-    name: str
+    name: SelectionName
     kind: SelectionKind
     hash: str
     size: int
@@ -153,6 +147,18 @@ class SelectionMeta:
     @override
     def __str__(self):
         return self.locked
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionListing:
+    """SelectionMeta plus drift information (how many items still resolve)."""
+
+    meta: SelectionMeta
+    present_count: int
+
+    @property
+    def missing_count(self) -> int:
+        return self.meta.size - self.present_count
 
 
 @dataclass(frozen=True, slots=True)
