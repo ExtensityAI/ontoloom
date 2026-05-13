@@ -2,9 +2,11 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.store import create_selection as core_create_selection
+from ontoloom.selections.types import SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def create_selection(
@@ -38,7 +40,7 @@ def create_selection(
         s.commit()
 
     sel = upserted.selection
-    parts = [f"Selection {sel.locked!r}: {sel.size} {sel.kind}"]
+    parts = [f"Selection {dquoted(sel.locked)}: {sel.size} {sel.kind}"]
     if upserted.previous_size is not None:
         parts.append(f"(overwrote previous: {upserted.previous_size} items)")
     return " ".join(parts)

@@ -1,60 +1,96 @@
+"""Pattern slot types: wildcard `*`, variable `?name`, or concrete IRI.
+
+`Slot` is a discriminated union over `WildcardSlot | VariableSlot | IRISlot`;
+Pydantic dispatches by string content via a callable discriminator. Wire form
+is a single string with one of three disjoint shapes.
+
+`BaseSlot` is the runtime parent class — use `isinstance(x, BaseSlot)` to check
+"is this any slot type."
+"""
+
 from __future__ import annotations
 
 import re
-from typing import ClassVar, override
+from typing import Annotated, Any, override
 
-from ontoloom.models import TypedStr
-from ontoloom.owl.iri import IRI_PATTERN
+from ontoloom.models import TypedStr, tagged, tagged_union_meta
+from ontoloom.owl.iri import IRI
+from ontoloom.utils import dquoted
 
 _VAR_PATTERN = re.compile(r"^\?[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-class Slot(TypedStr):
-    """A pattern slot: concrete IRI, variable (?name), or wildcard (*).
+class BaseSlot(TypedStr):
+    """Runtime parent for the three slot variants. Never instantiated directly."""
 
-    - "ex:Dog"  -> concrete IRI (validated)
-    - "?C"      -> variable (binds to matched value)
-    - "*"       -> wildcard (matches anything, no binding)
 
-    Slot is a `str` subclass, not a Pydantic model -> it intentionally carries
-    no `type` discriminator. Generated `T | Slot` unions (e.g. `IRI | Slot`,
-    `DataRange | Slot`, `TypedLiteral | LangLiteral | Slot`) rely on structural
-    disambiguation: Pydantic sees a JSON string and routes to `Slot`; an object
-    routes to the model variant. This is reliable because every non-Slot member
-    of these unions is a Pydantic model (or dict on the wire), never a bare
-    string.
-    """
+class WildcardSlot(BaseSlot):
+    """Pattern slot matching any value without binding."""
 
-    description: ClassVar[str] = 'IRI ("prefix:name"), variable ("?name"), or wildcard ("*")'
-    examples: ClassVar[tuple[str, ...]] = ("ex:Dog", "?C", "*")
+    description = 'Wildcard pattern slot, literal "*"'
+    pattern = r"^\*$"
+    examples = ("*",)
 
-    @classmethod
     @override
-    def parse(cls, value: str) -> str:
-        if value == "*":
-            return value
-        if value.startswith("?"):
-            if not _VAR_PATTERN.match(value):
-                msg = f"Variable must be ?identifier, got {value!r}"
-                raise ValueError(msg)
-            return value
-        if not IRI_PATTERN.match(value):
-            msg = f"Slot must be IRI (prefix:name), ?variable, or *, got {value!r}"
+    @classmethod
+    def parse(cls, value: str):
+        if value != "*":
+            msg = f'WildcardSlot must be "*", got {dquoted(value)}'
+            raise ValueError(msg)
+        return value
+
+
+class VariableSlot(BaseSlot):
+    """Pattern slot that binds to its matched value across positions."""
+
+    description = 'Variable pattern slot, "?name"'
+    pattern = r"^\?[a-zA-Z_][a-zA-Z0-9_]*$"
+    examples = ("?C", "?prop")
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        if not _VAR_PATTERN.match(value):
+            msg = f'VariableSlot must be "?identifier", got {dquoted(value)}'
             raise ValueError(msg)
         return value
 
     @property
-    def is_wildcard(self) -> bool:
-        return self == "*"
-
-    @property
-    def is_variable(self) -> bool:
-        return self.startswith("?")
-
-    @property
-    def is_iri(self) -> bool:
-        return not self.is_wildcard and not self.is_variable
-
-    @property
-    def var_name(self) -> str:
+    def name(self):
         return self[1:]
+
+
+class IRISlot(BaseSlot):
+    """Concrete IRI used in a pattern position. Same validation as `IRI`."""
+
+    description = IRI.description
+    pattern = IRI.pattern
+    examples = IRI.examples
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        return IRI.parse(value)
+
+
+def _get_slot_tag(v: Any):
+    if isinstance(v, BaseSlot):
+        return type(v).tag()
+
+    if isinstance(v, str):
+        if v == "*":
+            return WildcardSlot.tag()
+        if v.startswith("?"):
+            return VariableSlot.tag()
+        return IRISlot.tag()
+
+    # Non-string, non-slot input. Returning a non-matching tag makes Pydantic
+    # raise ValidationError for this branch and fall back to the next branch
+    # of any outer union (e.g. `TypedLiteral | LangLiteral | Slot`).
+    return ""
+
+
+Slot = Annotated[
+    tagged(WildcardSlot) | tagged(VariableSlot) | tagged(IRISlot),
+    *tagged_union_meta(_get_slot_tag, schema_type="string"),
+]

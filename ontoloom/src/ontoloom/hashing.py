@@ -13,6 +13,7 @@ from typing import override
 from ontoloom.canonical import canonical_json
 from ontoloom.models import TypedStr
 from ontoloom.owl.axioms import BaseAxiom
+from ontoloom.utils import dquoted
 
 # Standard width for hash prefixes shown to users. 12 hex chars = 48 bits;
 # collision probability stays under 0.02% even at 10M axioms (SNOMED CT scale).
@@ -39,7 +40,7 @@ class AxiomHashPrefix(TypedStr):
             msg = "AxiomHashPrefix must not be empty"
             raise ValueError(msg)
         if any(c not in "0123456789abcdef" for c in normalized):
-            msg = f"AxiomHashPrefix must be hex chars, got {value!r}"
+            msg = f"AxiomHashPrefix must be hex chars, got {dquoted(value)}"
             raise ValueError(msg)
         return normalized
 
@@ -57,7 +58,7 @@ class AxiomHash(TypedStr):
         normalized = value.lower()
 
         if len(normalized) != 64 or any(c not in "0123456789abcdef" for c in normalized):
-            msg = f"AxiomHash must be 64 lowercase hex chars, got {value!r}"
+            msg = f"AxiomHash must be 64 lowercase hex chars, got {dquoted(value)}"
             raise ValueError(msg)
         return normalized
 

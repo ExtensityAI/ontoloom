@@ -9,6 +9,7 @@ from ontoloom.connection import Metadata, Session, escape_like
 from ontoloom.errors import OntoloomError, StoreCorruptionError
 from ontoloom.models import TypedStr
 from ontoloom.owl.iri import IRI
+from ontoloom.utils import dquoted
 
 _PREFIX_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.-]*$")
 _NAMESPACE_IRI_PATTERN = re.compile(r"^\S+:\S+$")
@@ -27,7 +28,7 @@ class PrefixName(TypedStr):
         if not _PREFIX_NAME_PATTERN.match(value):
             msg = (
                 "PrefixName must start with a letter or underscore and contain only "
-                f"letters, digits, '_', '.', '-', got {value!r}"
+                f"letters, digits, '_', '.', '-', got {dquoted(value)}"
             )
             raise ValueError(msg)
         return value
@@ -49,7 +50,7 @@ class NamespaceIRI(TypedStr):
     @classmethod
     def parse(cls, value: str):
         if not _NAMESPACE_IRI_PATTERN.match(value):
-            msg = f"NamespaceIRI must contain ':' and no whitespace, got {value!r}"
+            msg = f"NamespaceIRI must contain ':' and no whitespace, got {dquoted(value)}"
             raise ValueError(msg)
         return value
 
@@ -67,7 +68,7 @@ class PrefixNotFoundError(OntoloomError):
 
     def __init__(self, name: PrefixName):
         self.name = name
-        super().__init__(f"No prefix {str(name)!r}.")
+        super().__init__(f"No prefix {dquoted(name)}.")
 
 
 class PrefixInUseError(OntoloomError):
@@ -76,7 +77,7 @@ class PrefixInUseError(OntoloomError):
     def __init__(self, name: PrefixName, count: int):
         self.name = name
         self.count = count
-        super().__init__(f"Prefix {str(name)!r} is still used by {count} entities.")
+        super().__init__(f"Prefix {dquoted(name)} is still used by {count} entities.")
 
 
 class UndeclaredPrefixError(OntoloomError):
@@ -84,7 +85,7 @@ class UndeclaredPrefixError(OntoloomError):
 
     def __init__(self, prefixes: frozenset[PrefixName]):
         self.prefixes = prefixes
-        sorted_names = ", ".join(repr(str(p)) for p in sorted(prefixes))
+        sorted_names = ", ".join(dquoted(p) for p in sorted(prefixes))
         super().__init__(f"Undeclared prefix(es): {sorted_names}.")
 
 

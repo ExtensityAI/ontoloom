@@ -4,12 +4,16 @@ Pure types -> no I/O. Persistence and operations live in `selections/store.py`.
 """
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import override
 
+from ontoloom.hashing import AxiomHash
 from ontoloom.models import TypedStr
 from ontoloom.owl.axioms import BaseAxiom
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
+from ontoloom.utils import dquoted
 
 MAX_SELECTION_NAME_LEN = 64
 LOCKED_PREFIX_MIN = 8
@@ -66,7 +70,7 @@ class SelectionContentHash(TypedStr):
         normalized = value.lower()
 
         if len(normalized) != 16 or any(c not in "0123456789abcdef" for c in normalized):
-            msg = f"SelectionContentHash must be 16 lowercase hex chars, got {value!r}"
+            msg = f"SelectionContentHash must be 16 lowercase hex chars, got {dquoted(value)}"
             raise ValueError(msg)
         return normalized
 
@@ -76,7 +80,7 @@ def _validate_name(value: str):
         msg = (
             f"Selection name must start with a letter and contain only letters, "
             f"digits, '_', '-', '.', '/', ':' (max {MAX_SELECTION_NAME_LEN} chars), "
-            f"got {value!r}"
+            f"got {dquoted(value)}"
         )
         raise ValueError(msg)
 
@@ -87,11 +91,6 @@ class SelectionName(TypedStr):
     Used for `within=` on read tools, where reads always reflect current state.
     Write tools that need optimistic locking on the scoped selection use
     `LockedSelection`, which carries the hash and enforces it.
-
-    Core construction is strict. At the MCP boundary a Pydantic
-    before-validator strips any `@hash` suffix so the LLM may pass the
-    locked-form (`my_sel@a3f1b2c4`) returned by other tools — see
-    `ontoloom_mcp.components.types.SelectionName`.
     """
 
     description = "Selection name"
@@ -114,6 +113,9 @@ class LockedSelection(TypedStr):
 
     Read paths take bare `SelectionName` and always reflect current state.
 
+    The decomposed parts (`name`, `hash_prefix`) are computed once at
+    construction and cached as instance attributes — no re-parsing on access.
+
     Examples:
         LockedSelection("my_sel@a3f1b2c4") -> my_sel@a3f1b2c4
     """
@@ -121,6 +123,9 @@ class LockedSelection(TypedStr):
     description = "Selection reference with optimistic locking, in 'name@hash_prefix' format"
     pattern = rf"^{_NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
     examples = ("my_selection@a3f1b2c4",)
+
+    name: SelectionName
+    hash_prefix: str
 
     @override
     @classmethod
@@ -130,19 +135,19 @@ class LockedSelection(TypedStr):
         if not sep or not _LOCKED_PATTERN.match(hash_prefix):
             msg = (
                 f"LockedSelection must be 'name@hash_prefix' with at least "
-                f"{LOCKED_PREFIX_MIN} hex chars (e.g. 'my_sel@a3f1b2c4'), got {value!r}"
+                f"{LOCKED_PREFIX_MIN} hex chars (e.g. 'my_sel@a3f1b2c4'), got {dquoted(value)}"
             )
             raise ValueError(msg)
         _validate_name(name)
         return value
 
-    @property
-    def name(self):
-        return SelectionName(self.split("@", 1)[0])
-
-    @property
-    def hash_prefix(self):
-        return self.split("@", 1)[1]
+    @override
+    def __new__(cls, value: str):
+        inst = super().__new__(cls, value)
+        name, _, hash_prefix = inst.partition("@")
+        inst.name = SelectionName(name)
+        inst.hash_prefix = hash_prefix
+        return inst
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,19 +180,50 @@ class SelectionListing:
 
 
 @dataclass(frozen=True, slots=True)
-class SelectionItem:
-    key: str
-    missing: bool
-    axiom: BaseAxiom | None = None
-    role: str | None = None
-    label: str | None = None
+class AxiomItem:
+    """One row of an axiom selection. `axiom is None` iff the hash no longer resolves."""
+
+    hash: AxiomHash
+    axiom: BaseAxiom | None
+
+    @property
+    def missing(self) -> bool:
+        return self.axiom is None
 
 
 @dataclass(frozen=True, slots=True)
-class SelectionPage:
+class EntityItem:
+    """One row of an entity selection. `present` is False iff the IRI is unreferenced.
+
+    `role` and `label` are populated only when the entity is declared (and indexed),
+    so they may be None even for present entities.
+    """
+
+    iri: IRI
+    present: bool
+    role: EntityType | None
+    label: str | None
+
+    @property
+    def missing(self) -> bool:
+        return not self.present
+
+
+@dataclass(frozen=True, slots=True)
+class AxiomSelectionPage:
     meta: SelectionMeta
-    items: list[SelectionItem] = field(default_factory=list)
-    total_filtered: int = 0
-    present: int = 0
-    missing: int = 0
-    show: ShowFilter = ShowFilter.ALL
+    items: tuple[AxiomItem, ...]
+    total_filtered: int
+    present: int
+    missing: int
+    show: ShowFilter
+
+
+@dataclass(frozen=True, slots=True)
+class EntitySelectionPage:
+    meta: SelectionMeta
+    items: tuple[EntityItem, ...]
+    total_filtered: int
+    present: int
+    missing: int
+    show: ShowFilter

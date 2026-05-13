@@ -1,54 +1,36 @@
+from typing import Annotated
+
+from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.selections.store import (
-    remove_selections as core_remove_selections,
-)
-from ontoloom.selections.store import (
-    remove_selections_by_pattern,
-)
+from ontoloom.selections.store import remove_selections as core_remove_selections
+from ontoloom.selections.types import SelectionName
+from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.errors import MissingRequiredError, MutuallyExclusiveError
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName, SelectionPattern
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def remove_selections(
     path: OntologyPath,
-    names: list[SelectionName] | None = None,
-    pattern: SelectionPattern | None = None,
+    names: Annotated[tuple[SelectionName, ...], MinLen(1)],
 ):
-    """Remove selections by exact name or glob pattern.
+    """Remove selections by exact name. Best-effort -> reports any not found.
 
-    Provide exactly one of:
-    - `names`: List of exact selection names. Best-effort -> reports any not found.
-    - `pattern`: Glob (`*` matches any sequence, `?` matches one character),
-      e.g. `audit_*`. Removes every selection whose name matches.
+    To delete selections matching a glob, call `list_selections` first to
+    discover the matching names, then pass them here.
     """
-    if names is not None and pattern is not None:
-        raise MutuallyExclusiveError(("names", "pattern"))
-
     ont = Ontology(path)
     with session(ont) as s:
-        if pattern is not None:
-            dropped = remove_selections_by_pattern(s, pattern)
-            s.commit()
-            if not dropped:
-                return f"No selections matched pattern {str(pattern)!r}."
-            items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in dropped)
-            return f"Removed {len(dropped)} selections matching {str(pattern)!r}: {items}."
-
-        if names is not None:
-            result = core_remove_selections(s, names)
-            s.commit()
-            parts = []
-            if result.dropped:
-                items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in result.dropped)
-                parts.append(f"Removed {len(result.dropped)} selections: {items}.")
-            if result.not_found:
-                parts.append(f"Not found: {', '.join(repr(str(n)) for n in result.not_found)}.")
-            return " ".join(parts) or "Nothing to remove."
-
-        raise MissingRequiredError(("names", "pattern"))
+        result = core_remove_selections(s, list(names))
+        s.commit()
+        parts = []
+        if result.dropped:
+            items = ", ".join(f"{dquoted(d.name)} ({d.size})" for d in result.dropped)
+            parts.append(f"Removed {len(result.dropped)} selections: {items}.")
+        if result.not_found:
+            parts.append(f"Not found: {', '.join(dquoted(n) for n in result.not_found)}.")
+        return " ".join(parts) or "Nothing to remove."
 
 
 tool_remove_selections = create_tool(

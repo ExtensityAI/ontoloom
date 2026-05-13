@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ontoloom.errors import OntoloomError
 from ontoloom.models import FrozenModel
+from ontoloom.utils import dquoted
 
 _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
@@ -74,7 +75,7 @@ def _validate_schema(conn: sqlite3.Connection):
     if metadata.schema_version != CURRENT_SCHEMA_VERSION:
         msg = (
             f"Schema version mismatch: "
-            f"expected {CURRENT_SCHEMA_VERSION}, got {metadata.schema_version!r}"
+            f"expected {CURRENT_SCHEMA_VERSION}, got {dquoted(metadata.schema_version)}"
         )
         raise OntologySchemaError(msg)
 
@@ -84,7 +85,7 @@ class OntologyNotFoundError(OntoloomError, FileNotFoundError):
 
     def __init__(self, path: Path):
         self.path = path
-        super().__init__(f"'{path}' does not exist.")
+        super().__init__(f"{dquoted(path)} does not exist.")
 
 
 class OntologyExistsError(OntoloomError, FileExistsError):
@@ -92,7 +93,7 @@ class OntologyExistsError(OntoloomError, FileExistsError):
 
     def __init__(self, path: Path):
         self.path = path
-        super().__init__(f"'{path}' already exists.")
+        super().__init__(f"{dquoted(path)} already exists.")
 
 
 class OntologySchemaError(OntoloomError):
@@ -117,12 +118,12 @@ class Ontology:
         if path.exists():
             raise OntologyExistsError(path)
         if not path.parent.exists():
-            msg = f"Parent directory {str(path.parent)!r} does not exist."
+            msg = f"Parent directory {dquoted(path.parent)} does not exist."
             raise FileNotFoundError(msg)
         try:
             conn = sqlite3.connect(str(path), autocommit=True)
         except sqlite3.OperationalError as e:
-            msg = f"Cannot open database at {str(path)!r}: {e}"
+            msg = f"Cannot open database at {dquoted(path)}: {e}"
             raise OntoloomError(msg) from e
         try:
             _apply_pragmas(conn)
@@ -169,13 +170,13 @@ def session(ont: Ontology) -> Iterator[Session]:
     try:
         raw = sqlite3.connect(str(ont.path), autocommit=True)
     except sqlite3.OperationalError as e:
-        msg = f"Cannot open database at {str(ont.path)!r}: {e}"
+        msg = f"Cannot open database at {dquoted(ont.path)}: {e}"
         raise OntoloomError(msg) from e
     try:
         try:
             _apply_pragmas(raw)
         except sqlite3.DatabaseError as e:
-            msg = f"Cannot read database at {str(ont.path)!r}: {e}"
+            msg = f"Cannot read database at {dquoted(ont.path)}: {e}"
             raise OntoloomError(msg) from e
         _validate_schema(raw)
         raw.execute("BEGIN")

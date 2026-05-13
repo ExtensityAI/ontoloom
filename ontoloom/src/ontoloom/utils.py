@@ -7,6 +7,6 @@ def dedupe[T](xs: Iterable[T]) -> list[T]:
     return list(dict.fromkeys(xs))
 
 
-def dquoted(s: str) -> str:
-    """Double-quote `s` for display, escaping embedded `"`, `\\`, and control chars."""
-    return json.dumps(s, ensure_ascii=False)
+def dquoted(s: object) -> str:
+    """Double-quote `str(s)` for display, escaping embedded `"`, `\\`, and control chars."""
+    return json.dumps(str(s), ensure_ascii=False)

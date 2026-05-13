@@ -12,15 +12,15 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.patterns.match import _match_slot_vs_expression
-from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.store import match_axioms
 from ontoloom.patterns.types import (
     AnnotationAssertionPattern,
-    ContainsExpr,
     EquivalentClassesPattern,
     ObjectSomeValuesFromPattern,
     SubClassOfPattern,
     SubObjectPropertyOfChainPattern,
+    TupleMatch,
 )
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
@@ -49,7 +49,7 @@ def populated(s):
 
 
 def test_axiom_type_filter(populated):
-    pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) == 2
     for h in result.axiom_hashes:
@@ -72,7 +72,7 @@ def test_expression_level_hits_container_types_not_declarations(populated):
             )
         ],
     )
-    pattern = ObjectSomeValuesFromPattern(property=Slot("*"), filler=Slot("*"))
+    pattern = ObjectSomeValuesFromPattern(property=WildcardSlot("*"), filler=WildcardSlot("*"))
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) > 0
 
@@ -88,7 +88,7 @@ def test_within_axiom_selection(populated):
 
     upsert_selection(populated, "dog_only", SelectionKind.AXIOMS, [dog_hash], source="test")
 
-    pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(populated, pattern, within="dog_only")
     assert len(result.axiom_hashes) == 1
     assert result.axiom_hashes[0] == dog_hash
@@ -97,7 +97,7 @@ def test_within_axiom_selection(populated):
 def test_within_entity_selection(populated):
     upsert_selection(populated, "cat_entities", SelectionKind.ENTITIES, ["ex:Cat"], source="test")
 
-    pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(populated, pattern, within="cat_entities")
     assert len(result.axiom_hashes) == 1
 
@@ -109,7 +109,7 @@ def test_variable_cross_position_same_value(populated):
     self_ax = SubClassOf(sub_class=IRI("ex:Self"), super_class=IRI("ex:Self"))
     add_axioms(populated, [self_ax])
 
-    pattern = SubClassOfPattern(sub_class=Slot("?C"), super_class=Slot("?C"))
+    pattern = SubClassOfPattern(sub_class=VariableSlot("?C"), super_class=VariableSlot("?C"))
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) == 1
     assert result.axiom_hashes[0] == HashedAxiom.of(self_ax).hash
@@ -123,8 +123,8 @@ def test_index_narrowing_with_many_iris(populated):
     add_axioms(populated, [chain_ax])
 
     pattern = SubObjectPropertyOfChainPattern(
-        chain=(Slot("ex:r1"), Slot("ex:r2"), Slot("ex:r3"), Slot("ex:r4")),
-        super_property=Slot("ex:s"),
+        chain=(IRISlot("ex:r1"), IRISlot("ex:r2"), IRISlot("ex:r3"), IRISlot("ex:r4")),
+        super_property=IRISlot("ex:s"),
     )
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) == 1
@@ -140,20 +140,23 @@ def test_contains_partial_set_match(populated):
     )
     add_axioms(populated, [ec_ax])
 
-    pattern = EquivalentClassesPattern(equivalent_classes=ContainsExpr(contains=(Slot("ex:A"),)))
+    pattern = EquivalentClassesPattern(
+        equivalent_classes=(IRISlot("ex:A"),),
+        equivalent_classes_match=TupleMatch.PARTIAL,
+    )
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) >= 1
     assert HashedAxiom.of(ec_ax).hash in result.axiom_hashes
 
 
 def test_pattern_matches_nothing(populated):
-    pattern = SubClassOfPattern(sub_class=Slot("ex:Nonexistent"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=IRISlot("ex:Nonexistent"), super_class=WildcardSlot("*"))
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) == 0
 
 
 def test_match_limit_truncates_and_flags(populated):
-    pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     full = match_axioms(populated, pattern)
     assert len(full.axiom_hashes) == 2
     assert full.truncated is False
@@ -165,31 +168,31 @@ def test_match_limit_truncates_and_flags(populated):
 
 
 def test_match_limit_not_hit_no_truncation(populated):
-    pattern = SubClassOfPattern(sub_class=Slot("*"), super_class=Slot("*"))
+    pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(populated, pattern, limit=10)
     assert len(result.axiom_hashes) == 2
     assert result.truncated is False
 
 
 def test_match_slot_vs_expression_concrete_slot_matches_bare_iri():
-    slot = Slot("ex:Dog")
+    slot = IRISlot("ex:Dog")
     bindings = _match_slot_vs_expression(slot, IRI("ex:Dog"), {})
     assert bindings == {}
 
 
 def test_match_slot_vs_expression_concrete_slot_rejects_mismatched_bare_iri():
-    slot = Slot("ex:Dog")
+    slot = IRISlot("ex:Dog")
     assert _match_slot_vs_expression(slot, IRI("ex:Cat"), {}) is None
 
 
 def test_match_slot_vs_expression_variable_binds_bare_iri():
-    slot = Slot("?C")
+    slot = VariableSlot("?C")
     bindings = _match_slot_vs_expression(slot, IRI("ex:Dog"), {})
     assert bindings == {"C": "ex:Dog"}
 
 
 def test_match_slot_vs_expression_variable_binds_iri_object():
-    slot = Slot("?C")
+    slot = VariableSlot("?C")
     bindings = _match_slot_vs_expression(slot, IRI("ex:Dog"), {})
     assert bindings == {"C": "ex:Dog"}
 
@@ -221,9 +224,9 @@ def labeled(s):
 
 def test_slot_variable_matches_lang_literal_value(labeled):
     pattern = AnnotationAssertionPattern(
-        property=Slot("rdfs:label"),
-        subject=Slot("?s"),
-        value=Slot("?v"),
+        property=IRISlot("rdfs:label"),
+        subject=VariableSlot("?s"),
+        value=VariableSlot("?v"),
     )
     result = match_axioms(labeled, pattern)
     assert len(result.axiom_hashes) == 2
@@ -231,9 +234,9 @@ def test_slot_variable_matches_lang_literal_value(labeled):
 
 def test_slot_wildcard_matches_typed_literal_value(labeled):
     pattern = AnnotationAssertionPattern(
-        property=Slot("rdfs:comment"),
-        subject=Slot("*"),
-        value=Slot("*"),
+        property=IRISlot("rdfs:comment"),
+        subject=WildcardSlot("*"),
+        value=WildcardSlot("*"),
     )
     result = match_axioms(labeled, pattern)
     assert len(result.axiom_hashes) == 1
@@ -243,9 +246,9 @@ def test_slot_variable_against_literal_does_not_unify_with_iri_in_other_position
     # Same variable in subject (binds to "ex:Dog") and value (binds to '"Dog"@en')
     # must NOT unify — different canonical strings, no match.
     pattern = AnnotationAssertionPattern(
-        property=Slot("rdfs:label"),
-        subject=Slot("?x"),
-        value=Slot("?x"),
+        property=IRISlot("rdfs:label"),
+        subject=VariableSlot("?x"),
+        value=VariableSlot("?x"),
     )
     result = match_axioms(labeled, pattern)
     assert len(result.axiom_hashes) == 0

@@ -1,7 +1,7 @@
 from ontoloom.owl.axioms import EquivalentClasses
 from ontoloom.owl.iri import IRI
 from ontoloom.patterns.match import match_pattern
-from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.slot import IRISlot
 from ontoloom.patterns.types import EquivalentClassesPattern
 
 
@@ -9,8 +9,8 @@ def test_equivalent_classes_pattern_order_insensitive():
     axiom = EquivalentClasses(equivalent_classes=(IRI("ex:Cat"), IRI("ex:Dog")))
     pattern = EquivalentClassesPattern(
         equivalent_classes=(
-            Slot("ex:Dog"),
-            Slot("ex:Cat"),
+            IRISlot("ex:Dog"),
+            IRISlot("ex:Cat"),
         ),
     )
     bindings = match_pattern(pattern, axiom)
@@ -28,8 +28,8 @@ def test_equivalent_classes_pattern_length_mismatch():
     )
     pattern = EquivalentClassesPattern(
         equivalent_classes=(
-            Slot("ex:Dog"),
-            Slot("ex:Cat"),
+            IRISlot("ex:Dog"),
+            IRISlot("ex:Cat"),
         ),
     )
     assert match_pattern(pattern, axiom) == []
@@ -45,7 +45,7 @@ def test_chain_pattern_order_sensitive():
         super_property=IRI("ex:hasUncle"),
     )
     swapped = SubObjectPropertyOfChainPattern(
-        chain=(Slot("ex:hasBrother"), Slot("ex:hasParent")),
-        super_property=Slot("ex:hasUncle"),
+        chain=(IRISlot("ex:hasBrother"), IRISlot("ex:hasParent")),
+        super_property=IRISlot("ex:hasUncle"),
     )
     assert match_pattern(swapped, axiom) == []

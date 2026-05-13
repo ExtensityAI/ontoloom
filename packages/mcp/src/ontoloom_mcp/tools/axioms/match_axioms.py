@@ -1,11 +1,11 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import AxiomHash, HashedAxiom
+from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
-from ontoloom.selections.store import read_selection as core_read_selection
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.store import read_axiom_selection, upsert_selection
+from ontoloom.selections.types import SelectionKind, SelectionName, ShowFilter
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -15,7 +15,7 @@ from ontoloom_mcp.components.formatting import (
     format_selection_result,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import Limit, OntologyPath, SelectionName
+from ontoloom_mcp.components.types import Limit, OntologyPath
 
 
 def match_axioms(
@@ -59,12 +59,12 @@ def match_axioms(
 
         if not result.axiom_hashes:
             s.commit()
-            return f"{header} -> {sel.locked!r}."
+            return f"{header} -> {dquoted(sel.locked)}."
 
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = core_read_selection(s, into, limit=page_size, offset=0)
+        page = read_axiom_selection(s, sel, limit=page_size, offset=0, show=ShowFilter.ALL)
         page_axioms = [
-            HashedAxiom(axiom=item.axiom, hash=AxiomHash(item.key))
+            HashedAxiom(axiom=item.axiom, hash=item.hash)
             for item in page.items
             if item.axiom is not None
         ]

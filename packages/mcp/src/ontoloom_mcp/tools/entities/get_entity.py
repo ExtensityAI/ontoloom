@@ -3,12 +3,13 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import axiom_hashes_for_entity
 from ontoloom.entities.store import get_entity as core_get_entity
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import get_selection, upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import build_refs, format_entity_inspect
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def get_entity(
@@ -22,8 +23,7 @@ def get_entity(
     Does NOT include inherited or inferred information.
     Use `match_axioms` to see the full axiom details.
 
-    - `within`: Scope to a named selection. Within an axiom selection: only count axioms
-      about this entity that are in the selection. Entity selections have no effect here.
+    - `within`: Scope to a named *axiom* selection (entity selections raise).
     - `into`: Save this entity's axiom hashes as an axiom selection. Entry point for
       "I want to work on this entity's axioms" -> then use `match_axioms(within=...)`
       or `remove_axioms(within=...)` on the result.
@@ -34,20 +34,12 @@ def get_entity(
         ref = build_refs(s, [iri])[0]
         result = format_entity_inspect(ref, info)
 
-        if within:
-            sel = get_selection(s, within)
-            if sel.kind == SelectionKind.ENTITIES:
-                result += (
-                    "\n\nNote: `within` with an entity selection has no filtering effect "
-                    "on get_entity. To filter displayed axioms, use an axiom selection."
-                )
-
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
-            source = f"get_entity(iri={str(iri)!r})"
+            source = f"get_entity(iri={dquoted(iri)})"
             upserted = upsert_selection(s, into, SelectionKind.AXIOMS, hashes, source)
             sel = upserted.selection
-            sel_msg = f"\n\n{sel.size} axiom hashes -> {sel.locked!r}."
+            sel_msg = f"\n\n{sel.size} axiom hashes -> {dquoted(sel.locked)}."
             if upserted.previous_size is not None:
                 sel_msg += f" Overwrote previous ({upserted.previous_size} items)."
             result += sel_msg

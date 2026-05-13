@@ -315,7 +315,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
             create_selection(s, "r", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
             page = read_selection(s, "r", limit=5)
-            print(",".join(item.key for item in page.items))
+            print(",".join(item.iri for item in page.items))
             s.commit()
     """)
 

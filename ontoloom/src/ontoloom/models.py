@@ -11,13 +11,15 @@ from pydantic_core import CoreSchema, core_schema
 def tagged_union_meta(
     get_tag: Callable[[Any], str],
     *,
-    schema_type: Literal["object"] | tuple[Literal["string"], Literal["object"]] = "object",
+    schema_type: Literal["object", "string"] | tuple[Literal["string"], Literal["object"]] = (
+        "object"
+    ),
 ):
     """Annotated metadata for a discriminated union: discriminator + JSON-schema type marker.
 
     Splat into `Annotated[A | B, *tagged_union_meta(get_tag)]`. `schema_type`
-    is `"object"` for object-only unions, or `("string", "object")` for
-    unions that also accept a bare string.
+    is `"object"` for object-only unions, `"string"` for string-only unions
+    (e.g. Slot), or `("string", "object")` for mixed unions.
     """
     # Without the type marker the Claude Code MCP client serializes dicts as JSON-encoded strings.
     json_schema_extra: dict[str, Any] = {"type": schema_type}

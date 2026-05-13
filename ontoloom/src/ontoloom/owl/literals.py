@@ -1,12 +1,32 @@
 from __future__ import annotations
 
+import re
 from enum import StrEnum
 from typing import Annotated, override
 
 from pydantic import Field, Tag
 
-from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
+from ontoloom.models import FrozenModel, TypedStr, make_tag_resolver, tagged_union_meta
 from ontoloom.owl.markers import Unordered
+from ontoloom.utils import dquoted
+
+_BCP47_PATTERN = re.compile(r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$")
+
+
+class BCP47Tag(TypedStr):
+    """A BCP 47 language tag (e.g. 'en', 'en-GB', 'zh-Hans')."""
+
+    description = "BCP 47 language tag (e.g. 'en', 'en-GB', 'zh-Hans')"
+    pattern = r"^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$"
+    examples = ("en", "en-GB", "zh-Hans")
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        if not _BCP47_PATTERN.match(value):
+            msg = f"must be a valid BCP 47 language tag (e.g. 'en', 'en-GB'), got {dquoted(value)}"
+            raise ValueError(msg)
+        return value
 
 
 class DataType(StrEnum):
@@ -54,12 +74,10 @@ class TypedLiteral(FrozenModel):
 
 
 class LangLiteral(FrozenModel):
-    """A value with a language tag: "Dog"@en"""
+    """A value with a language tag: "Dog"@en. Use TypedLiteral for untagged values."""
 
     value: str
-    # Empty string is a valid sentinel meaning "no language tag". Prefer an
-    # explicit tag (e.g. lang="en") whenever the language is known.
-    lang: str = Field(default="en", pattern=r"^$|^[a-zA-Z]{2,3}(-[a-zA-Z0-9]+)*$")
+    lang: BCP47Tag = BCP47Tag("en")
 
     @override
     def __str__(self) -> str:

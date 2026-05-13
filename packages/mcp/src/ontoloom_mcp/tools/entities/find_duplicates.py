@@ -3,11 +3,11 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 _PREVIEW_GROUPS = 20
 
@@ -36,9 +36,9 @@ def find_duplicates(
         if not result.affected_iris:
             return f"No duplicate {annotation_property} values found."
 
-        source = f"find_duplicates(annotation_property={str(annotation_property)!r})"
+        source = f"find_duplicates(annotation_property={dquoted(annotation_property)})"
         if within:
-            source += f", within={str(within)!r}"
+            source += f", within={dquoted(within)}"
         upserted = upsert_selection(
             s, into, SelectionKind.ENTITIES, result.affected_iris, source=source
         )
@@ -47,7 +47,7 @@ def find_duplicates(
 
     lines = [
         f"Found {result.total_groups} duplicate {annotation_property} values "
-        f"across {sel.size} entities -> {sel.locked!r}."
+        f"across {sel.size} entities -> {dquoted(sel.locked)}."
     ]
     if upserted.previous_size is not None:
         lines.append(f"Overwrote previous ({upserted.previous_size} items).")

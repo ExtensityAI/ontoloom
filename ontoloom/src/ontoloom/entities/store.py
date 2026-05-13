@@ -17,7 +17,7 @@ from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes import PrefixName
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import SelectionKindError, get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.text_index import (
     DECLARED_EXISTS,
@@ -25,6 +25,7 @@ from ontoloom.text_index import (
     LOCAL_NAME_PROPERTY,
     NOT_DEPRECATED,
 )
+from ontoloom.utils import dquoted
 
 
 class EntityNotFoundError(OntoloomError):
@@ -37,7 +38,7 @@ class EntityNotFoundError(OntoloomError):
     def __init__(self, iri: str, near_matches: list[str] | None = None):
         self.iri = iri
         self.near_matches = near_matches or []
-        super().__init__(f"Entity {iri!r} not found.")
+        super().__init__(f"Entity {dquoted(iri)} not found.")
 
 
 # A: this file is huge. we need to look at it separately
@@ -45,15 +46,21 @@ class EntityNotFoundError(OntoloomError):
 _TEXT_SCAN_CAP = 1000
 
 
-def _axiom_scope_join(s: Session, within: SelectionName | None) -> tuple[str, list[str]]:
+def _axiom_scope_join(
+    s: Session, within: SelectionName | None, operation: str
+) -> tuple[str, list[str]]:
     """Join clause for queries already in axiom-context (alias `a` for axioms).
-    Silently no-op for ENTITIES selections -> these reads only respect axiom selections.
+
+    Raises SelectionKindError if `within` is an entity selection — these reads
+    only accept axiom selections.
     """
     if within is None:
         return "", []
     sel = get_selection(s, within)
     if sel.kind != SelectionKind.AXIOMS:
-        return "", []
+        raise SelectionKindError(
+            name=within, expected=SelectionKind.AXIOMS, actual=sel.kind, operation=operation
+        )
     return (
         " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?",
         [within],
@@ -125,7 +132,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
         )
     ]
 
-    extra_join, extra_params = _axiom_scope_join(s, within)
+    extra_join, extra_params = _axiom_scope_join(s, within, "get_entity")
 
     axiom_counts = Counter(
         {
@@ -156,7 +163,7 @@ def axiom_hashes_for_entity(
 ) -> list[str]:
     """Return all axiom hashes for an entity."""
     iri_str = str(iri)
-    extra_join, extra_params = _axiom_scope_join(s, within)
+    extra_join, extra_params = _axiom_scope_join(s, within, "axiom_hashes_for_entity")
 
     return [
         r[0]

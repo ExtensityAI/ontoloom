@@ -4,8 +4,6 @@ from ontoloom.patterns.codegen import generate_body
 def test_gen_patterns_produces_python_source():
     source = generate_body()
     assert "class SubClassOfPattern" in source
-    assert "class ContainsExpr" in source
-    assert "class ContainsSlot" in source
     assert "Pattern = Annotated[" in source
     assert "tagged_union_meta(_get_pattern_tag)" in source
 
@@ -27,16 +25,20 @@ def test_gen_patterns_class_expression_becomes_exprslot():
     assert "super_class: ExprSlot" in source
 
 
-def test_gen_patterns_unordered_tuple_gets_contains():
+def test_gen_patterns_unordered_tuple_gets_sibling_match_enum():
     source = generate_body()
-    assert "tuple[ExprSlot, ...] | ContainsExpr" in source
-    assert "tuple[Slot, ...] | ContainsSlot" in source
+    # Unordered tuple field -> bare tuple + sibling `<field>_match: TupleMatch`
+    assert "equivalent_classes: tuple[ExprSlot, ...]" in source
+    assert "equivalent_classes_match: TupleMatch = TupleMatch.EXACT" in source
+    assert "object_properties: tuple[Slot, ...]" in source
+    assert "object_properties_match: TupleMatch = TupleMatch.EXACT" in source
 
 
-def test_gen_patterns_ordered_tuple_has_no_contains():
+def test_gen_patterns_ordered_tuple_has_no_sibling_match():
     source = generate_body()
-    # SubObjectPropertyOfChain.chain is ordered -> no Contains
+    # SubObjectPropertyOfChain.chain is ordered -> bare tuple, no sibling
     assert "chain: tuple[Slot, ...]" in source
+    assert "chain_match" not in source
 
 
 def test_gen_patterns_data_range_gets_slot_option():
@@ -164,33 +166,43 @@ def test_expression_container_types_reflective_derivation():
 
 def test_gen_patterns_field_type_transformations():
     """Key field-type transformations verified at runtime via model_fields annotations."""
-    from typing import get_args
+    from typing import Annotated, get_args, get_origin
 
     from ontoloom.patterns import types as gen
     from ontoloom.patterns.slot import Slot
 
+    def _strip_annotated(t):
+        return get_args(t)[0] if get_origin(t) is Annotated else t
+
+    # `Slot` is `Annotated[Union[...], Discriminator, Field]`; the outer Annotated
+    # gets stripped when Slot is a direct field annotation but preserved when it's
+    # a union member, so normalize before comparing.
+    slot_inner = _strip_annotated(Slot)
+
     # IRI field → Slot
     ann = gen.AnnotationAssertionPattern.model_fields["property"].annotation
-    assert ann is Slot, f"expected Slot for .property, got {ann}"
+    assert _strip_annotated(ann) == slot_inner, f"expected Slot for .property, got {ann}"
 
     # ClassExpression field → ExprSlot (a union containing Slot)
     ann = gen.SubClassOfPattern.model_fields["sub_class"].annotation
-    args = get_args(ann)
+    args = [_strip_annotated(a) for a in get_args(ann)]
     assert args, f"expected union for .sub_class, got {ann}"
-    assert Slot in args, f"Slot missing from ExprSlot union: {ann}"
+    assert slot_inner in args, f"Slot missing from ExprSlot union: {ann}"
 
     # DataRange field → DataRange | Slot (union containing Slot)
     ann = gen.DataPropertyRangePattern.model_fields["range"].annotation
-    args = get_args(ann)
+    args = [_strip_annotated(a) for a in get_args(ann)]
     assert args, f"expected union for .range, got {ann}"
-    assert Slot in args, f"Slot missing from DataRange|Slot union: {ann}"
+    assert slot_inner in args, f"Slot missing from DataRange|Slot union: {ann}"
 
-    # Ordered tuple of IRI → tuple[Slot, ...] (no Contains)
+    # Ordered tuple of IRI → tuple[Slot, ...] (no sibling _match)
     ann = gen.SubObjectPropertyOfChainPattern.model_fields["chain"].annotation
-    assert ann == tuple[Slot, ...], f"expected tuple[Slot, ...] for .chain, got {ann}"
+    inner = _strip_annotated(get_args(ann)[0])
+    assert inner == slot_inner, f"expected tuple[Slot, ...] for .chain, got {ann}"
+    assert "chain_match" not in gen.SubObjectPropertyOfChainPattern.model_fields
 
-    # Unordered tuple of IRI → tuple[Slot, ...] | ContainsSlot
+    # Unordered tuple of IRI → tuple[Slot, ...] + sibling `<field>_match`
     ann = gen.EquivalentObjectPropertiesPattern.model_fields["object_properties"].annotation
-    args = get_args(ann)
-    assert args, f"expected union for .object_properties, got {ann}"
-    assert gen.ContainsSlot in args
+    inner = _strip_annotated(get_args(ann)[0])
+    assert inner == slot_inner, f"expected tuple[Slot, ...] for object_properties, got {ann}"
+    assert "object_properties_match" in gen.EquivalentObjectPropertiesPattern.model_fields

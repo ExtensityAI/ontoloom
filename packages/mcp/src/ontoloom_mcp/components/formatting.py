@@ -175,7 +175,7 @@ def format_selection_result(
     page_text: str,
 ):
     sel = upserted.selection
-    parts = [f"{sel.size} {kind_label} -> {sel.locked!r}."]
+    parts = [f"{sel.size} {kind_label} -> {dquoted(sel.locked)}."]
     if upserted.previous_size is not None:
         parts.append(f"Overwrote previous ({upserted.previous_size} items).")
 
@@ -187,7 +187,7 @@ def format_selection_result(
         parts.append("")
         parts.append(page_text)
         parts.append(
-            f"\nUse `read_selection` with name {str(sel.name)!r} to browse all {sel.size} results."
+            f"\nUse `read_selection` with name {dquoted(sel.name)} to browse all {sel.size} results."
         )
 
     return "\n".join(parts)

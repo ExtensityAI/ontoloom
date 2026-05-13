@@ -4,12 +4,12 @@ from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
 from ontoloom.axioms.store import resolve_hash_prefix
+from ontoloom.axioms.types import AddAnnotation, AnnotationChange, RemoveAnnotation
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.owl.annotations import Annotation
 from ontoloom.utils import dedupe
 
-from ontoloom_mcp.components.errors import MissingRequiredError
 from ontoloom_mcp.components.formatting import (
     build_refs_per_axiom,
     format_axiom_listing,
@@ -21,18 +21,24 @@ from ontoloom_mcp.components.types import OntologyPath
 def annotate_axiom(
     path: OntologyPath,
     axiom_hash: AxiomHashPrefix,
-    add_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
-    remove_annotations: Annotated[list[Annotation], MinLen(1)] | None = None,
+    changes: Annotated[tuple[AnnotationChange, ...], MinLen(1)],
 ):
     """Add or remove annotations on an existing axiom. The axiom's hash does not change.
 
     Args:
     - `axiom_hash`: Full hash or unambiguous prefix. Use `match_axioms` to find one.
-    - `add_annotations`: Annotations to add (deduplicated against existing).
-    - `remove_annotations`: Annotations to remove (no-op if absent).
+    - `changes`: At least one change. Each change is either `{"add": <annotation>}`
+      (idempotent: skipped if already present) or `{"remove": <annotation>}`
+      (no-op if absent).
     """
-    if add_annotations is None and remove_annotations is None:
-        raise MissingRequiredError(("add_annotations", "remove_annotations"))
+    add_annotations: list[Annotation] = []
+    remove_annotations: list[Annotation] = []
+    for change in changes:
+        match change:
+            case AddAnnotation(add=ann):
+                add_annotations.append(ann)
+            case RemoveAnnotation(remove=ann):
+                remove_annotations.append(ann)
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -46,8 +52,8 @@ def annotate_axiom(
         listing = format_axiom_listing([result.hashed], refs_per_axiom=refs_per_axiom)
         n_added = len(result.added)
         n_removed = len(result.removed)
-        already_present = len(dedupe(add_annotations or [])) - n_added
-        absent = len(dedupe(remove_annotations or [])) - n_removed
+        already_present = len(dedupe(add_annotations)) - n_added
+        absent = len(dedupe(remove_annotations)) - n_removed
         s.commit()
 
     summary = f"+{n_added} added, {n_removed} removed"

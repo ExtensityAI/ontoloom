@@ -3,14 +3,15 @@ from ontoloom.axioms.store import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import LockedSelection, SelectionKind
+from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def rename_iri(
@@ -82,7 +83,7 @@ def rename_iri(
     parts.append(f"Batch: {result.batch_id}")
     if upserted is not None:
         sel = upserted.selection
-        parts.append(f"Saved to {sel.locked!r} ({sel.size} items).")
+        parts.append(f"Saved to {dquoted(sel.locked)} ({sel.size} items).")
     return " ".join(parts)
 
 

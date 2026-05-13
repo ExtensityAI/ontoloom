@@ -56,7 +56,6 @@ from ontoloom.selections.store import (
     create_selection,
     list_selections,
     read_selection,
-    remove_selections_by_pattern,
     upsert_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
@@ -580,18 +579,6 @@ def test_namespace_filter_escapes_underscore(s):
     # Without ESCAPE, `a_b:%` would match `aXb:Y` because `_` is a LIKE wildcard.
     assert "a_b:X" in iris
     assert "aXb:Y" not in iris
-
-
-def test_remove_selections_by_pattern(s):
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    upsert_selection(s, "audit_one", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    upsert_selection(s, "audit_two", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    upsert_selection(s, "keep", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-
-    dropped = remove_selections_by_pattern(s, "audit_*")
-    names = [d.name for d in dropped]
-    assert names == ["audit_one", "audit_two"]
-    assert {ls.meta.name for ls in list_selections(s)} == {"keep"}
 
 
 # -- IRI validation --

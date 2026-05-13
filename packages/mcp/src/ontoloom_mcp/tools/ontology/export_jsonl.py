@@ -3,9 +3,11 @@ from pathlib import Path
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.export import export_to_jsonl
+from ontoloom.selections.types import SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionName | None = None):
@@ -24,7 +26,7 @@ def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionName | 
     if within:
         skipped_note = f" (skipped {result.skipped} missing items)" if result.skipped > 0 else ""
         return (
-            f"Exported {result.exported} axioms from selection {str(within)!r}"
+            f"Exported {result.exported} axioms from selection {dquoted(within)}"
             f"{skipped_note} to `{output_path}`."
         )
     return f"Exported {result.exported} axioms to `{output_path}`."

@@ -7,6 +7,7 @@ hierarchy in `ontoloom.owl.axioms` — do not edit the body by hand.
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import Tag
@@ -30,19 +31,26 @@ class BasePattern(FrozenModel):
         return cls.__name__.removesuffix("Pattern")
 
 
+# Implementation note: each unordered tuple pattern field gets a sibling
+# `<field>_match: TupleMatch` emitted by codegen. The matcher reads it to
+# pick set-equality vs subset semantics. We use a sibling enum (not a
+# wrapper class like `Match[T]`) to keep the bare-tuple shorthand for the
+# common case and avoid extra wrapper types in the schema.
+# Ordered tuple fields stay bare and match positionally. If partial-match
+# is ever needed for ordered fields (prefix / contains / subsequence), add
+# a separate `SequenceMatch` enum + sibling there.
+class TupleMatch(StrEnum):
+    """Match mode for an unordered tuple field on a pattern.
+
+    EXACT: pattern items equal the axiom's items (same set, any order).
+    PARTIAL: pattern items are a subset of the axiom's items (any order).
+    """
+
+    EXACT = "exact"
+    PARTIAL = "partial"
+
+
 # ---- AUTOGEN BELOW: do not edit; regenerate via `uv run ontoloom-gen-patterns` ----
-
-
-class ContainsExpr(FrozenModel):
-    """Partial-set match for expression-tuple fields."""
-
-    contains: tuple[ExprSlot, ...]
-
-
-class ContainsSlot(FrozenModel):
-    """Partial-set match for slot-tuple fields (e.g. property lists)."""
-
-    contains: tuple[Slot, ...]
 
 
 class ObjectSomeValuesFromPattern(BasePattern):
@@ -51,7 +59,8 @@ class ObjectSomeValuesFromPattern(BasePattern):
 
 
 class ObjectIntersectionOfPattern(BasePattern):
-    operands: tuple[ExprSlot, ...] | ContainsExpr
+    operands: tuple[ExprSlot, ...]
+    operands_match: TupleMatch = TupleMatch.EXACT
 
 
 class ObjectOneOfPattern(BasePattern):
@@ -101,11 +110,13 @@ class SubClassOfPattern(BasePattern):
 
 
 class EquivalentClassesPattern(BasePattern):
-    equivalent_classes: tuple[ExprSlot, ...] | ContainsExpr
+    equivalent_classes: tuple[ExprSlot, ...]
+    equivalent_classes_match: TupleMatch = TupleMatch.EXACT
 
 
 class DisjointClassesPattern(BasePattern):
-    disjoint_classes: tuple[ExprSlot, ...] | ContainsExpr
+    disjoint_classes: tuple[ExprSlot, ...]
+    disjoint_classes_match: TupleMatch = TupleMatch.EXACT
 
 
 class SubObjectPropertyOfPattern(BasePattern):
@@ -119,7 +130,8 @@ class SubObjectPropertyOfChainPattern(BasePattern):
 
 
 class EquivalentObjectPropertiesPattern(BasePattern):
-    object_properties: tuple[Slot, ...] | ContainsSlot
+    object_properties: tuple[Slot, ...]
+    object_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class TransitiveObjectPropertyPattern(BasePattern):
@@ -146,7 +158,8 @@ class SubDataPropertyOfPattern(BasePattern):
 
 
 class EquivalentDataPropertiesPattern(BasePattern):
-    data_properties: tuple[Slot, ...] | ContainsSlot
+    data_properties: tuple[Slot, ...]
+    data_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class DataPropertyDomainPattern(BasePattern):
@@ -180,8 +193,10 @@ class AnnotationPropertyRangePattern(BasePattern):
 
 class HasKeyPattern(BasePattern):
     class_expression: ExprSlot
-    object_properties: tuple[Slot, ...] | ContainsSlot
-    data_properties: tuple[Slot, ...] | ContainsSlot
+    object_properties: tuple[Slot, ...]
+    object_properties_match: TupleMatch = TupleMatch.EXACT
+    data_properties: tuple[Slot, ...]
+    data_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class DatatypeDefinitionPattern(BasePattern):
@@ -224,11 +239,13 @@ class NegativeDataPropertyAssertionPattern(BasePattern):
 
 
 class SameIndividualPattern(BasePattern):
-    same_individuals: tuple[Slot, ...] | ContainsSlot
+    same_individuals: tuple[Slot, ...]
+    same_individuals_match: TupleMatch = TupleMatch.EXACT
 
 
 class DifferentIndividualsPattern(BasePattern):
-    different_individuals: tuple[Slot, ...] | ContainsSlot
+    different_individuals: tuple[Slot, ...]
+    different_individuals_match: TupleMatch = TupleMatch.EXACT
 
 
 ExpressionPattern = (
@@ -352,19 +369,13 @@ Pattern = Annotated[
     *tagged_union_meta(_get_pattern_tag),
 ]
 
-ContainsExpr.model_rebuild()
-ContainsSlot.model_rebuild()
 ObjectSomeValuesFromPattern.model_rebuild()
 ObjectIntersectionOfPattern.model_rebuild()
 SubClassOfPattern.model_rebuild()
 EquivalentClassesPattern.model_rebuild()
 DisjointClassesPattern.model_rebuild()
-EquivalentObjectPropertiesPattern.model_rebuild()
 ObjectPropertyDomainPattern.model_rebuild()
 ObjectPropertyRangePattern.model_rebuild()
-EquivalentDataPropertiesPattern.model_rebuild()
 DataPropertyDomainPattern.model_rebuild()
 HasKeyPattern.model_rebuild()
 ClassAssertionPattern.model_rebuild()
-SameIndividualPattern.model_rebuild()
-DifferentIndividualsPattern.model_rebuild()

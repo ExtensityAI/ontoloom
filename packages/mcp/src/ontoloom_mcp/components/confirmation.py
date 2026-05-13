@@ -3,6 +3,7 @@
 import hashlib
 
 from fastmcp.exceptions import ToolError
+from ontoloom.utils import dquoted
 
 
 def confirmation_token(*parts: str):
@@ -13,4 +14,4 @@ def confirmation_token(*parts: str):
 class ConfirmationRequiredError(ToolError):
     def __init__(self, message: str, token: str):
         self.token = token
-        super().__init__(f"{message}\n\nTo proceed, call again with confirm={token!r}.")
+        super().__init__(f"{message}\n\nTo proceed, call again with confirm={dquoted(token)}.")

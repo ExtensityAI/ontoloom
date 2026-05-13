@@ -14,9 +14,8 @@ from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
-from ontoloom.owl.iri import IRI
 from ontoloom.patterns.match import match_pattern
-from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
@@ -168,11 +167,9 @@ def _extract_concrete_iris(pattern: BasePattern) -> list[str]:
 def _walk_for_iris(obj: object, iris: list[str]):
     """Recursively collect concrete IRI values from a pattern object."""
     match obj:
-        case IRI():
+        case IRISlot():
             iris.append(str(obj))
-        case Slot() if obj.is_iri:
-            iris.append(str(obj))
-        case Slot():
+        case WildcardSlot() | VariableSlot():
             return
         case FrozenModel():
             for field_name in type(obj).model_fields:

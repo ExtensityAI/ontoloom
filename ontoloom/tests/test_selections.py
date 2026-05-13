@@ -49,7 +49,7 @@ def test_intersection(s):
     assert card == 1
 
     page = read_selection(s, "inter")
-    assert [item.key for item in page.items] == ["ex:Cat"]
+    assert [item.iri for item in page.items] == ["ex:Cat"]
 
     upsert_selection(s, "c", SelectionKind.ENTITIES, ["ex:Fish"], "test")
     card_disjoint = create_selection(
@@ -68,7 +68,7 @@ def test_difference(s):
     assert card_a_minus_b == 2
 
     page = read_selection(s, "diff_ab")
-    assert {item.key for item in page.items} == {"ex:Dog", "ex:Fish"}
+    assert {item.iri for item in page.items} == {"ex:Dog", "ex:Fish"}
 
     card_b_minus_a = create_selection(
         s, "diff_ba", DiffExpr(diff=(SelectionName("b"), SelectionName("a")))
@@ -111,7 +111,7 @@ def test_entities_in(s):
     assert meta.kind == SelectionKind.ENTITIES
 
     page = read_selection(s, "ent_in")
-    keys = {item.key for item in page.items}
+    keys = {item.iri for item in page.items}
     assert "ex:Dog" in keys
     assert "ex:Animal" in keys
 
@@ -343,7 +343,7 @@ def test_selection_hash_round_trip(s):
     items = ["ex:C", "ex:A", "ex:B"]
     result1 = upsert_selection(s, "s", SelectionKind.ENTITIES, items, "test")
     page = read_selection(s, "s")
-    read_back = [item.key for item in page.items]
+    read_back = [item.iri for item in page.items]
     result2 = upsert_selection(s, "s2", SelectionKind.ENTITIES, read_back, "test")
     assert result1.selection.hash == result2.selection.hash
 

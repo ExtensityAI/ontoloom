@@ -63,21 +63,7 @@ _DATA_RANGE_UNION = get_args(DataRange)[0]
 def generate_body():
     """Emit the AUTOGEN section content (everything below the marker)."""
     lines: list[str] = []
-    # Two Contains variants -> one per inner element type. Splitting them prevents
-    # a Slot-tuple Contains from being silently accepted on an ExprSlot-tuple
-    # field (Pydantic catches the type mismatch at construction).
-    lines += [
-        "class ContainsExpr(FrozenModel):",
-        '    """Partial-set match for expression-tuple fields."""',
-        "    contains: tuple[ExprSlot, ...]",
-        "",
-        "class ContainsSlot(FrozenModel):",
-        '    """Partial-set match for slot-tuple fields (e.g. property lists)."""',
-        "    contains: tuple[Slot, ...]",
-        "",
-    ]
-
-    needs_rebuild: list[str] = ["ContainsExpr", "ContainsSlot"]
+    needs_rebuild: list[str] = []
 
     for cls in _EXPR_CLASSES:
         emitted = _emit_class(cls)
@@ -129,10 +115,15 @@ def _emit_class(cls: type):
     for field_name, info in cls.model_fields.items():
         if field_name in SKIP:
             continue
-        field_type = _to_pattern_type(hints[field_name], is_unordered(info))
+        unordered = is_unordered(info)
+        field_type = _to_pattern_type(hints[field_name], unordered)
         lines.append(f"    {field_name}: {field_type}")
-        if "ExprSlot" in field_type or "ContainsExpr" in field_type or "ContainsSlot" in field_type:
+        if "ExprSlot" in field_type:
             needs_rebuild = True
+        # Sibling enum for unordered tuple fields -> matcher reads it to pick
+        # between exact set-equality and subset. See TupleMatch docstring.
+        if unordered:
+            lines.append(f"    {field_name}_match: TupleMatch = TupleMatch.EXACT")
 
     return EmittedClass(lines=tuple(lines), needs_rebuild=needs_rebuild)
 
@@ -165,11 +156,7 @@ def _to_pattern_type(t: object, unordered: bool = False) -> str:
     origin = get_origin(t)
     if origin is tuple:
         inner = _to_pattern_type(get_args(t)[0])
-        base = f"tuple[{inner}, ...]"
-        if not unordered:
-            return base
-        contains_variant = "ContainsExpr" if inner == "ExprSlot" else "ContainsSlot"
-        return f"{base} | {contains_variant}"
+        return f"tuple[{inner}, ...]"
 
     if origin is types.UnionType or origin is typing.Union:
         parts = [_union_member(arg) for arg in get_args(t)]

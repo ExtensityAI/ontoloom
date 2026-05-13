@@ -13,12 +13,11 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.expressions import BaseClassExpression
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import is_unordered
-from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.slot import BaseSlot, IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import (
     BasePattern,
-    ContainsExpr,
-    ContainsSlot,
     ExpressionPattern,
+    TupleMatch,
 )
 
 Bindings = dict[str, str]
@@ -64,7 +63,7 @@ def _match_model(
     """Match a pattern model against an actual model, field by field."""
     # Handle bare IRI strings: match pattern.iri against the string
     if isinstance(actual, str):
-        if hasattr(pattern, "iri") and isinstance(getattr(pattern, "iri", None), Slot):
+        if hasattr(pattern, "iri") and isinstance(getattr(pattern, "iri", None), BaseSlot):
             return _match_slot_vs_str(pattern.iri, actual, bindings)  # pyright: ignore[reportAttributeAccessIssue]
         return None
 
@@ -72,8 +71,9 @@ def _match_model(
         return None
 
     actual_fields = type(actual).model_fields
-    for field_name in type(pattern).model_fields:
-        if field_name in SKIP:
+    pattern_fields = type(pattern).model_fields
+    for field_name in pattern_fields:
+        if field_name in SKIP or field_name.endswith("_match"):
             continue
 
         pattern_val = getattr(pattern, field_name)
@@ -81,9 +81,13 @@ def _match_model(
         if actual_val is None:
             return None
 
+        # Pattern's sibling mode (codegen-emitted) drives tuple match semantics.
+        mode = getattr(pattern, f"{field_name}_match", TupleMatch.EXACT)
         # Look up Unordered marker on the actual axiom's field -> pattern fields
         # don't carry the marker, the axiom side does.
-        result = _match_field(pattern_val, actual_val, bindings, actual_fields.get(field_name))
+        result = _match_field(
+            pattern_val, actual_val, bindings, actual_fields.get(field_name), mode
+        )
         if result is None:
             return None
         bindings = result
@@ -96,33 +100,28 @@ def _match_field(  # noqa: C901
     actual_val: object,
     bindings: Bindings,
     info: FieldInfo | None = None,
+    mode: TupleMatch = TupleMatch.EXACT,
 ) -> Bindings | None:
     """Dispatch matching based on the pattern value's type."""
     # Slot against a class expression (shorthand semantics)
-    if isinstance(pattern_val, Slot) and isinstance(actual_val, BaseClassExpression):
+    if isinstance(pattern_val, BaseSlot) and isinstance(actual_val, BaseClassExpression):
         return _match_slot_vs_expression(pattern_val, actual_val, bindings)
 
     # Slot against a string (IRI or EntityType)
-    if isinstance(pattern_val, Slot) and isinstance(actual_val, str):
+    if isinstance(pattern_val, BaseSlot) and isinstance(actual_val, str):
         return _match_slot_vs_str(pattern_val, str(actual_val), bindings)
 
     # Slot against a typed/lang literal: bind to the canonical string repr
     # (`"Dog"@en`, `"42"^^xsd:integer`) so cross-position equality holds and
     # different literal shapes don't unify spuriously.
-    if isinstance(pattern_val, Slot) and isinstance(actual_val, TypedLiteral | LangLiteral):
+    if isinstance(pattern_val, BaseSlot) and isinstance(actual_val, TypedLiteral | LangLiteral):
         return _match_slot_vs_str(pattern_val, str(actual_val), bindings)
 
-    # Contains{Expr,Slot}: partial-set match (any subset, any order). Two
-    # variants exist so codegen can give expression-tuple and slot-tuple fields
-    # distinct types -> Pydantic rejects a wrong-shape Contains at parse time.
-    if isinstance(pattern_val, ContainsExpr | ContainsSlot) and isinstance(actual_val, tuple):
-        return _match_contains(pattern_val.contains, actual_val, bindings)
-
-    # Plain tuple: dispatch on field metadata. Unordered fields require equal
-    # length but allow any permutation; ordered fields require exact pairing.
+    # Tuple match: ordered fields match positionally; unordered fields use the
+    # `mode` from the pattern's sibling `<field>_match` enum.
     if isinstance(pattern_val, tuple) and isinstance(actual_val, tuple):
         if info is not None and is_unordered(info):
-            if len(pattern_val) != len(actual_val):
+            if mode == TupleMatch.EXACT and len(pattern_val) != len(actual_val):
                 return None
             return _match_contains(pattern_val, actual_val, bindings)
         return _match_tuple(pattern_val, actual_val, bindings)
@@ -146,18 +145,24 @@ def _match_field(  # noqa: C901
 # ---------------------------------------------------------------------------
 
 
-def _match_slot_vs_str(slot: Slot, actual: str, bindings: Bindings) -> Bindings | None:
+def _match_slot_vs_str(slot: BaseSlot, actual: str, bindings: Bindings) -> Bindings | None:
     """Match a Slot against a plain string (IRI field, EntityType, etc.)."""
-    if slot.is_wildcard:
-        return bindings
-    if slot.is_variable:
-        return _bind_variable(slot.var_name, actual, bindings)
-    # Concrete IRI: exact string match
-    return bindings if str(slot) == actual else None
+    match slot:
+        case WildcardSlot():
+            return bindings
+        case VariableSlot():
+            return _bind_variable(slot.name, actual, bindings)
+        case IRISlot():
+            return bindings if slot == actual else None
+        case _:
+            msg = f"unhandled BaseSlot subtype {type(slot).__name__}"
+            raise TypeError(msg)
 
 
 def _match_slot_vs_expression(
-    slot: Slot, expr: str | BaseClassExpression, bindings: Bindings
+    slot: BaseSlot,
+    expr: str | BaseClassExpression,
+    bindings: Bindings,
 ) -> Bindings | None:
     """Match a Slot against a ClassExpression or bare IRI string.
 
@@ -166,18 +171,18 @@ def _match_slot_vs_expression(
     - Variable: binds to the IRI string for bare IRI, else to repr.
     - Concrete IRI: matches a bare IRI string with the same value.
     """
-    if slot.is_wildcard:
-        return bindings
-
-    if isinstance(expr, str):
-        if slot.is_variable:
-            return _bind_variable(slot.var_name, expr, bindings)
-        return bindings if str(slot) == expr else None
-
-    if slot.is_variable:
-        return _bind_variable(slot.var_name, repr(expr), bindings)
-
-    return None
+    match slot:
+        case WildcardSlot():
+            return bindings
+        case VariableSlot():
+            return _bind_variable(
+                slot.name, expr if isinstance(expr, str) else repr(expr), bindings
+            )
+        case IRISlot():
+            return bindings if isinstance(expr, str) and slot == expr else None
+        case _:
+            msg = f"unhandled BaseSlot subtype {type(slot).__name__}"
+            raise TypeError(msg)
 
 
 def _bind_variable(name: str, value: str, bindings: Bindings) -> Bindings | None:

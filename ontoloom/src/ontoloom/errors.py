@@ -1,3 +1,5 @@
+from ontoloom.utils import dquoted
+
 """Foundation exceptions for the ontoloom core library.
 
 Domain-specific errors live with the code that raises them; only the base class
@@ -47,7 +49,9 @@ class UnionDispatchError(OntoloomError):
         self.keys = keys
         self.missing = missing
         self.unknown = unknown
-        parts = [f"input does not match any {union_name} variant; closest: {closest_variant!r}"]
+        parts = [
+            f"input does not match any {union_name} variant; closest: {dquoted(closest_variant)}"
+        ]
         if missing:
             parts.append(f"missing required field(s) {sorted(missing)}")
         if unknown:

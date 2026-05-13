@@ -13,6 +13,7 @@ from ontoloom.connection import (
 from ontoloom.prefixes import NamespaceIRI, PrefixName, list_prefixes
 from ontoloom.selections.store import SelectionKindError, get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.utils import dquoted
 
 FORMAT_VERSION = 4
 
@@ -41,7 +42,7 @@ def export_to_jsonl(
     assert_within_workspace(output_path)
 
     if not output_path.parent.exists():
-        msg = f"Directory '{output_path.parent}' does not exist."
+        msg = f"Directory {dquoted(output_path.parent)} does not exist."
         raise FileNotFoundError(msg)
 
     selection_size: int | None = None

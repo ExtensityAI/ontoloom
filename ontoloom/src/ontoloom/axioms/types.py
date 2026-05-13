@@ -2,10 +2,15 @@
 
 from collections import Counter
 from dataclasses import dataclass
+from typing import Annotated
 
-from ontoloom.hashing import AxiomHash, HashedAxiom
+from annotated_types import MinLen
+
+from ontoloom.hashing import AxiomHash, AxiomHashPrefix, HashedAxiom
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.iri import IRI
+from ontoloom.selections.types import LockedSelection
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,3 +69,47 @@ class RenameResult:
     def colliding_hashes(self) -> tuple[AxiomHash, ...]:
         """New hashes whose insertion was a no-op because an axiom with that hash already existed."""
         return tuple(sorted(r.new.hash for r in self.replaced if r.was_merged_into_existing))
+
+
+class ByHashes(FrozenModel):
+    """Target a set of axioms by hash (full or unambiguous prefix)."""
+
+    hashes: Annotated[tuple[AxiomHashPrefix, ...], MinLen(1)]
+
+
+class BySelection(FrozenModel):
+    """Target every axiom in a locked axiom-selection."""
+
+    selection: LockedSelection
+
+
+_get_remove_axioms_target_tag = make_tag_resolver(
+    (ByHashes, BySelection), union_name="RemoveAxiomsTarget"
+)
+
+RemoveAxiomsTarget = Annotated[
+    tagged(ByHashes) | tagged(BySelection),
+    *tagged_union_meta(_get_remove_axioms_target_tag),
+]
+
+
+class AddAnnotation(FrozenModel):
+    """Add one annotation to an axiom (idempotent: skipped if already present)."""
+
+    add: Annotation
+
+
+class RemoveAnnotation(FrozenModel):
+    """Remove one annotation from an axiom (no-op if absent)."""
+
+    remove: Annotation
+
+
+_get_annotation_change_tag = make_tag_resolver(
+    (AddAnnotation, RemoveAnnotation), union_name="AnnotationChange"
+)
+
+AnnotationChange = Annotated[
+    tagged(AddAnnotation) | tagged(RemoveAnnotation),
+    *tagged_union_meta(_get_annotation_change_tag),
+]

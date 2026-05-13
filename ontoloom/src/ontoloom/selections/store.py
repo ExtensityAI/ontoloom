@@ -7,10 +7,11 @@ from pydantic import Field
 
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
-from ontoloom.hashing import short_hash
+from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.owl.axioms import Declaration
-from ontoloom.owl.markers import Position
+from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType, Position
 from ontoloom.selections.expr import (
     AxiomsForExpr,
     DiffExpr,
@@ -21,25 +22,27 @@ from ontoloom.selections.expr import (
     UnionExpr,
 )
 from ontoloom.selections.types import (
+    AxiomItem,
+    AxiomSelectionPage,
+    EntityItem,
+    EntitySelectionPage,
     LockedSelection,
     SelectionContentHash,
-    SelectionItem,
     SelectionKind,
     SelectionListing,
     SelectionMeta,
     SelectionName,
-    SelectionPage,
     SetOp,
     ShowFilter,
 )
 from ontoloom.text_index import lookup_entity_labels
-from ontoloom.utils import dedupe
+from ontoloom.utils import dedupe, dquoted
 
 
 class SelectionNotFoundError(OntoloomError):
     def __init__(self, name: SelectionName):
         self.name = name
-        super().__init__(f"Selection {name!r} does not exist.")
+        super().__init__(f"Selection {dquoted(name)} does not exist.")
 
 
 class StaleSelectionError(OntoloomError):
@@ -58,8 +61,8 @@ class StaleSelectionError(OntoloomError):
         self.current_size = current_size
         current = current_hash[:12] if current_hash else "<absent>"
         super().__init__(
-            f"Selection {name!r} has changed (your prefix: {supplied_prefix!r}, "
-            f"current hash: {current!r}). Re-read the selection to get the current hash."
+            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
+            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
         )
 
 
@@ -78,8 +81,8 @@ class SelectionKindError(OntoloomError):
         self.actual = actual
         self.operation = operation
         super().__init__(
-            f"'{operation}' requires an {expected} selection, "
-            f"but {name!r} is an {actual} selection."
+            f"{dquoted(operation)} requires an {expected} selection, "
+            f"but {dquoted(name)} is an {actual} selection."
         )
 
 
@@ -306,17 +309,17 @@ def read_selection(
     limit: Annotated[int, Field(ge=1)] = 20,
     offset: int = 0,
     show: ShowFilter = ShowFilter.ALL,
-) -> SelectionPage:
+) -> AxiomSelectionPage | EntitySelectionPage:
     sel = get_selection(s, name)
 
     if sel.kind == SelectionKind.AXIOMS:
-        return _read_axiom_selection(s, sel, limit=limit, offset=offset, show=show)
-    return _read_entity_selection(s, sel, limit=limit, offset=offset, show=show)
+        return read_axiom_selection(s, sel, limit=limit, offset=offset, show=show)
+    return read_entity_selection(s, sel, limit=limit, offset=offset, show=show)
 
 
-def _read_axiom_selection(
+def read_axiom_selection(
     s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
-) -> SelectionPage:
+) -> AxiomSelectionPage:
     base = (
         "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item WHERE si.selection_name = ?"
     )
@@ -338,10 +341,9 @@ def _read_axiom_selection(
         (sel.name,),
     ).fetchone()[0]
 
-    items = [
-        SelectionItem(
-            key=item_hash,
-            missing=data is None,
+    items = tuple(
+        AxiomItem(
+            hash=AxiomHash(item_hash),
             axiom=(
                 load_axiom(data, f"axiom {short_hash(item_hash)} in read_selection")
                 if data is not None
@@ -349,9 +351,9 @@ def _read_axiom_selection(
             ),
         )
         for item_hash, data in rows
-    ]
+    )
 
-    return SelectionPage(
+    return AxiomSelectionPage(
         meta=sel,
         items=items,
         total_filtered=total,
@@ -361,9 +363,9 @@ def _read_axiom_selection(
     )
 
 
-def _read_entity_selection(
+def read_entity_selection(
     s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
-) -> SelectionPage:
+) -> EntitySelectionPage:
     base = (
         "FROM selection_items si "
         "LEFT JOIN ("
@@ -389,36 +391,36 @@ def _read_entity_selection(
         (sel.name,),
     ).fetchone()[0]
 
-    # Batch-fetch roles and labels for present items.
     present_iris = [iri for iri, is_present in rows if is_present]
-    roles_map: dict[str, str] = {}
+    roles_map: dict[str, EntityType] = {}
     labels_map: dict[str, str] = {}
 
     if present_iris:
         placeholders = ",".join("?" for _ in present_iris)
         roles_map.update(
-            s._conn.execute(
+            (iri, EntityType(role))
+            for iri, role in s._conn.execute(
                 f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
                 f"JOIN axioms a ON a.id = ae.axiom_id "
                 f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
                 present_iris,
-            ).fetchall()
+            )
         )
         labels_map.update(
             {k: v for k, v in lookup_entity_labels(s, present_iris).items() if v is not None}
         )
 
-    items = [
-        SelectionItem(
-            key=iri,
-            missing=not is_present,
+    items = tuple(
+        EntityItem(
+            iri=IRI(iri),
+            present=bool(is_present),
             role=roles_map.get(iri) if is_present else None,
             label=labels_map.get(iri) if is_present else None,
         )
         for iri, is_present in rows
-    ]
+    )
 
-    return SelectionPage(
+    return EntitySelectionPage(
         meta=sel,
         items=items,
         total_filtered=total,
@@ -455,41 +457,6 @@ def remove_selections(s: Session, names: list[SelectionName]) -> RemoveSelection
     found = {d.name for d in dropped}
     not_found = tuple(n for n in deduped if n not in found)
     return RemoveSelectionsResult(dropped=tuple(dropped), not_found=not_found)
-
-
-def _glob_to_like(pattern: str):
-    """Translate a glob (`*`, `?`) into a SQL LIKE pattern with `\\` escape.
-
-    SQL `LIKE` uses `%`/`_` as wildcards and has no native single-char glob;
-    this translation lets callers pass familiar `*`/`?` semantics."""
-    out: list[str] = []
-    for c in pattern:
-        if c == "*":
-            out.append("%")
-        elif c == "?":
-            out.append("_")
-        elif c in ("%", "_", "\\"):
-            out.append("\\" + c)
-        else:
-            out.append(c)
-    return "".join(out)
-
-
-def remove_selections_by_pattern(s: Session, pattern: str) -> list[DroppedSelection]:
-    """Remove every selection whose name matches a glob pattern.
-
-    `pattern` uses `*` (any sequence) and `?` (one character). Returns each
-    removed selection in name order.
-    """
-    sql_pattern = _glob_to_like(pattern)
-    matching = [
-        SelectionName(r[0])
-        for r in s._conn.execute(
-            "SELECT name FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
-            (sql_pattern,),
-        )
-    ]
-    return _remove_by_names(s, matching)
 
 
 def create_selection(
@@ -542,10 +509,10 @@ def _eval_set_op(
     s: Session, operands: Sequence[SetOperand], op: SetOp
 ) -> tuple[list[str], SelectionKind]:
     if not operands:
-        msg = f"'{op}' requires at least one operand."
+        msg = f"{dquoted(op)} requires at least one operand."
         raise SelectionExprError(msg)
     if op in (SetOp.INTERSECTION, SetOp.DIFFERENCE) and len(operands) < 2:
-        msg = f"'{op}' requires at least two operands; got {len(operands)}."
+        msg = f"{dquoted(op)} requires at least two operands; got {len(operands)}."
         raise SelectionExprError(msg)
 
     results = [_eval_expr(s, sub) for sub in operands]

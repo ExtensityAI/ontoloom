@@ -168,6 +168,7 @@ def test_find_duplicates_within_missing_selection_translates(populated_db):
 
 
 def test_annotate_axiom_reports_applied_counts(populated_db):
+    from ontoloom.axioms.types import AddAnnotation, RemoveAnnotation
     from ontoloom.owl.annotations import Annotation
     from ontoloom.owl.literals import LangLiteral
     from ontoloom_mcp.tools.axioms.annotate_axiom import annotate_axiom
@@ -183,7 +184,11 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     target_hash = HashedAxiom.of(sub_axiom).hash
 
     # Fresh add: +1 added, no skipped
-    fresh = annotate_axiom(path=populated_db, axiom_hash=target_hash[:8], add_annotations=[add_ann])
+    fresh = annotate_axiom(
+        path=populated_db,
+        axiom_hash=target_hash[:8],
+        changes=(AddAnnotation(add=add_ann),),
+    )
     assert "+1 added, 0 removed" in fresh
     assert "already present" not in fresh
     assert "absent" not in fresh
@@ -192,7 +197,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     dup = annotate_axiom(
         path=populated_db,
         axiom_hash=target_hash[:8],
-        add_annotations=[add_ann, add_ann],
+        changes=(AddAnnotation(add=add_ann), AddAnnotation(add=add_ann)),
     )
     assert "+0 added, 0 removed" in dup
     assert "1 already present" in dup
@@ -203,7 +208,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     res = annotate_axiom(
         path=populated_db,
         axiom_hash=target_hash[:8],
-        remove_annotations=[absent_ann],
+        changes=(RemoveAnnotation(remove=absent_ann),),
     )
     assert "+0 added, 0 removed" in res
     assert "1 absent" in res
@@ -224,7 +229,7 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
     assert "*missing*" not in page
 
 
-def test_pattern_mismatch_error_includes_description():
+def test_bcp47_lang_validation_error_message():
     from ontoloom.owl.literals import LangLiteral
     from ontoloom_mcp.components.errors import _format_validation_error
     from pydantic import ValidationError
@@ -233,20 +238,7 @@ def test_pattern_mismatch_error_includes_description():
         LangLiteral(value="x", lang="invalid lang!")
     msg = _format_validation_error(exc_info.value)
     assert "BCP 47" in msg
-    assert "must match" in msg
-    assert "'invalid lang!'" in msg
-
-
-def test_selection_pattern_accepts_glob_chars():
-    from ontoloom_mcp.components.types import SelectionPattern
-    from pydantic import TypeAdapter, ValidationError
-
-    adapter: TypeAdapter[str] = TypeAdapter(SelectionPattern)
-    assert adapter.validate_python("audit_*") == "audit_*"
-    assert adapter.validate_python("foo?bar") == "foo?bar"
-    assert adapter.validate_python("*") == "*"
-    with pytest.raises(ValidationError):
-        adapter.validate_python("has space")
+    assert '"invalid lang!"' in msg
 
 
 def test_get_entity_not_found_includes_suggestion(populated_db):
@@ -274,6 +266,7 @@ def test_remove_axioms_stale_selection_translates(populated_db):
     # Create an axiom selection, then mutate it, then try to use the stale hash.
     search_entities(path=populated_db, into=SelectionName("dogs_ent"), query="Dog")
     # Manually create an axiom selection from those entities (use create_selection directly)
+    from ontoloom.axioms.types import BySelection
     from ontoloom.selections.expr import AxiomsForExpr
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
@@ -287,21 +280,11 @@ def test_remove_axioms_stale_selection_translates(populated_db):
 
     wrapped = translate_errors(remove_axioms)
     with pytest.raises(ToolError) as exc_info:
-        wrapped(path=populated_db, within=stale)
+        wrapped(path=populated_db, target=BySelection(selection=stale))
     msg = str(exc_info.value)
     assert "changed" in msg
     assert "Current: dogs_ax@" in msg
     assert "items)" in msg
-
-
-def test_remove_axioms_rejects_both_inputs():
-    wrapped = translate_errors(remove_axioms)
-    with pytest.raises(ToolError):
-        wrapped(
-            path="dummy",
-            axiom_hashes=["abc"],
-            within=LockedSelection("foo@deadbeef"),
-        )
 
 
 def test_axiom_dispatch_failure_renders_focused_mcp_message():
@@ -446,21 +429,3 @@ def test_rename_iri_collision_with_wrong_token_raises(populated_db):
             new_iri=IRI("ex:Animal"),
             confirm="00000000",
         )
-
-
-def test_mcp_selection_name_strips_locked_hash_suffix():
-    from ontoloom_mcp.components.types import SelectionName as McpSelectionName
-    from pydantic import TypeAdapter
-
-    adapter = TypeAdapter(McpSelectionName)
-    assert adapter.validate_python("my_sel@a3f1b2c4") == "my_sel"
-    assert adapter.validate_python("my_sel") == "my_sel"
-
-
-def test_mcp_selection_name_rejects_invalid_name_after_strip():
-    from ontoloom_mcp.components.types import SelectionName as McpSelectionName
-    from pydantic import TypeAdapter, ValidationError
-
-    adapter = TypeAdapter(McpSelectionName)
-    with pytest.raises(ValidationError):
-        adapter.validate_python("1bad@a3f1b2c4")  # leading digit invalid

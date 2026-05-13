@@ -9,7 +9,8 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes import PrefixName
 from ontoloom.selections.store import get_selection, upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -18,7 +19,7 @@ from ontoloom_mcp.components.formatting import (
     format_selection_result,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def search_entities(
@@ -70,7 +71,7 @@ def search_entities(
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties, within)
             s.commit()
-            return f"0 entities -> {sel.locked!r}.\n{no_results}"
+            return f"0 entities -> {dquoted(sel.locked)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
@@ -88,23 +89,23 @@ def search_entities(
 
 def _within_metadata(s: Session, within: SelectionName):
     sel = get_selection(s, within)
-    return f"\nWithin selection {sel.locked!r} ({sel.kind}, {sel.size} items)"
+    return f"\nWithin selection {dquoted(sel.locked)} ({sel.kind}, {sel.size} items)"
 
 
 def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:
     parts = []
     if query:
-        parts.append(f"query={query!r}")
+        parts.append(f"query={dquoted(query)}")
     if role:
-        parts.append(f"role={str(role)!r}")
+        parts.append(f"role={dquoted(role)}")
     if namespace:
-        parts.append(f"namespace={str(namespace)!r}")
+        parts.append(f"namespace={dquoted(namespace)}")
     if declared is not None:
         parts.append(f"declared={declared}")
     if properties:
-        parts.append(f"properties=[{', '.join(repr(str(p)) for p in properties)}]")
+        parts.append(f"properties=[{', '.join(dquoted(p) for p in properties)}]")
     if within:
-        parts.append(f"within={str(within)!r}")
+        parts.append(f"within={dquoted(within)}")
     return parts
 
 

@@ -10,6 +10,8 @@ from ontoloom.entities.store import (
 )
 from ontoloom.prefixes import list_prefixes, prefix_usage_counts
 from ontoloom.selections.store import get_selection
+from ontoloom.selections.types import SelectionName
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     build_refs,
@@ -18,7 +20,7 @@ from ontoloom_mcp.components.formatting import (
     format_ref,
 )
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import OntologyPath, SelectionName
+from ontoloom_mcp.components.types import OntologyPath
 
 _TOP_ENTITIES = 10
 
@@ -41,7 +43,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
 
         if within:
             sel = get_selection(s, within)
-            parts.append(f"Within selection {sel.locked!r} ({sel.kind}):")
+            parts.append(f"Within selection {dquoted(sel.locked)} ({sel.kind}):")
             parts.append("")
 
         parts.append(format_entity_summary(ent_summary))

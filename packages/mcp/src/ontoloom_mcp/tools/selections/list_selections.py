@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.selections.store import list_selections as core_list_selections
+from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -25,7 +26,7 @@ def list_selections(path: OntologyPath):
         meta = listing.meta
         missing = listing.missing_count
         missing_note = f", {missing} missing" if missing > 0 else ""
-        lines.append(f"  {meta.locked!r} ({meta.kind}) -> {meta.size} items{missing_note}")
+        lines.append(f"  {dquoted(meta.locked)} ({meta.kind}) -> {meta.size} items{missing_note}")
         lines.append(f"    source: {meta.source}")
     return "\n".join(lines)
 
