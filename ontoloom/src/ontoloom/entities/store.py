@@ -16,6 +16,7 @@ from ontoloom.errors import OntoloomError
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes import PrefixName
 from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.text_index import (
@@ -172,11 +173,11 @@ def search_entities(
     s: Session,
     *,
     query: str | None = None,
-    role: str | None = None,
-    namespace: str | None = None,
+    role: EntityType | None = None,
+    namespace: PrefixName | None = None,
     within: SelectionName | None = None,
     declared: bool | None = None,
-    properties: list[str] | None = None,
+    properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
     limit: int = 50,
     offset: int = 0,
@@ -220,11 +221,11 @@ def collect_entity_iris(
     s: Session,
     *,
     query: str | None = None,
-    role: str | None = None,
-    namespace: str | None = None,
+    role: EntityType | None = None,
+    namespace: PrefixName | None = None,
     within: SelectionName | None = None,
     declared: bool | None = None,
-    properties: list[str] | None = None,
+    properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
 ) -> list[str]:
     """Return all matching entity IRIs (no display data). For select workflows."""
@@ -304,7 +305,7 @@ def entity_summary(s: Session, *, within: SelectionName | None = None) -> Entity
 
 def find_duplicate_entities(
     s: Session,
-    annotation_property: str,
+    annotation_property: IRI,
     *,
     within: SelectionName | None = None,
 ) -> DuplicateResult:
@@ -364,11 +365,11 @@ def find_duplicate_entities(
 
 def _build_entity_filter(
     s: Session,
-    role: str | None,
-    namespace: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
     within: SelectionName | None,
     declared: bool | None,
-    properties: list[str] | None,
+    properties: list[IRI] | None,
     exclude_deprecated: bool,
 ) -> tuple[str, str, list[str | int]]:
     """Build (joins, where_clause, params) for entity queries against `axiom_entities ae`."""
@@ -404,8 +405,8 @@ def _build_entity_filter(
 def _apply_text_filters(
     s: Session,
     matches: dict[str, tuple[MatchSource, MatchQuality]],
-    role: str | None,
-    namespace: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
     within: SelectionName | None,
     declared: bool | None,
     exclude_deprecated: bool,
@@ -432,11 +433,11 @@ def _apply_text_filters(
 
 def _list_entities(
     s: Session,
-    role: str | None,
-    namespace: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
     within: SelectionName | None,
     declared: bool | None,
-    properties: list[str] | None,
+    properties: list[IRI] | None,
     exclude_deprecated: bool,
     limit: int,
     offset: int,
@@ -480,11 +481,11 @@ def _list_entities(
 def _text_search_entities(
     s: Session,
     query: str,
-    role: str | None,
-    namespace: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
     within: SelectionName | None,
     declared: bool | None,
-    properties: list[str] | None,
+    properties: list[IRI] | None,
     exclude_deprecated: bool,
     limit: int,
     offset: int,
@@ -556,7 +557,7 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
     }
 
 
-def _batch_check_roles(s: Session, iris: list[str], role: str) -> set[str]:
+def _batch_check_roles(s: Session, iris: list[str], role: EntityType) -> set[str]:
     placeholders = ",".join("?" for _ in iris)
     return {
         r[0]
@@ -614,7 +615,7 @@ def _find_text_matches(
     property_filter: str | None,
     source_label: MatchSource,
     *,
-    properties: list[str] | None = None,
+    properties: list[IRI] | None = None,
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
     """Returns {iri: (source_label, quality)}.
 

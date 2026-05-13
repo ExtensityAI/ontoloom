@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from ontoloom.connection import Metadata, Session, escape_like
 from ontoloom.errors import OntoloomError, StoreCorruptionError
 from ontoloom.models import TypedStr
+from ontoloom.owl.iri import IRI
 
 _PREFIX_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.-]*$")
 _NAMESPACE_IRI_PATTERN = re.compile(r"^\S+:\S+$")
@@ -110,18 +111,13 @@ def list_prefixes(s: Session) -> dict[PrefixName, NamespaceIRI]:
     return {PrefixName(k): NamespaceIRI(v) for k, v in _get_metadata(s).prefixes.items()}
 
 
-def check_iri_prefixes(s: Session, iris: Iterable[str]):
+def check_iri_prefixes(s: Session, iris: Iterable[IRI]):
     """Raise `UndeclaredPrefixError` if any IRI uses a prefix that is neither
     declared in this ontology nor in `BUILTIN_PREFIXES`. Empty prefixes
     (default namespace, e.g. `:Dog`) are accepted."""
     declared = frozenset(list_prefixes(s))
     allowed = declared | BUILTIN_PREFIXES
-    unknown = {
-        PrefixName(prefix)
-        for iri in iris
-        for prefix in (iri.split(":", 1)[0],)
-        if prefix and prefix not in allowed
-    }
+    unknown = {PrefixName(iri.prefix) for iri in iris if iri.prefix and iri.prefix not in allowed}
     if unknown:
         raise UndeclaredPrefixError(frozenset(unknown))
 

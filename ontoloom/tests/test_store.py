@@ -4,7 +4,6 @@ import pytest
 from ontoloom.axioms.store import (
     AmbiguousHashError,
     AxiomNotFoundError,
-    InvalidHashError,
     add_axioms,
     annotate_axiom,
     remove_by_hash,
@@ -27,7 +26,7 @@ from ontoloom.entities.store import (
 )
 from ontoloom.errors import StoreCorruptionError
 from ontoloom.export import export_to_jsonl
-from ontoloom.hashing import HashedAxiom
+from ontoloom.hashing import AxiomHashPrefix, HashedAxiom
 from ontoloom.load import load_axiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
@@ -262,7 +261,7 @@ def test_rename_iri_rejects_entity_selection(s):
     locked = LockedSelection(f"dogs@{h}")
 
     with pytest.raises(SelectionKindError):
-        rename_iri(s, "ex:Animal", "ex:Mammal", within=locked)
+        rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
 
 
 def test_rename_iri_preserves_annotations(s):
@@ -274,7 +273,7 @@ def test_rename_iri_preserves_annotations(s):
     )
     add_axioms(s, [ax])
 
-    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
@@ -295,7 +294,7 @@ def test_rename_iri_does_not_corrupt_literal_values(s):
     )
     add_axioms(s, [ax])
 
-    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
     assert len(result.replaced) == 1
 
     row = s._conn.execute(
@@ -310,7 +309,7 @@ def test_rename_iri_noop_when_iri_absent(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     add_axioms(s, [ax])
 
-    result = rename_iri(s, "ex:Cat", "ex:Kitten")
+    result = rename_iri(s, IRI("ex:Cat"), IRI("ex:Kitten"))
     assert result.replaced == ()
 
 
@@ -529,21 +528,13 @@ def test_get_entity_not_found_includes_near_matches(populated):
 
 def test_remove_not_found_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        remove_by_hash(s, ["deadbeef"])
+        remove_by_hash(s, [AxiomHashPrefix("deadbeef")])
 
 
-def test_remove_ambiguous_prefix_raises(s):
-    """An empty prefix is rejected as invalid hex."""
-    add_axioms(
-        s,
-        [
-            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
-            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B")),
-        ],
-    )
-    # Empty prefix matches everything via GLOB '*'
-    with pytest.raises(InvalidHashError):
-        remove_by_hash(s, [""])
+def test_axiom_hash_prefix_rejects_empty():
+    """Empty prefix is rejected at the parse boundary."""
+    with pytest.raises(ValueError, match="must not be empty"):
+        AxiomHashPrefix("")
 
 
 # -- annotate searchability --
@@ -737,9 +728,9 @@ def test_batch_remove_rollback_on_failure(s):
 # -- Hash prefix validation --
 
 
-def test_remove_rejects_non_hex_prefix(s):
-    with pytest.raises(InvalidHashError):
-        remove_by_hash(s, ["not*hex"])
+def test_axiom_hash_prefix_rejects_non_hex():
+    with pytest.raises(ValueError, match="hex chars"):
+        AxiomHashPrefix("not*hex")
 
 
 # -- Selection: entities_in with field (position filter) --
@@ -927,7 +918,7 @@ def test_rename_iri_noop_same_iri(s):
     add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
 
-    result = rename_iri(s, "ex:Dog", "ex:Dog")
+    result = rename_iri(s, IRI("ex:Dog"), IRI("ex:Dog"))
     assert len(result.replaced) == 1
     assert result.replaced[0].was_noop is True
     assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
@@ -940,7 +931,7 @@ def test_rename_iri_collision_with_existing(s):
     old_h = HashedAxiom.of(ax_old).hash
     new_h = HashedAxiom.of(ax_new).hash
 
-    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
@@ -954,7 +945,7 @@ def test_rename_iri_collision_sets_merged_flag_and_colliding_hashes(s):
     add_axioms(s, [ax_old, ax_new])
     new_h = HashedAxiom.of(ax_new).hash
 
-    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
 
     assert len(result.replaced) == 1
     rep = result.replaced[0]
@@ -966,7 +957,7 @@ def test_rename_iri_no_collision_has_empty_colliding_hashes(s):
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
     add_axioms(s, [ax])
 
-    result = rename_iri(s, "ex:Animal", "ex:Mammal")
+    result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
 
     assert len(result.replaced) == 1
     assert result.replaced[0].was_merged_into_existing is False
@@ -989,7 +980,7 @@ def test_rename_iri_scoped_to_selection(s):
     sel_hash = upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test").selection.hash
     locked = LockedSelection(f"scope@{sel_hash[:8]}")
 
-    renamed = rename_iri(s, "ex:Animal", "ex:Mammal", within=locked)
+    renamed = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
     assert len(renamed.replaced) == 1
 
     # ax_out is outside the scope -> its hash should be unchanged

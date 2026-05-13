@@ -27,10 +27,8 @@ def remove_axioms(
       all axioms in this axiom selection. Best-effort: skips hashes no longer in DB.
       Mutually exclusive with axiom_hashes.
     """
-    if within is not None and axiom_hashes is not None:
+    if axiom_hashes is not None and within is not None:
         raise MutuallyExclusiveError(("axiom_hashes", "within"))
-    if within is None and axiom_hashes is None:
-        raise MissingRequiredError(("axiom_hashes", "within"))
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -44,11 +42,13 @@ def remove_axioms(
             )
             return format_diff(entries, summary, max_rows=20)
 
-        result = remove_by_hash(s, axiom_hashes)  # pyright: ignore[reportArgumentType]
-        entries = [("-", ha) for ha in result.removed]
-        s.commit()
+        if axiom_hashes is not None:
+            result = remove_by_hash(s, axiom_hashes)
+            entries = [("-", ha) for ha in result.removed]
+            s.commit()
+            return format_diff(entries, f"Removed {len(result.removed)} axioms.")
 
-    return format_diff(entries, f"Removed {len(result.removed)} axioms.")
+        raise MissingRequiredError(("axiom_hashes", "within"))
 
 
 tool_remove_axioms = create_tool(

@@ -268,10 +268,10 @@ def test_selection_name_accepts_valid_shapes(good):
 def test_verify_hash_match_and_mismatch(s):
     hash1 = upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
 
-    get_locked_selection(s, "sel", hash1[:8])  # should not raise
+    get_locked_selection(s, LockedSelection(f"sel@{hash1[:8]}"))  # should not raise
 
     with pytest.raises(StaleSelectionError):
-        get_locked_selection(s, "sel", "00000000")
+        get_locked_selection(s, LockedSelection("sel@00000000"))
 
 
 def test_read_with_show_filters(s):

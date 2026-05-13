@@ -1,6 +1,9 @@
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Annotated
+
+from pydantic import Field
 
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
@@ -133,15 +136,15 @@ def get_selection(s: Session, name: SelectionName):
     )
 
 
-def get_locked_selection(s: Session, name: SelectionName, hash_prefix: str):
-    """Fetch a selection, requiring its current hash to start with `hash_prefix`.
+def get_locked_selection(s: Session, locked: LockedSelection):
+    """Fetch a selection by name, requiring its current hash to match `locked.hash_prefix`.
 
     Raises StaleSelectionError if the lock doesn't match.
     """
-    sel = get_selection(s, name)
+    sel = get_selection(s, locked.name)
 
-    if not sel.hash.startswith(hash_prefix):
-        raise StaleSelectionError(name, hash_prefix, sel.hash, sel.size)
+    if not sel.hash.startswith(locked.hash_prefix):
+        raise StaleSelectionError(locked.name, locked.hash_prefix, sel.hash, sel.size)
 
     return sel
 
@@ -158,7 +161,7 @@ def require_locked_selection(
         StaleSelectionError: if `within.hash_prefix` no longer matches.
         SelectionKindError: if the selection exists but is the wrong kind.
     """
-    sel = get_locked_selection(s, within.name, within.hash_prefix)
+    sel = get_locked_selection(s, within)
 
     if sel.kind != expected_kind:
         raise SelectionKindError(
@@ -300,13 +303,10 @@ def read_selection(
     s: Session,
     name: SelectionName,
     *,
-    limit: int = 20,
+    limit: Annotated[int, Field(ge=1)] = 20,
     offset: int = 0,
     show: ShowFilter = ShowFilter.ALL,
 ) -> SelectionPage:
-    if limit < 1:
-        msg = f"limit must be >= 1, got {limit}."
-        raise ValueError(msg)
     sel = get_selection(s, name)
 
     if sel.kind == SelectionKind.AXIOMS:

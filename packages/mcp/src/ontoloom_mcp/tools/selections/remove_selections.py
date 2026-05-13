@@ -26,8 +26,6 @@ def remove_selections(
     """
     if names is not None and pattern is not None:
         raise MutuallyExclusiveError(("names", "pattern"))
-    if names is None and pattern is None:
-        raise MissingRequiredError(("names", "pattern"))
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -39,16 +37,18 @@ def remove_selections(
             items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in dropped)
             return f"Removed {len(dropped)} selections matching {str(pattern)!r}: {items}."
 
-        result = core_remove_selections(s, names)  # pyright: ignore[reportArgumentType]
-        s.commit()
+        if names is not None:
+            result = core_remove_selections(s, names)
+            s.commit()
+            parts = []
+            if result.dropped:
+                items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in result.dropped)
+                parts.append(f"Removed {len(result.dropped)} selections: {items}.")
+            if result.not_found:
+                parts.append(f"Not found: {', '.join(repr(str(n)) for n in result.not_found)}.")
+            return " ".join(parts) or "Nothing to remove."
 
-    parts = []
-    if result.dropped:
-        items = ", ".join(f"{str(d.name)!r} ({d.size})" for d in result.dropped)
-        parts.append(f"Removed {len(result.dropped)} selections: {items}.")
-    if result.not_found:
-        parts.append(f"Not found: {', '.join(repr(str(n)) for n in result.not_found)}.")
-    return " ".join(parts) or "Nothing to remove."
+        raise MissingRequiredError(("names", "pattern"))
 
 
 tool_remove_selections = create_tool(

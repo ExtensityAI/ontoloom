@@ -1,4 +1,3 @@
-import re
 import uuid
 from collections import Counter
 from collections.abc import Sequence
@@ -17,7 +16,13 @@ from ontoloom.axioms.types import (
 from ontoloom.connection import Session
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError, OntoloomError
-from ontoloom.hashing import AxiomHash, HashedAxiom, disambiguating_prefixes, short_hash
+from ontoloom.hashing import (
+    AxiomHash,
+    AxiomHashPrefix,
+    HashedAxiom,
+    disambiguating_prefixes,
+    short_hash,
+)
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
@@ -38,7 +43,7 @@ from ontoloom.utils import dedupe
 class AxiomNotFoundError(OntoloomError):
     """No axiom matches the given hash prefix."""
 
-    def __init__(self, prefix: str):
+    def __init__(self, prefix: AxiomHashPrefix):
         self.prefix = prefix
         super().__init__(f"No axiom matching hash prefix [{prefix}].")
 
@@ -50,7 +55,7 @@ class AmbiguousHashError(OntoloomError):
     identify each match -> the caller can copy any of them verbatim to retry.
     """
 
-    def __init__(self, prefix: str, count: int, distinguishing_prefixes: Sequence[str]):
+    def __init__(self, prefix: AxiomHashPrefix, count: int, distinguishing_prefixes: Sequence[str]):
         self.prefix = prefix
         self.count = count
         self.distinguishing_prefixes = distinguishing_prefixes
@@ -60,24 +65,6 @@ class AmbiguousHashError(OntoloomError):
         super().__init__(f"[{prefix}] matches {count} axioms: {shown}{suffix}.")
 
 
-class InvalidHashError(OntoloomError):
-    """Hash prefix contains non-hex characters."""
-
-    def __init__(self, prefix: str):
-        self.prefix = prefix
-        super().__init__(f"[{prefix}] is not a valid hex hash prefix.")
-
-
-_HEX_RE = re.compile(r"^[0-9a-f]+$")
-
-
-def _require_hex_prefix(prefix: str):
-    """Validate that `prefix` is a non-empty lowercase hex string before it reaches SQL.
-    Guarantees no LIKE metacharacters can appear."""
-    if not _HEX_RE.match(prefix):
-        raise InvalidHashError(prefix)
-
-
 @dataclass(frozen=True, slots=True)
 class ResolvedAxiom:
     axiom_id: int
@@ -85,9 +72,8 @@ class ResolvedAxiom:
     json_data: str
 
 
-def _resolve_unique_axiom(s: Session, prefix: str) -> ResolvedAxiom:
+def _resolve_unique_axiom(s: Session, prefix: AxiomHashPrefix) -> ResolvedAxiom:
     """Look up an axiom by hash prefix; raise on missing or ambiguous match."""
-    _require_hex_prefix(prefix)
     rows = s._conn.execute(
         "SELECT id, hash, json(data) FROM axioms WHERE hash LIKE ? || '%'",
         (prefix,),
@@ -126,10 +112,7 @@ def _delete_axioms(s: Session, axioms: Sequence[HashedAxiom]):
     )
 
 
-def remove_by_hash(s: Session, hash_prefixes: list[str]) -> RemoveResult:
-    for prefix in hash_prefixes:
-        _require_hex_prefix(prefix)
-
+def remove_by_hash(s: Session, hash_prefixes: Sequence[AxiomHashPrefix]) -> RemoveResult:
     to_remove: list[HashedAxiom] = []
     for prefix in hash_prefixes:
         resolved = _resolve_unique_axiom(s, prefix)
@@ -169,7 +152,7 @@ def remove_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectio
 
 def annotate_axiom(
     s: Session,
-    hash_prefix: str,
+    hash_prefix: AxiomHashPrefix,
     *,
     add_annotations: list[Annotation] | None = None,
     remove_annotations: list[Annotation] | None = None,
@@ -216,7 +199,9 @@ def annotate_axiom(
     )
 
 
-def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> ReplaceResult:
+def replace_axiom(
+    s: Session, old_hash_prefix: AxiomHashPrefix, new_axiom: BaseAxiom
+) -> ReplaceResult:
     """Atomic delete+add with event tracking.
 
     Old axiom-level annotations are carried forward onto the new axiom -> annotations
@@ -228,7 +213,6 @@ def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> Rep
     If new hash matches a different existing axiom: old is deleted, add is skipped
     (the existing axiom keeps its own annotations), event records the mapping.
     """
-    _require_hex_prefix(old_hash_prefix)
     check_iri_prefixes(s, (iri for iri, _, _ in iter_axiom_entities(new_axiom)))
 
     new_h = HashedAxiom.of(new_axiom).hash
@@ -265,7 +249,7 @@ def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> Rep
     )
 
 
-def _substitute_iri(axiom: BaseAxiom, old_iri: str, new_iri: str) -> BaseAxiom:
+def _substitute_iri(axiom: BaseAxiom, old_iri: IRI, new_iri: IRI) -> BaseAxiom:
     """Walk axiom, replacing each IRI == old_iri with new_iri.
 
     Only IRI-typed fields are substituted; plain str fields (e.g. LangLiteral.value,
@@ -276,13 +260,13 @@ def _substitute_iri(axiom: BaseAxiom, old_iri: str, new_iri: str) -> BaseAxiom:
     return cast("BaseAxiom", _sub(axiom, old_iri, new_iri))
 
 
-def _sub(value: object, old_iri: str, new_iri: str):
+def _sub(value: object, old_iri: IRI, new_iri: IRI):
     """Recursively rebuild `value`, replacing every IRI equal to `old_iri` with `new_iri`.
 
     Walks IRIs directly, tuples element-wise, and FrozenModel fields by name.
     Anything else is returned unchanged."""
     if isinstance(value, IRI):
-        return IRI(new_iri) if value == old_iri else value
+        return new_iri if value == old_iri else value
     if isinstance(value, tuple):
         return tuple(_sub(v, old_iri, new_iri) for v in value)
     if isinstance(value, FrozenModel):
@@ -298,8 +282,8 @@ def _sub(value: object, old_iri: str, new_iri: str):
 
 def rename_iri(
     s: Session,
-    old_iri: str,
-    new_iri: str,
+    old_iri: IRI,
+    new_iri: IRI,
     *,
     within: LockedSelection | None = None,
 ) -> RenameResult:
@@ -360,9 +344,7 @@ def rename_iri(
             )
         )
 
-    return RenameResult(
-        old_iri=IRI(old_iri), new_iri=IRI(new_iri), replaced=tuple(results), batch_id=batch
-    )
+    return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
 
 
 def _count_axioms_by_type(s: Session, query: str, params: Sequence[object] = ()):
