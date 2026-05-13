@@ -4,12 +4,10 @@ Builds a realistic ontology with diverse axiom types, then verifies that
 every entity is discoverable through the applicable search paths.
 """
 
-import tempfile
-from pathlib import Path
 
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology, Session, session
+from ontoloom.connection import Session
 from ontoloom.entities.store import (
     EntityNotFoundError,
     collect_entity_iris,
@@ -66,17 +64,6 @@ from ontoloom.owl.literals import (
     TypedLiteral,
 )
 from ontoloom.owl.markers import EntityType
-
-
-@pytest.fixture
-def s():
-    with tempfile.TemporaryDirectory() as td:
-        path = Path(td) / "test.db"
-        Ontology.create(path)
-        with session(Ontology(path)) as s:
-            yield s
-            s.commit()
-
 
 # ---------------------------------------------------------------------------
 # Helpers

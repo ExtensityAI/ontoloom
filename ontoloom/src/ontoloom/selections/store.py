@@ -28,6 +28,7 @@ from ontoloom.selections.types import (
     SetOp,
     ShowFilter,
 )
+from ontoloom.text_index import lookup_entity_labels
 from ontoloom.utils import dedupe
 
 
@@ -402,10 +403,8 @@ def _read_entity_selection(
                 present_iris,
             ).fetchall()
         )
-        from ontoloom.entities.store import lookup_entity_labels as _lookup_labels
-
         labels_map.update(
-            {k: v for k, v in _lookup_labels(s, present_iris).items() if v is not None}
+            {k: v for k, v in lookup_entity_labels(s, present_iris).items() if v is not None}
         )
 
     items = [

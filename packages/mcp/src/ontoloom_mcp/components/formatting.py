@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from ontoloom.axioms.types import AxiomSummary
 from ontoloom.connection import Session
-from ontoloom.entities.store import lookup_entity_labels
 from ontoloom.entities.types import EntityInfo, EntitySearchPage, EntitySummary
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.hashing import HashedAxiom, short_hash
@@ -12,6 +11,7 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import UpsertResult
+from ontoloom.text_index import lookup_entity_labels
 from ontoloom.utils import dquoted
 
 SELECT_PREVIEW = 5

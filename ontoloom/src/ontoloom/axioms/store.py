@@ -15,7 +15,6 @@ from ontoloom.axioms.types import (
     ReplaceResult,
 )
 from ontoloom.connection import Session
-from ontoloom.entities.store import _LOCAL_NAME_PROPERTY
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError, OntoloomError
 from ontoloom.hashing import HashedAxiom, disambiguating_prefixes, short_hash
@@ -26,11 +25,13 @@ from ontoloom.owl.axioms import AnnotationAssertion, BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes import check_iri_prefixes
 from ontoloom.selections.store import (
     get_selection,
     require_locked_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.text_index import LOCAL_NAME_PROPERTY
 from ontoloom.utils import dedupe
 
 
@@ -100,6 +101,7 @@ def _resolve_unique_axiom(s: Session, prefix: str) -> ResolvedAxiom:
 
 
 def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
+    check_iri_prefixes(s, (iri for axiom in axioms for iri, _, _ in iter_axiom_entities(axiom)))
     added: list[HashedAxiom] = []
     skipped: list[HashedAxiom] = []
 
@@ -227,6 +229,7 @@ def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> Rep
     (the existing axiom keeps its own annotations), event records the mapping.
     """
     _require_hex_prefix(old_hash_prefix)
+    check_iri_prefixes(s, (iri for iri, _, _ in iter_axiom_entities(new_axiom)))
 
     new_h = HashedAxiom.of(new_axiom).hash
 
@@ -311,6 +314,7 @@ def rename_iri(
         SelectionKindError: if `within` is an entity selection; convert with
             `axioms_for` first.
     """
+    check_iri_prefixes(s, [new_iri])
     batch = uuid.uuid4().hex[:12]
     results: list[ReplaceResult] = []
 
@@ -447,7 +451,7 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
         entity_rows.append((axiom_id, iri_str, role_val, pos_val))
         if iri_str not in seen_iris:
             seen_iris.add(iri_str)
-            text_rows.append((axiom_id, iri_str, iri.local_name, _LOCAL_NAME_PROPERTY))
+            text_rows.append((axiom_id, iri_str, iri.local_name, LOCAL_NAME_PROPERTY))
 
     # AnnotationAssertion adds one extra entity_text row indexing the value
     # under the annotation property (e.g. rdfs:label -> "Dog"), enabling

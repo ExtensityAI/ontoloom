@@ -80,7 +80,7 @@ class MissingRequiredError(ToolError):
 
 
 # Exception types we translate at MCP boundaries (decorator and middleware).
-_TRANSLATABLE: tuple[type[Exception], ...] = (
+TRANSLATABLE: tuple[type[Exception], ...] = (
     OntoloomError,
     FileNotFoundError,
     PermissionError,
@@ -179,7 +179,7 @@ def translate_errors(fn):
             return fn(*args, **kwargs)
         except ToolError:
             raise
-        except _TRANSLATABLE as e:
+        except TRANSLATABLE as e:
             raise ToolError(format_error(e)) from None
 
     return wrapper

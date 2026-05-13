@@ -1,6 +1,5 @@
 import pytest
 from ontoloom.axioms.store import add_axioms
-from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
@@ -22,16 +21,6 @@ from ontoloom.selections.store import (
     upsert_selection,
 )
 from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName, ShowFilter
-
-
-@pytest.fixture()
-def s(tmp_path):
-    path = tmp_path / "test.ontology.db"
-    Ontology.create(path)
-    with session(Ontology(path)) as s:
-        yield s
-        s.commit()
-
 
 # -- P-03-3: Selection set algebra --
 

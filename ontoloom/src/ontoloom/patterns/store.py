@@ -15,7 +15,7 @@ from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns.match import _match_pattern
+from ontoloom.patterns.match import match_pattern
 from ontoloom.patterns.slot import Slot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.selections.store import get_selection
@@ -51,7 +51,7 @@ def match_axioms(
     truncated = False
     for h, json_data in _iter_candidates(s, pattern, within):
         axiom = load_axiom(json_data, f"match {short_hash(h)}")
-        if _match_pattern(pattern, axiom):
+        if match_pattern(pattern, axiom):
             matched_hashes.append(h)
             if limit is not None and len(matched_hashes) >= limit:
                 truncated = True

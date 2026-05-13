@@ -14,10 +14,16 @@ from ontoloom.entities.types import (
 )
 from ontoloom.errors import OntoloomError
 from ontoloom.owl.axioms import Declaration
-from ontoloom.owl.iri import IRI, RDFS_LABEL
+from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.text_index import (
+    DECLARED_EXISTS,
+    DECLARED_NOT_EXISTS,
+    LOCAL_NAME_PROPERTY,
+    NOT_DEPRECATED,
+)
 
 
 class EntityNotFoundError(OntoloomError):
@@ -35,26 +41,7 @@ class EntityNotFoundError(OntoloomError):
 
 # A: this file is huge. we need to look at it separately
 
-_LABEL_BATCH_SIZE = 500
-_LOCAL_NAME_PROPERTY = "local_name"
 _TEXT_SCAN_CAP = 1000
-
-# SQL fragments for declared/deprecated filters (reference ae.entity_iri from outer query)
-_DECLARED_EXISTS = (
-    "EXISTS (SELECT 1 FROM axiom_entities ae_d "
-    "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
-)
-_DECLARED_NOT_EXISTS = (
-    "NOT EXISTS (SELECT 1 FROM axiom_entities ae_d "
-    "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
-    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
-)
-_NOT_DEPRECATED = (
-    "NOT EXISTS (SELECT 1 FROM entity_text et_dep "
-    "WHERE et_dep.entity_iri = ae.entity_iri "
-    "AND et_dep.property LIKE '%deprecated%' AND LOWER(et_dep.text) = 'true')"
-)
 
 
 def _axiom_scope_join(s: Session, within: SelectionName | None) -> tuple[str, list[str]]:
@@ -133,7 +120,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
             "SELECT DISTINCT property, text FROM entity_text "
             "WHERE entity_iri = ? AND property != ? "
             "ORDER BY property, text",
-            (iri_str, _LOCAL_NAME_PROPERTY),
+            (iri_str, LOCAL_NAME_PROPERTY),
         )
     ]
 
@@ -255,7 +242,7 @@ def collect_entity_iris(
         ]
 
     # Text search path
-    matches = _find_text_matches(s, query, _LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -326,6 +313,7 @@ def find_duplicate_entities(
     sel_join_inner = ""
     sel_params: list[str] = []
     if within is not None:
+        get_selection(s, within)  # validates existence; matches other read entrypoints
         sel_join_outer = (
             " JOIN selection_items si ON si.item = et.entity_iri AND si.selection_name = ?"
         )
@@ -396,9 +384,9 @@ def _build_entity_filter(
         params.append(escape_like(namespace))
 
     if declared is True:
-        conditions.append(_DECLARED_EXISTS)
+        conditions.append(DECLARED_EXISTS)
     elif declared is False:
-        conditions.append(_DECLARED_NOT_EXISTS)
+        conditions.append(DECLARED_NOT_EXISTS)
 
     if properties is not None:
         ph = ",".join("?" for _ in properties)
@@ -408,7 +396,7 @@ def _build_entity_filter(
         params.extend(properties)
 
     if exclude_deprecated:
-        conditions.append(_NOT_DEPRECATED)
+        conditions.append(NOT_DEPRECATED)
 
     return joins, " AND ".join(conditions), params
 
@@ -501,7 +489,7 @@ def _text_search_entities(
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    matches = _find_text_matches(s, query, _LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -555,7 +543,7 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
         f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
         f"WHERE entity_iri IN ({placeholders}) AND property != ? "
         f"ORDER BY entity_iri, property, text",
-        [*iris, _LOCAL_NAME_PROPERTY],
+        [*iris, LOCAL_NAME_PROPERTY],
     ):
         anns_by_iri.setdefault(iri_str, []).append(AnnotationRow(property=IRI(prop), value=text))
 
@@ -643,7 +631,7 @@ def _find_text_matches(
         params.extend(properties)
     else:
         prop_cond = "property != ?"
-        params.append(_LOCAL_NAME_PROPERTY)
+        params.append(LOCAL_NAME_PROPERTY)
 
     # ORDER BY entity_iri: insertion order determines `_text_search_entities`
     # pagination output. Without it, page-1 contents drift across runs.
@@ -667,22 +655,6 @@ def _find_text_matches(
             matches[iri_str] = (source_label, MatchQuality.SUBSTRING)
 
     return matches
-
-
-def lookup_entity_labels(s: Session, iris: list[str]) -> dict[str, str | None]:
-    """Return {iri: rdfs:label | None} for each IRI in the list."""
-    result: dict[str, str | None] = dict.fromkeys(iris)
-    for i in range(0, len(iris), _LABEL_BATCH_SIZE):
-        batch = iris[i : i + _LABEL_BATCH_SIZE]
-        ph = ",".join("?" for _ in batch)
-        result.update(
-            s.conn.execute(
-                f"SELECT entity_iri, text FROM entity_text "
-                f"WHERE entity_iri IN ({ph}) AND property = ?",
-                (*batch, RDFS_LABEL),
-            ).fetchall()
-        )
-    return result
 
 
 def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
@@ -712,9 +684,9 @@ def undeclared_entity_count(
     Set False to count every undeclared entity including deprecated ones.
     """
     scope_join, scope_params = _entity_scope_join(s, within)
-    where = _DECLARED_NOT_EXISTS
+    where = DECLARED_NOT_EXISTS
     if exclude_deprecated:
-        where = f"{where} AND {_NOT_DEPRECATED}"
+        where = f"{where} AND {NOT_DEPRECATED}"
     return s.conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {where}",
         scope_params,

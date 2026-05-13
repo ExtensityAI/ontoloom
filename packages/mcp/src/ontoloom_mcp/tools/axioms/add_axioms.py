@@ -4,9 +4,7 @@ from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import add_axioms as core_add_axioms
 from ontoloom.connection import Ontology, session
-from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.owl.axioms import Axiom
-from ontoloom.prefixes import check_iri_prefixes
 
 from ontoloom_mcp.components.formatting import format_diff
 from ontoloom_mcp.components.tool import create_tool
@@ -20,10 +18,6 @@ def add_axioms(
     """Add axioms to an existing ontology. Duplicates are skipped. Returns a diff: `+` = added, `=` = skipped."""
     ont = Ontology(path)
     with session(ont) as s:
-        check_iri_prefixes(
-            s,
-            (iri for axiom in axioms for iri, _, _ in iter_axiom_entities(axiom)),
-        )
         result = core_add_axioms(s, axioms)
         s.commit()
 

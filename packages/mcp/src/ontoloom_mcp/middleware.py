@@ -7,7 +7,7 @@ from typing import override
 from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware import Middleware
 
-from ontoloom_mcp.components.errors import _TRANSLATABLE, format_error
+from ontoloom_mcp.components.errors import TRANSLATABLE, format_error
 
 logger = logging.getLogger("ontoloom")
 
@@ -41,7 +41,7 @@ class LastResortMiddleware(Middleware):
             return await call_next(context)
         except ToolError:
             raise
-        except _TRANSLATABLE as e:
+        except TRANSLATABLE as e:
             raise ToolError(format_error(e)) from None
         except Exception as e:
             logger.exception("Unhandled exception in tool %s", context.message.name)

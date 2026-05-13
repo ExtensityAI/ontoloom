@@ -31,7 +31,7 @@ _EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
 # ---------------------------------------------------------------------------
 
 
-def _match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
+def match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
     """Match a pattern against an axiom.
 
     - Axiom-level pattern: matches the whole axiom. Returns 0 or 1 binding dicts.

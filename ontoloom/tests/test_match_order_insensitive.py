@@ -1,6 +1,6 @@
 from ontoloom.owl.axioms import EquivalentClasses
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns.match import _match_pattern
+from ontoloom.patterns.match import match_pattern
 from ontoloom.patterns.slot import Slot
 from ontoloom.patterns.types import EquivalentClassesPattern
 
@@ -13,7 +13,7 @@ def test_equivalent_classes_pattern_order_insensitive():
             Slot("ex:Cat"),
         ),
     )
-    bindings = _match_pattern(pattern, axiom)
+    bindings = match_pattern(pattern, axiom)
     assert bindings == [{}]
 
 
@@ -32,7 +32,7 @@ def test_equivalent_classes_pattern_length_mismatch():
             Slot("ex:Cat"),
         ),
     )
-    assert _match_pattern(pattern, axiom) == []
+    assert match_pattern(pattern, axiom) == []
 
 
 def test_chain_pattern_order_sensitive():
@@ -48,4 +48,4 @@ def test_chain_pattern_order_sensitive():
         chain=(Slot("ex:hasBrother"), Slot("ex:hasParent")),
         super_property=Slot("ex:hasUncle"),
     )
-    assert _match_pattern(swapped, axiom) == []
+    assert match_pattern(swapped, axiom) == []

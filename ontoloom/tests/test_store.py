@@ -64,15 +64,6 @@ from pydantic import TypeAdapter
 
 
 @pytest.fixture()
-def s(tmp_path):
-    path = tmp_path / "test.ontology.db"
-    Ontology.create(path)
-    with session(Ontology(path)) as s:
-        yield s
-        s.commit()
-
-
-@pytest.fixture()
 def populated(s):
     add_axioms(
         s,
@@ -364,45 +355,45 @@ def test_locked_selection_min_prefix_length():
 # -- Prefix management --
 
 
-def test_set_and_list_prefixes(s):
-    set_prefix(s, "ex", "http://example.org/")
-    set_prefix(s, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
-    assert list_prefixes(s) == {
+def test_set_and_list_prefixes(bare_session):
+    set_prefix(bare_session, "ex", "http://example.org/")
+    set_prefix(bare_session, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+    assert list_prefixes(bare_session) == {
         "ex": "http://example.org/",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
     }
 
 
-def test_set_prefix_overwrites_when_unused(s):
-    set_prefix(s, "ex", "http://example.org/v1/")
-    set_prefix(s, "ex", "http://example.org/v2/")
-    assert list_prefixes(s)["ex"] == "http://example.org/v2/"
+def test_set_prefix_overwrites_when_unused(bare_session):
+    set_prefix(bare_session, "ex", "http://example.org/v1/")
+    set_prefix(bare_session, "ex", "http://example.org/v2/")
+    assert list_prefixes(bare_session)["ex"] == "http://example.org/v2/"
 
 
-def test_set_prefix_idempotent(s):
-    result = set_prefix(s, "ex", "http://example.org/")
+def test_set_prefix_idempotent(bare_session):
+    result = set_prefix(bare_session, "ex", "http://example.org/")
     assert result.previous_iri is None
 
-    result = set_prefix(s, "ex", "http://example.org/")
+    result = set_prefix(bare_session, "ex", "http://example.org/")
     assert result.previous_iri == "http://example.org/"
     assert result.in_use_count == 0
 
 
-def test_set_prefix_reassigns_and_reports_in_use_count(s):
-    set_prefix(s, "ex", "http://example.org/v1/")
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+def test_set_prefix_reassigns_and_reports_in_use_count(bare_session):
+    set_prefix(bare_session, "ex", "http://example.org/v1/")
+    add_axioms(bare_session, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
 
-    result = set_prefix(s, "ex", "http://example.org/v2/")
+    result = set_prefix(bare_session, "ex", "http://example.org/v2/")
     assert result.previous_iri == "http://example.org/v1/"
     assert result.in_use_count == 1
-    assert list_prefixes(s)["ex"] == "http://example.org/v2/"
+    assert list_prefixes(bare_session)["ex"] == "http://example.org/v2/"
 
 
-def test_remove_prefix(s):
-    set_prefix(s, "ex", "http://example.org/")
-    set_prefix(s, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
-    remove_prefix(s, "ex")
-    result = list_prefixes(s)
+def test_remove_prefix(bare_session):
+    set_prefix(bare_session, "ex", "http://example.org/")
+    set_prefix(bare_session, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+    remove_prefix(bare_session, "ex")
+    result = list_prefixes(bare_session)
     assert "ex" not in result
     assert "rdfs" in result
 
