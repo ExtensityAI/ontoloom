@@ -2,7 +2,7 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import remove_by_hash, remove_by_selection
+from ontoloom.axioms.store import remove_by_hash, remove_by_selection, resolve_hash_prefix
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.selections.types import LockedSelection
@@ -43,7 +43,8 @@ def remove_axioms(
             return format_diff(entries, summary, max_rows=20)
 
         if axiom_hashes is not None:
-            result = remove_by_hash(s, axiom_hashes)
+            resolved = [resolve_hash_prefix(s, p) for p in axiom_hashes]
+            result = remove_by_hash(s, resolved)
             entries = [("-", ha) for ha in result.removed]
             s.commit()
             return format_diff(entries, f"Removed {len(result.removed)} axioms.")

@@ -9,6 +9,7 @@ from ontoloom.axioms.store import (
     remove_by_hash,
     rename_iri,
     replace_axiom,
+    resolve_hash_prefix,
 )
 from ontoloom.connection import (
     Ontology,
@@ -26,7 +27,7 @@ from ontoloom.entities.store import (
 )
 from ontoloom.errors import StoreCorruptionError
 from ontoloom.export import export_to_jsonl
-from ontoloom.hashing import AxiomHashPrefix, HashedAxiom
+from ontoloom.hashing import AxiomHash, AxiomHashPrefix, HashedAxiom
 from ontoloom.load import load_axiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
@@ -193,7 +194,7 @@ def test_annotate_axiom_remove_absent_is_noop(s):
 
 def test_annotate_nonexistent_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        annotate_axiom(s, "deadbeef", add_annotations=[])
+        annotate_axiom(s, AxiomHash("dead" + "0" * 60), add_annotations=[])
 
 
 # -- Annotation preservation across content-hash changes --
@@ -482,7 +483,7 @@ def test_entity_text_survives_partial_removal(s):
 
     # Remove the SubClassOf but keep the Declaration
     subclassof_hash = next(ha.hash for ha in result.added if ha.axiom.tag() == "SubClassOf")
-    remove_by_hash(s, [subclassof_hash[:8]])
+    remove_by_hash(s, [subclassof_hash])
 
     # ex:Dog should still be searchable (Declaration still references it)
     page = search_entities(s, query="Dog", limit=10)
@@ -528,7 +529,12 @@ def test_get_entity_not_found_includes_near_matches(populated):
 
 def test_remove_not_found_raises(s):
     with pytest.raises(AxiomNotFoundError):
-        remove_by_hash(s, [AxiomHashPrefix("deadbeef")])
+        remove_by_hash(s, [AxiomHash("dead" + "0" * 60)])
+
+
+def test_resolve_hash_prefix_not_found_raises(s):
+    with pytest.raises(AxiomNotFoundError):
+        resolve_hash_prefix(s, AxiomHashPrefix("deadbeef"))
 
 
 def test_axiom_hash_prefix_rejects_empty():
@@ -707,18 +713,18 @@ def test_batch_remove_multiple(s):
     h1 = result.added[0].hash
     h2 = result.added[1].hash
 
-    removed = remove_by_hash(s, [h1[:8], h2[:8]])
+    removed = remove_by_hash(s, [h1, h2])
     assert len(removed.removed) == 2
 
 
 def test_batch_remove_rollback_on_failure(s):
-    """If one prefix in a batch fails, none should be removed."""
+    """If one hash in a batch is missing, none should be removed."""
     ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
     result = add_axioms(s, [ax])
     h = result.added[0].hash
 
     with pytest.raises(AxiomNotFoundError):
-        remove_by_hash(s, [h[:8], "deadbeef"])
+        remove_by_hash(s, [h, AxiomHash("dead" + "0" * 60)])
 
     # The first axiom should still exist (rollback)
     count = s._conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
@@ -865,7 +871,7 @@ def test_ambiguous_hash_error(s):
     )
 
     with pytest.raises(AmbiguousHashError) as exc_info:
-        remove_by_hash(s, [prefix])
+        resolve_hash_prefix(s, AxiomHashPrefix(prefix))
     assert exc_info.value.count == 2
     assert exc_info.value.prefix == prefix
 
@@ -1003,7 +1009,7 @@ def test_replace_to_existing_hash(s):
     h_a = HashedAxiom.of(ax_a).hash
     h_b = HashedAxiom.of(ax_b).hash
 
-    result = replace_axiom(s, h_a[:8], ax_b)
+    result = replace_axiom(s, h_a, ax_b)
     assert not result.was_noop
     assert result.new.hash == h_b
 

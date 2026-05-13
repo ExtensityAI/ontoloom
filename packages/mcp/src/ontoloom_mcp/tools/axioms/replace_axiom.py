@@ -1,5 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import replace_axiom as core_replace_axiom
+from ontoloom.axioms.store import resolve_hash_prefix
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix, short_hash
 from ontoloom.owl.axioms import Axiom
@@ -30,7 +31,7 @@ def replace_axiom(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        result = core_replace_axiom(s, axiom_hash, new_axiom)
+        result = core_replace_axiom(s, resolve_hash_prefix(s, axiom_hash), new_axiom)
         s.commit()
 
     if result.was_noop:

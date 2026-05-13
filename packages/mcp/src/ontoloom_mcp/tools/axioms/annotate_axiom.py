@@ -3,6 +3,7 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
+from ontoloom.axioms.store import resolve_hash_prefix
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.owl.annotations import Annotation
@@ -37,7 +38,7 @@ def annotate_axiom(
     with session(ont) as s:
         result = core_annotate_axiom(
             s,
-            axiom_hash,
+            resolve_hash_prefix(s, axiom_hash),
             add_annotations=add_annotations,
             remove_annotations=remove_annotations,
         )

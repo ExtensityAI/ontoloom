@@ -113,10 +113,7 @@ def format_error(e: Exception) -> str:  # noqa: C901
         case SelectionExprError():
             return f"Invalid set expression: {e}"
         case AxiomNotFoundError():
-            return (
-                f"No axiom matching hash prefix [{e.prefix}]. "
-                f"Use `match_axioms` to find axiom hashes."
-            )
+            return f"No axiom matching hash [{e.needle}]. Use `match_axioms` to find axiom hashes."
         case EntityNotFoundError():
             near = f" Similar entities: {', '.join(e.near_matches)}." if e.near_matches else ""
             return (

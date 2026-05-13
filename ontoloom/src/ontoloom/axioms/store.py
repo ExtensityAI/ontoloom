@@ -41,11 +41,11 @@ from ontoloom.utils import dedupe
 
 
 class AxiomNotFoundError(OntoloomError):
-    """No axiom matches the given hash prefix."""
+    """No axiom matches the given hash prefix or full hash."""
 
-    def __init__(self, prefix: AxiomHashPrefix):
-        self.prefix = prefix
-        super().__init__(f"No axiom matching hash prefix [{prefix}].")
+    def __init__(self, needle: AxiomHashPrefix | AxiomHash):
+        self.needle = needle
+        super().__init__(f"No axiom matching hash [{needle}].")
 
 
 class AmbiguousHashError(OntoloomError):
@@ -72,18 +72,30 @@ class ResolvedAxiom:
     json_data: str
 
 
-def _resolve_unique_axiom(s: Session, prefix: AxiomHashPrefix) -> ResolvedAxiom:
-    """Look up an axiom by hash prefix; raise on missing or ambiguous match."""
+def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
+    """Resolve a hash prefix to a full axiom hash; raise on missing or ambiguous.
+
+    Mutation paths in core take `AxiomHash` directly; prefix → full resolution
+    happens at the MCP boundary (or any other adapter that takes user input).
+    """
     rows = s._conn.execute(
-        "SELECT id, hash, json(data) FROM axioms WHERE hash LIKE ? || '%'",
+        "SELECT hash FROM axioms WHERE hash LIKE ? || '%'",
         (prefix,),
     ).fetchall()
     if not rows:
         raise AxiomNotFoundError(prefix)
     if len(rows) > 1:
-        full_hashes = [r[1] for r in rows]
+        full_hashes = [r[0] for r in rows]
         raise AmbiguousHashError(prefix, len(rows), disambiguating_prefixes(full_hashes))
-    return ResolvedAxiom(axiom_id=rows[0][0], hash=AxiomHash(rows[0][1]), json_data=rows[0][2])
+    return AxiomHash(rows[0][0])
+
+
+def _load_axiom_row(s: Session, h: AxiomHash) -> ResolvedAxiom:
+    """Fetch the row backing `h`. Raises AxiomNotFoundError if absent (race-safe)."""
+    row = s._conn.execute("SELECT id, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    if row is None:
+        raise AxiomNotFoundError(h)
+    return ResolvedAxiom(axiom_id=row[0], hash=h, json_data=row[1])
 
 
 def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
@@ -112,10 +124,10 @@ def _delete_axioms(s: Session, axioms: Sequence[HashedAxiom]):
     )
 
 
-def remove_by_hash(s: Session, hash_prefixes: Sequence[AxiomHashPrefix]) -> RemoveResult:
+def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
     to_remove: list[HashedAxiom] = []
-    for prefix in hash_prefixes:
-        resolved = _resolve_unique_axiom(s, prefix)
+    for h in hashes:
+        resolved = _load_axiom_row(s, h)
         axiom = load_axiom(
             resolved.json_data, f"axiom {short_hash(resolved.hash)} in remove_by_hash"
         )
@@ -152,12 +164,12 @@ def remove_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectio
 
 def annotate_axiom(
     s: Session,
-    hash_prefix: AxiomHashPrefix,
+    axiom_hash: AxiomHash,
     *,
     add_annotations: list[Annotation] | None = None,
     remove_annotations: list[Annotation] | None = None,
 ) -> AnnotateResult:
-    """Modify axiom-level metadata annotations. Accepts full hash or unambiguous prefix.
+    """Modify axiom-level metadata annotations.
 
     Returns an `AnnotateResult` with the actually-applied add/remove sets:
     duplicates against existing annotations are dropped from `added`, and
@@ -167,7 +179,7 @@ def annotate_axiom(
     add_annotations = add_annotations or []
     remove_annotations = remove_annotations or []
 
-    resolved = _resolve_unique_axiom(s, hash_prefix)
+    resolved = _load_axiom_row(s, axiom_hash)
     axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in annotate")
 
     current = list(axiom.annotations)
@@ -199,9 +211,7 @@ def annotate_axiom(
     )
 
 
-def replace_axiom(
-    s: Session, old_hash_prefix: AxiomHashPrefix, new_axiom: BaseAxiom
-) -> ReplaceResult:
+def replace_axiom(s: Session, old_hash: AxiomHash, new_axiom: BaseAxiom) -> ReplaceResult:
     """Atomic delete+add with event tracking.
 
     Old axiom-level annotations are carried forward onto the new axiom -> annotations
@@ -217,7 +227,7 @@ def replace_axiom(
 
     new_h = HashedAxiom.of(new_axiom).hash
 
-    resolved = _resolve_unique_axiom(s, old_hash_prefix)
+    resolved = _load_axiom_row(s, old_hash)
     old_axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in replace")
     old_hashed = HashedAxiom(axiom=old_axiom, hash=resolved.hash)
 
