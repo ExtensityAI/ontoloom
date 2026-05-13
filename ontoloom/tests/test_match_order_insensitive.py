@@ -1,8 +1,8 @@
 from ontoloom.owl.axioms import EquivalentClasses
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns import EquivalentClassesPattern
 from ontoloom.patterns.match import _match_pattern
 from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.types import EquivalentClassesPattern
 
 
 def test_equivalent_classes_pattern_order_insensitive():
@@ -38,7 +38,7 @@ def test_equivalent_classes_pattern_length_mismatch():
 def test_chain_pattern_order_sensitive():
     """SubObjectPropertyOfChain.chain is ordered -> match_pattern must respect order."""
     from ontoloom.owl.axioms import SubObjectPropertyOfChain
-    from ontoloom.patterns import SubObjectPropertyOfChainPattern
+    from ontoloom.patterns.types import SubObjectPropertyOfChainPattern
 
     axiom = SubObjectPropertyOfChain(
         chain=(IRI("ex:hasParent"), IRI("ex:hasBrother")),

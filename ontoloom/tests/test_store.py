@@ -26,7 +26,7 @@ from ontoloom.entities.store import (
     search_entities,
 )
 from ontoloom.errors import StoreCorruptionError
-from ontoloom.export import HeaderRecord, export_to_jsonl, import_jsonl
+from ontoloom.export import export_to_jsonl
 from ontoloom.hashing import HashedAxiom
 from ontoloom.load import load_axiom
 from ontoloom.owl.annotations import Annotation
@@ -227,7 +227,7 @@ def test_replace_preserves_old_annotations(s):
     assert not result.was_noop
 
     row = s.conn.execute(
-        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
     assert stored["annotations"] == [ann.model_dump(mode="json")]
@@ -249,7 +249,7 @@ def test_replace_discards_new_axiom_annotations(s):
     result = replace_axiom(s, old_h, new)
 
     row = s.conn.execute(
-        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new_hash,)
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
     # Old axiom had no annotations; new_axiom's annotations are discarded.
@@ -288,7 +288,7 @@ def test_rename_iri_preserves_annotations(s):
     assert not result.replaced[0].was_noop
 
     row = s.conn.execute(
-        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
     assert stored["annotations"] == [ann.model_dump(mode="json")]
@@ -308,7 +308,7 @@ def test_rename_iri_does_not_corrupt_literal_values(s):
     assert len(result.replaced) == 1
 
     row = s.conn.execute(
-        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new_hash,)
+        "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
     assert stored["subject"] == "ex:Mammal"  # IRI field renamed
@@ -559,20 +559,6 @@ def test_remove_ambiguous_prefix_raises(s):
 
 
 # -- export roundtrip --
-
-
-def test_export_jsonl_roundtrip(populated, tmp_path):
-    """Exported JSONL lines should parse back to valid axioms."""
-
-    export_path = tmp_path / "roundtrip.jsonl"
-    export_to_jsonl(populated, export_path)
-
-    imported = import_jsonl(export_path)
-    assert isinstance(imported.header, HeaderRecord)
-    assert imported.header.format == "ontoloom-jsonl"
-    assert len(imported.axioms) == 8
-    for axiom in imported.axioms:
-        assert axiom.tag()
 
 
 # -- INSTR safety --
@@ -1037,7 +1023,7 @@ def test_replace_to_existing_hash(s):
 
     result = replace_axiom(s, h_a[:8], ax_b)
     assert not result.was_noop
-    assert result.new_hash == h_b
+    assert result.new.hash == h_b
 
     # Old axiom gone; new (pre-existing) axiom survives unmodified
     assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None

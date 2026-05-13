@@ -700,15 +700,6 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     ]
 
 
-def declared_entity_count(s: Session, within: SelectionName | None = None) -> int:
-    """Count distinct entities that have a Declaration axiom, optionally scoped to a selection."""
-    scope_join, scope_params = _entity_scope_join(s, within)
-    return s.conn.execute(
-        f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {_DECLARED_EXISTS}",
-        scope_params,
-    ).fetchone()[0]
-
-
 def undeclared_entity_count(
     s: Session,
     within: SelectionName | None = None,

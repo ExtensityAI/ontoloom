@@ -93,14 +93,3 @@ def test_no_warning_after_explicit_rollback(tmp_path):
         with session(ont) as s:
             _set_prefix(s, "https://example.com/")
             s.rollback()
-
-
-def test_session_id_differs_across_calls(tmp_path):
-    ont = _make_ont(tmp_path)
-    with session(ont) as s1:
-        id1 = s1.session_id
-        s1.commit()
-    with session(ont) as s2:
-        id2 = s2.session_id
-        s2.commit()
-    assert id1 != id2

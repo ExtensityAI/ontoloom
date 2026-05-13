@@ -37,14 +37,6 @@ class ReplaceResult:
     was_noop: bool  # True if new.hash == old.hash
     was_merged_into_existing: bool = False  # True if new_hash collided with another existing axiom
 
-    @property
-    def old_hash(self) -> str:
-        return self.old.hash
-
-    @property
-    def new_hash(self) -> str:
-        return self.new.hash
-
 
 @dataclass(frozen=True, slots=True)
 class AnnotateResult:

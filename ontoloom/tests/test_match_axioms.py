@@ -12,7 +12,10 @@ from ontoloom.owl.axioms import (
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.patterns import (
+from ontoloom.patterns.match import _match_slot_vs_expression
+from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.store import match_axioms
+from ontoloom.patterns.types import (
     AnnotationAssertionPattern,
     ContainsExpr,
     EquivalentClassesPattern,
@@ -20,9 +23,6 @@ from ontoloom.patterns import (
     SubClassOfPattern,
     SubObjectPropertyOfChainPattern,
 )
-from ontoloom.patterns.match import _match_slot_vs_expression
-from ontoloom.patterns.slot import Slot
-from ontoloom.patterns.store import match_axioms
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
 

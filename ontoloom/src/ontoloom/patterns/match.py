@@ -13,9 +13,13 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.expressions import BaseClassExpression
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import is_unordered
-from ontoloom.patterns import ContainsExpr, ContainsSlot, ExpressionPattern
-from ontoloom.patterns.base import BasePattern
 from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.types import (
+    BasePattern,
+    ContainsExpr,
+    ContainsSlot,
+    ExpressionPattern,
+)
 
 Bindings = dict[str, str]
 

@@ -1,46 +1,10 @@
 from ontoloom.canonical import canonical_json
 from ontoloom.entity_walker import iter_axiom_entities
-from ontoloom.owl.axioms import AnnotationAssertion, SubClassOf
-from ontoloom.owl.expressions import ClassExpression, ObjectHasSelf, is_class_expression
+from ontoloom.owl.axioms import SubClassOf
+from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
 from pydantic import TypeAdapter
-
-
-def test_iri_instance_returns_true():
-    iri = IRI(":Dog")
-    assert is_class_expression(iri)
-
-
-def test_base_class_expression_instance_returns_true():
-    expr = ObjectHasSelf(self_property=IRI(":likes"))
-    assert is_class_expression(expr)
-
-
-def test_plain_int_returns_false():
-    assert not is_class_expression(42)
-
-
-def test_plain_dict_returns_false():
-    assert not is_class_expression({"key": "value"})
-
-
-def test_plain_none_returns_false():
-    assert not is_class_expression(None)
-
-
-def test_plain_str_returns_false():
-    assert not is_class_expression("plain string")
-
-
-def test_non_class_expression_owl_model_returns_false():
-    annotation_axiom = AnnotationAssertion(
-        property=IRI(":label"),
-        subject=IRI(":Dog"),
-        value=IRI(":LabelValue"),
-    )
-    assert not is_class_expression(annotation_axiom)
-
 
 # -- Bare IRI as ClassExpression (Task 5) --
 

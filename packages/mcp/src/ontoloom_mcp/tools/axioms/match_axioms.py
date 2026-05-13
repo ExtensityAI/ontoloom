@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
-from ontoloom.patterns import Pattern
 from ontoloom.patterns.store import match_axioms as core_match
+from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind

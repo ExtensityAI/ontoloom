@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Any, TypeGuard, override
+from typing import Annotated, Any, override
 
 from pydantic import Field
 
@@ -15,10 +15,6 @@ from ontoloom.owl.markers import EntityType, Position, Unordered
 
 class BaseClassExpression(FrozenModel):
     pass
-
-
-def is_class_expression(x: object) -> TypeGuard[IRI | BaseClassExpression]:
-    return isinstance(x, (IRI, BaseClassExpression))
 
 
 # -- Object property restrictions --

@@ -10,8 +10,6 @@ from ontoloom.connection import (
     Session,
     assert_within_workspace,
 )
-from ontoloom.load import load_axiom
-from ontoloom.owl.axioms import Axiom
 from ontoloom.prefixes import NamespaceIRI, PrefixName, list_prefixes
 from ontoloom.selections.store import SelectionKindError, get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
@@ -25,12 +23,6 @@ class HeaderRecord(BaseModel, frozen=True):
     schema_version: int
     exported_at: str
     prefixes: dict[PrefixName, NamespaceIRI]
-
-
-@dataclass(frozen=True, slots=True)
-class ImportJsonlResult:
-    header: HeaderRecord
-    axioms: list[Axiom]
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,18 +85,3 @@ def export_to_jsonl(
 
     skipped = 0 if selection_size is None else selection_size - count
     return ExportResult(exported=count, skipped=skipped)
-
-
-def import_jsonl(path: Path) -> ImportJsonlResult:
-    """Read a JSONL export. Validates the header and parses all axiom lines."""
-    assert_within_workspace(path)
-    lines = [line for line in path.read_text().splitlines() if line.strip()]
-    if not lines:
-        msg = f"'{path}' is empty"
-        raise ValueError(msg)
-    header = HeaderRecord.model_validate_json(lines[0])
-    if header.format_version > FORMAT_VERSION:
-        msg = f"Unsupported format_version {header.format_version} (this build supports up to {FORMAT_VERSION})"
-        raise ValueError(msg)
-    axioms_list = [load_axiom(line) for line in lines[1:]]
-    return ImportJsonlResult(header=header, axioms=axioms_list)

@@ -15,10 +15,9 @@ from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns import ExpressionPattern
-from ontoloom.patterns.base import BasePattern
 from ontoloom.patterns.match import _match_pattern
 from ontoloom.patterns.slot import Slot
+from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 

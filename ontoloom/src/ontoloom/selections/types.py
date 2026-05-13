@@ -53,11 +53,6 @@ class SetOp(StrEnum):
     DIFFERENCE = "difference"
 
 
-class ConversionOp(StrEnum):
-    AXIOMS_FOR = "axioms_for"
-    ENTITIES_IN = "entities_in"
-
-
 def _validate_name(value: str):
     if not _NAME_PATTERN.match(value):
         msg = (

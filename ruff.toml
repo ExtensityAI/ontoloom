@@ -6,7 +6,6 @@ extend-exclude = [
     ".vscode",
     "build",
     "site-packages",
-    "**/_generated.py",
 ]
 force-exclude = true
 

@@ -1,36 +1,14 @@
 import importlib.resources
 import os
-import re
 import sqlite3
-import uuid
 import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
 
 from ontoloom.errors import OntoloomError
-from ontoloom.models import FrozenModel, TypedStr
-
-_SESSION_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
-
-
-class SessionId(TypedStr):
-    """A 32-character lowercase hex session identifier (UUID4 hex)."""
-
-    description = "32-character hex session id (UUID4 hex, lowercase)."
-    pattern = r"^[0-9a-f]{32}$"
-    examples = ("a3f1b2c4d5e6f70809a1b2c3d4e5f607",)
-
-    @override
-    @classmethod
-    def parse(cls, value: str):
-        if not _SESSION_ID_PATTERN.match(value):
-            msg = f"SessionId must be 32 lowercase hex chars, got {value!r}"
-            raise ValueError(msg)
-        return value
-
+from ontoloom.models import FrozenModel
 
 _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
@@ -40,7 +18,7 @@ CURRENT_SCHEMA_VERSION = 3
 
 
 # Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`
-# to confine `Ontology(...)` and `export.to_jsonl`/`import_jsonl`. Unset (default)
+# to confine `Ontology(...)` and `export_to_jsonl`. Unset (default)
 # means unrestricted, preserving single-user behavior.
 _env = os.environ.get("ONTOLOOM_WORKSPACE_ROOT")
 WORKSPACE_ROOT = Path(_env).resolve() if _env else None
@@ -170,7 +148,6 @@ class Session:
 
     ontology: Ontology
     conn: sqlite3.Connection
-    session_id: SessionId
 
     def commit(self):
         self.conn.execute("COMMIT")
@@ -202,7 +179,7 @@ def session(ont: Ontology) -> Iterator[Session]:
             raise OntoloomError(msg) from e
         _validate_schema(raw)
         raw.execute("BEGIN")
-        s = Session(ontology=ont, conn=raw, session_id=SessionId(uuid.uuid4().hex))
+        s = Session(ontology=ont, conn=raw)
         try:
             yield s
         except:
