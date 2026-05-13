@@ -4,7 +4,6 @@ Builds a realistic ontology with diverse axiom types, then verifies that
 every entity is discoverable through the applicable search paths.
 """
 
-
 import pytest
 from ontoloom.axioms.store import add_axioms
 from ontoloom.connection import Session

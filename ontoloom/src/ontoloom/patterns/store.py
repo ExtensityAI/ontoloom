@@ -9,7 +9,7 @@ from typing import Annotated, get_args, get_origin
 
 from ontoloom.canonical import SKIP
 from ontoloom.connection import Session
-from ontoloom.hashing import short_hash
+from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
@@ -22,15 +22,14 @@ from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class MatchResult:
     """Result of a pattern match search.
 
     `truncated=True` means iteration stopped at `limit`; more matches may exist.
     """
 
-    axiom_hashes: list[str]
-    total: int
+    axiom_hashes: tuple[AxiomHash, ...]
     truncated: bool = False
 
 
@@ -47,18 +46,17 @@ def match_axioms(
     For expression-level patterns, searches all axioms (or scoped set).
     `limit` caps the number of matches collected; iteration stops early when hit.
     """
-    matched_hashes: list[str] = []
+    matched_hashes: list[AxiomHash] = []
     truncated = False
     for h, json_data in _iter_candidates(s, pattern, within):
         axiom = load_axiom(json_data, f"match {short_hash(h)}")
         if match_pattern(pattern, axiom):
-            matched_hashes.append(h)
+            matched_hashes.append(AxiomHash(h))
             if limit is not None and len(matched_hashes) >= limit:
                 truncated = True
                 break
     return MatchResult(
-        axiom_hashes=matched_hashes,
-        total=len(matched_hashes),
+        axiom_hashes=tuple(matched_hashes),
         truncated=truncated,
     )
 
@@ -153,7 +151,7 @@ def _iter_candidates(
 
     # ORDER BY a.hash: candidate order determines which axioms hit the
     # match-and-limit cap; without it page-1 results drift across runs.
-    yield from s.conn.execute(
+    yield from s._conn.execute(
         f"SELECT DISTINCT a.hash, json(a.data) FROM axioms a{join_clause}{where_clause} "
         "ORDER BY a.hash",
         join_params + cond_params,

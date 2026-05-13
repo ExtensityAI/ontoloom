@@ -53,6 +53,24 @@ class SetOp(StrEnum):
     DIFFERENCE = "difference"
 
 
+class SelectionContentHash(TypedStr):
+    """Lowercase 16-hex content digest of a selection's sorted items."""
+
+    description = "Selection content hash (16 lowercase hex chars)"
+    pattern = r"^[0-9a-f]{16}$"
+    examples = ("0123456789abcdef",)
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        normalized = value.lower()
+
+        if len(normalized) != 16 or any(c not in "0123456789abcdef" for c in normalized):
+            msg = f"SelectionContentHash must be 16 lowercase hex chars, got {value!r}"
+            raise ValueError(msg)
+        return normalized
+
+
 def _validate_name(value: str):
     if not _NAME_PATTERN.match(value):
         msg = (
@@ -131,7 +149,7 @@ class LockedSelection(TypedStr):
 class SelectionMeta:
     name: SelectionName
     kind: SelectionKind
-    hash: str
+    hash: SelectionContentHash
     size: int
     source: str = ""
 

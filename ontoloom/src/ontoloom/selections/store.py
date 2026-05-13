@@ -19,6 +19,7 @@ from ontoloom.selections.expr import (
 )
 from ontoloom.selections.types import (
     LockedSelection,
+    SelectionContentHash,
     SelectionItem,
     SelectionKind,
     SelectionListing,
@@ -106,19 +107,19 @@ class RemoveSelectionsResult:
     not_found: tuple[SelectionName, ...]
 
 
-def _hash_selection_items(items: list[str]):
+def _hash_selection_items(items: list[str]) -> SelectionContentHash:
     # Use ASCII Record Separator (\x1e) -> control char that cannot appear in
     # valid IRIs/CURIEs/hashes, so two distinct item sets never collide.
     # Empty `items` always produces the same hash (SHA-256 of ""). This is
     # correct: all empty selections have identical content. To distinguish two
     # empty selections by provenance, use the name, not the hash.
     content = "\x1e".join(sorted(items))
-    return hashlib.sha256(content.encode()).hexdigest()[:16]
+    return SelectionContentHash(hashlib.sha256(content.encode()).hexdigest()[:16])
 
 
 def get_selection(s: Session, name: SelectionName):
     """Get selection metadata. Raises SelectionNotFoundError if not found."""
-    row = s.conn.execute(
+    row = s._conn.execute(
         "SELECT kind, hash, size, source FROM selections WHERE name = ?", (name,)
     ).fetchone()
     if row is None:
@@ -126,7 +127,7 @@ def get_selection(s: Session, name: SelectionName):
     return SelectionMeta(
         name=name,
         kind=SelectionKind(row[0]),
-        hash=row[1],
+        hash=SelectionContentHash(row[1]),
         size=row[2],
         source=row[3],
     )
@@ -196,7 +197,7 @@ def upsert_selection(
     content_hash = _hash_selection_items(items)
     size = len(items)
 
-    existing = s.conn.execute(
+    existing = s._conn.execute(
         "SELECT size, hash FROM selections WHERE name = ?", (name,)
     ).fetchone()
 
@@ -208,15 +209,15 @@ def upsert_selection(
             existing[0] if existing else None,
         )
 
-    s.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
-    s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
-    s.conn.execute(
+    s._conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
+    s._conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+    s._conn.execute(
         "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
         (name, kind, content_hash, size, source),
     )
 
     if items:
-        s.conn.executemany(
+        s._conn.executemany(
             "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
             [(name, item) for item in items],
         )
@@ -249,7 +250,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
             size=r[3],
             source=r[4],
         )
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT name, kind, hash, size, source FROM selections ORDER BY created_at, name"
         )
     ]
@@ -260,7 +261,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
     # Batched present-count queries — one per kind. Selections with zero items
     # produce count=0 via the LEFT JOIN's NULL row.
     axiom_present: dict[str, int] = dict(
-        s.conn.execute(
+        s._conn.execute(
             "SELECT s.name, COUNT(a.hash) "
             "FROM selections s "
             "LEFT JOIN selection_items si ON si.selection_name = s.name "
@@ -271,7 +272,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
         )
     )
     entity_present: dict[str, int] = dict(
-        s.conn.execute(
+        s._conn.execute(
             "SELECT s.name, COUNT(DISTINCT CASE WHEN ae.entity_iri IS NOT NULL THEN si.item END) "
             "FROM selections s "
             "LEFT JOIN selection_items si ON si.selection_name = s.name "
@@ -324,13 +325,13 @@ def _read_axiom_selection(
     elif show == ShowFilter.MISSING:
         base += " AND a.id IS NULL"
 
-    total = s.conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
-    rows = s.conn.execute(
+    total = s._conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
+    rows = s._conn.execute(
         f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
         (sel.name, limit, offset),
     ).fetchall()
 
-    present_count = s.conn.execute(
+    present_count = s._conn.execute(
         "SELECT COUNT(*) FROM selection_items si "
         "JOIN axioms a ON a.hash = si.item "
         "WHERE si.selection_name = ?",
@@ -375,13 +376,13 @@ def _read_entity_selection(
     elif show == ShowFilter.MISSING:
         base += " AND refd.entity_iri IS NULL"
 
-    total = s.conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
-    rows = s.conn.execute(
+    total = s._conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
+    rows = s._conn.execute(
         f"SELECT si.item, refd.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
         (sel.name, limit, offset),
     ).fetchall()
 
-    present_count = s.conn.execute(
+    present_count = s._conn.execute(
         "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
         "JOIN axiom_entities ae ON ae.entity_iri = si.item "
         "WHERE si.selection_name = ?",
@@ -396,7 +397,7 @@ def _read_entity_selection(
     if present_iris:
         placeholders = ",".join("?" for _ in present_iris)
         roles_map.update(
-            s.conn.execute(
+            s._conn.execute(
                 f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
                 f"JOIN axioms a ON a.id = ae.axiom_id "
                 f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
@@ -434,13 +435,13 @@ def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[Dropped
     placeholders = ",".join("?" for _ in names)
     dropped = [
         DroppedSelection(name=SelectionName(r[0]), size=r[1])
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT name, size FROM selections WHERE name IN ({placeholders}) ORDER BY name",
             tuple(names),
         )
     ]
     if dropped:
-        s.conn.execute(
+        s._conn.execute(
             f"DELETE FROM selections WHERE name IN ({placeholders})",
             tuple(names),
         )
@@ -483,7 +484,7 @@ def remove_selections_by_pattern(s: Session, pattern: str) -> list[DroppedSelect
     sql_pattern = _glob_to_like(pattern)
     matching = [
         SelectionName(r[0])
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT name FROM selections WHERE name LIKE ? ESCAPE '\\' ORDER BY name",
             (sql_pattern,),
         )
@@ -505,7 +506,7 @@ def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
         sel = get_selection(s, SelectionName(expr))
         items = [
             r[0]
-            for r in s.conn.execute(
+            for r in s._conn.execute(
                 "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
                 (expr,),
             )
@@ -580,7 +581,7 @@ def _axioms_for(s: Session, entity_iris: Sequence[str]) -> list[str]:
     placeholders = ",".join("?" for _ in entity_iris)
     return [
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT a.hash FROM axioms a "
             f"JOIN axiom_entities ae ON ae.axiom_id = a.id "
             f"WHERE ae.entity_iri IN ({placeholders}) "
@@ -597,7 +598,7 @@ def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None
     if field is not None:
         return [
             r[0]
-            for r in s.conn.execute(
+            for r in s._conn.execute(
                 f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
                 f"JOIN axioms a ON a.id = ae.axiom_id "
                 f"WHERE a.hash IN ({placeholders}) AND ae.position = ? "
@@ -607,7 +608,7 @@ def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None
         ]
     return [
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
             f"WHERE a.hash IN ({placeholders}) "

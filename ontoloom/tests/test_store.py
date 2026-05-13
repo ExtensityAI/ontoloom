@@ -217,7 +217,7 @@ def test_replace_preserves_old_annotations(s):
     result = replace_axiom(s, old_h, new)
     assert not result.was_noop
 
-    row = s.conn.execute(
+    row = s._conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -239,7 +239,7 @@ def test_replace_discards_new_axiom_annotations(s):
     )
     result = replace_axiom(s, old_h, new)
 
-    row = s.conn.execute(
+    row = s._conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -278,7 +278,7 @@ def test_rename_iri_preserves_annotations(s):
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    row = s.conn.execute(
+    row = s._conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -298,7 +298,7 @@ def test_rename_iri_does_not_corrupt_literal_values(s):
     result = rename_iri(s, "ex:Animal", "ex:Mammal")
     assert len(result.replaced) == 1
 
-    row = s.conn.execute(
+    row = s._conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -681,7 +681,7 @@ def test_workspace_root_allows_inside(tmp_path, monkeypatch):
     inside = workspace / "ok.db"
     Ontology.create(inside)
     with session(Ontology(inside)) as s:
-        assert s.conn is not None
+        assert s._conn is not None
         s.commit()
 
 
@@ -690,7 +690,7 @@ def test_workspace_root_unset_unrestricted(tmp_path, monkeypatch):
     path = tmp_path / "anywhere.db"
     Ontology.create(path)
     with session(Ontology(path)) as s:
-        assert s.conn is not None
+        assert s._conn is not None
         s.commit()
 
 
@@ -730,7 +730,7 @@ def test_batch_remove_rollback_on_failure(s):
         remove_by_hash(s, [h[:8], "deadbeef"])
 
     # The first axiom should still exist (rollback)
-    count = s.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
+    count = s._conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
     assert count == 1
 
 
@@ -777,7 +777,7 @@ def test_entities_in_with_field_sub_class(axiom_selection):
     )
     items = [
         r[0]
-        for r in axiom_selection.conn.execute(
+        for r in axiom_selection._conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("sub_classes",)
         )
     ]
@@ -792,7 +792,7 @@ def test_entities_in_with_field_super_class(axiom_selection):
     )
     items = [
         r[0]
-        for r in axiom_selection.conn.execute(
+        for r in axiom_selection._conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("super_classes",)
         )
     ]
@@ -809,7 +809,7 @@ def test_entities_in_with_field_filler(axiom_selection):
     )
     items = [
         r[0]
-        for r in axiom_selection.conn.execute(
+        for r in axiom_selection._conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("fillers",)
         )
     ]
@@ -822,7 +822,7 @@ def test_entities_in_without_field(axiom_selection):
     )
     items = [
         r[0]
-        for r in axiom_selection.conn.execute(
+        for r in axiom_selection._conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("all_ents",)
         )
     ]
@@ -864,11 +864,11 @@ def test_ambiguous_hash_error(s):
     prefix = "aaaa"
     h1 = prefix + "0" * 60
     h2 = prefix + "1" + "0" * 59
-    s.conn.execute(
+    s._conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
         (h1, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
     )
-    s.conn.execute(
+    s._conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
         (h2, '{"type":"Declaration","iri":"ex:Y","entity_type":"Class","annotations":[]}'),
     )
@@ -881,12 +881,12 @@ def test_ambiguous_hash_error(s):
 
 def test_store_corruption_error(s):
     h = "b" * 64
-    s.conn.execute(
+    s._conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Unknown', jsonb(?))",
         (h, '{"type":"UnknownAxiomType","garbage":true}'),
     )
 
-    row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    row = s._conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     assert row is not None
     with pytest.raises(StoreCorruptionError):
         load_axiom(row[0], "test context")
@@ -896,7 +896,7 @@ def test_store_corruption_error(s):
 
 
 def test_export_jsonl_hash_roundtrip(populated, tmp_path):
-    original_hashes = {r[0] for r in populated.conn.execute("SELECT hash FROM axioms")}
+    original_hashes = {r[0] for r in populated._conn.execute("SELECT hash FROM axioms")}
 
     export_path = tmp_path / "export.jsonl"
     export_to_jsonl(populated, export_path)
@@ -930,7 +930,7 @@ def test_rename_iri_noop_same_iri(s):
     result = rename_iri(s, "ex:Dog", "ex:Dog")
     assert len(result.replaced) == 1
     assert result.replaced[0].was_noop is True
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
 
 
 def test_rename_iri_collision_with_existing(s):
@@ -944,8 +944,8 @@ def test_rename_iri_collision_with_existing(s):
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
 
 
 def test_rename_iri_collision_sets_merged_flag_and_colliding_hashes(s):
@@ -993,7 +993,7 @@ def test_rename_iri_scoped_to_selection(s):
     assert len(renamed.replaced) == 1
 
     # ax_out is outside the scope -> its hash should be unchanged
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
 
 
 # -- P-03-11: Additional small coverage gaps --
@@ -1017,8 +1017,8 @@ def test_replace_to_existing_hash(s):
     assert result.new.hash == h_b
 
     # Old axiom gone; new (pre-existing) axiom survives unmodified
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
-    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
+    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
 
 
 def test_prefix_remove_while_in_use(s):
@@ -1089,7 +1089,7 @@ def test_list_all_selections_order(s):
     # Force identical created_at on two selections; tiebreaker by name must sort a_sel first.
     upsert_selection(s, "z_sel", SelectionKind.ENTITIES, ["ex:A"], "test")
     upsert_selection(s, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
-    s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
+    s._conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
     names = [ls.meta.name for ls in list_selections(s)]
     assert names == ["a_sel", "z_sel"]

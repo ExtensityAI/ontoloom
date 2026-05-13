@@ -44,7 +44,7 @@ def lookup_entity_labels(s: Session, iris: Iterable[str]) -> dict[str, str | Non
         batch = iri_list[i : i + _LABEL_BATCH_SIZE]
         ph = ",".join("?" for _ in batch)
         result.update(
-            s.conn.execute(
+            s._conn.execute(
                 f"SELECT entity_iri, text FROM entity_text "
                 f"WHERE entity_iri IN ({ph}) AND property = ?",
                 (*batch, RDFS_LABEL),

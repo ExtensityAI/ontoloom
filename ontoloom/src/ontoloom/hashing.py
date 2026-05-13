@@ -44,17 +44,35 @@ class AxiomHashPrefix(TypedStr):
         return normalized
 
 
+class AxiomHash(TypedStr):
+    """Full 64-character lowercase hex SHA-256 digest of an axiom's canonical JSON."""
+
+    description = "Full SHA-256 hex digest of an axiom (64 lowercase hex chars)"
+    pattern = r"^[0-9a-f]{64}$"
+    examples = ("0123456789abcdef" * 4,)
+
+    @override
+    @classmethod
+    def parse(cls, value: str):
+        normalized = value.lower()
+
+        if len(normalized) != 64 or any(c not in "0123456789abcdef" for c in normalized):
+            msg = f"AxiomHash must be 64 lowercase hex chars, got {value!r}"
+            raise ValueError(msg)
+        return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class HashedAxiom:
     """An axiom paired with its computed content hash."""
 
     axiom: BaseAxiom
-    hash: str
+    hash: AxiomHash
 
     @classmethod
     def of(cls, axiom: BaseAxiom):
         digest = hashlib.sha256(canonical_json(axiom).encode()).hexdigest()
-        return cls(axiom=axiom, hash=digest)
+        return cls(axiom=axiom, hash=AxiomHash(digest))
 
     @property
     def short(self):
@@ -62,11 +80,7 @@ class HashedAxiom:
 
 
 def disambiguating_prefixes(hashes: Sequence[str]) -> list[str]:
-    """Shortest prefix of each hash that uniquely identifies it within the set.
-
-    Used by AmbiguousHashError to tell the caller exactly how much they need to
-    extend their prefix. Returns prefixes in input order.
-    """
+    """Shortest prefix of each input string that uniquely identifies it. Order-preserving."""
     if len(hashes) == 1:
         return [hashes[0]]
 

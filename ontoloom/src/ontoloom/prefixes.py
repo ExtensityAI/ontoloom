@@ -94,7 +94,7 @@ class SetPrefixResult:
 
 
 def _get_metadata(s: Session) -> Metadata:
-    row = s.conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
+    row = s._conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
     try:
         return Metadata.model_validate_json(row[0])
     except ValidationError as e:
@@ -103,7 +103,7 @@ def _get_metadata(s: Session) -> Metadata:
 
 
 def _save_metadata(s: Session, meta: Metadata):
-    s.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
+    s._conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
 
 
 def list_prefixes(s: Session) -> dict[PrefixName, NamespaceIRI]:
@@ -134,7 +134,7 @@ def set_prefix(s: Session, name: PrefixName, iri: NamespaceIRI) -> SetPrefixResu
     in_use_count = 0
 
     if previous_iri is not None and previous_iri != iri:
-        in_use_count = s.conn.execute(
+        in_use_count = s._conn.execute(
             "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
             "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
             (escape_like(name),),
@@ -149,7 +149,7 @@ def remove_prefix(s: Session, name: PrefixName):
     if name not in meta.prefixes:
         raise PrefixNotFoundError(name)
 
-    count = s.conn.execute(
+    count = s._conn.execute(
         "SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities "
         "WHERE entity_iri LIKE ? || ':%' ESCAPE '\\'",
         (escape_like(name),),
@@ -166,7 +166,7 @@ def prefix_usage_counts(s: Session) -> dict[PrefixName, int]:
     registered = list_prefixes(s)
     db_counts = {
         PrefixName(row[0]): row[1]
-        for row in s.conn.execute(
+        for row in s._conn.execute(
             "SELECT substr(entity_iri, 1, instr(entity_iri, ':') - 1) AS prefix, "
             "COUNT(DISTINCT entity_iri) "
             "FROM axiom_entities WHERE instr(entity_iri, ':') > 0 "

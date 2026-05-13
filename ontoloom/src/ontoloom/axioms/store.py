@@ -17,7 +17,7 @@ from ontoloom.axioms.types import (
 from ontoloom.connection import Session
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError, OntoloomError
-from ontoloom.hashing import HashedAxiom, disambiguating_prefixes, short_hash
+from ontoloom.hashing import AxiomHash, HashedAxiom, disambiguating_prefixes, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
@@ -81,14 +81,14 @@ def _require_hex_prefix(prefix: str):
 @dataclass(frozen=True, slots=True)
 class ResolvedAxiom:
     axiom_id: int
-    hash: str
+    hash: AxiomHash
     json_data: str
 
 
 def _resolve_unique_axiom(s: Session, prefix: str) -> ResolvedAxiom:
     """Look up an axiom by hash prefix; raise on missing or ambiguous match."""
     _require_hex_prefix(prefix)
-    rows = s.conn.execute(
+    rows = s._conn.execute(
         "SELECT id, hash, json(data) FROM axioms WHERE hash LIKE ? || '%'",
         (prefix,),
     ).fetchall()
@@ -97,7 +97,7 @@ def _resolve_unique_axiom(s: Session, prefix: str) -> ResolvedAxiom:
     if len(rows) > 1:
         full_hashes = [r[1] for r in rows]
         raise AmbiguousHashError(prefix, len(rows), disambiguating_prefixes(full_hashes))
-    return ResolvedAxiom(axiom_id=rows[0][0], hash=rows[0][1], json_data=rows[0][2])
+    return ResolvedAxiom(axiom_id=rows[0][0], hash=AxiomHash(rows[0][1]), json_data=rows[0][2])
 
 
 def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
@@ -120,7 +120,7 @@ def _delete_axioms(s: Session, axioms: Sequence[HashedAxiom]):
     if not axioms:
         return
     placeholders = ",".join("?" for _ in axioms)
-    s.conn.execute(
+    s._conn.execute(
         f"DELETE FROM axioms WHERE hash IN ({placeholders})",
         tuple(ha.hash for ha in axioms),
     )
@@ -150,18 +150,18 @@ def remove_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectio
     absent = 0
     items = [
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", (within.name,)
         )
     ]
     for h in items:
-        row = s.conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+        row = s._conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
         if row is None:
             absent += 1
             continue
         full_hash, json_data = row
         axiom = load_axiom(json_data, f"axiom {short_hash(full_hash)} in remove_by_selection")
-        to_remove.append(HashedAxiom(axiom=axiom, hash=full_hash))
+        to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
     _delete_axioms(s, to_remove)
     return RemoveBySelectionResult(removed=tuple(to_remove), absent=absent)
@@ -198,7 +198,7 @@ def annotate_axiom(
     updated = axiom.model_copy(update={"annotations": tuple(current)})
     new_json = updated.model_dump_json()
 
-    s.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, resolved.axiom_id))
+    s._conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, resolved.axiom_id))
 
     original = set(axiom.annotations)
     final = set(current)
@@ -243,7 +243,7 @@ def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> Rep
     # Delete old, then attempt to insert new. If new_h collides with a
     # different existing axiom, INSERT OR IGNORE skips and that axiom keeps
     # its own annotations -> the carry-forward is irrelevant in that case.
-    s.conn.execute("DELETE FROM axioms WHERE id = ?", (resolved.axiom_id,))
+    s._conn.execute("DELETE FROM axioms WHERE id = ?", (resolved.axiom_id,))
     new_axiom_id = insert_axiom(s, new_axiom)
     merged = new_axiom_id is None
 
@@ -251,7 +251,7 @@ def replace_axiom(s: Session, old_hash_prefix: str, new_axiom: BaseAxiom) -> Rep
         # Carry old axiom-level annotations onto the new axiom; annotations
         # don't enter the canonical hash so new_h is unchanged.
         new_axiom = new_axiom.model_copy(update={"annotations": old_axiom.annotations})
-        s.conn.execute(
+        s._conn.execute(
             "UPDATE axioms SET data = jsonb(?) WHERE id = ?",
             (new_axiom.model_dump_json(), new_axiom_id),
         )
@@ -322,7 +322,7 @@ def rename_iri(
         require_locked_selection(s, within, SelectionKind.AXIOMS, "rename_iri")
         # ORDER BY a.hash: candidate iteration order determines event-log
         # insertion order; revert(n=1) replays the last batch in reverse.
-        rows = s.conn.execute(
+        rows = s._conn.execute(
             "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
             "JOIN axiom_entities ae ON ae.axiom_id = a.id "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
@@ -330,7 +330,7 @@ def rename_iri(
             (within.name, old_iri),
         ).fetchall()
     else:
-        rows = s.conn.execute(
+        rows = s._conn.execute(
             "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
             "JOIN axiom_entities ae ON ae.axiom_id = a.id "
             "WHERE ae.entity_iri = ? ORDER BY a.hash",
@@ -348,7 +348,7 @@ def rename_iri(
             results.append(ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True))
             continue
 
-        s.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
+        s._conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
         merged = insert_axiom(s, new_axiom) is None
 
         results.append(
@@ -360,11 +360,13 @@ def rename_iri(
             )
         )
 
-    return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
+    return RenameResult(
+        old_iri=IRI(old_iri), new_iri=IRI(new_iri), replaced=tuple(results), batch_id=batch
+    )
 
 
 def _count_axioms_by_type(s: Session, query: str, params: Sequence[object] = ()):
-    return Counter(dict(s.conn.execute(query, params)))
+    return Counter(dict(s._conn.execute(query, params)))
 
 
 def axiom_summary(s: Session, *, within: SelectionName | None = None) -> AxiomSummary:
@@ -407,7 +409,7 @@ def insert_axiom(s: Session, axiom: BaseAxiom) -> int | None:
     """
     h = HashedAxiom.of(axiom).hash
     json_data = axiom.model_dump_json()
-    cursor = s.conn.execute(
+    cursor = s._conn.execute(
         "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
         (h, axiom.tag(), json_data),
     )
@@ -424,12 +426,12 @@ def insert_axiom(s: Session, axiom: BaseAxiom) -> int | None:
 
 def repopulate_axiom_text(s: Session, axiom_id: int, annotations: tuple[Annotation, ...]) -> None:
     """Rebuild axiom_text index rows for a single axiom after an annotation change."""
-    s.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
+    s._conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
     rows = [
         (axiom_id, _annotation_value_to_text(ann.value), str(ann.property)) for ann in annotations
     ]
     if rows:
-        s.conn.executemany(
+        s._conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             rows,
         )
@@ -466,11 +468,11 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
             )
         )
 
-    s.conn.executemany(
+    s._conn.executemany(
         "INSERT INTO axiom_entities (axiom_id, entity_iri, role, position) VALUES (?, ?, ?, ?)",
         entity_rows,
     )
-    s.conn.executemany(
+    s._conn.executemany(
         "INSERT INTO entity_text (axiom_id, entity_iri, text, property) VALUES (?, ?, ?, ?)",
         text_rows,
     )
@@ -483,7 +485,7 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
         for ann in axiom.annotations
     ]
     if axiom_text_rows:
-        s.conn.executemany(
+        s._conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             axiom_text_rows,
         )

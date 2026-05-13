@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import HashedAxiom
+from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import read_selection as core_read_selection
@@ -55,7 +55,7 @@ def match_axioms(
         truncated_hint = (
             f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
         )
-        header = f"{result.total} axioms matched{truncated_hint}"
+        header = f"{len(result.axiom_hashes)} axioms matched{truncated_hint}"
 
         if not result.axiom_hashes:
             s.commit()
@@ -64,7 +64,7 @@ def match_axioms(
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_read_selection(s, into, limit=page_size, offset=0)
         page_axioms = [
-            HashedAxiom(axiom=item.axiom, hash=item.key)
+            HashedAxiom(axiom=item.axiom, hash=AxiomHash(item.key))
             for item in page.items
             if item.axiom is not None
         ]

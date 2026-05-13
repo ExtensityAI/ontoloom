@@ -3,8 +3,9 @@
 from collections import Counter
 from dataclasses import dataclass
 
-from ontoloom.hashing import HashedAxiom
+from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.annotations import Annotation
+from ontoloom.owl.iri import IRI
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,12 +55,12 @@ class AnnotateResult:
 
 @dataclass(frozen=True, slots=True)
 class RenameResult:
-    old_iri: str
-    new_iri: str
+    old_iri: IRI
+    new_iri: IRI
     replaced: tuple[ReplaceResult, ...]
     batch_id: str
 
     @property
-    def colliding_hashes(self) -> tuple[str, ...]:
+    def colliding_hashes(self) -> tuple[AxiomHash, ...]:
         """New hashes whose insertion was a no-op because an axiom with that hash already existed."""
         return tuple(sorted(r.new.hash for r in self.replaced if r.was_merged_into_existing))

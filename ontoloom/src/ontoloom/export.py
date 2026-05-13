@@ -78,7 +78,7 @@ def export_to_jsonl(
     with output_path.open("w") as f:
         f.write(header.model_dump_json())
         f.write("\n")
-        for (json_text,) in s.conn.execute(query, params):
+        for (json_text,) in s._conn.execute(query, params):
             f.write(json_text)
             f.write("\n")
             count += 1

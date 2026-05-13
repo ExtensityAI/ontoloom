@@ -84,13 +84,13 @@ def _entity_scope_allowed(s: Session, within: SelectionName) -> set[str]:
     if sel.kind == SelectionKind.ENTITIES:
         return {
             r[0]
-            for r in s.conn.execute(
+            for r in s._conn.execute(
                 "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
             )
         }
     return {
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             "JOIN axioms a ON a.id = ae.axiom_id "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
@@ -108,7 +108,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
 
     roles = {
         EntityType(r[0])
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT DISTINCT role FROM axiom_entities WHERE entity_iri = ? AND role IS NOT NULL",
             (iri_str,),
         )
@@ -116,7 +116,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
 
     annotations = [
         AnnotationRow(property=IRI(r[0]), value=r[1])
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             "SELECT DISTINCT property, text FROM entity_text "
             "WHERE entity_iri = ? AND property != ? "
             "ORDER BY property, text",
@@ -129,7 +129,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
     axiom_counts = Counter(
         {
             r[0]: r[1]
-            for r in s.conn.execute(
+            for r in s._conn.execute(
                 f"""
             SELECT a.type, COUNT(DISTINCT a.id)
             FROM axiom_entities ae
@@ -159,7 +159,7 @@ def axiom_hashes_for_entity(
 
     return [
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT a.hash FROM axiom_entities ae "
             f"JOIN axioms a ON ae.axiom_id = a.id{extra_join} "
             f"WHERE ae.entity_iri = ? ORDER BY a.hash",
@@ -234,7 +234,7 @@ def collect_entity_iris(
         )
         return [
             r[0]
-            for r in s.conn.execute(
+            for r in s._conn.execute(
                 f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} "
                 f"WHERE {where} ORDER BY ae.entity_iri",
                 params,
@@ -252,12 +252,12 @@ def collect_entity_iris(
 
 def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
     if within is None:
-        total = s.conn.execute("SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities").fetchone()[
+        total = s._conn.execute("SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities").fetchone()[
             0
         ]
         by_role = Counter(
             dict(
-                s.conn.execute(
+                s._conn.execute(
                     "SELECT role, COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE role IS NOT NULL GROUP BY role"
                 )
             )
@@ -266,14 +266,14 @@ def entity_summary(s: Session, *, within: SelectionName | None = None) -> Entity
 
     sel = get_selection(s, within)
     if sel.kind == SelectionKind.ENTITIES:
-        total = s.conn.execute(
+        total = s._conn.execute(
             "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
             "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ?",
             (within,),
         ).fetchone()[0]
         by_role = Counter(
             dict(
-                s.conn.execute(
+                s._conn.execute(
                     "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
                     "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
                     "WHERE ae.role IS NOT NULL GROUP BY ae.role",
@@ -282,7 +282,7 @@ def entity_summary(s: Session, *, within: SelectionName | None = None) -> Entity
             )
         )
     else:  # axioms
-        total = s.conn.execute(
+        total = s._conn.execute(
             "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
             "JOIN axioms a ON a.id = ae.axiom_id "
             "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
@@ -290,7 +290,7 @@ def entity_summary(s: Session, *, within: SelectionName | None = None) -> Entity
         ).fetchone()[0]
         by_role = Counter(
             dict(
-                s.conn.execute(
+                s._conn.execute(
                     "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
                     "JOIN axioms a ON a.id = ae.axiom_id "
                     "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
@@ -325,7 +325,7 @@ def find_duplicate_entities(
     # EXISTS variant of the previous CTE: for each (text, iri) row in the
     # property/scope, keep it iff some *other* entity has the same text.
     # Lets SQLite use idx_entity_text_prop_text directly without a temp table.
-    rows = s.conn.execute(
+    rows = s._conn.execute(
         f"SELECT et.text, et.entity_iri"
         f" FROM entity_text et{sel_join_outer}"
         f" WHERE et.property = ?"
@@ -445,14 +445,14 @@ def _list_entities(
         s, role, namespace, within, declared, properties, exclude_deprecated
     )
 
-    total = s.conn.execute(
+    total = s._conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{joins} WHERE {where}",
         params,
     ).fetchone()[0]
 
     page_iris = [
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} WHERE {where} ORDER BY ae.entity_iri LIMIT ? OFFSET ?",
             [*params, limit, offset],
         )
@@ -532,14 +532,14 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
     placeholders = ",".join("?" for _ in iris)
 
     roles_by_iri: dict[str, set[EntityType]] = {}
-    for iri_str, role_val in s.conn.execute(
+    for iri_str, role_val in s._conn.execute(
         f"SELECT entity_iri, role FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role IS NOT NULL",
         iris,
     ):
         roles_by_iri.setdefault(iri_str, set()).add(EntityType(role_val))
 
     anns_by_iri: dict[str, list[AnnotationRow]] = {}
-    for iri_str, prop, text in s.conn.execute(
+    for iri_str, prop, text in s._conn.execute(
         f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
         f"WHERE entity_iri IN ({placeholders}) AND property != ? "
         f"ORDER BY entity_iri, property, text",
@@ -560,7 +560,7 @@ def _batch_check_roles(s: Session, iris: list[str], role: str) -> set[str]:
     placeholders = ",".join("?" for _ in iris)
     return {
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT entity_iri FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role = ?",
             [*iris, role],
         )
@@ -577,7 +577,7 @@ def _filter_declared(
     placeholders = ",".join("?" for _ in iris)
     declared_iris = {
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
             f"JOIN axioms a ON a.id = ae.axiom_id "
             f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.tag()}'",
@@ -598,7 +598,7 @@ def _filter_deprecated(
     placeholders = ",".join("?" for _ in iris)
     deprecated_iris = {
         r[0]
-        for r in s.conn.execute(
+        for r in s._conn.execute(
             f"SELECT DISTINCT entity_iri FROM entity_text "
             f"WHERE entity_iri IN ({placeholders}) "
             f"AND property LIKE '%deprecated%' AND LOWER(text) = 'true'",
@@ -640,14 +640,14 @@ def _find_text_matches(
     matches: dict[str, tuple[MatchSource, MatchQuality]] = {}
     query_lower = query.lower()
 
-    for (iri_str,) in s.conn.execute(
+    for (iri_str,) in s._conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND LOWER(text) = ? ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
         if iri_str not in matches:
             matches[iri_str] = (source_label, MatchQuality.EXACT)
 
-    for (iri_str,) in s.conn.execute(
+    for (iri_str,) in s._conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0 ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
@@ -661,7 +661,7 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     """Top n entities by number of distinct axioms they appear in."""
     return [
         (IRI(row[0]), row[1])
-        for row in s.conn.execute(
+        for row in s._conn.execute(
             "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
             "FROM axiom_entities ae "
             "GROUP BY ae.entity_iri "
@@ -687,7 +687,7 @@ def undeclared_entity_count(
     where = DECLARED_NOT_EXISTS
     if exclude_deprecated:
         where = f"{where} AND {NOT_DEPRECATED}"
-    return s.conn.execute(
+    return s._conn.execute(
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {where}",
         scope_params,
     ).fetchone()[0]
