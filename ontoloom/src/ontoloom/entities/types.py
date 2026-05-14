@@ -32,7 +32,7 @@ class AnnotationRow:
 @dataclass(frozen=True, slots=True)
 class EntitySummary:
     total: int
-    by_role: Counter[str]
+    by_role: Counter[EntityType]
 
 
 @dataclass(frozen=True, slots=True)

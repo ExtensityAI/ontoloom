@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing
 from collections.abc import Iterator
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Annotated, get_args, get_origin
 
@@ -14,11 +15,19 @@ from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
+from ontoloom.owl.iri import IRI
 from ontoloom.patterns.match import match_pattern
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
-from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.query._constraints import (
+    AxiomConstraint,
+    InSelection,
+    MentionsAll,
+    OfTypes,
+)
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.stream_axioms import StreamAxioms
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +45,7 @@ def match_axioms(
     s: Session,
     pattern: BasePattern,
     *,
-    within: SelectionName | None = None,
+    within: ResolvedSelection | None = None,
     limit: int | None = None,
 ) -> MatchResult:
     """Find axioms matching a pattern. Returns matched hashes.
@@ -47,13 +56,16 @@ def match_axioms(
     """
     matched_hashes: list[AxiomHash] = []
     truncated = False
-    for h, json_data in _iter_candidates(s, pattern, within):
-        axiom = load_axiom(json_data, f"match {short_hash(h)}")
-        if match_pattern(pattern, axiom):
-            matched_hashes.append(AxiomHash(h))
-            if limit is not None and len(matched_hashes) >= limit:
-                truncated = True
-                break
+
+    with _iter_candidates(s, pattern, within) as rows:
+        for h, json_data in rows:
+            axiom = load_axiom(json_data, f"match {short_hash(h)}")
+            if match_pattern(pattern, axiom):
+                matched_hashes.append(AxiomHash(h))
+                if limit is not None and len(matched_hashes) >= limit:
+                    truncated = True
+                    break
+
     return MatchResult(
         axiom_hashes=tuple(matched_hashes),
         truncated=truncated,
@@ -100,61 +112,28 @@ _EXPRESSION_CONTAINER_TYPES = frozenset(
 def _iter_candidates(
     s: Session,
     pattern: BasePattern,
-    within: SelectionName | None,
-) -> Iterator[tuple[str, str]]:
+    within: ResolvedSelection | None,
+) -> AbstractContextManager[Iterator[tuple[AxiomHash, str]]]:
     """Stream candidate axioms from DB, narrowed by type and scope.
 
     Cursor-based iteration: caller may break early without buffering the full
     result set. Safe because `match_axioms` doesn't write during iteration.
     """
-    joins: list[str] = []
-    conditions: list[str] = []
-    # JOIN params must appear before WHERE params in the final list because
-    # SQLite binds positional `?` placeholders in SQL left-to-right, and JOIN
-    # ON clauses precede WHERE in the generated statement.
-    join_params: list[str] = []
-    cond_params: list[str] = []
+    constraints: list[AxiomConstraint] = []
 
     if isinstance(pattern, _EXPRESSION_PATTERN_CLASSES):
-        placeholders = ",".join("?" for _ in _EXPRESSION_CONTAINER_TYPES)
-        conditions.append(f"a.type IN ({placeholders})")
-        cond_params.extend(sorted(_EXPRESSION_CONTAINER_TYPES))
+        constraints.append(OfTypes(tags=tuple(sorted(_EXPRESSION_CONTAINER_TYPES))))
     else:
-        conditions.append("a.type = ?")
-        cond_params.append(pattern.axiom_tag())
+        constraints.append(OfTypes(tags=(pattern.axiom_tag(),)))
 
     concrete_iris = _extract_concrete_iris(pattern)
-    for iri in concrete_iris[:3]:
-        alias = f"ae_p{len(joins)}"
-        joins.append(
-            f"JOIN axiom_entities {alias} ON {alias}.axiom_id = a.id AND {alias}.entity_iri = ?"
-        )
-        join_params.append(iri)
+    if concrete_iris[:3]:
+        constraints.append(MentionsAll(iris=tuple(IRI(iri) for iri in concrete_iris[:3])))
 
     if within is not None:
-        sel = get_selection(s, within)
-        if sel.kind == SelectionKind.AXIOMS:
-            joins.append(
-                "JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?"
-            )
-            join_params.append(within)
-        else:
-            joins.append("JOIN axiom_entities ae_w ON ae_w.axiom_id = a.id")
-            joins.append(
-                "JOIN selection_items si_w ON si_w.item = ae_w.entity_iri AND si_w.selection_name = ?"
-            )
-            join_params.append(within)
+        constraints.append(InSelection(ref=within))
 
-    join_clause = (" " + " ".join(joins)) if joins else ""
-    where_clause = (" WHERE " + " AND ".join(conditions)) if conditions else ""
-
-    # ORDER BY a.hash: candidate order determines which axioms hit the
-    # match-and-limit cap; without it page-1 results drift across runs.
-    yield from s._conn.execute(
-        f"SELECT DISTINCT a.hash, json(a.data) FROM axioms a{join_clause}{where_clause} "
-        "ORDER BY a.hash",
-        join_params + cond_params,
-    )
+    return run(s, StreamAxioms(constraints=tuple(constraints)))
 
 
 def _extract_concrete_iris(pattern: BasePattern) -> list[str]:

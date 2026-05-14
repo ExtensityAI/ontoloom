@@ -1,5 +1,4 @@
 import uuid
-from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -30,12 +29,18 @@ from ontoloom.owl.axioms import AnnotationAssertion, BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.prefixes import check_iri_prefixes
-from ontoloom.selections.store import (
-    get_selection,
-    require_locked_selection,
+from ontoloom.prefixes.store import check_iri_prefixes
+from ontoloom.query._constraints import AxiomConstraint, InSelection, MentionsAll
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import (
+    LockedSelectionRef,
+    ResolvedSelection,
+    resolve_selection,
 )
-from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.query.count_axioms_by_type import CountAxiomsByType
+from ontoloom.query.list_axioms import ListAxioms
+from ontoloom.selections.store import require_locked_selection
+from ontoloom.selections.types import LockedSelection, SelectionKind
 from ontoloom.text_index import LOCAL_NAME_PROPERTY
 from ontoloom.utils import dedupe
 
@@ -295,7 +300,7 @@ def rename_iri(
     old_iri: IRI,
     new_iri: IRI,
     *,
-    within: LockedSelection | None = None,
+    within: LockedSelectionRef | None = None,
 ) -> RenameResult:
     """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id.
 
@@ -312,24 +317,12 @@ def rename_iri(
     batch = uuid.uuid4().hex[:12]
     results: list[ReplaceResult] = []
 
+    constraints: list[AxiomConstraint] = [MentionsAll(iris=(old_iri,))]
     if within is not None:
-        require_locked_selection(s, within, SelectionKind.AXIOMS, "rename_iri")
-        # ORDER BY a.hash: candidate iteration order determines event-log
-        # insertion order; revert(n=1) replays the last batch in reverse.
-        rows = s._conn.execute(
-            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-            "WHERE ae.entity_iri = ? ORDER BY a.hash",
-            (within.name, old_iri),
-        ).fetchall()
-    else:
-        rows = s._conn.execute(
-            "SELECT DISTINCT a.hash, json(a.data) FROM axioms a "
-            "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-            "WHERE ae.entity_iri = ? ORDER BY a.hash",
-            (old_iri,),
-        ).fetchall()
+        resolved = resolve_selection(s, within)
+        constraints.append(InSelection(ref=resolved, expected_kind=SelectionKind.AXIOMS))
+
+    rows = list(run(s, ListAxioms(constraints=tuple(constraints))))
 
     for old_full_hash, old_json_data in rows:
         old_axiom = load_axiom(old_json_data, f"rename {old_iri} -> {new_iri}")
@@ -357,32 +350,11 @@ def rename_iri(
     return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
 
 
-def _count_axioms_by_type(s: Session, query: str, params: Sequence[object] = ()):
-    return Counter(dict(s._conn.execute(query, params)))
-
-
-def axiom_summary(s: Session, *, within: SelectionName | None = None) -> AxiomSummary:
-    if within is None:
-        by_type = _count_axioms_by_type(s, "SELECT type, COUNT(*) FROM axioms GROUP BY type")
-    else:
-        sel = get_selection(s, within)
-        if sel.kind == SelectionKind.AXIOMS:
-            by_type = _count_axioms_by_type(
-                s,
-                "SELECT a.type, COUNT(*) FROM axioms a "
-                "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-                "GROUP BY a.type",
-                (within,),
-            )
-        else:  # entities: count axioms mentioning those entities
-            by_type = _count_axioms_by_type(
-                s,
-                "SELECT a.type, COUNT(DISTINCT a.id) FROM axioms a "
-                "JOIN axiom_entities ae ON ae.axiom_id = a.id "
-                "JOIN selection_items si ON si.item = ae.entity_iri "
-                "AND si.selection_name = ? GROUP BY a.type",
-                (within,),
-            )
+def axiom_summary(s: Session, *, within: ResolvedSelection | None = None) -> AxiomSummary:
+    constraints: tuple[AxiomConstraint, ...] = (
+        (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),) if within is not None else ()
+    )
+    by_type = run(s, CountAxiomsByType(constraints=constraints))
     return AxiomSummary(total=sum(by_type.values()), by_type=by_type)
 
 

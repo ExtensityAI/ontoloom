@@ -3,7 +3,10 @@ from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
-from ontoloom.selections.store import read_axiom_selection, upsert_selection
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import ResolvedSelection, resolve_selection
+from ontoloom.query.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind, SelectionName, ShowFilter
 from ontoloom.utils import dquoted
 
@@ -14,6 +17,7 @@ from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
     format_selection_result,
 )
+from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -21,8 +25,8 @@ from ontoloom_mcp.components.types import Limit, OntologyPath
 def match_axioms(
     path: OntologyPath,
     pattern: Pattern,
-    into: SelectionName,
-    within: SelectionName | None = None,
+    into: SelectionRefParam,
+    within: SelectionRefParam | None = None,
     limit: Limit = 100,
 ):
     """Find axioms matching a structural pattern; save matches to an axiom selection.
@@ -40,15 +44,26 @@ def match_axioms(
 
     Args:
     - `pattern`: The pattern object to match.
-    - `into`: Name for the axiom selection to save results.
-    - `within`: Optional selection to restrict search to.
+    - `into`: Kind-prefixed name for the axiom selection to save results
+      (e.g. `"axioms:my_matches"`).
+    - `within`: Optional selection reference (e.g. `"axioms:my_sel"` or
+      `"entities:my_ents"`) to restrict the search to.
     - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
     """
+    if into.kind != SelectionKind.AXIOMS:
+        msg = f"match_axioms produces an AXIOMS selection; got 'into={into}' with kind={into.kind}"
+        raise ValueError(msg)
+
     ont = Ontology(path)
     with session(ont) as s:
-        result = core_match(s, pattern, within=within, limit=limit)
+        resolved_within = resolve_selection(s, within) if within is not None else None
+        result = core_match(s, pattern, within=resolved_within, limit=limit)
         upserted = upsert_selection(
-            s, into, SelectionKind.AXIOMS, result.axiom_hashes, "match_axioms"
+            s,
+            SelectionName(into.bare_name),
+            SelectionKind.AXIOMS,
+            result.axiom_hashes,
+            "match_axioms",
         )
         sel = upserted.selection
 
@@ -62,7 +77,15 @@ def match_axioms(
             return f"{header} -> {dquoted(sel.locked)}."
 
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = read_axiom_selection(s, sel, limit=page_size, offset=0, show=ShowFilter.ALL)
+        page = run(
+            s,
+            ReadAxiomSelection(
+                selection=ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name=str(sel.name)),
+                limit=page_size,
+                offset=0,
+                show=ShowFilter.ALL,
+            ),
+        )
         page_axioms = [
             HashedAxiom(axiom=item.axiom, hash=item.hash)
             for item in page.items

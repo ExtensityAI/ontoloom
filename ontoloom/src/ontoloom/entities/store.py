@@ -1,9 +1,6 @@
-from collections import Counter, defaultdict
-
-from ontoloom.connection import Session, escape_like
+from ontoloom.connection import Session
 from ontoloom.entities.types import (
     AnnotationRow,
-    DuplicateGroup,
     DuplicateResult,
     EntityInfo,
     EntityMatch,
@@ -13,17 +10,34 @@ from ontoloom.entities.types import (
     MatchSource,
 )
 from ontoloom.errors import OntoloomError
-from ontoloom.owl.axioms import Declaration
+from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.prefixes import PrefixName
-from ontoloom.selections.store import SelectionKindError, get_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.prefixes.types import PrefixName
+from ontoloom.query._constraints import (
+    AxiomConstraint,
+    Declared,
+    EntityConstraint,
+    HasEntityRole,
+    InNamespaces,
+    InSelection,
+    MentionsAll,
+    NotDeprecated,
+    WithAnyProperty,
+    WithIRIs,
+    WithRoles,
+)
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.count_axioms_by_type import CountAxiomsByType
+from ontoloom.query.count_entities import CountEntities
+from ontoloom.query.count_entities_by_role import CountEntitiesByRole
+from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
+from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.list_entities import ListEntities
+from ontoloom.selections.types import SelectionKind
 from ontoloom.text_index import (
-    DECLARED_EXISTS,
-    DECLARED_NOT_EXISTS,
     LOCAL_NAME_PROPERTY,
-    NOT_DEPRECATED,
 )
 from ontoloom.utils import dquoted
 
@@ -46,71 +60,10 @@ class EntityNotFoundError(OntoloomError):
 _TEXT_SCAN_CAP = 1000
 
 
-def _axiom_scope_join(
-    s: Session, within: SelectionName | None, operation: str
-) -> tuple[str, list[str]]:
-    """Join clause for queries already in axiom-context (alias `a` for axioms).
-
-    Raises SelectionKindError if `within` is an entity selection — these reads
-    only accept axiom selections.
-    """
-    if within is None:
-        return "", []
-    sel = get_selection(s, within)
-    if sel.kind != SelectionKind.AXIOMS:
-        raise SelectionKindError(
-            name=within, expected=SelectionKind.AXIOMS, actual=sel.kind, operation=operation
-        )
-    return (
-        " JOIN selection_items si_w ON si_w.item = a.hash AND si_w.selection_name = ?",
-        [within],
-    )
-
-
-def _entity_scope_join(s: Session, within: SelectionName | None) -> tuple[str, list[str]]:
-    """Join clause for queries in axiom_entities-context (alias `ae`).
-    Handles both AXIOMS (via a_w) and ENTITIES (via ae.entity_iri) selection kinds.
-    """
-    if within is None:
-        return "", []
-    sel = get_selection(s, within)
-    if sel.kind == SelectionKind.ENTITIES:
-        return (
-            " JOIN selection_items si_w ON si_w.item = ae.entity_iri AND si_w.selection_name = ?",
-            [within],
-        )
-    return (
-        " JOIN axioms a_w ON a_w.id = ae.axiom_id"
-        " JOIN selection_items si_w ON si_w.item = a_w.hash AND si_w.selection_name = ?",
-        [within],
-    )
-
-
-def _entity_scope_allowed(s: Session, within: SelectionName) -> set[str]:
-    """Allowed entity IRIs under `within`, as a set for in-Python post-filtering."""
-    sel = get_selection(s, within)
-    if sel.kind == SelectionKind.ENTITIES:
-        return {
-            r[0]
-            for r in s._conn.execute(
-                "SELECT item FROM selection_items WHERE selection_name = ?", (within,)
-            )
-        }
-    return {
-        r[0]
-        for r in s._conn.execute(
-            "SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-            "JOIN axioms a ON a.id = ae.axiom_id "
-            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
-            (within,),
-        )
-    }
-
-
 _NEAR_MATCH_LIMIT = 3
 
 
-def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> EntityInfo:
+def get_entity(s: Session, iri: IRI, *, within: ResolvedSelection | None = None) -> EntityInfo:
     """Return entity details. Raises EntityNotFoundError (with near matches) on miss."""
     iri_str = str(iri)
 
@@ -132,23 +85,15 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
         )
     ]
 
-    extra_join, extra_params = _axiom_scope_join(s, within, "get_entity")
-
-    axiom_counts = Counter(
-        {
-            r[0]: r[1]
-            for r in s._conn.execute(
-                f"""
-            SELECT a.type, COUNT(DISTINCT a.id)
-            FROM axiom_entities ae
-            JOIN axioms a ON ae.axiom_id = a.id{extra_join}
-            WHERE ae.entity_iri = ?
-            GROUP BY a.type
-            """,
-                (*extra_params, iri_str),
-            )
-        }
+    axiom_count_constraints: tuple[AxiomConstraint, ...] = (
+        MentionsAll(iris=(iri,)),
+        *(
+            (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),)
+            if within is not None
+            else ()
+        ),
     )
+    axiom_counts = run(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
     if not roles and not annotations and not axiom_counts:
         near = search_entities(s, query=iri.local_name, limit=_NEAR_MATCH_LIMIT)
@@ -159,21 +104,18 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
 
 
 def axiom_hashes_for_entity(
-    s: Session, iri: IRI, *, within: SelectionName | None = None
-) -> list[str]:
+    s: Session, iri: IRI, *, within: ResolvedSelection | None = None
+) -> list[AxiomHash]:
     """Return all axiom hashes for an entity."""
-    iri_str = str(iri)
-    extra_join, extra_params = _axiom_scope_join(s, within, "axiom_hashes_for_entity")
-
-    return [
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT a.hash FROM axiom_entities ae "
-            f"JOIN axioms a ON ae.axiom_id = a.id{extra_join} "
-            f"WHERE ae.entity_iri = ? ORDER BY a.hash",
-            (*extra_params, iri_str),
-        )
-    ]
+    constraints: tuple[AxiomConstraint, ...] = (
+        MentionsAll(iris=(iri,)),
+        *(
+            (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),)
+            if within is not None
+            else ()
+        ),
+    )
+    return run(s, ListAxiomHashes(constraints=constraints))
 
 
 def search_entities(
@@ -182,7 +124,7 @@ def search_entities(
     query: str | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
-    within: SelectionName | None = None,
+    within: ResolvedSelection | None = None,
     declared: bool | None = None,
     properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
@@ -230,24 +172,22 @@ def collect_entity_iris(
     query: str | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
-    within: SelectionName | None = None,
+    within: ResolvedSelection | None = None,
     declared: bool | None = None,
     properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
-) -> list[str]:
+) -> list[IRI]:
     """Return all matching entity IRIs (no display data). For select workflows."""
     if query is None:
-        joins, where, params = _build_entity_filter(
-            s, role, namespace, within, declared, properties, exclude_deprecated
+        constraints = _build_entity_constraints(
+            role=role,
+            namespace=namespace,
+            within=within,
+            declared=declared,
+            properties=properties,
+            exclude_deprecated=exclude_deprecated,
         )
-        return [
-            r[0]
-            for r in s._conn.execute(
-                f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} "
-                f"WHERE {where} ORDER BY ae.entity_iri",
-                params,
-            )
-        ]
+        return run(s, ListEntities(constraints=constraints))
 
     # Text search path
     matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
@@ -255,58 +195,16 @@ def collect_entity_iris(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
     matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
-    return list(matches.keys())
+    return [IRI(k) for k in matches]
 
 
-def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
-    if within is None:
-        total = s._conn.execute("SELECT COUNT(DISTINCT entity_iri) FROM axiom_entities").fetchone()[
-            0
-        ]
-        by_role = Counter(
-            dict(
-                s._conn.execute(
-                    "SELECT role, COUNT(DISTINCT entity_iri) FROM axiom_entities WHERE role IS NOT NULL GROUP BY role"
-                )
-            )
-        )
-        return EntitySummary(total=total, by_role=by_role)
-
-    sel = get_selection(s, within)
-    if sel.kind == SelectionKind.ENTITIES:
-        total = s._conn.execute(
-            "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
-            "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ?",
-            (within,),
-        ).fetchone()[0]
-        by_role = Counter(
-            dict(
-                s._conn.execute(
-                    "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
-                    "JOIN selection_items si ON si.item = ae.entity_iri AND si.selection_name = ? "
-                    "WHERE ae.role IS NOT NULL GROUP BY ae.role",
-                    (within,),
-                )
-            )
-        )
-    else:  # axioms
-        total = s._conn.execute(
-            "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
-            "JOIN axioms a ON a.id = ae.axiom_id "
-            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ?",
-            (within,),
-        ).fetchone()[0]
-        by_role = Counter(
-            dict(
-                s._conn.execute(
-                    "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
-                    "JOIN axioms a ON a.id = ae.axiom_id "
-                    "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-                    "WHERE ae.role IS NOT NULL GROUP BY ae.role",
-                    (within,),
-                )
-            )
-        )
+def entity_summary(s: Session, *, within: ResolvedSelection | None = None) -> EntitySummary:
+    constraints: tuple[EntityConstraint, ...] = (
+        HasEntityRole(),
+        *((InSelection(ref=within),) if within is not None else ()),
+    )
+    total = run(s, CountEntities(constraints=constraints))
+    by_role = run(s, CountEntitiesByRole(constraints=constraints))
     return EntitySummary(total=total, by_role=by_role)
 
 
@@ -314,99 +212,41 @@ def find_duplicate_entities(
     s: Session,
     annotation_property: IRI,
     *,
-    within: SelectionName | None = None,
+    within: ResolvedSelection | None = None,
 ) -> DuplicateResult:
     """Find annotation values shared by multiple entities."""
-    sel_join_outer = ""
-    sel_join_inner = ""
-    sel_params: list[str] = []
-    if within is not None:
-        get_selection(s, within)  # validates existence; matches other read entrypoints
-        sel_join_outer = (
-            " JOIN selection_items si ON si.item = et.entity_iri AND si.selection_name = ?"
-        )
-        sel_join_inner = (
-            " JOIN selection_items si2 ON si2.item = et2.entity_iri AND si2.selection_name = ?"
-        )
-        sel_params.append(within)
-
-    # EXISTS variant of the previous CTE: for each (text, iri) row in the
-    # property/scope, keep it iff some *other* entity has the same text.
-    # Lets SQLite use idx_entity_text_prop_text directly without a temp table.
-    rows = s._conn.execute(
-        f"SELECT et.text, et.entity_iri"
-        f" FROM entity_text et{sel_join_outer}"
-        f" WHERE et.property = ?"
-        f"   AND EXISTS ("
-        f"     SELECT 1 FROM entity_text et2{sel_join_inner}"
-        f"     WHERE et2.property = ? AND et2.text = et.text AND et2.entity_iri != et.entity_iri"
-        f"   )"
-        f" GROUP BY et.text, et.entity_iri"
-        f" ORDER BY et.text, et.entity_iri",
-        (*sel_params, annotation_property, *sel_params, annotation_property),
-    ).fetchall()
-
-    by_text: dict[str, list[str]] = defaultdict(list)
-    for text, iri in rows:
-        by_text[text].append(iri)
-
-    sorted_pairs = sorted(by_text.items(), key=lambda g: len(g[1]), reverse=True)
-    groups = tuple(DuplicateGroup(value=value, iris=tuple(iris)) for value, iris in sorted_pairs)
-    affected: list[str] = []
-    seen: set[str] = set()
-    for group in groups:
-        for iri in group.iris:
-            if iri not in seen:
-                seen.add(iri)
-                affected.append(iri)
-
-    return DuplicateResult(
-        groups=groups,
-        total_groups=len(groups),
-        affected_iris=tuple(affected),
-    )
+    return run(s, FindDuplicateEntities(annotation_property=annotation_property, within=within))
 
 
 # -- Private helpers --
 
 
-def _build_entity_filter(
-    s: Session,
+def _build_entity_constraints(
+    *,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: SelectionName | None,
+    within: ResolvedSelection | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
-) -> tuple[str, str, list[str | int]]:
-    """Build (joins, where_clause, params) for entity queries against `axiom_entities ae`."""
-    conditions = ["ae.role IS NOT NULL"]
-    joins, scope_params = _entity_scope_join(s, within)
-    params: list[str | int] = list(scope_params)
+) -> tuple[EntityConstraint, ...]:
+    """Build the constraint tuple for the non-text entity search path."""
+    constraints: list[EntityConstraint] = [HasEntityRole()]
 
     if role is not None:
-        conditions.append("ae.role = ?")
-        params.append(role)
+        constraints.append(WithRoles(roles=(role,)))
     if namespace is not None:
-        conditions.append("ae.entity_iri LIKE ? || ':%' ESCAPE '\\'")
-        params.append(escape_like(namespace))
-
-    if declared is True:
-        conditions.append(DECLARED_EXISTS)
-    elif declared is False:
-        conditions.append(DECLARED_NOT_EXISTS)
-
+        constraints.append(InNamespaces(namespaces=(namespace,)))
+    if within is not None:
+        constraints.append(InSelection(ref=within))
+    if declared is not None:
+        constraints.append(Declared(state=declared))
     if properties is not None:
-        ph = ",".join("?" for _ in properties)
-        conditions.append(
-            f"EXISTS (SELECT 1 FROM entity_text et_p WHERE et_p.entity_iri = ae.entity_iri AND et_p.property IN ({ph}))"
-        )
-        params.extend(properties)
-
+        constraints.append(WithAnyProperty(properties=tuple(properties)))
     if exclude_deprecated:
-        conditions.append(NOT_DEPRECATED)
+        constraints.append(NotDeprecated())
 
-    return joins, " AND ".join(conditions), params
+    return tuple(constraints)
 
 
 def _apply_text_filters(
@@ -414,71 +254,69 @@ def _apply_text_filters(
     matches: dict[str, tuple[MatchSource, MatchQuality]],
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: SelectionName | None,
+    within: ResolvedSelection | None,
     declared: bool | None,
     exclude_deprecated: bool,
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
-    """Apply post-text-search filters to candidate matches."""
-    if within is not None and matches:
-        allowed = _entity_scope_allowed(s, within)
-        matches = {k: v for k, v in matches.items() if k in allowed}
+    """Apply post-text-search filters to candidate matches via a single ListEntities call."""
+    if not matches:
+        return matches
 
-    if role is not None and matches:
-        role_iris = _batch_check_roles(s, list(matches.keys()), role)
-        matches = {k: v for k, v in matches.items() if k in role_iris}
+    constraints: list[EntityConstraint] = [WithIRIs(iris=tuple(IRI(k) for k in matches))]
+
+    if within is not None:
+        constraints.append(InSelection(ref=within))
+    if role is not None:
+        constraints.append(WithRoles(roles=(role,)))
     if namespace is not None:
-        prefix = f"{namespace}:"
-        matches = {k: v for k, v in matches.items() if k.startswith(prefix)}
+        constraints.append(InNamespaces(namespaces=(namespace,)))
+    if declared is not None:
+        constraints.append(Declared(state=declared))
+    if exclude_deprecated:
+        constraints.append(NotDeprecated())
 
-    if declared is not None and matches:
-        matches = _filter_declared(s, matches, declared)
-    if exclude_deprecated and matches:
-        matches = _filter_deprecated(s, matches)
+    surviving = set(run(s, ListEntities(constraints=tuple(constraints))))
 
-    return matches
+    return {k: v for k, v in matches.items() if k in surviving}
 
 
 def _list_entities(
     s: Session,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: SelectionName | None,
+    within: ResolvedSelection | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    joins, where, params = _build_entity_filter(
-        s, role, namespace, within, declared, properties, exclude_deprecated
+    constraints = _build_entity_constraints(
+        role=role,
+        namespace=namespace,
+        within=within,
+        declared=declared,
+        properties=properties,
+        exclude_deprecated=exclude_deprecated,
     )
+    total = run(s, CountEntities(constraints=constraints))
+    page_iris = run(s, ListEntities(constraints=constraints, limit=limit, offset=offset))
 
-    total = s._conn.execute(
-        f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{joins} WHERE {where}",
-        params,
-    ).fetchone()[0]
-
-    page_iris = [
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae{joins} WHERE {where} ORDER BY ae.entity_iri LIMIT ? OFFSET ?",
-            [*params, limit, offset],
-        )
-    ]
     if not page_iris:
         return EntitySearchPage(matches=(), total=total, offset=offset)
 
-    display = _batch_fetch_entity_display(s, page_iris)
+    display = _batch_fetch_entity_display(s, [str(i) for i in page_iris])
+
     return EntitySearchPage(
         matches=tuple(
             EntityMatch(
-                iri=IRI(iri_str),
-                roles=display.get(iri_str, (frozenset(), ()))[0],
-                annotations=display.get(iri_str, (frozenset(), ()))[1],
+                iri=iri,
+                roles=display.get(str(iri), (frozenset(), ()))[0],
+                annotations=display.get(str(iri), (frozenset(), ()))[1],
                 match_source=MatchSource.LIST,
                 match_quality=MatchQuality.EXACT,
             )
-            for iri_str in page_iris
+            for iri in page_iris
         ),
         total=total,
         offset=offset,
@@ -490,7 +328,7 @@ def _text_search_entities(
     query: str,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: SelectionName | None,
+    within: ResolvedSelection | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
@@ -564,58 +402,6 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
     }
 
 
-def _batch_check_roles(s: Session, iris: list[str], role: EntityType) -> set[str]:
-    placeholders = ",".join("?" for _ in iris)
-    return {
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT entity_iri FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role = ?",
-            [*iris, role],
-        )
-    }
-
-
-def _filter_declared(
-    s: Session,
-    matches: dict[str, tuple[MatchSource, MatchQuality]],
-    declared: bool,
-) -> dict[str, tuple[MatchSource, MatchQuality]]:
-    """Filter text-search matches by declaration status."""
-    iris = list(matches.keys())
-    placeholders = ",".join("?" for _ in iris)
-    declared_iris = {
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-            f"JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE ae.entity_iri IN ({placeholders}) AND a.type = '{Declaration.tag()}'",
-            iris,
-        )
-    }
-    if declared:
-        return {k: v for k, v in matches.items() if k in declared_iris}
-    return {k: v for k, v in matches.items() if k not in declared_iris}
-
-
-def _filter_deprecated(
-    s: Session,
-    matches: dict[str, tuple[MatchSource, MatchQuality]],
-) -> dict[str, tuple[MatchSource, MatchQuality]]:
-    """Remove deprecated entities from text-search matches."""
-    iris = list(matches.keys())
-    placeholders = ",".join("?" for _ in iris)
-    deprecated_iris = {
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT entity_iri FROM entity_text "
-            f"WHERE entity_iri IN ({placeholders}) "
-            f"AND property LIKE '%deprecated%' AND LOWER(text) = 'true'",
-            iris,
-        )
-    }
-    return {k: v for k, v in matches.items() if k not in deprecated_iris}
-
-
 def _find_text_matches(
     s: Session,
     query: str,
@@ -682,7 +468,7 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
 
 def undeclared_entity_count(
     s: Session,
-    within: SelectionName | None = None,
+    within: ResolvedSelection | None = None,
     *,
     exclude_deprecated: bool = True,
 ) -> int:
@@ -691,11 +477,10 @@ def undeclared_entity_count(
     `exclude_deprecated=True` matches `search_entities(declared=False)` defaults.
     Set False to count every undeclared entity including deprecated ones.
     """
-    scope_join, scope_params = _entity_scope_join(s, within)
-    where = DECLARED_NOT_EXISTS
-    if exclude_deprecated:
-        where = f"{where} AND {NOT_DEPRECATED}"
-    return s._conn.execute(
-        f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae{scope_join} WHERE {where}",
-        scope_params,
-    ).fetchone()[0]
+    constraints: tuple[EntityConstraint, ...] = (
+        HasEntityRole(),
+        Declared(state=False),
+        *((NotDeprecated(),) if exclude_deprecated else ()),
+        *((InSelection(ref=within),) if within is not None else ()),
+    )
+    return run(s, CountEntities(constraints=constraints))

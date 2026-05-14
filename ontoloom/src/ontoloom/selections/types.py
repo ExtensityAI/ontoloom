@@ -8,12 +8,70 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import override
 
+from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
 from ontoloom.models import TypedStr
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.utils import dquoted
+
+
+class SelectionNotFoundError(OntoloomError):
+    def __init__(self, name: "SelectionName"):
+        self.name = name
+        super().__init__(f"Selection {dquoted(name)} does not exist.")
+
+
+class StaleSelectionError(OntoloomError):
+    """Selection has changed since the caller last observed it."""
+
+    def __init__(
+        self,
+        name: "SelectionName",
+        supplied_prefix: str,
+        current_hash: str | None,
+        current_size: int | None = None,
+    ):
+        self.name = name
+        self.supplied_prefix = supplied_prefix
+        self.current_hash = current_hash
+        self.current_size = current_size
+        current = current_hash[:12] if current_hash else "<absent>"
+        super().__init__(
+            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
+            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
+        )
+
+
+class SelectionKindError(OntoloomError):
+    """Wrong selection kind for the requested operation."""
+
+    def __init__(
+        self,
+        name: "SelectionName",
+        expected: "SelectionKind",
+        actual: "SelectionKind",
+        operation: str,
+    ):
+        self.name = name
+        self.expected = expected
+        self.actual = actual
+        self.operation = operation
+        super().__init__(
+            f"{dquoted(operation)} requires an {expected} selection, "
+            f"but {dquoted(name)} is an {actual} selection."
+        )
+
+
+class SelectionExprError(OntoloomError):
+    """Set-expression evaluation precondition violated.
+
+    Covers operand-cardinality issues (no operands, too few for intersect/diff)
+    and kind mismatches (axioms_for over an axiom expression, mixed-kind operands
+    of a set op).
+    """
+
 
 MAX_SELECTION_NAME_LEN = 64
 LOCKED_PREFIX_MIN = 8

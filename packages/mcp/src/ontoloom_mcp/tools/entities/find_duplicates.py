@@ -2,10 +2,12 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import find_duplicate_entities
 from ontoloom.owl.iri import IRI
+from ontoloom.query._selection_ref import resolve_selection
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
 
+from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -14,9 +16,9 @@ _PREVIEW_GROUPS = 20
 
 def find_duplicates(
     path: OntologyPath,
-    into: SelectionName,
+    into: SelectionRefParam,
     annotation_property: IRI,
-    within: SelectionName | None = None,
+    within: SelectionRefParam | None = None,
 ):
     """Find annotation values shared by multiple entities.
 
@@ -24,23 +26,37 @@ def find_duplicates(
     (e.g., "rdfs:label"). Saves all affected entities as an entity selection.
 
     Args:
-    - `into`: Name for the output selection (entities involved in any duplicate).
+    - `into`: Kind-prefixed name for the output selection
+      (e.g. `"entities:dup_labels"`).
     - `annotation_property`: The property whose values are checked for duplicates
       (e.g. "rdfs:label").
-    - `within`: Optional entity selection to restrict the check to.
+    - `within`: Optional entity selection (e.g. `"entities:my_classes"`) to
+      restrict the check to.
     """
+    if into.kind != SelectionKind.ENTITIES:
+        msg = (
+            f"find_duplicates produces an ENTITIES selection; "
+            f"got 'into={into}' with kind={into.kind}"
+        )
+        raise ValueError(msg)
+
     ont = Ontology(path)
     with session(ont) as s:
-        result = find_duplicate_entities(s, annotation_property, within=within)
+        resolved_within = resolve_selection(s, within) if within is not None else None
+        result = find_duplicate_entities(s, annotation_property, within=resolved_within)
 
         if not result.affected_iris:
             return f"No duplicate {annotation_property} values found."
 
         source = f"find_duplicates(annotation_property={dquoted(annotation_property)})"
-        if within:
-            source += f", within={dquoted(within)}"
+        if within is not None:
+            source += f", within={dquoted(str(within))}"
         upserted = upsert_selection(
-            s, into, SelectionKind.ENTITIES, result.affected_iris, source=source
+            s,
+            SelectionName(into.bare_name),
+            SelectionKind.ENTITIES,
+            result.affected_iris,
+            source=source,
         )
         sel = upserted.selection
         s.commit()

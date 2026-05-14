@@ -42,23 +42,27 @@ from ontoloom.owl.expressions import ObjectSomeValuesFrom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType, Position
-from ontoloom.prefixes import (
-    PrefixInUseError,
-    PrefixNotFoundError,
+from ontoloom.prefixes.store import (
     list_prefixes,
     prefix_usage_counts,
     remove_prefix,
     set_prefix,
 )
+from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError
+from ontoloom.query._selection_ref import LockedSelectionRef
 from ontoloom.selections.expr import EntitiesInExpr
 from ontoloom.selections.store import (
-    SelectionKindError,
     create_selection,
     list_selections,
     read_selection,
     upsert_selection,
 )
-from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.selections.types import (
+    LockedSelection,
+    SelectionKind,
+    SelectionKindError,
+    SelectionName,
+)
 from pydantic import TypeAdapter
 
 
@@ -258,7 +262,7 @@ def test_rename_iri_rejects_entity_selection(s):
         ],
     )
     h = upsert_selection(s, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
-    locked = LockedSelection(f"dogs@{h}")
+    locked = LockedSelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs", hash_prefix=h)
 
     with pytest.raises(SelectionKindError):
         rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
@@ -971,7 +975,9 @@ def test_rename_iri_scoped_to_selection(s):
     h_out = HashedAxiom.of(ax_out).hash
 
     sel_hash = upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test").selection.hash
-    locked = LockedSelection(f"scope@{sel_hash[:8]}")
+    locked = LockedSelectionRef(
+        kind=SelectionKind.AXIOMS, bare_name="scope", hash_prefix=sel_hash[:8]
+    )
 
     renamed = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
     assert len(renamed.replaced) == 1

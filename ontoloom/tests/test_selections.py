@@ -12,15 +12,20 @@ from ontoloom.selections.expr import (
     UnionExpr,
 )
 from ontoloom.selections.store import (
-    SelectionExprError,
-    StaleSelectionError,
     create_selection,
     get_locked_selection,
     get_selection,
     read_selection,
     upsert_selection,
 )
-from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName, ShowFilter
+from ontoloom.selections.types import (
+    LockedSelection,
+    SelectionExprError,
+    SelectionKind,
+    SelectionName,
+    ShowFilter,
+    StaleSelectionError,
+)
 
 # -- P-03-3: Selection set algebra --
 

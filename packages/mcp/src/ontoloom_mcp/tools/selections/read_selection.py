@@ -11,19 +11,23 @@ from ontoloom.selections.types import (
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_axiom_annotations
+from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
 
 def read_selection(
     path: OntologyPath,
-    name: SelectionName,
+    name: SelectionRefParam,
     limit: Limit = 20,
     offset: Offset = 0,
     show: ShowFilter = ShowFilter.ALL,
 ):
     """Paginated view of a selection's contents with missing-item visibility.
 
+    - `name`: Kind-prefixed selection reference (e.g. `"axioms:my_sel"` or
+      `"entities:my_sel"`). The actual kind is read from the stored selection;
+      the prefix is informational.
     - `show`: "all" (default), "present" (only items still in ontology),
       "missing" (only items removed since the selection was created).
       Use "missing" to audit a selection after ontology modifications.
@@ -34,7 +38,9 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        page = core_read_selection(s, name, limit=limit, offset=offset, show=show)
+        page = core_read_selection(
+            s, SelectionName(name.bare_name), limit=limit, offset=offset, show=show
+        )
         s.commit()
 
     meta = page.meta

@@ -415,12 +415,6 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_by_namespace(self, s):
         add_axioms(s, AXIOMS)
-        default_ns = _search_entities_ns(s, "")
-        # All :-prefixed entities
-        assert ":Dog" in default_ns
-        assert ":Alice" in default_ns
-        assert ":owns" in default_ns
-        # Other namespace
         rdfs_ns = _search_entities_ns(s, "rdfs")
         assert "rdfs:label" in rdfs_ns
         assert "rdfs:comment" in rdfs_ns

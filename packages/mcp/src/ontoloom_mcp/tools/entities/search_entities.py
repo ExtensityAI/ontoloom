@@ -7,7 +7,8 @@ from ontoloom.entities.store import collect_entity_iris
 from ontoloom.entities.store import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.prefixes import PrefixName
+from ontoloom.prefixes.types import PrefixName
+from ontoloom.query._selection_ref import ResolvedSelection, resolve_selection
 from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
@@ -18,19 +19,20 @@ from ontoloom_mcp.components.formatting import (
     format_entity_search_page,
     format_selection_result,
 )
+from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
 def search_entities(
     path: OntologyPath,
-    into: SelectionName,
+    into: SelectionRefParam,
     query: Annotated[str, MinLen(1)] | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
     declared: bool | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
-    within: SelectionName | None = None,
+    within: SelectionRefParam | None = None,
     exclude_deprecated: bool = True,
 ):
     """Search for entities by name, type, or namespace; save the result as a selection.
@@ -39,7 +41,8 @@ def search_entities(
     compose it with other selections.
 
     Args:
-    - `into`: Name for the output selection (required).
+    - `into`: Kind-prefixed name for the output selection
+      (e.g. `"entities:dogs"`).
     - `query`: Substring match on IRI local names and annotation values (labels, comments).
     - `role`: Filter by entity type: "Class", "ObjectProperty", "DataProperty",
       "AnnotationProperty", "NamedIndividual", "Datatype".
@@ -47,29 +50,42 @@ def search_entities(
     - `declared`: True = only declared entities, False = only undeclared, None = all.
     - `properties`: Restrict text search to these annotation properties; when query is
       None, find entities that have any annotation with these properties.
-    - `within`: Restrict search to a named selection. An entity selection restricts to
-      those entities; an axiom selection restricts to entities mentioned in those axioms.
+    - `within`: Restrict search to a named selection (e.g. `"entities:my_ents"`
+      or `"axioms:my_axioms"`). An entity selection restricts to those entities;
+      an axiom selection restricts to entities mentioned in those axioms.
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
+    if into.kind != SelectionKind.ENTITIES:
+        msg = (
+            f"search_entities produces an ENTITIES selection; "
+            f"got 'into={into}' with kind={into.kind}"
+        )
+        raise ValueError(msg)
+
     ont = Ontology(path)
     with session(ont) as s:
+        resolved_within = resolve_selection(s, within) if within is not None else None
         kwargs = {
             "query": query,
             "role": role,
             "namespace": namespace,
-            "within": within,
+            "within": resolved_within,
             "declared": declared,
             "properties": properties,
             "exclude_deprecated": exclude_deprecated,
         }
 
         iris = collect_entity_iris(s, **kwargs)
-        source = _build_source(query, role, namespace, declared, properties, within)
-        upserted = upsert_selection(s, into, SelectionKind.ENTITIES, iris, source)
+        source = _build_source(query, role, namespace, declared, properties, resolved_within)
+        upserted = upsert_selection(
+            s, SelectionName(into.bare_name), SelectionKind.ENTITIES, iris, source
+        )
         sel = upserted.selection
 
         if not iris:
-            no_results = _no_results_msg(query, role, namespace, declared, properties, within)
+            no_results = _no_results_msg(
+                query, role, namespace, declared, properties, resolved_within
+            )
             s.commit()
             return f"0 entities -> {dquoted(sel.locked)}.\n{no_results}"
 
@@ -79,16 +95,16 @@ def search_entities(
 
         result = format_selection_result("entities", upserted, page_text)
 
-        if within is not None:
-            result += "\n" + _within_metadata(s, within)
+        if resolved_within is not None:
+            result += "\n" + _within_metadata(s, resolved_within)
 
         s.commit()
 
     return result
 
 
-def _within_metadata(s: Session, within: SelectionName):
-    sel = get_selection(s, within)
+def _within_metadata(s: Session, within: ResolvedSelection):
+    sel = get_selection(s, SelectionName(within.bare_name))
     return f"\nWithin selection {dquoted(sel.locked)} ({sel.kind}, {sel.size} items)"
 
 
@@ -104,8 +120,8 @@ def _filter_parts(query, role, namespace, declared, properties, within) -> list[
         parts.append(f"declared={declared}")
     if properties:
         parts.append(f"properties=[{', '.join(dquoted(p) for p in properties)}]")
-    if within:
-        parts.append(f"within={dquoted(within)}")
+    if within is not None:
+        parts.append(f"within={dquoted(str(within))}")
     return parts
 
 

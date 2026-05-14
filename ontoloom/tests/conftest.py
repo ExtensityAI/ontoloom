@@ -9,7 +9,7 @@ itself and need to start from a clean prefix table.
 
 import pytest
 from ontoloom.connection import Ontology, session
-from ontoloom.prefixes import set_prefix
+from ontoloom.prefixes.store import set_prefix
 
 _TEST_PREFIXES = {
     "ex": "http://example.org/",

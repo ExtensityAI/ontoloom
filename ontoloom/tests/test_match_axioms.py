@@ -22,6 +22,7 @@ from ontoloom.patterns.types import (
     SubObjectPropertyOfChainPattern,
     TupleMatch,
 )
+from ontoloom.query._selection_ref import ResolvedSelection
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind
 
@@ -89,7 +90,11 @@ def test_within_axiom_selection(populated):
     upsert_selection(populated, "dog_only", SelectionKind.AXIOMS, [dog_hash], source="test")
 
     pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
-    result = match_axioms(populated, pattern, within="dog_only")
+    result = match_axioms(
+        populated,
+        pattern,
+        within=ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="dog_only"),
+    )
     assert len(result.axiom_hashes) == 1
     assert result.axiom_hashes[0] == dog_hash
 
@@ -98,7 +103,11 @@ def test_within_entity_selection(populated):
     upsert_selection(populated, "cat_entities", SelectionKind.ENTITIES, ["ex:Cat"], source="test")
 
     pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
-    result = match_axioms(populated, pattern, within="cat_entities")
+    result = match_axioms(
+        populated,
+        pattern,
+        within=ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="cat_entities"),
+    )
     assert len(result.axiom_hashes) == 1
 
     cat_ax = SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal"))

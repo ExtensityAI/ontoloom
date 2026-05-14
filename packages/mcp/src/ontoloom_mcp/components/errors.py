@@ -12,8 +12,8 @@ from ontoloom.errors import (
     StoreCorruptionError,
     UnionDispatchError,
 )
-from ontoloom.prefixes import PrefixInUseError, PrefixNotFoundError, UndeclaredPrefixError
-from ontoloom.selections.store import (
+from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError, UndeclaredPrefixError
+from ontoloom.selections.types import (
     SelectionExprError,
     SelectionKindError,
     SelectionNotFoundError,

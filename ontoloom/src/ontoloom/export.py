@@ -10,8 +10,13 @@ from ontoloom.connection import (
     Session,
     assert_within_workspace,
 )
-from ontoloom.prefixes import NamespaceIRI, PrefixName, list_prefixes
-from ontoloom.selections.store import SelectionKindError, get_selection
+from ontoloom.prefixes.store import list_prefixes
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
+from ontoloom.query._constraints import AxiomConstraint, InSelection
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.stream_axioms import StreamAxioms
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
 
@@ -36,7 +41,7 @@ class ExportResult:
 
 
 def export_to_jsonl(
-    s: Session, output_path: Path, *, within: SelectionName | None = None
+    s: Session, output_path: Path, *, within: ResolvedSelection | None = None
 ) -> ExportResult:
     """Export axioms as JSONL with a header line."""
     assert_within_workspace(output_path)
@@ -46,26 +51,12 @@ def export_to_jsonl(
         raise FileNotFoundError(msg)
 
     selection_size: int | None = None
+    constraints: list[AxiomConstraint] = []
 
     if within is not None:
-        sel = get_selection(s, within)
-        if sel.kind != SelectionKind.AXIOMS:
-            raise SelectionKindError(
-                name=within,
-                expected=SelectionKind.AXIOMS,
-                actual=sel.kind,
-                operation="export_jsonl",
-            )
-        selection_size = sel.size
-        query = (
-            "SELECT json(a.data) FROM axioms a "
-            "JOIN selection_items si ON si.item = a.hash AND si.selection_name = ? "
-            "ORDER BY a.hash"
-        )
-        params: tuple[str, ...] = (within,)
-    else:
-        query = "SELECT json(data) FROM axioms ORDER BY hash"
-        params = ()
+        meta = get_selection(s, SelectionName(within.bare_name))
+        selection_size = meta.size
+        constraints.append(InSelection(ref=within, expected_kind=SelectionKind.AXIOMS))
 
     header = HeaderRecord(
         format="ontoloom-jsonl",
@@ -79,10 +70,11 @@ def export_to_jsonl(
     with output_path.open("w") as f:
         f.write(header.model_dump_json())
         f.write("\n")
-        for (json_text,) in s._conn.execute(query, params):
-            f.write(json_text)
-            f.write("\n")
-            count += 1
+        with run(s, StreamAxioms(constraints=tuple(constraints))) as it:
+            for _h, json_text in it:
+                f.write(json_text)
+                f.write("\n")
+                count += 1
 
     skipped = 0 if selection_size is None else selection_size - count
     return ExportResult(exported=count, skipped=skipped)

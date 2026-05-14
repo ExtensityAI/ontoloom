@@ -6,12 +6,21 @@ from typing import Annotated
 from pydantic import Field
 
 from ontoloom.connection import Session
-from ontoloom.errors import OntoloomError
-from ontoloom.hashing import AxiomHash, short_hash
-from ontoloom.load import load_axiom
-from ontoloom.owl.axioms import Declaration
+from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import EntityType, Position
+from ontoloom.owl.markers import Position
+from ontoloom.query._constraints import (
+    EntityConstraint,
+    InPositions,
+    MentionedInAxioms,
+    MentionsAny,
+)
+from ontoloom.query._dispatch import run
+from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.list_entities import ListEntities
+from ontoloom.query.read_axiom_selection import ReadAxiomSelection
+from ontoloom.query.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.expr import (
     AxiomsForExpr,
     DiffExpr,
@@ -22,77 +31,22 @@ from ontoloom.selections.expr import (
     UnionExpr,
 )
 from ontoloom.selections.types import (
-    AxiomItem,
     AxiomSelectionPage,
-    EntityItem,
     EntitySelectionPage,
     LockedSelection,
     SelectionContentHash,
+    SelectionExprError,
     SelectionKind,
+    SelectionKindError,
     SelectionListing,
     SelectionMeta,
     SelectionName,
+    SelectionNotFoundError,
     SetOp,
     ShowFilter,
+    StaleSelectionError,
 )
-from ontoloom.text_index import lookup_entity_labels
 from ontoloom.utils import dedupe, dquoted
-
-
-class SelectionNotFoundError(OntoloomError):
-    def __init__(self, name: SelectionName):
-        self.name = name
-        super().__init__(f"Selection {dquoted(name)} does not exist.")
-
-
-class StaleSelectionError(OntoloomError):
-    """Selection has changed since the caller last observed it."""
-
-    def __init__(
-        self,
-        name: SelectionName,
-        supplied_prefix: str,
-        current_hash: str | None,
-        current_size: int | None = None,
-    ):
-        self.name = name
-        self.supplied_prefix = supplied_prefix
-        self.current_hash = current_hash
-        self.current_size = current_size
-        current = current_hash[:12] if current_hash else "<absent>"
-        super().__init__(
-            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
-            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
-        )
-
-
-class SelectionKindError(OntoloomError):
-    """Wrong selection kind for the requested operation."""
-
-    def __init__(
-        self,
-        name: SelectionName,
-        expected: SelectionKind,
-        actual: SelectionKind,
-        operation: str,
-    ):
-        self.name = name
-        self.expected = expected
-        self.actual = actual
-        self.operation = operation
-        super().__init__(
-            f"{dquoted(operation)} requires an {expected} selection, "
-            f"but {dquoted(name)} is an {actual} selection."
-        )
-
-
-class SelectionExprError(OntoloomError):
-    """Set-expression evaluation precondition violated.
-
-    Covers operand-cardinality issues (no operands, too few for intersect/diff)
-    and kind mismatches (axioms_for over an axiom expression, mixed-kind operands
-    of a set op).
-    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -311,123 +265,11 @@ def read_selection(
     show: ShowFilter = ShowFilter.ALL,
 ) -> AxiomSelectionPage | EntitySelectionPage:
     sel = get_selection(s, name)
+    ref = ResolvedSelection(kind=sel.kind, bare_name=str(name))
 
     if sel.kind == SelectionKind.AXIOMS:
-        return read_axiom_selection(s, sel, limit=limit, offset=offset, show=show)
-    return read_entity_selection(s, sel, limit=limit, offset=offset, show=show)
-
-
-def read_axiom_selection(
-    s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
-) -> AxiomSelectionPage:
-    base = (
-        "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item WHERE si.selection_name = ?"
-    )
-    if show == ShowFilter.PRESENT:
-        base += " AND a.id IS NOT NULL"
-    elif show == ShowFilter.MISSING:
-        base += " AND a.id IS NULL"
-
-    total = s._conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
-    rows = s._conn.execute(
-        f"SELECT si.item, json(a.data) {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
-        (sel.name, limit, offset),
-    ).fetchall()
-
-    present_count = s._conn.execute(
-        "SELECT COUNT(*) FROM selection_items si "
-        "JOIN axioms a ON a.hash = si.item "
-        "WHERE si.selection_name = ?",
-        (sel.name,),
-    ).fetchone()[0]
-
-    items = tuple(
-        AxiomItem(
-            hash=AxiomHash(item_hash),
-            axiom=(
-                load_axiom(data, f"axiom {short_hash(item_hash)} in read_selection")
-                if data is not None
-                else None
-            ),
-        )
-        for item_hash, data in rows
-    )
-
-    return AxiomSelectionPage(
-        meta=sel,
-        items=items,
-        total_filtered=total,
-        present=present_count,
-        missing=sel.size - present_count,
-        show=show,
-    )
-
-
-def read_entity_selection(
-    s: Session, sel: SelectionMeta, *, limit: int, offset: int, show: ShowFilter
-) -> EntitySelectionPage:
-    base = (
-        "FROM selection_items si "
-        "LEFT JOIN ("
-        "  SELECT DISTINCT ae.entity_iri FROM axiom_entities ae"
-        ") refd ON refd.entity_iri = si.item "
-        "WHERE si.selection_name = ?"
-    )
-    if show == ShowFilter.PRESENT:
-        base += " AND refd.entity_iri IS NOT NULL"
-    elif show == ShowFilter.MISSING:
-        base += " AND refd.entity_iri IS NULL"
-
-    total = s._conn.execute(f"SELECT COUNT(*) {base}", (sel.name,)).fetchone()[0]
-    rows = s._conn.execute(
-        f"SELECT si.item, refd.entity_iri IS NOT NULL {base} ORDER BY si.rowid LIMIT ? OFFSET ?",
-        (sel.name, limit, offset),
-    ).fetchall()
-
-    present_count = s._conn.execute(
-        "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
-        "JOIN axiom_entities ae ON ae.entity_iri = si.item "
-        "WHERE si.selection_name = ?",
-        (sel.name,),
-    ).fetchone()[0]
-
-    present_iris = [iri for iri, is_present in rows if is_present]
-    roles_map: dict[str, EntityType] = {}
-    labels_map: dict[str, str] = {}
-
-    if present_iris:
-        placeholders = ",".join("?" for _ in present_iris)
-        roles_map.update(
-            (iri, EntityType(role))
-            for iri, role in s._conn.execute(
-                f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
-                f"JOIN axioms a ON a.id = ae.axiom_id "
-                f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
-                present_iris,
-            )
-        )
-        labels_map.update(
-            {k: v for k, v in lookup_entity_labels(s, present_iris).items() if v is not None}
-        )
-
-    items = tuple(
-        EntityItem(
-            iri=IRI(iri),
-            present=bool(is_present),
-            role=roles_map.get(iri) if is_present else None,
-            label=labels_map.get(iri) if is_present else None,
-        )
-        for iri, is_present in rows
-    )
-
-    return EntitySelectionPage(
-        meta=sel,
-        items=items,
-        total_filtered=total,
-        present=present_count,
-        missing=sel.size - present_count,
-        show=show,
-    )
+        return run(s, ReadAxiomSelection(selection=ref, limit=limit, offset=offset, show=show))
+    return run(s, ReadEntitySelection(selection=ref, limit=limit, offset=offset, show=show))
 
 
 def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[DroppedSelection]:
@@ -468,7 +310,7 @@ def create_selection(
     return upsert_selection(s, name, kind, items, auto_source)
 
 
-def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
+def _eval_expr(s: Session, expr: SetOperand) -> tuple[Sequence[str], SelectionKind]:
     if isinstance(expr, str):
         sel = get_selection(s, SelectionName(expr))
         items = [
@@ -507,7 +349,7 @@ def _eval_expr(s: Session, expr: SetOperand) -> tuple[list[str], SelectionKind]:
 
 def _eval_set_op(
     s: Session, operands: Sequence[SetOperand], op: SetOp
-) -> tuple[list[str], SelectionKind]:
+) -> tuple[Sequence[str], SelectionKind]:
     if not operands:
         msg = f"{dquoted(op)} requires at least one operand."
         raise SelectionExprError(msg)
@@ -542,44 +384,23 @@ def _eval_set_op(
     return sorted(items_set), kind
 
 
-def _axioms_for(s: Session, entity_iris: Sequence[str]) -> list[str]:
+def _axioms_for(s: Session, entity_iris: Sequence[str]) -> list[AxiomHash]:
     if not entity_iris:
         return []
-    placeholders = ",".join("?" for _ in entity_iris)
-    return [
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT a.hash FROM axioms a "
-            f"JOIN axiom_entities ae ON ae.axiom_id = a.id "
-            f"WHERE ae.entity_iri IN ({placeholders}) "
-            f"ORDER BY a.hash",
-            tuple(entity_iris),
-        )
-    ]
+    return run(
+        s,
+        ListAxiomHashes(
+            constraints=(MentionsAny(iris=tuple(IRI(i) for i in entity_iris)),),
+        ),
+    )
 
 
-def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None) -> list[str]:
+def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None) -> list[IRI]:
     if not axiom_hashes:
         return []
-    placeholders = ",".join("?" for _ in axiom_hashes)
-    if field is not None:
-        return [
-            r[0]
-            for r in s._conn.execute(
-                f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-                f"JOIN axioms a ON a.id = ae.axiom_id "
-                f"WHERE a.hash IN ({placeholders}) AND ae.position = ? "
-                f"ORDER BY ae.entity_iri",
-                (*axiom_hashes, field),
-            )
-        ]
-    return [
-        r[0]
-        for r in s._conn.execute(
-            f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae "
-            f"JOIN axioms a ON a.id = ae.axiom_id "
-            f"WHERE a.hash IN ({placeholders}) "
-            f"ORDER BY ae.entity_iri",
-            tuple(axiom_hashes),
-        )
+    constraints: list[EntityConstraint] = [
+        MentionedInAxioms(hashes=tuple(AxiomHash(h) for h in axiom_hashes))
     ]
+    if field is not None:
+        constraints.append(InPositions(positions=(field,)))
+    return run(s, ListEntities(constraints=tuple(constraints)))

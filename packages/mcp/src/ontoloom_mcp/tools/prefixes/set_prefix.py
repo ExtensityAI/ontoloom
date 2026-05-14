@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.prefixes import NamespaceIRI, PrefixName
-from ontoloom.prefixes import set_prefix as core_set_prefix
+from ontoloom.prefixes.store import set_prefix as core_set_prefix
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (

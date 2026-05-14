@@ -3,13 +3,14 @@ from ontoloom.axioms.store import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
+from ontoloom_mcp.components.selection_refs import LockedSelectionRefParam, SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -18,8 +19,8 @@ def rename_iri(
     path: OntologyPath,
     old_iri: IRI,
     new_iri: IRI,
-    within: LockedSelection | None = None,
-    into: SelectionName | None = None,
+    within: LockedSelectionRefParam | None = None,
+    into: SelectionRefParam | None = None,
     confirm: str | None = None,
 ):
     """Rename an IRI across all (or restricted) axioms.
@@ -31,17 +32,21 @@ def rename_iri(
     Args:
     - `old_iri`: IRI to replace.
     - `new_iri`: New IRI to use in its place.
-    - `within`: Optional `name@hash_prefix` reference (e.g. "my_sel@a3f1") to
-      restrict the rename to an axiom selection. The hash prefix verifies the
-      selection hasn't changed since you last observed it.
-    - `into`: Optional axiom selection name to populate with the post-rename
-      hashes of every replaced axiom. Use to inspect or further operate on the
-      affected axioms without re-querying.
+    - `within`: Optional locked axiom selection reference
+      `"axioms:name@hash_prefix"` (e.g. `"axioms:my_sel@a3f1b2c4"`). The hash
+      prefix verifies the selection hasn't changed since you last observed it.
+    - `into`: Optional axiom selection (e.g. `"axioms:renamed"`) to populate
+      with the post-rename hashes of every replaced axiom. Use to inspect or
+      further operate on the affected axioms without re-querying.
     - `confirm`: When the rename would merge axioms into existing ones (hash
       collision => annotations on the merged axioms may be lost), the first
       call raises `ConfirmationRequiredError` with a token. Pass that token
       here to apply the change.
     """
+    if into is not None and into.kind != SelectionKind.AXIOMS:
+        msg = f"rename_iri produces an AXIOMS selection; got 'into={into}' with kind={into.kind}"
+        raise ValueError(msg)
+
     ont = Ontology(path)
     with session(ont) as s:
         result = core_rename_iri(s, old_iri, new_iri, within=within)
@@ -64,7 +69,7 @@ def rename_iri(
             new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
             upserted = upsert_selection(
                 s,
-                into,
+                SelectionName(into.bare_name),
                 SelectionKind.AXIOMS,
                 new_hashes,
                 f"rename_iri({old_iri} -> {new_iri})",
