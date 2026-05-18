@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ontoloom.connection import escape_like
+from ontoloom.entity_text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
 from ontoloom.query._normalize import normalize_axiom, normalize_entity
 from ontoloom.query.constraints import (
@@ -43,7 +44,7 @@ DECLARED_NOT_EXISTS = (
 NOT_DEPRECATED = (
     "NOT EXISTS (SELECT 1 FROM entity_text et_dep "
     "WHERE et_dep.entity_iri = ae.entity_iri "
-    "AND et_dep.property LIKE '%deprecated%' AND LOWER(et_dep.text) = 'true')"
+    "AND et_dep.property = ? AND LOWER(et_dep.text) = 'true')"
 )
 
 
@@ -98,6 +99,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                 fragments.append(DECLARED_EXISTS if state else DECLARED_NOT_EXISTS)
             case Deprecated(state=False):
                 fragments.append(NOT_DEPRECATED)
+                params.append(OWL_DEPRECATED_PROPERTY)
             case HasAnyProperty(properties=properties):
                 placeholders = ",".join("?" for _ in properties)
                 fragments.append(
@@ -182,11 +184,10 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
                 params.append(ref.bare)
             case InSelection(ref=EntitySelectionName() as ref):
                 fragments.append(
-                    "EXISTS (SELECT 1 FROM axiom_entities ae_w "
-                    "WHERE ae_w.axiom_id = a.id "
-                    "AND EXISTS (SELECT 1 FROM selection_items si_w "
-                    "WHERE si_w.item = ae_w.entity_iri "
-                    "AND si_w.selection_name = ?))"
+                    "EXISTS (SELECT 1 FROM selection_items si_w "
+                    "JOIN axiom_entities ae_w ON ae_w.entity_iri = si_w.item "
+                    "WHERE si_w.selection_name = ? "
+                    "AND ae_w.axiom_id = a.id)"
                 )
                 params.append(ref.bare)
             case _:

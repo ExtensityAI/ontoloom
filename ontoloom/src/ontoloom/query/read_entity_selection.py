@@ -32,6 +32,13 @@ def _show_filter_clause(show: ShowFilter) -> str:
 
 
 class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
+    """Paginated read of an entity-kind selection.
+
+    Page order is stable and lexicographic on the item IRI. The
+    `(selection_name, item)` autoindex provides the ordering for free, so
+    paginated reads avoid a temp-sort over the full selection.
+    """
+
     selection: EntitySelectionName
     show: ShowFilter = ShowFilter.ALL
 
@@ -53,7 +60,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
         if filter_clause:
             sql_parts.append(filter_clause.lstrip())
 
-        sql_parts.append("ORDER BY si.rowid")
+        sql_parts.append("ORDER BY si.item")
 
         if self.limit is not None:
             sql_parts.append("LIMIT ?")

@@ -96,10 +96,10 @@ def upsert_selection(
 ) -> UpsertResult:
     """Write a selection, overwriting if it exists.
 
-    Items are stored in insertion order (not sorted); the hash is
-    order-independent (sorted internally). Set-algebra paths (union,
-    intersection, difference) pre-sort before calling upsert, so their
-    insertion order is also sorted order.
+    Storage order is implementation detail. Paginated reads
+    (`Read*Selection`) iterate selections in lexicographic order by item, so
+    callers see stable cross-call pagination regardless of insertion order.
+    The content hash is order-independent (items sorted internally).
 
     Unconditional overwrite -> last writer wins, even if another agent has
     written since you last read. Optimistic locking (hash-prefix check) is a
@@ -177,10 +177,11 @@ def list_selections(s: Session) -> list[SelectionListing]:
     )
     entity_present: dict[str, int] = dict(
         s.conn.execute(
-            "SELECT s.name, COUNT(DISTINCT CASE WHEN ae.entity_iri IS NOT NULL THEN si.item END) "
+            "SELECT s.name, SUM(CASE WHEN EXISTS ("
+            "SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item"
+            ") THEN 1 ELSE 0 END) "
             "FROM selections s "
             "LEFT JOIN selection_items si ON si.selection_name = s.name "
-            "LEFT JOIN axiom_entities ae ON ae.entity_iri = si.item "
             "WHERE s.kind = ? "
             "GROUP BY s.name",
             (SelectionKind.ENTITIES.value,),

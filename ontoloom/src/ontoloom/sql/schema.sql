@@ -32,6 +32,14 @@ CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_role ON axiom_entities(entity_
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom ON axiom_entities(axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_pos ON axiom_entities(entity_iri, position, axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom_pos ON axiom_entities(axiom_id, position);
+-- Covering probe for MentionsAll's EXISTS chains: lets each per-IRI EXISTS hit
+-- (axiom_id=? AND entity_iri=?) without re-filtering after an axiom_id scan.
+CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom_iri ON axiom_entities(axiom_id, entity_iri);
+-- Role-leading index so `count_entities_by_role` GROUP BY walks in role-grouped
+-- order and skips the TEMP B-TREE. Partial (role IS NOT NULL) keeps the index
+-- small; the predicate matches every consumer of this index.
+CREATE INDEX IF NOT EXISTS idx_axiom_entities_role_iri
+    ON axiom_entities(role, entity_iri) WHERE role IS NOT NULL;
 
 -- Derived text index keyed to a specific entity: the entity's local_name plus
 -- any AnnotationAssertion values targeting it (labels, comments, ...). Used

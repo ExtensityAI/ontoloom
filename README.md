@@ -125,10 +125,6 @@ Added 10, skipped 0 axioms.
 - `list_selections` — show all named selections
 - `remove_selections` — drop one or more selections
 
-**History**
-- `show_changes` — recent events grouped by batch
-- `revert` — undo a batch by appending inverse events
-
 **Export**
 `export_jsonl` — dump all axioms to a sorted JSONL file
 
@@ -172,10 +168,6 @@ uv run --project packages/mcp python -m ontoloom_mcp.server
 ### Sandboxing (optional)
 
 Set `ONTOLOOM_WORKSPACE_ROOT=/path/to/workspace` to confine all `Ontology(...)`, `export_jsonl`, and import paths to that directory tree. Useful when running an agent that may take instructions from untrusted documents — the agent can't open or write SQLite files outside the workspace. Unset (default) means unrestricted single-user behavior.
-
-### Event log retention
-
-The event log (`events` table) permanently retains full axiom content, including annotation values. There is no expiry, pruning, or redaction mechanism. Do not store sensitive information in annotation values if log retention is a concern.
 
 ## How it works
 

@@ -290,9 +290,9 @@ def test_selection_hash_order_independent(tmp_path):
 def test_selection_pagination_stable_across_processes(tmp_path):
     """Set-op selections must paginate the same way regardless of PYTHONHASHSEED.
 
-    Set ops materialise via Python `set`, whose iteration order is randomized;
-    selection_items.rowid would differ across runs without deterministic ordering
-    at the set-op level, and read_selection paginates by rowid.
+    Read pagination is lexicographic by item, so this is robust independently
+    of how set-ops iterate. Kept as a regression guard against accidental order
+    drift.
     """
     import subprocess
     import sys

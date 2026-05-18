@@ -43,7 +43,7 @@ def test_render_default_show_all_no_pagination():
         "SELECT si.item, json(a.data) "
         "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item "
         "WHERE si.selection_name = ? "
-        "ORDER BY si.rowid"
+        "ORDER BY si.item"
     )
     assert compiled.params == ("sel",)
 
@@ -62,13 +62,13 @@ def test_render_show_missing():
 
 def test_render_limit_and_offset():
     compiled = (ReadAxiomSelection(selection=_ref("sel"), limit=5, offset=2)).render()
-    assert compiled.sql.endswith("ORDER BY si.rowid LIMIT ? OFFSET ?")
+    assert compiled.sql.endswith("ORDER BY si.item LIMIT ? OFFSET ?")
     assert compiled.params == ("sel", 5, 2)
 
 
 def test_render_limit_only():
     compiled = (ReadAxiomSelection(selection=_ref("sel"), limit=10)).render()
-    assert compiled.sql.endswith("ORDER BY si.rowid LIMIT ?")
+    assert compiled.sql.endswith("ORDER BY si.item LIMIT ?")
     assert compiled.params == ("sel", 10)
 
 
@@ -125,7 +125,7 @@ def test_run_show_missing_only(s):
     assert all(item.missing for item in page.items)
 
 
-def test_run_pagination_walks_in_insertion_order(s):
+def test_run_pagination_walks_in_lexicographic_order(s):
     axs = [
         Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Zebra")),
         Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Antelope")),
@@ -137,6 +137,7 @@ def test_run_pagination_walks_in_insertion_order(s):
 
     full = (ReadAxiomSelection(selection=_ref("sel")))._run(s)
     full_hashes = [i.hash for i in full.items]
+    assert full_hashes == sorted(full_hashes)
 
     page1 = (ReadAxiomSelection(selection=_ref("sel"), limit=2))._run(s)
     page2 = (ReadAxiomSelection(selection=_ref("sel"), limit=2, offset=2))._run(s)

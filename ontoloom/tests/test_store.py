@@ -1047,3 +1047,91 @@ def test_list_all_selections_order(s):
 
     names = [ls.meta.name for ls in list_selections(s)]
     assert names == ["a_sel", "z_sel"]
+
+
+def test_resolve_hash_prefix_range_scan(s):
+    # Multiple hashes sharing a prefix get caught by the range scan; non-matching
+    # hashes that sort just past the prefix boundary are excluded.
+    near_miss = "9" + "0" * 63  # sorts immediately before any 'a*' hash
+    sibling = "a" + "f" * 63
+    target = "ab" + "0" * 62
+    for h in (near_miss, sibling, target):
+        s.conn.execute(
+            "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
+            (h, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+        )
+
+    assert resolve_hash_prefix(s, AxiomHashPrefix("ab")) == AxiomHash(target)
+
+    with pytest.raises(AmbiguousHashError):
+        resolve_hash_prefix(s, AxiomHashPrefix("a"))
+
+
+def test_resolve_hash_prefix_upper_bound_edges(s):
+    # The '9' -> ':' upper-bound increment must not include 'a*' hashes; the
+    # 'f' -> 'g' increment must not pull in hashes outside the hex alphabet.
+    hashes = [
+        "9" + "0" * 63,
+        "a" + "0" * 63,
+        "f" + "0" * 63,
+    ]
+    for h in hashes:
+        s.conn.execute(
+            "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
+            (h, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+        )
+
+    assert resolve_hash_prefix(s, AxiomHashPrefix("9")) == AxiomHash(hashes[0])
+    assert resolve_hash_prefix(s, AxiomHashPrefix("f")) == AxiomHash(hashes[2])
+
+
+def test_remove_by_hash_batches_single_query(s):
+    axs = [
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Aa")),
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Bb")),
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cc")),
+    ]
+    add_axioms(s, axs)
+    hashes = [HashedAxiom.of(a).hash for a in axs]
+
+    result = remove_by_hash(s, hashes)
+    assert tuple(ha.hash for ha in result.removed) == tuple(hashes)
+
+
+def test_remove_by_hash_missing_raises_for_first_absent(s):
+    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))
+    add_axioms(s, [ax])
+    h = HashedAxiom.of(ax).hash
+    missing_a = AxiomHash("dead" + "0" * 60)
+    missing_b = AxiomHash("beef" + "0" * 60)
+
+    with pytest.raises(AxiomNotFoundError) as exc:
+        remove_by_hash(s, [h, missing_a, missing_b])
+    assert exc.value.needle == missing_a
+
+
+def test_list_selections_present_count_no_double_count(s):
+    # An entity referenced by multiple axioms must still count once.
+    add_axioms(
+        s,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Mammal")),
+        ],
+    )
+    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
+
+    listings = {ls.meta.name: ls for ls in list_selections(s)}
+    assert listings["sel"].present_count == 1
+
+
+def test_list_selections_entity_selection_unaffected_by_axiom_growth(s):
+    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
+    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    before = {ls.meta.name: ls.present_count for ls in list_selections(s)}
+
+    add_axioms(s, [SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))])
+    after = {ls.meta.name: ls.present_count for ls in list_selections(s)}
+
+    assert before["sel"] == after["sel"] == 1

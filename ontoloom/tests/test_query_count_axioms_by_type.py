@@ -121,10 +121,9 @@ def test_render_in_selection_entities():
     compiled = (CountAxiomsByType(constraints=(InSelection(ref=ref),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
-        "EXISTS (SELECT 1 FROM axiom_entities ae_w "
-        "WHERE ae_w.axiom_id = a.id "
-        "AND EXISTS (SELECT 1 FROM selection_items si_w "
-        "WHERE si_w.item = ae_w.entity_iri AND si_w.selection_name = ?)) "
+        "EXISTS (SELECT 1 FROM selection_items si_w "
+        "JOIN axiom_entities ae_w ON ae_w.entity_iri = si_w.item "
+        "WHERE si_w.selection_name = ? AND ae_w.axiom_id = a.id) "
         "GROUP BY a.type"
     )
     assert compiled.params == ("my_entity_sel",)

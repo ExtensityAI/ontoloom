@@ -124,7 +124,7 @@ def test_render_not_deprecated():
     assert compiled.sql == (
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {NOT_DEPRECATED}"
     )
-    assert compiled.params == ()
+    assert compiled.params == ("owl:deprecated",)
 
 
 def test_render_with_any_property():

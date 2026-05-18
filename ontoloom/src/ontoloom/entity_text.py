@@ -15,6 +15,11 @@ from ontoloom.owl.iri import RDFS_LABEL
 # (vs. real annotation-property values).
 LOCAL_NAME_PROPERTY = "local_name"
 
+# Compact form of `owl:deprecated`. The codebase stores IRIs as CURIEs
+# throughout, so this single literal is the only form seen by the property
+# column in `entity_text`. Used by the `NOT_DEPRECATED` predicate.
+OWL_DEPRECATED_PROPERTY = "owl:deprecated"
+
 _LABEL_BATCH_SIZE = 500
 
 

@@ -44,7 +44,7 @@ def test_render_default_show_all_no_pagination():
         "EXISTS (SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item) AS is_present "
         "FROM selection_items si "
         "WHERE si.selection_name = ? "
-        "ORDER BY si.rowid"
+        "ORDER BY si.item"
     )
     assert compiled.params == ("sel",)
 
@@ -66,7 +66,7 @@ def test_render_show_missing_uses_not_exists():
 
 def test_render_limit_and_offset():
     compiled = (ReadEntitySelection(selection=_ref("sel"), limit=5, offset=2)).render()
-    assert compiled.sql.endswith("ORDER BY si.rowid LIMIT ? OFFSET ?")
+    assert compiled.sql.endswith("ORDER BY si.item LIMIT ? OFFSET ?")
     assert compiled.params == ("sel", 5, 2)
 
 
@@ -137,7 +137,7 @@ def test_run_labels_populated_for_present_entities(s):
     assert page.items[0].label == "Dog"
 
 
-def test_run_pagination_in_insertion_order(s):
+def test_run_pagination_in_lexicographic_order(s):
     add_axioms(
         s,
         [
@@ -152,6 +152,7 @@ def test_run_pagination_in_insertion_order(s):
 
     full = (ReadEntitySelection(selection=_ref("sel")))._run(s)
     iris_full = [i.iri for i in full.items]
+    assert iris_full == [IRI("ex:Antelope"), IRI("ex:Mongoose"), IRI("ex:Zebra")]
 
     page1 = (ReadEntitySelection(selection=_ref("sel"), limit=2))._run(s)
     page2 = (ReadEntitySelection(selection=_ref("sel"), limit=2, offset=2))._run(s)

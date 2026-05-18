@@ -72,15 +72,26 @@ class ResolvedAxiom:
     json_data: str
 
 
+def _prefix_upper_bound(prefix: str) -> str:
+    """Lexicographic upper bound for `LIKE prefix || '%'` on a BINARY column.
+
+    Increments the last character of the prefix by one code point. The prefix
+    is constrained to lowercase hex by `AxiomHashPrefix`, so the increment
+    never wraps past printable ASCII (`'9' -> ':'`, `'a' -> 'b'`, ...).
+    """
+    return prefix[:-1] + chr(ord(prefix[-1]) + 1)
+
+
 def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
     """Resolve a hash prefix to a full axiom hash; raise on missing or ambiguous.
 
     Mutation paths in core take `AxiomHash` directly; prefix → full resolution
     happens at the MCP boundary (or any other adapter that takes user input).
     """
+    upper = _prefix_upper_bound(prefix)
     rows = s.conn.execute(
-        "SELECT hash FROM axioms WHERE hash LIKE ? || '%'",
-        (prefix,),
+        "SELECT hash FROM axioms WHERE hash >= ? AND hash < ?",
+        (prefix, upper),
     ).fetchall()
     if not rows:
         raise AxiomNotFoundError(prefix)
@@ -125,13 +136,28 @@ def _delete_axioms(s: Session, axioms: Sequence[HashedAxiom]):
 
 
 def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
-    to_remove: list[HashedAxiom] = []
-    for h in hashes:
-        resolved = _load_axiom_row(s, h)
-        axiom = load_axiom(
-            resolved.json_data, f"axiom {short_hash(resolved.hash)} in remove_by_hash"
+    if not hashes:
+        return RemoveResult(removed=())
+
+    placeholders = ",".join("?" for _ in hashes)
+    found: dict[AxiomHash, str] = {
+        AxiomHash(h): data
+        for h, data in s.conn.execute(
+            f"SELECT hash, json(data) FROM axioms WHERE hash IN ({placeholders})",
+            tuple(hashes),
         )
-        to_remove.append(HashedAxiom(axiom=axiom, hash=resolved.hash))
+    }
+    for h in hashes:
+        if h not in found:
+            raise AxiomNotFoundError(h)
+
+    to_remove = [
+        HashedAxiom(
+            axiom=load_axiom(found[h], f"axiom {short_hash(h)} in remove_by_hash"),
+            hash=h,
+        )
+        for h in hashes
+    ]
 
     _delete_axioms(s, to_remove)
     return RemoveResult(removed=tuple(to_remove))
@@ -147,18 +173,16 @@ def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelec
 
     to_remove: list[HashedAxiom] = []
     absent = 0
-    items = [
-        r[0]
-        for r in s.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", (bare,)
-        )
-    ]
-    for h in items:
-        row = s.conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
-        if row is None:
+    rows = s.conn.execute(
+        "SELECT si.item, a.hash, json(a.data) "
+        "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item "
+        "WHERE si.selection_name = ?",
+        (bare,),
+    )
+    for _item, full_hash, json_data in rows:
+        if full_hash is None:
             absent += 1
             continue
-        full_hash, json_data = row
         axiom = load_axiom(json_data, f"axiom {short_hash(full_hash)} in remove_by_selection")
         to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
