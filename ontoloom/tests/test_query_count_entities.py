@@ -6,24 +6,28 @@ from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query._constraints import (
+from ontoloom.query._predicates import DECLARED_EXISTS, DECLARED_NOT_EXISTS, NOT_DEPRECATED
+from ontoloom.query.constraints import (
     AlwaysFalse,
     Declared,
-    HasEntityRole,
+    Deprecated,
+    HasAnyProperty,
+    HasRole,
+    InIRIs,
     InNamespaces,
     InPositions,
     InSelection,
-    MentionedInAxioms,
-    NotDeprecated,
-    WithAnyProperty,
-    WithIRIs,
+    MentionedIn,
     WithRoles,
 )
-from ontoloom.query._selection_ref import ResolvedSelection
-from ontoloom.query.count_entities import CountEntities, _run, render
+from ontoloom.query.count_entities import CountEntities
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
-from ontoloom.text_index import DECLARED_EXISTS, DECLARED_NOT_EXISTS, NOT_DEPRECATED
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+    SelectionKind,
+    SelectionName,
+)
 
 # 64-char lowercase hex placeholder for AxiomHash construction in render snapshots.
 _HASH_A = "a" * 64
@@ -33,13 +37,13 @@ _HASH_A = "a" * 64
 
 
 def test_render_no_constraints():
-    compiled = render(CountEntities(constraints=()))
-    assert compiled.sql == "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae"
+    compiled = (CountEntities(constraints=())).render()
+    assert compiled.sql == "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE 1"
     assert compiled.params == ()
 
 
 def test_render_with_iris_single():
-    compiled = render(CountEntities(constraints=(WithIRIs(iris=(IRI("ex:A"),)),)))
+    compiled = (CountEntities(constraints=(InIRIs(iris=(IRI("ex:A"),)),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE ae.entity_iri IN (?)"
     )
@@ -47,7 +51,7 @@ def test_render_with_iris_single():
 
 
 def test_render_with_iris_many():
-    compiled = render(CountEntities(constraints=(WithIRIs(iris=(IRI("ex:B"), IRI("ex:A"))),)))
+    compiled = (CountEntities(constraints=(InIRIs(iris=(IRI("ex:B"), IRI("ex:A"))),))).render()
     # dedupe_sort sorts the iris
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE ae.entity_iri IN (?,?)"
@@ -56,11 +60,11 @@ def test_render_with_iris_many():
 
 
 def test_render_with_roles():
-    compiled = render(
+    compiled = (
         CountEntities(
             constraints=(WithRoles(roles=(EntityType.OBJECT_PROPERTY, EntityType.CLASS)),)
         )
-    )
+    ).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE ae.role IN (?,?)"
     )
@@ -69,7 +73,7 @@ def test_render_with_roles():
 
 
 def test_render_has_entity_role():
-    compiled = render(CountEntities(constraints=(HasEntityRole(),)))
+    compiled = (CountEntities(constraints=(HasRole(),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE ae.role IS NOT NULL"
     )
@@ -77,7 +81,7 @@ def test_render_has_entity_role():
 
 
 def test_render_in_namespaces_single():
-    compiled = render(CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)))
+    compiled = (CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         r"WHERE ae.entity_iri LIKE ? || ':%' ESCAPE '\'"
@@ -86,11 +90,11 @@ def test_render_in_namespaces_single():
 
 
 def test_render_in_namespaces_multi():
-    compiled = render(
+    compiled = (
         CountEntities(
             constraints=(InNamespaces(namespaces=(PrefixName("ex"), PrefixName("other"))),)
         )
-    )
+    ).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         r"WHERE (ae.entity_iri LIKE ? || ':%' ESCAPE '\' "
@@ -100,7 +104,7 @@ def test_render_in_namespaces_multi():
 
 
 def test_render_declared_true():
-    compiled = render(CountEntities(constraints=(Declared(state=True),)))
+    compiled = (CountEntities(constraints=(Declared(state=True),))).render()
     assert compiled.sql == (
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {DECLARED_EXISTS}"
     )
@@ -108,7 +112,7 @@ def test_render_declared_true():
 
 
 def test_render_declared_false():
-    compiled = render(CountEntities(constraints=(Declared(state=False),)))
+    compiled = (CountEntities(constraints=(Declared(state=False),))).render()
     assert compiled.sql == (
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {DECLARED_NOT_EXISTS}"
     )
@@ -116,7 +120,7 @@ def test_render_declared_false():
 
 
 def test_render_not_deprecated():
-    compiled = render(CountEntities(constraints=(NotDeprecated(),)))
+    compiled = (CountEntities(constraints=(Deprecated(state=False),))).render()
     assert compiled.sql == (
         f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {NOT_DEPRECATED}"
     )
@@ -124,9 +128,9 @@ def test_render_not_deprecated():
 
 
 def test_render_with_any_property():
-    compiled = render(
-        CountEntities(constraints=(WithAnyProperty(properties=(IRI("rdfs:label"),)),))
-    )
+    compiled = (
+        CountEntities(constraints=(HasAnyProperty(properties=(IRI("rdfs:label"),)),))
+    ).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE EXISTS (SELECT 1 FROM entity_text et_p "
@@ -137,7 +141,7 @@ def test_render_with_any_property():
 
 
 def test_render_mentioned_in_axioms():
-    compiled = render(CountEntities(constraints=(MentionedInAxioms(hashes=(AxiomHash(_HASH_A),)),)))
+    compiled = (CountEntities(constraints=(MentionedIn(hashes=(AxiomHash(_HASH_A),)),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE EXISTS (SELECT 1 FROM axioms a_m "
@@ -148,7 +152,7 @@ def test_render_mentioned_in_axioms():
 
 
 def test_render_in_positions():
-    compiled = render(CountEntities(constraints=(InPositions(positions=(Position.SUB_CLASS,)),)))
+    compiled = (CountEntities(constraints=(InPositions(positions=(Position.SUB_CLASS,)),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE ae.position IN (?)"
     )
@@ -156,8 +160,8 @@ def test_render_in_positions():
 
 
 def test_render_in_selection_entities():
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="my_sel")
-    compiled = render(CountEntities(constraints=(InSelection(ref=ref),)))
+    ref = EntitySelectionName("entities:my_sel")
+    compiled = (CountEntities(constraints=(InSelection(ref=ref),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE EXISTS (SELECT 1 FROM selection_items si_w "
@@ -168,8 +172,8 @@ def test_render_in_selection_entities():
 
 
 def test_render_in_selection_axioms():
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="my_axiom_sel")
-    compiled = render(CountEntities(constraints=(InSelection(ref=ref),)))
+    ref = AxiomSelectionName("axioms:my_axiom_sel")
+    compiled = (CountEntities(constraints=(InSelection(ref=ref),))).render()
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE EXISTS (SELECT 1 FROM selection_items si_w "
@@ -181,25 +185,26 @@ def test_render_in_selection_axioms():
 
 
 def test_render_always_false():
-    compiled = render(CountEntities(constraints=(AlwaysFalse(),)))
+    compiled = (CountEntities(constraints=(AlwaysFalse(),))).render()
     assert compiled.sql == "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE 0"
     assert compiled.params == ()
 
 
 def test_render_always_false_short_circuits_other_constraints():
     # Even with other constraints alongside AlwaysFalse, predicate is "0".
-    compiled = render(
-        CountEntities(constraints=(WithIRIs(iris=(IRI("ex:A"),)), AlwaysFalse(), HasEntityRole()))
-    )
+    compiled = (
+        CountEntities(constraints=(InIRIs(iris=(IRI("ex:A"),)), AlwaysFalse(), HasRole()))
+    ).render()
     assert compiled.sql == "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE 0"
     assert compiled.params == ()
 
 
 def test_render_conjunction():
-    compiled = render(CountEntities(constraints=(WithIRIs(iris=(IRI("ex:A"),)), HasEntityRole())))
+    compiled = (CountEntities(constraints=(InIRIs(iris=(IRI("ex:A"),)), HasRole()))).render()
+    # normalize sorts constraints by repr, so HasRole appears before InIRIs
     assert compiled.sql == (
         "SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
-        "WHERE ae.entity_iri IN (?) AND ae.role IS NOT NULL"
+        "WHERE ae.role IS NOT NULL AND ae.entity_iri IN (?)"
     )
     assert compiled.params == ("ex:A",)
 
@@ -208,7 +213,7 @@ def test_render_namespace_param_escapes_like_metacharacters():
     # PrefixName regex doesn't allow %/_, but the helper must still pass through
     # escape_like — verify it does by passing a value with no metacharacters
     # (no-op escape) and the binding equals the raw prefix.
-    compiled = render(CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)))
+    compiled = (CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))).render()
     assert compiled.params == ("ex",)
 
 
@@ -216,12 +221,12 @@ def test_render_namespace_param_escapes_like_metacharacters():
 
 
 def test_run_empty_ontology(s):
-    assert _run(s, CountEntities(constraints=())) == 0
+    assert (CountEntities(constraints=()))._run(s) == 0
 
 
 def test_run_single_declaration(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert _run(s, CountEntities(constraints=())) == 1
+    assert (CountEntities(constraints=()))._run(s) == 1
 
 
 def test_run_multiple_role_filter(s):
@@ -234,25 +239,13 @@ def test_run_multiple_role_filter(s):
         ],
     )
     # All entities (any role).
-    assert _run(s, CountEntities(constraints=(HasEntityRole(),))) == 3
+    assert (CountEntities(constraints=(HasRole(),)))._run(s) == 3
 
     # Classes only.
-    assert (
-        _run(
-            s,
-            CountEntities(constraints=(WithRoles(roles=(EntityType.CLASS,)),)),
-        )
-        == 2
-    )
+    assert CountEntities(constraints=(WithRoles(roles=(EntityType.CLASS,)),))._run(s) == 2
 
     # ObjectProperty only.
-    assert (
-        _run(
-            s,
-            CountEntities(constraints=(WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),)),
-        )
-        == 1
-    )
+    assert CountEntities(constraints=(WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),))._run(s) == 1
 
 
 def test_run_in_selection_entities(s):
@@ -271,8 +264,8 @@ def test_run_in_selection_entities(s):
         ["ex:Dog", "ex:Cat"],
         source="test",
     )
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="dogs_and_cats")
-    assert _run(s, CountEntities(constraints=(InSelection(ref=ref),))) == 2
+    ref = EntitySelectionName("entities:dogs_and_cats")
+    assert (CountEntities(constraints=(InSelection(ref=ref),)))._run(s) == 2
 
 
 def test_run_in_selection_axioms(s):
@@ -289,13 +282,13 @@ def test_run_in_selection_axioms(s):
         [dog_hash],
         source="test",
     )
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="dog_only")
-    assert _run(s, CountEntities(constraints=(InSelection(ref=ref),))) == 1
+    ref = AxiomSelectionName("axioms:dog_only")
+    assert (CountEntities(constraints=(InSelection(ref=ref),)))._run(s) == 1
 
 
 def test_run_always_false(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert _run(s, CountEntities(constraints=(AlwaysFalse(),))) == 0
+    assert (CountEntities(constraints=(AlwaysFalse(),)))._run(s) == 0
 
 
 def test_run_namespace_filter(s):
@@ -306,32 +299,23 @@ def test_run_namespace_filter(s):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("other:Fish")),
         ],
     )
+    assert CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))._run(s) == 1
     assert (
-        _run(
-            s,
-            CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)),
-        )
-        == 1
-    )
-    assert (
-        _run(
-            s,
-            CountEntities(
-                constraints=(InNamespaces(namespaces=(PrefixName("ex"), PrefixName("other"))),)
-            ),
-        )
+        CountEntities(
+            constraints=(InNamespaces(namespaces=(PrefixName("ex"), PrefixName("other"))),)
+        )._run(s)
         == 2
     )
 
 
 def test_run_normalize_runs_before_render(s):
-    # normalize_entity intersects two WithIRIs into one; the result is a
+    # normalize_entity intersects two InIRIs into one; the result is a
     # single-element set, and the SQL run should still match.
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     q = CountEntities(
         constraints=(
-            WithIRIs(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),
-            WithIRIs(iris=(IRI("ex:Dog"), IRI("ex:Fish"))),
+            InIRIs(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),
+            InIRIs(iris=(IRI("ex:Dog"), IRI("ex:Fish"))),
         )
     )
-    assert _run(s, q) == 1
+    assert q._run(s) == 1

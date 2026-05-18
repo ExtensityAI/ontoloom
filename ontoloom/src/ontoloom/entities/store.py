@@ -9,35 +9,36 @@ from ontoloom.entities.types import (
     MatchQuality,
     MatchSource,
 )
+from ontoloom.entity_text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query._constraints import (
+from ontoloom.query.constraints import (
     AxiomConstraint,
     Declared,
+    Deprecated,
     EntityConstraint,
-    HasEntityRole,
+    HasAnyProperty,
+    HasRole,
+    InIRIs,
     InNamespaces,
     InSelection,
     MentionsAll,
-    NotDeprecated,
-    WithAnyProperty,
-    WithIRIs,
     WithRoles,
 )
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
+from ontoloom.query.dispatch import run
 from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_entities import ListEntities
-from ontoloom.selections.types import SelectionKind
-from ontoloom.text_index import (
-    LOCAL_NAME_PROPERTY,
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+    SelectionRef,
 )
 from ontoloom.utils import dquoted
 
@@ -63,13 +64,13 @@ _TEXT_SCAN_CAP = 1000
 _NEAR_MATCH_LIMIT = 3
 
 
-def get_entity(s: Session, iri: IRI, *, within: ResolvedSelection | None = None) -> EntityInfo:
+def get_entity(s: Session, iri: IRI, *, within: AxiomSelectionName | None = None) -> EntityInfo:
     """Return entity details. Raises EntityNotFoundError (with near matches) on miss."""
     iri_str = str(iri)
 
     roles = {
         EntityType(r[0])
-        for r in s._conn.execute(
+        for r in s.conn.execute(
             "SELECT DISTINCT role FROM axiom_entities WHERE entity_iri = ? AND role IS NOT NULL",
             (iri_str,),
         )
@@ -77,7 +78,7 @@ def get_entity(s: Session, iri: IRI, *, within: ResolvedSelection | None = None)
 
     annotations = [
         AnnotationRow(property=IRI(r[0]), value=r[1])
-        for r in s._conn.execute(
+        for r in s.conn.execute(
             "SELECT DISTINCT property, text FROM entity_text "
             "WHERE entity_iri = ? AND property != ? "
             "ORDER BY property, text",
@@ -87,11 +88,7 @@ def get_entity(s: Session, iri: IRI, *, within: ResolvedSelection | None = None)
 
     axiom_count_constraints: tuple[AxiomConstraint, ...] = (
         MentionsAll(iris=(iri,)),
-        *(
-            (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),)
-            if within is not None
-            else ()
-        ),
+        *((InSelection(ref=within),) if within is not None else ()),
     )
     axiom_counts = run(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
@@ -104,16 +101,12 @@ def get_entity(s: Session, iri: IRI, *, within: ResolvedSelection | None = None)
 
 
 def axiom_hashes_for_entity(
-    s: Session, iri: IRI, *, within: ResolvedSelection | None = None
+    s: Session, iri: IRI, *, within: AxiomSelectionName | None = None
 ) -> list[AxiomHash]:
     """Return all axiom hashes for an entity."""
     constraints: tuple[AxiomConstraint, ...] = (
         MentionsAll(iris=(iri,)),
-        *(
-            (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),)
-            if within is not None
-            else ()
-        ),
+        *((InSelection(ref=within),) if within is not None else ()),
     )
     return run(s, ListAxiomHashes(constraints=constraints))
 
@@ -124,7 +117,7 @@ def search_entities(
     query: str | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
-    within: ResolvedSelection | None = None,
+    within: SelectionRef | None = None,
     declared: bool | None = None,
     properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
@@ -172,7 +165,7 @@ def collect_entity_iris(
     query: str | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
-    within: ResolvedSelection | None = None,
+    within: SelectionRef | None = None,
     declared: bool | None = None,
     properties: list[IRI] | None = None,
     exclude_deprecated: bool = True,
@@ -198,9 +191,9 @@ def collect_entity_iris(
     return [IRI(k) for k in matches]
 
 
-def entity_summary(s: Session, *, within: ResolvedSelection | None = None) -> EntitySummary:
+def entity_summary(s: Session, *, within: SelectionRef | None = None) -> EntitySummary:
     constraints: tuple[EntityConstraint, ...] = (
-        HasEntityRole(),
+        HasRole(),
         *((InSelection(ref=within),) if within is not None else ()),
     )
     total = run(s, CountEntities(constraints=constraints))
@@ -212,7 +205,7 @@ def find_duplicate_entities(
     s: Session,
     annotation_property: IRI,
     *,
-    within: ResolvedSelection | None = None,
+    within: EntitySelectionName | None = None,
 ) -> DuplicateResult:
     """Find annotation values shared by multiple entities."""
     return run(s, FindDuplicateEntities(annotation_property=annotation_property, within=within))
@@ -225,13 +218,13 @@ def _build_entity_constraints(
     *,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: ResolvedSelection | None,
+    within: SelectionRef | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
 ) -> tuple[EntityConstraint, ...]:
     """Build the constraint tuple for the non-text entity search path."""
-    constraints: list[EntityConstraint] = [HasEntityRole()]
+    constraints: list[EntityConstraint] = [HasRole()]
 
     if role is not None:
         constraints.append(WithRoles(roles=(role,)))
@@ -242,9 +235,9 @@ def _build_entity_constraints(
     if declared is not None:
         constraints.append(Declared(state=declared))
     if properties is not None:
-        constraints.append(WithAnyProperty(properties=tuple(properties)))
+        constraints.append(HasAnyProperty(properties=tuple(properties)))
     if exclude_deprecated:
-        constraints.append(NotDeprecated())
+        constraints.append(Deprecated(state=False))
 
     return tuple(constraints)
 
@@ -254,7 +247,7 @@ def _apply_text_filters(
     matches: dict[str, tuple[MatchSource, MatchQuality]],
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: ResolvedSelection | None,
+    within: SelectionRef | None,
     declared: bool | None,
     exclude_deprecated: bool,
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
@@ -262,7 +255,7 @@ def _apply_text_filters(
     if not matches:
         return matches
 
-    constraints: list[EntityConstraint] = [WithIRIs(iris=tuple(IRI(k) for k in matches))]
+    constraints: list[EntityConstraint] = [InIRIs(iris=tuple(IRI(k) for k in matches))]
 
     if within is not None:
         constraints.append(InSelection(ref=within))
@@ -273,7 +266,7 @@ def _apply_text_filters(
     if declared is not None:
         constraints.append(Declared(state=declared))
     if exclude_deprecated:
-        constraints.append(NotDeprecated())
+        constraints.append(Deprecated(state=False))
 
     surviving = set(run(s, ListEntities(constraints=tuple(constraints))))
 
@@ -284,7 +277,7 @@ def _list_entities(
     s: Session,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: ResolvedSelection | None,
+    within: SelectionRef | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
@@ -328,7 +321,7 @@ def _text_search_entities(
     query: str,
     role: EntityType | None,
     namespace: PrefixName | None,
-    within: ResolvedSelection | None,
+    within: SelectionRef | None,
     declared: bool | None,
     properties: list[IRI] | None,
     exclude_deprecated: bool,
@@ -378,14 +371,14 @@ def _batch_fetch_entity_display(s: Session, iris: list[str]):
     placeholders = ",".join("?" for _ in iris)
 
     roles_by_iri: dict[str, set[EntityType]] = {}
-    for iri_str, role_val in s._conn.execute(
+    for iri_str, role_val in s.conn.execute(
         f"SELECT entity_iri, role FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role IS NOT NULL",
         iris,
     ):
         roles_by_iri.setdefault(iri_str, set()).add(EntityType(role_val))
 
     anns_by_iri: dict[str, list[AnnotationRow]] = {}
-    for iri_str, prop, text in s._conn.execute(
+    for iri_str, prop, text in s.conn.execute(
         f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
         f"WHERE entity_iri IN ({placeholders}) AND property != ? "
         f"ORDER BY entity_iri, property, text",
@@ -434,14 +427,14 @@ def _find_text_matches(
     matches: dict[str, tuple[MatchSource, MatchQuality]] = {}
     query_lower = query.lower()
 
-    for (iri_str,) in s._conn.execute(
+    for (iri_str,) in s.conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND LOWER(text) = ? ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
         if iri_str not in matches:
             matches[iri_str] = (source_label, MatchQuality.EXACT)
 
-    for (iri_str,) in s._conn.execute(
+    for (iri_str,) in s.conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0 ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
@@ -455,7 +448,7 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     """Top n entities by number of distinct axioms they appear in."""
     return [
         (IRI(row[0]), row[1])
-        for row in s._conn.execute(
+        for row in s.conn.execute(
             "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
             "FROM axiom_entities ae "
             "GROUP BY ae.entity_iri "
@@ -468,7 +461,7 @@ def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
 
 def undeclared_entity_count(
     s: Session,
-    within: ResolvedSelection | None = None,
+    within: SelectionRef | None = None,
     *,
     exclude_deprecated: bool = True,
 ) -> int:
@@ -478,9 +471,9 @@ def undeclared_entity_count(
     Set False to count every undeclared entity including deprecated ones.
     """
     constraints: tuple[EntityConstraint, ...] = (
-        HasEntityRole(),
+        HasRole(),
         Declared(state=False),
-        *((NotDeprecated(),) if exclude_deprecated else ()),
+        *((Deprecated(state=False),) if exclude_deprecated else ()),
         *((InSelection(ref=within),) if within is not None else ()),
     )
     return run(s, CountEntities(constraints=constraints))

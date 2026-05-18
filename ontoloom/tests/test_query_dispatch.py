@@ -8,11 +8,11 @@ from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.constraints import InSelection
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
+from ontoloom.query.dispatch import run
 from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_axioms import ListAxioms
@@ -22,9 +22,12 @@ from ontoloom.query.read_entity_selection import ReadEntitySelection
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import (
+    AxiomSelectionName,
     AxiomSelectionPage,
+    EntitySelectionName,
     EntitySelectionPage,
     SelectionKind,
+    SelectionNotFoundError,
 )
 
 
@@ -98,7 +101,7 @@ def test_dispatch_read_axiom_selection(s):
     dog_hash = HashedAxiom.of(dog).hash
     upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, [dog_hash], "test")
 
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="ax_sel")
+    ref = AxiomSelectionName("axioms:ax_sel")
     result = run(s, ReadAxiomSelection(selection=ref))
     assert isinstance(result, AxiomSelectionPage)
     assert result.meta.size == 1
@@ -108,7 +111,7 @@ def test_dispatch_read_entity_selection(s):
     _seed(s)
     upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="ent_sel")
+    ref = EntitySelectionName("entities:ent_sel")
     result = run(s, ReadEntitySelection(selection=ref))
     assert isinstance(result, EntitySelectionPage)
     assert result.meta.size == 1
@@ -122,6 +125,40 @@ def test_dispatch_find_duplicate_entities(s):
     assert result.affected_iris == ()
 
 
-def test_dispatch_unknown_type_raises(s):
-    with pytest.raises(ValueError, match="unknown query type"):
-        run(s, object())  # pyright: ignore[reportCallIssue]
+def test_run_raises_on_nonexistent_selection_ref_in_constraints(s):
+    ref = EntitySelectionName("entities:does_not_exist")
+
+    with pytest.raises(SelectionNotFoundError):
+        run(s, ListEntities(constraints=(InSelection(ref=ref),)))
+
+
+def test_run_raises_on_nonexistent_selection_in_read_axiom_selection(s):
+    ref = AxiomSelectionName("axioms:does_not_exist")
+
+    with pytest.raises(SelectionNotFoundError):
+        run(s, ReadAxiomSelection(selection=ref))
+
+
+def test_run_raises_on_nonexistent_within_in_find_duplicates(s):
+    ref = EntitySelectionName("entities:does_not_exist")
+
+    with pytest.raises(SelectionNotFoundError):
+        run(s, FindDuplicateEntities(annotation_property=IRI("rdfs:label"), within=ref))
+
+
+def test_read_axiom_selection_rejects_entity_ref():
+    # Pyright catches `selection: AxiomSelectionName` at the callsite;
+    # Pydantic enforces it at runtime.
+    from pydantic import ValidationError
+
+    entity_ref = EntitySelectionName("entities:foo")
+    with pytest.raises(ValidationError):
+        ReadAxiomSelection(selection=entity_ref)  # pyright: ignore[reportArgumentType]
+
+
+def test_read_entity_selection_rejects_axiom_ref():
+    from pydantic import ValidationError
+
+    axiom_ref = AxiomSelectionName("axioms:foo")
+    with pytest.raises(ValidationError):
+        ReadEntitySelection(selection=axiom_ref)  # pyright: ignore[reportArgumentType]

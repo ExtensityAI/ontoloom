@@ -5,20 +5,20 @@ from ontoloom.selections.store import read_selection as core_read_selection
 from ontoloom.selections.types import (
     AxiomSelectionPage,
     EntitySelectionPage,
-    SelectionName,
+    SelectionRef,
     ShowFilter,
 )
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_axiom_annotations
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
+from ontoloom_mcp.components.locking import format_locked
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
 
 def read_selection(
     path: OntologyPath,
-    name: SelectionRefParam,
+    name: SelectionRef,
     limit: Limit = 20,
     offset: Offset = 0,
     show: ShowFilter = ShowFilter.ALL,
@@ -38,14 +38,12 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        page = core_read_selection(
-            s, SelectionName(name.bare_name), limit=limit, offset=offset, show=show
-        )
+        page = core_read_selection(s, name.bare, limit=limit, offset=offset, show=show)
         s.commit()
 
     meta = page.meta
     header = (
-        f"Selection {dquoted(meta.locked)} ({meta.kind}): "
+        f"Selection {dquoted(format_locked(meta))} ({meta.kind}): "
         f"{meta.size} total ({page.present} present, {page.missing} missing)"
     )
 

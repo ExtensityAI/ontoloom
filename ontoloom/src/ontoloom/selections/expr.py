@@ -9,7 +9,7 @@ Examples:
     {"diff": ["sel_a", "sel_b"]}
     {"axioms_for": "ents"}
     {"axioms_for": {"union": ["ents_a", "ents_b"]}}
-    {"entities_in": "axs", "field": "sub_class"}
+    {"entities_in": "axs", "position": "sub_class"}
 """
 
 from typing import Annotated, Any, override
@@ -55,12 +55,12 @@ class AxiomsForExpr(FrozenModel):
 
 class EntitiesInExpr(FrozenModel):
     entities_in: "SetOperand"
-    field: Position | None = None
+    position: Position | None = None
 
     @override
     def __str__(self):
-        if self.field is not None:
-            return f"entities_in({self.entities_in}, field={self.field})"
+        if self.position is not None:
+            return f"entities_in({self.entities_in}, position={self.position})"
         return f"entities_in({self.entities_in})"
 
 

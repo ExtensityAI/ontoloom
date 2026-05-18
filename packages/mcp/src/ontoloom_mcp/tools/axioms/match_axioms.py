@@ -3,11 +3,15 @@ from ontoloom.connection import Ontology, session
 from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection, resolve_selection
+from ontoloom.query.dispatch import run
 from ontoloom.query.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName, ShowFilter
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    SelectionKind,
+    SelectionRef,
+    ShowFilter,
+)
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
@@ -17,7 +21,7 @@ from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
     format_selection_result,
 )
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
+from ontoloom_mcp.components.locking import format_locked
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -25,8 +29,8 @@ from ontoloom_mcp.components.types import Limit, OntologyPath
 def match_axioms(
     path: OntologyPath,
     pattern: Pattern,
-    into: SelectionRefParam,
-    within: SelectionRefParam | None = None,
+    into: AxiomSelectionName,
+    within: SelectionRef | None = None,
     limit: Limit = 100,
 ):
     """Find axioms matching a structural pattern; save matches to an axiom selection.
@@ -50,22 +54,18 @@ def match_axioms(
       `"entities:my_ents"`) to restrict the search to.
     - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
     """
-    if into.kind != SelectionKind.AXIOMS:
-        msg = f"match_axioms produces an AXIOMS selection; got 'into={into}' with kind={into.kind}"
-        raise ValueError(msg)
-
     ont = Ontology(path)
     with session(ont) as s:
-        resolved_within = resolve_selection(s, within) if within is not None else None
-        result = core_match(s, pattern, within=resolved_within, limit=limit)
+        result = core_match(s, pattern, within=within, limit=limit)
         upserted = upsert_selection(
             s,
-            SelectionName(into.bare_name),
+            into.bare,
             SelectionKind.AXIOMS,
             result.axiom_hashes,
             "match_axioms",
         )
         sel = upserted.selection
+        sel_locked = format_locked(sel)
 
         truncated_hint = (
             f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
@@ -74,13 +74,13 @@ def match_axioms(
 
         if not result.axiom_hashes:
             s.commit()
-            return f"{header} -> {dquoted(sel.locked)}."
+            return f"{header} -> {dquoted(sel_locked)}."
 
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = run(
             s,
             ReadAxiomSelection(
-                selection=ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name=str(sel.name)),
+                selection=AxiomSelectionName(f"axioms:{sel.name}"),
                 limit=page_size,
                 offset=0,
                 show=ShowFilter.ALL,

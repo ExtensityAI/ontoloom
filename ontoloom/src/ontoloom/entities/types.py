@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import EntityType
+from ontoloom.owl.markers import AxiomTag, EntityType
 
 
 class MatchSource(StrEnum):
@@ -39,7 +39,7 @@ class EntitySummary:
 class EntityInfo:
     roles: frozenset[EntityType]
     annotations: tuple[AnnotationRow, ...]
-    axiom_counts: Counter[str]
+    axiom_counts: Counter[AxiomTag]
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,13 +3,12 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import axiom_hashes_for_entity
 from ontoloom.entities.store import get_entity as core_get_entity
 from ontoloom.owl.iri import IRI
-from ontoloom.query._selection_ref import resolve_selection
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.types import AxiomSelectionName, SelectionKind
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import build_refs, format_entity_inspect
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
+from ontoloom_mcp.components.locking import format_locked
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -17,40 +16,32 @@ from ontoloom_mcp.components.types import OntologyPath
 def get_entity(
     path: OntologyPath,
     iri: IRI,
-    into: SelectionRefParam | None = None,
-    within: SelectionRefParam | None = None,
+    into: AxiomSelectionName | None = None,
+    within: AxiomSelectionName | None = None,
 ):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
 
     Does NOT include inherited or inferred information.
     Use `match_axioms` to see the full axiom details.
 
-    - `within`: Scope to a named axiom selection (e.g. `"axioms:my_sel"`);
-      entity selections raise.
+    - `within`: Scope to a named axiom selection (e.g. `"axioms:my_sel"`).
     - `into`: Save this entity's axiom hashes under the given axiom selection
       (e.g. `"axioms:dog_axioms"`). Entry point for "I want to work on this
       entity's axioms" -> then use `match_axioms(within=...)` or
       `remove_axioms(within=...)` on the result.
     """
-    if into is not None and into.kind != SelectionKind.AXIOMS:
-        msg = f"get_entity produces an AXIOMS selection; got 'into={into}' with kind={into.kind}"
-        raise ValueError(msg)
-
     ont = Ontology(path)
     with session(ont) as s:
-        resolved = resolve_selection(s, within) if within is not None else None
-        info = core_get_entity(s, iri, within=resolved)
+        info = core_get_entity(s, iri, within=within)
         ref = build_refs(s, [iri])[0]
         result = format_entity_inspect(ref, info)
 
         if into is not None:
-            hashes = axiom_hashes_for_entity(s, iri, within=resolved)
+            hashes = axiom_hashes_for_entity(s, iri, within=within)
             source = f"get_entity(iri={dquoted(iri)})"
-            upserted = upsert_selection(
-                s, SelectionName(into.bare_name), SelectionKind.AXIOMS, hashes, source
-            )
+            upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
             sel = upserted.selection
-            sel_msg = f"\n\n{sel.size} axiom hashes -> {dquoted(sel.locked)}."
+            sel_msg = f"\n\n{sel.size} axiom hashes -> {dquoted(format_locked(sel))}."
             if upserted.previous_size is not None:
                 sel_msg += f" Overwrote previous ({upserted.previous_size} items)."
             result += sel_msg

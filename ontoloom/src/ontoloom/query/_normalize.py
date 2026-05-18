@@ -2,28 +2,36 @@
 
 from collections.abc import Callable, Sequence
 
-from ontoloom.query._constraints import (
+from ontoloom.query.constraints import (
+    _MENTIONS_ALL_CAP,
     AlwaysFalse,
     AxiomConstraint,
     Declared,
+    Deprecated,
     EntityConstraint,
-    HasEntityRole,
+    HasAnyProperty,
+    HasRole,
+    InIRIs,
     InNamespaces,
     InPositions,
     InSelection,
-    MentionedInAxioms,
+    MentionedIn,
     MentionsAll,
+    MentionsAllOverflowError,
     MentionsAny,
-    NotDeprecated,
-    OfTypes,
-    WithAnyProperty,
-    WithIRIs,
     WithRoles,
+    WithTypes,
 )
+from ontoloom.utils import dedupe
 
 
 class _EmptyIntersectionError(Exception):
-    """Raised by _intersect when the intersection of collection-field values is empty."""
+    """Raised by _intersect when the intersection of collection-field values is empty.
+
+    Module-private control-flow signal; caught inside the same `normalize_*` call
+    and converted to `(AlwaysFalse(),)`. Never escapes this module — kept as bare
+    `Exception` (not `OntoloomError`-rooted) to make that explicit.
+    """
 
 
 def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, ...]:  # noqa: C901
@@ -35,14 +43,14 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
     if not cs:
         return ()
 
-    with_iris: list[WithIRIs] = []
+    in_iris: list[InIRIs] = []
     with_roles: list[WithRoles] = []
-    has_entity_role: list[HasEntityRole] = []
+    has_role: list[HasRole] = []
     in_namespaces: list[InNamespaces] = []
     declared: list[Declared] = []
-    not_deprecated: list[NotDeprecated] = []
-    with_any_property: list[WithAnyProperty] = []
-    mentioned_in_axioms: list[MentionedInAxioms] = []
+    deprecated: list[Deprecated] = []
+    has_any_property: list[HasAnyProperty] = []
+    mentioned_in: list[MentionedIn] = []
     in_positions: list[InPositions] = []
     in_selection: list[InSelection] = []
 
@@ -50,26 +58,29 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
         if isinstance(c, AlwaysFalse):
             return (AlwaysFalse(),)
 
-        if isinstance(c, WithIRIs):
-            with_iris.append(c)
+        if isinstance(c, InIRIs):
+            in_iris.append(c)
         elif isinstance(c, WithRoles):
             with_roles.append(c)
-        elif isinstance(c, HasEntityRole):
-            has_entity_role.append(c)
+        elif isinstance(c, HasRole):
+            has_role.append(c)
         elif isinstance(c, InNamespaces):
             in_namespaces.append(c)
         elif isinstance(c, Declared):
             declared.append(c)
-        elif isinstance(c, NotDeprecated):
-            not_deprecated.append(c)
-        elif isinstance(c, WithAnyProperty):
-            with_any_property.append(c)
-        elif isinstance(c, MentionedInAxioms):
-            mentioned_in_axioms.append(c)
+        elif isinstance(c, Deprecated):
+            deprecated.append(c)
+        elif isinstance(c, HasAnyProperty):
+            has_any_property.append(c)
+        elif isinstance(c, MentionedIn):
+            mentioned_in.append(c)
         elif isinstance(c, InPositions):
             in_positions.append(c)
         elif isinstance(c, InSelection):
             in_selection.append(c)
+        else:
+            msg = f"unknown entity constraint variant: {type(c).__name__}"
+            raise ValueError(msg)
 
     if len(in_selection) > 1:
         msg = "a query may have at most one selection scope"
@@ -81,7 +92,7 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
         result.append(in_selection[0])
 
     try:
-        iris_merged = _intersect(with_iris, "iris", lambda v: WithIRIs(iris=tuple(v)))
+        iris_merged = _intersect(in_iris, "iris", lambda v: InIRIs(iris=tuple(v)))
         if iris_merged is not None:
             result.append(iris_merged)
 
@@ -104,8 +115,8 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
         return (AlwaysFalse(),)
 
     # Non-mergeable: dedupe exact-value-equal duplicates only.
-    result.extend(_dedupe(with_any_property))
-    result.extend(_dedupe(mentioned_in_axioms))
+    result.extend(dedupe(has_any_property))
+    result.extend(dedupe(mentioned_in))
 
     # Declared: same state → dedupe; different states → AlwaysFalse.
     if declared:
@@ -116,12 +127,18 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
 
         result.append(Declared(state=next(iter(states))))
 
-    # Nullary variants: dedupe to one.
-    if has_entity_role:
-        result.append(HasEntityRole())
+    # Deprecated: same state → dedupe; different states → AlwaysFalse.
+    if deprecated:
+        states = {d.state for d in deprecated}
 
-    if not_deprecated:
-        result.append(NotDeprecated())
+        if len(states) > 1:
+            return (AlwaysFalse(),)
+
+        result.append(Deprecated(state=next(iter(states))))
+
+    # Nullary variants: dedupe to one.
+    if has_role:
+        result.append(HasRole())
 
     return tuple(sorted(result, key=repr))
 
@@ -135,7 +152,7 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
     if not cs:
         return ()
 
-    of_types: list[OfTypes] = []
+    with_types: list[WithTypes] = []
     mentions_all: list[MentionsAll] = []
     mentions_any: list[MentionsAny] = []
     in_selection: list[InSelection] = []
@@ -144,14 +161,17 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
         if isinstance(c, AlwaysFalse):
             return (AlwaysFalse(),)
 
-        if isinstance(c, OfTypes):
-            of_types.append(c)
+        if isinstance(c, WithTypes):
+            with_types.append(c)
         elif isinstance(c, MentionsAll):
             mentions_all.append(c)
         elif isinstance(c, MentionsAny):
             mentions_any.append(c)
         elif isinstance(c, InSelection):
             in_selection.append(c)
+        else:
+            msg = f"unknown axiom constraint variant: {type(c).__name__}"
+            raise ValueError(msg)
 
     if len(in_selection) > 1:
         msg = "a query may have at most one selection scope"
@@ -163,20 +183,22 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
         result.append(in_selection[0])
 
     try:
-        types_merged = _intersect(of_types, "tags", lambda v: OfTypes(tags=tuple(v)))
+        types_merged = _intersect(with_types, "tags", lambda v: WithTypes(tags=tuple(v)))
         if types_merged is not None:
             result.append(types_merged)
     except _EmptyIntersectionError:
         return (AlwaysFalse(),)
 
-    # MentionsAll: union IRI collections. Pydantic raises ValidationError if the
-    # union exceeds the 8-IRI cap; that is a caller bug.
     if mentions_all:
         union = sorted({iri for m in mentions_all for iri in m.iris})
+
+        if len(union) > _MENTIONS_ALL_CAP:
+            raise MentionsAllOverflowError(count=len(union), cap=_MENTIONS_ALL_CAP)
+
         result.append(MentionsAll(iris=tuple(union)))
 
     # Non-mergeable: dedupe exact-value-equal duplicates only.
-    result.extend(_dedupe(mentions_any))
+    result.extend(dedupe(mentions_any))
 
     return tuple(sorted(result, key=repr))
 
@@ -209,14 +231,3 @@ def _intersect[C, V: str](
         raise _EmptyIntersectionError
 
     return build(sorted(intersection))
-
-
-def _dedupe[C](instances: list[C]) -> list[C]:
-    """Return instances with exact-value-equal duplicates removed, preserving first-seen order."""
-    seen: list[C] = []
-
-    for inst in instances:
-        if inst not in seen:
-            seen.append(inst)
-
-    return seen

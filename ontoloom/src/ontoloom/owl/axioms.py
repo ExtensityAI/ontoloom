@@ -12,7 +12,7 @@ from ontoloom.owl.literals import (
     LiteralValue,
     TypedLiteral,
 )
-from ontoloom.owl.markers import EntityType, Position, Unordered
+from ontoloom.owl.markers import AxiomTag, EntityType, Position, Unordered
 
 
 class BaseAxiom(FrozenModel):
@@ -581,6 +581,15 @@ _AXIOM_CLASSES = (
     DifferentIndividuals,
 )
 _get_axiom_tag = make_tag_resolver(_AXIOM_CLASSES, union_name="Axiom")
+
+
+_TAGS = frozenset(t.value for t in AxiomTag)
+_CLASS_NAMES = frozenset(cls.__name__ for cls in _AXIOM_CLASSES)
+if _TAGS != _CLASS_NAMES:
+    _missing = _CLASS_NAMES - _TAGS
+    _extra = _TAGS - _CLASS_NAMES
+    msg = f"AxiomTag/_AXIOM_CLASSES drift — missing tags: {_missing}; extra tags: {_extra}"
+    raise RuntimeError(msg)
 
 
 Axiom = Annotated[

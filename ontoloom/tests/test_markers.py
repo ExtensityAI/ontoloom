@@ -1,6 +1,7 @@
 from typing import Annotated, Literal
 
 from ontoloom.owl.markers import (
+    AxiomTag,
     EntityType,
     Position,
     Unordered,
@@ -48,3 +49,9 @@ def test_axiom_tag_classmethod():
 
     assert Declaration.tag() == "Declaration"
     assert SubClassOf.tag() == "SubClassOf"
+
+
+def test_axiom_tag_matches_axiom_classes():
+    from ontoloom.owl.axioms import _AXIOM_CLASSES
+
+    assert {cls.__name__ for cls in _AXIOM_CLASSES} == {t.value for t in AxiomTag}

@@ -1,3 +1,10 @@
+"""Selection persistence and set-expression evaluation.
+
+Core mutations do not perform optimistic-lock checks: callers needing
+LLM-context staleness mitigation wrap mutations in `verify_lock` at the MCP
+boundary. Multi-process callers need real transactions, not hash prefixes.
+"""
+
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -9,14 +16,13 @@ from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import Position
-from ontoloom.query._constraints import (
+from ontoloom.query.constraints import (
     EntityConstraint,
     InPositions,
-    MentionedInAxioms,
+    MentionedIn,
     MentionsAny,
 )
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.read_axiom_selection import ReadAxiomSelection
@@ -30,21 +36,20 @@ from ontoloom.selections.expr import (
     SetOperand,
     UnionExpr,
 )
+from ontoloom.selections.metadata import get_selection_meta
 from ontoloom.selections.types import (
+    AxiomSelectionName,
     AxiomSelectionPage,
+    EntitySelectionName,
     EntitySelectionPage,
-    LockedSelection,
     SelectionContentHash,
     SelectionExprError,
     SelectionKind,
-    SelectionKindError,
     SelectionListing,
     SelectionMeta,
     SelectionName,
-    SelectionNotFoundError,
     SetOp,
     ShowFilter,
-    StaleSelectionError,
 )
 from ontoloom.utils import dedupe, dquoted
 
@@ -77,57 +82,9 @@ def _hash_selection_items(items: list[str]) -> SelectionContentHash:
     return SelectionContentHash(hashlib.sha256(content.encode()).hexdigest()[:16])
 
 
-def get_selection(s: Session, name: SelectionName):
+def get_selection(s: Session, name: SelectionName) -> SelectionMeta:
     """Get selection metadata. Raises SelectionNotFoundError if not found."""
-    row = s._conn.execute(
-        "SELECT kind, hash, size, source FROM selections WHERE name = ?", (name,)
-    ).fetchone()
-    if row is None:
-        raise SelectionNotFoundError(name)
-    return SelectionMeta(
-        name=name,
-        kind=SelectionKind(row[0]),
-        hash=SelectionContentHash(row[1]),
-        size=row[2],
-        source=row[3],
-    )
-
-
-def get_locked_selection(s: Session, locked: LockedSelection):
-    """Fetch a selection by name, requiring its current hash to match `locked.hash_prefix`.
-
-    Raises StaleSelectionError if the lock doesn't match.
-    """
-    sel = get_selection(s, locked.name)
-
-    if not sel.hash.startswith(locked.hash_prefix):
-        raise StaleSelectionError(locked.name, locked.hash_prefix, sel.hash, sel.size)
-
-    return sel
-
-
-def require_locked_selection(
-    s: Session,
-    within: LockedSelection,
-    expected_kind: SelectionKind,
-    operation: str,
-) -> SelectionMeta:
-    """Lock-check `within` and require its kind matches.
-
-    Raises:
-        StaleSelectionError: if `within.hash_prefix` no longer matches.
-        SelectionKindError: if the selection exists but is the wrong kind.
-    """
-    sel = get_locked_selection(s, within)
-
-    if sel.kind != expected_kind:
-        raise SelectionKindError(
-            name=within.name,
-            expected=expected_kind,
-            actual=sel.kind,
-            operation=operation,
-        )
-    return sel
+    return get_selection_meta(s, name)
 
 
 def upsert_selection(
@@ -136,8 +93,6 @@ def upsert_selection(
     kind: SelectionKind,
     items: Sequence[str],
     source: str,
-    *,
-    if_hash: str | None = None,
 ) -> UpsertResult:
     """Write a selection, overwriting if it exists.
 
@@ -146,38 +101,27 @@ def upsert_selection(
     intersection, difference) pre-sort before calling upsert, so their
     insertion order is also sorted order.
 
-    With `if_hash=None` (default), unconditional overwrite -> last writer wins,
-    even if another agent has written since you last read.
-
-    With `if_hash` supplied, the existing selection's hash must start with the
-    given prefix; otherwise `StaleSelectionError` is raised. Use this when the
-    caller has a lock-and-update flow and wants to detect concurrent overwrites.
+    Unconditional overwrite -> last writer wins, even if another agent has
+    written since you last read. Optimistic locking (hash-prefix check) is a
+    MCP-layer concern; callers needing it wrap this with `verify_lock`.
     """
     items = dedupe(items)
     content_hash = _hash_selection_items(items)
     size = len(items)
 
-    existing = s._conn.execute(
+    existing = s.conn.execute(
         "SELECT size, hash FROM selections WHERE name = ?", (name,)
     ).fetchone()
 
-    if if_hash is not None and (existing is None or not existing[1].startswith(if_hash)):
-        raise StaleSelectionError(
-            name,
-            if_hash,
-            existing[1] if existing else None,
-            existing[0] if existing else None,
-        )
-
-    s._conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
-    s._conn.execute("DELETE FROM selections WHERE name = ?", (name,))
-    s._conn.execute(
+    s.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
+    s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+    s.conn.execute(
         "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
         (name, kind, content_hash, size, source),
     )
 
     if items:
-        s._conn.executemany(
+        s.conn.executemany(
             "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
             [(name, item) for item in items],
         )
@@ -210,7 +154,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
             size=r[3],
             source=r[4],
         )
-        for r in s._conn.execute(
+        for r in s.conn.execute(
             "SELECT name, kind, hash, size, source FROM selections ORDER BY created_at, name"
         )
     ]
@@ -221,7 +165,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
     # Batched present-count queries — one per kind. Selections with zero items
     # produce count=0 via the LEFT JOIN's NULL row.
     axiom_present: dict[str, int] = dict(
-        s._conn.execute(
+        s.conn.execute(
             "SELECT s.name, COUNT(a.hash) "
             "FROM selections s "
             "LEFT JOIN selection_items si ON si.selection_name = s.name "
@@ -232,7 +176,7 @@ def list_selections(s: Session) -> list[SelectionListing]:
         )
     )
     entity_present: dict[str, int] = dict(
-        s._conn.execute(
+        s.conn.execute(
             "SELECT s.name, COUNT(DISTINCT CASE WHEN ae.entity_iri IS NOT NULL THEN si.item END) "
             "FROM selections s "
             "LEFT JOIN selection_items si ON si.selection_name = s.name "
@@ -265,11 +209,26 @@ def read_selection(
     show: ShowFilter = ShowFilter.ALL,
 ) -> AxiomSelectionPage | EntitySelectionPage:
     sel = get_selection(s, name)
-    ref = ResolvedSelection(kind=sel.kind, bare_name=str(name))
 
     if sel.kind == SelectionKind.AXIOMS:
-        return run(s, ReadAxiomSelection(selection=ref, limit=limit, offset=offset, show=show))
-    return run(s, ReadEntitySelection(selection=ref, limit=limit, offset=offset, show=show))
+        return run(
+            s,
+            ReadAxiomSelection(
+                selection=AxiomSelectionName(f"axioms:{name}"),
+                limit=limit,
+                offset=offset,
+                show=show,
+            ),
+        )
+    return run(
+        s,
+        ReadEntitySelection(
+            selection=EntitySelectionName(f"entities:{name}"),
+            limit=limit,
+            offset=offset,
+            show=show,
+        ),
+    )
 
 
 def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[DroppedSelection]:
@@ -279,13 +238,13 @@ def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[Dropped
     placeholders = ",".join("?" for _ in names)
     dropped = [
         DroppedSelection(name=SelectionName(r[0]), size=r[1])
-        for r in s._conn.execute(
+        for r in s.conn.execute(
             f"SELECT name, size FROM selections WHERE name IN ({placeholders}) ORDER BY name",
             tuple(names),
         )
     ]
     if dropped:
-        s._conn.execute(
+        s.conn.execute(
             f"DELETE FROM selections WHERE name IN ({placeholders})",
             tuple(names),
         )
@@ -315,7 +274,7 @@ def _eval_expr(s: Session, expr: SetOperand) -> tuple[Sequence[str], SelectionKi
         sel = get_selection(s, SelectionName(expr))
         items = [
             r[0]
-            for r in s._conn.execute(
+            for r in s.conn.execute(
                 "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
                 (expr,),
             )
@@ -341,7 +300,7 @@ def _eval_expr(s: Session, expr: SetOperand) -> tuple[Sequence[str], SelectionKi
         if kind != SelectionKind.AXIOMS:
             msg = f"`entities_in` requires an axiom expression; operand is {kind}."
             raise SelectionExprError(msg)
-        return _entities_in(s, items, expr.field), SelectionKind.ENTITIES
+        return _entities_in(s, items, expr.position), SelectionKind.ENTITIES
 
     msg = f"Unknown SetExpr variant: {type(expr).__name__}"
     raise ValueError(msg)
@@ -399,7 +358,7 @@ def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None
     if not axiom_hashes:
         return []
     constraints: list[EntityConstraint] = [
-        MentionedInAxioms(hashes=tuple(AxiomHash(h) for h in axiom_hashes))
+        MentionedIn(hashes=tuple(AxiomHash(h) for h in axiom_hashes))
     ]
     if field is not None:
         constraints.append(InPositions(positions=(field,)))

@@ -16,18 +16,19 @@ from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import AxiomTag
 from ontoloom.patterns.match import match_pattern
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
-from ontoloom.query._constraints import (
+from ontoloom.query.constraints import (
     AxiomConstraint,
     InSelection,
     MentionsAll,
-    OfTypes,
+    WithTypes,
 )
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
+from ontoloom.selections.types import SelectionRef
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,7 +46,7 @@ def match_axioms(
     s: Session,
     pattern: BasePattern,
     *,
-    within: ResolvedSelection | None = None,
+    within: SelectionRef | None = None,
     limit: int | None = None,
 ) -> MatchResult:
     """Find axioms matching a pattern. Returns matched hashes.
@@ -104,15 +105,15 @@ def _has_class_expression_field(cls: type) -> bool:
     )
 
 
-_EXPRESSION_CONTAINER_TYPES = frozenset(
-    cls.tag() for cls in _AXIOM_CLASSES if _has_class_expression_field(cls)
+_EXPRESSION_CONTAINER_TYPES: tuple[AxiomTag, ...] = tuple(
+    AxiomTag(cls.__name__) for cls in _AXIOM_CLASSES if _has_class_expression_field(cls)
 )
 
 
 def _iter_candidates(
     s: Session,
     pattern: BasePattern,
-    within: ResolvedSelection | None,
+    within: SelectionRef | None,
 ) -> AbstractContextManager[Iterator[tuple[AxiomHash, str]]]:
     """Stream candidate axioms from DB, narrowed by type and scope.
 
@@ -122,9 +123,9 @@ def _iter_candidates(
     constraints: list[AxiomConstraint] = []
 
     if isinstance(pattern, _EXPRESSION_PATTERN_CLASSES):
-        constraints.append(OfTypes(tags=tuple(sorted(_EXPRESSION_CONTAINER_TYPES))))
+        constraints.append(WithTypes(tags=tuple(sorted(_EXPRESSION_CONTAINER_TYPES))))
     else:
-        constraints.append(OfTypes(tags=(pattern.axiom_tag(),)))
+        constraints.append(WithTypes(tags=(AxiomTag(pattern.axiom_tag()),)))
 
     concrete_iris = _extract_concrete_iris(pattern)
     if concrete_iris[:3]:

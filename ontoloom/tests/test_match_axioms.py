@@ -22,9 +22,8 @@ from ontoloom.patterns.types import (
     SubObjectPropertyOfChainPattern,
     TupleMatch,
 )
-from ontoloom.query._selection_ref import ResolvedSelection
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionKind
 
 
 @pytest.fixture()
@@ -54,7 +53,7 @@ def test_axiom_type_filter(populated):
     result = match_axioms(populated, pattern)
     assert len(result.axiom_hashes) == 2
     for h in result.axiom_hashes:
-        row = populated._conn.execute("SELECT type FROM axioms WHERE hash = ?", (h,)).fetchone()
+        row = populated.conn.execute("SELECT type FROM axioms WHERE hash = ?", (h,)).fetchone()
         assert row is not None
         assert row[0] == "SubClassOf"
 
@@ -78,7 +77,7 @@ def test_expression_level_hits_container_types_not_declarations(populated):
     assert len(result.axiom_hashes) > 0
 
     for h in result.axiom_hashes:
-        row = populated._conn.execute("SELECT type FROM axioms WHERE hash = ?", (h,)).fetchone()
+        row = populated.conn.execute("SELECT type FROM axioms WHERE hash = ?", (h,)).fetchone()
         assert row is not None
         assert row[0] != "Declaration"
 
@@ -93,7 +92,7 @@ def test_within_axiom_selection(populated):
     result = match_axioms(
         populated,
         pattern,
-        within=ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="dog_only"),
+        within=AxiomSelectionName("axioms:dog_only"),
     )
     assert len(result.axiom_hashes) == 1
     assert result.axiom_hashes[0] == dog_hash
@@ -106,7 +105,7 @@ def test_within_entity_selection(populated):
     result = match_axioms(
         populated,
         pattern,
-        within=ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="cat_entities"),
+        within=EntitySelectionName("entities:cat_entities"),
     )
     assert len(result.axiom_hashes) == 1
 

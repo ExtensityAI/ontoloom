@@ -13,6 +13,7 @@ from ontoloom.axioms.types import (
     ReplaceResult,
 )
 from ontoloom.connection import Session
+from ontoloom.entity_text import LOCAL_NAME_PROPERTY
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError, OntoloomError
 from ontoloom.hashing import (
@@ -30,18 +31,12 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.store import check_iri_prefixes
-from ontoloom.query._constraints import AxiomConstraint, InSelection, MentionsAll
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import (
-    LockedSelectionRef,
-    ResolvedSelection,
-    resolve_selection,
-)
+from ontoloom.query.constraints import AxiomConstraint, InSelection, MentionsAll
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
+from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.selections.store import require_locked_selection
-from ontoloom.selections.types import LockedSelection, SelectionKind
-from ontoloom.text_index import LOCAL_NAME_PROPERTY
+from ontoloom.selections.store import get_selection
+from ontoloom.selections.types import AxiomSelectionName, SelectionRef
 from ontoloom.utils import dedupe
 
 
@@ -83,7 +78,7 @@ def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
     Mutation paths in core take `AxiomHash` directly; prefix → full resolution
     happens at the MCP boundary (or any other adapter that takes user input).
     """
-    rows = s._conn.execute(
+    rows = s.conn.execute(
         "SELECT hash FROM axioms WHERE hash LIKE ? || '%'",
         (prefix,),
     ).fetchall()
@@ -97,7 +92,7 @@ def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
 
 def _load_axiom_row(s: Session, h: AxiomHash) -> ResolvedAxiom:
     """Fetch the row backing `h`. Raises AxiomNotFoundError if absent (race-safe)."""
-    row = s._conn.execute("SELECT id, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    row = s.conn.execute("SELECT id, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     if row is None:
         raise AxiomNotFoundError(h)
     return ResolvedAxiom(axiom_id=row[0], hash=h, json_data=row[1])
@@ -123,7 +118,7 @@ def _delete_axioms(s: Session, axioms: Sequence[HashedAxiom]):
     if not axioms:
         return
     placeholders = ",".join("?" for _ in axioms)
-    s._conn.execute(
+    s.conn.execute(
         f"DELETE FROM axioms WHERE hash IN ({placeholders})",
         tuple(ha.hash for ha in axioms),
     )
@@ -142,20 +137,24 @@ def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
     return RemoveResult(removed=tuple(to_remove))
 
 
-def remove_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectionResult:
-    """Remove axioms referenced by an axiom selection. Best-effort: skips missing."""
-    require_locked_selection(s, within, SelectionKind.AXIOMS, "remove_axioms")
+def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelectionResult:
+    """Remove axioms referenced by an axiom selection. Best-effort: skips missing.
+
+    The post-mutation `SelectionMeta` is returned so adapters (MCP) can render a
+    fresh locked ref for follow-up calls.
+    """
+    bare = within.bare
 
     to_remove: list[HashedAxiom] = []
     absent = 0
     items = [
         r[0]
-        for r in s._conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", (within.name,)
+        for r in s.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?", (bare,)
         )
     ]
     for h in items:
-        row = s._conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+        row = s.conn.execute("SELECT hash, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
         if row is None:
             absent += 1
             continue
@@ -164,7 +163,8 @@ def remove_by_selection(s: Session, within: LockedSelection) -> RemoveBySelectio
         to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
     _delete_axioms(s, to_remove)
-    return RemoveBySelectionResult(removed=tuple(to_remove), absent=absent)
+    meta = get_selection(s, bare)
+    return RemoveBySelectionResult(removed=tuple(to_remove), absent=absent, meta=meta)
 
 
 def annotate_axiom(
@@ -198,7 +198,7 @@ def annotate_axiom(
     updated = axiom.model_copy(update={"annotations": tuple(current)})
     new_json = updated.model_dump_json()
 
-    s._conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, resolved.axiom_id))
+    s.conn.execute("UPDATE axioms SET data = jsonb(?) WHERE id = ?", (new_json, resolved.axiom_id))
 
     original = set(axiom.annotations)
     final = set(current)
@@ -242,7 +242,7 @@ def replace_axiom(s: Session, old_hash: AxiomHash, new_axiom: BaseAxiom) -> Repl
     # Delete old, then attempt to insert new. If new_h collides with a
     # different existing axiom, INSERT OR IGNORE skips and that axiom keeps
     # its own annotations -> the carry-forward is irrelevant in that case.
-    s._conn.execute("DELETE FROM axioms WHERE id = ?", (resolved.axiom_id,))
+    s.conn.execute("DELETE FROM axioms WHERE id = ?", (resolved.axiom_id,))
     new_axiom_id = insert_axiom(s, new_axiom)
     merged = new_axiom_id is None
 
@@ -250,7 +250,7 @@ def replace_axiom(s: Session, old_hash: AxiomHash, new_axiom: BaseAxiom) -> Repl
         # Carry old axiom-level annotations onto the new axiom; annotations
         # don't enter the canonical hash so new_h is unchanged.
         new_axiom = new_axiom.model_copy(update={"annotations": old_axiom.annotations})
-        s._conn.execute(
+        s.conn.execute(
             "UPDATE axioms SET data = jsonb(?) WHERE id = ?",
             (new_axiom.model_dump_json(), new_axiom_id),
         )
@@ -300,18 +300,12 @@ def rename_iri(
     old_iri: IRI,
     new_iri: IRI,
     *,
-    within: LockedSelectionRef | None = None,
+    within: AxiomSelectionName | None = None,
 ) -> RenameResult:
     """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id.
 
-    `within`: optional locked AXIOMS selection (`name@hash_prefix`) to restrict
-    the rename. The hash prefix is verified against the current selection hash.
-
-    Raises:
-        StaleSelectionError: if `within.hash_prefix` does not match the current
-            selection hash.
-        SelectionKindError: if `within` is an entity selection; convert with
-            `axioms_for` first.
+    `within`: optional axiom selection to restrict the rename. The kind is
+    enforced by the parameter type.
     """
     check_iri_prefixes(s, [new_iri])
     batch = uuid.uuid4().hex[:12]
@@ -319,8 +313,7 @@ def rename_iri(
 
     constraints: list[AxiomConstraint] = [MentionsAll(iris=(old_iri,))]
     if within is not None:
-        resolved = resolve_selection(s, within)
-        constraints.append(InSelection(ref=resolved, expected_kind=SelectionKind.AXIOMS))
+        constraints.append(InSelection(ref=within))
 
     rows = list(run(s, ListAxioms(constraints=tuple(constraints))))
 
@@ -335,7 +328,7 @@ def rename_iri(
             results.append(ReplaceResult(old=old_hashed, new=old_hashed, was_noop=True))
             continue
 
-        s._conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
+        s.conn.execute("DELETE FROM axioms WHERE hash = ?", (old_full_hash,))
         merged = insert_axiom(s, new_axiom) is None
 
         results.append(
@@ -350,9 +343,9 @@ def rename_iri(
     return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
 
 
-def axiom_summary(s: Session, *, within: ResolvedSelection | None = None) -> AxiomSummary:
+def axiom_summary(s: Session, *, within: SelectionRef | None = None) -> AxiomSummary:
     constraints: tuple[AxiomConstraint, ...] = (
-        (InSelection(ref=within, expected_kind=SelectionKind.AXIOMS),) if within is not None else ()
+        (InSelection(ref=within),) if within is not None else ()
     )
     by_type = run(s, CountAxiomsByType(constraints=constraints))
     return AxiomSummary(total=sum(by_type.values()), by_type=by_type)
@@ -373,7 +366,7 @@ def insert_axiom(s: Session, axiom: BaseAxiom) -> int | None:
     """
     h = HashedAxiom.of(axiom).hash
     json_data = axiom.model_dump_json()
-    cursor = s._conn.execute(
+    cursor = s.conn.execute(
         "INSERT OR IGNORE INTO axioms (hash, type, data) VALUES (?, ?, jsonb(?))",
         (h, axiom.tag(), json_data),
     )
@@ -390,12 +383,12 @@ def insert_axiom(s: Session, axiom: BaseAxiom) -> int | None:
 
 def repopulate_axiom_text(s: Session, axiom_id: int, annotations: tuple[Annotation, ...]) -> None:
     """Rebuild axiom_text index rows for a single axiom after an annotation change."""
-    s._conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
+    s.conn.execute("DELETE FROM axiom_text WHERE axiom_id = ?", (axiom_id,))
     rows = [
         (axiom_id, _annotation_value_to_text(ann.value), str(ann.property)) for ann in annotations
     ]
     if rows:
-        s._conn.executemany(
+        s.conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             rows,
         )
@@ -432,11 +425,11 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
             )
         )
 
-    s._conn.executemany(
+    s.conn.executemany(
         "INSERT INTO axiom_entities (axiom_id, entity_iri, role, position) VALUES (?, ?, ?, ?)",
         entity_rows,
     )
-    s._conn.executemany(
+    s.conn.executemany(
         "INSERT INTO entity_text (axiom_id, entity_iri, text, property) VALUES (?, ?, ?, ?)",
         text_rows,
     )
@@ -449,7 +442,7 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
         for ann in axiom.annotations
     ]
     if axiom_text_rows:
-        s._conn.executemany(
+        s.conn.executemany(
             "INSERT INTO axiom_text (axiom_id, text, property) VALUES (?, ?, ?)",
             axiom_text_rows,
         )

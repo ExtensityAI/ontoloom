@@ -25,7 +25,7 @@ def _read_prefixes(path):
 
 
 def _set_prefix(s, value: str):
-    s._conn.execute(
+    s.conn.execute(
         "UPDATE metadata SET data = json_set(data, '$.prefixes.ex', ?) WHERE id = 1",
         (value,),
     )

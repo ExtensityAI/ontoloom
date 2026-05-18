@@ -62,7 +62,7 @@ from ontoloom.owl.literals import (
     LangLiteral,
     TypedLiteral,
 )
-from ontoloom.owl.markers import EntityType
+from ontoloom.owl.markers import AxiomTag, EntityType
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -511,8 +511,8 @@ class TestGetEntityComprehensive:
         ann_values = {a.value for a in info.annotations}
         assert "Dog" in ann_values
         assert "Hund" in ann_values
-        assert info.axiom_counts["SubClassOf"] >= 3
-        assert info.axiom_counts["DisjointClasses"] >= 1
+        assert info.axiom_counts[AxiomTag.SUB_CLASS_OF] >= 3
+        assert info.axiom_counts[AxiomTag.DISJOINT_CLASSES] >= 1
 
     def test_get_individual_entity(self, s):
         add_axioms(s, AXIOMS)
@@ -527,17 +527,17 @@ class TestGetEntityComprehensive:
         info = get_entity(s, IRI(":owns"))
         assert info is not None
         assert EntityType.OBJECT_PROPERTY in info.roles
-        assert info.axiom_counts["ObjectPropertyDomain"] >= 1
-        assert info.axiom_counts["ObjectPropertyRange"] >= 1
+        assert info.axiom_counts[AxiomTag.OBJECT_PROPERTY_DOMAIN] >= 1
+        assert info.axiom_counts[AxiomTag.OBJECT_PROPERTY_RANGE] >= 1
 
     def test_get_data_property_entity(self, s):
         add_axioms(s, AXIOMS)
         info = get_entity(s, IRI(":hasAge"))
         assert info is not None
         assert EntityType.DATA_PROPERTY in info.roles
-        assert info.axiom_counts["DataPropertyDomain"] >= 1
-        assert info.axiom_counts["DataPropertyRange"] >= 1
-        assert info.axiom_counts["FunctionalDataProperty"] >= 1
+        assert info.axiom_counts[AxiomTag.DATA_PROPERTY_DOMAIN] >= 1
+        assert info.axiom_counts[AxiomTag.DATA_PROPERTY_RANGE] >= 1
+        assert info.axiom_counts[AxiomTag.FUNCTIONAL_DATA_PROPERTY] >= 1
 
     def test_get_nonexistent_entity(self, s):
 
@@ -546,14 +546,12 @@ class TestGetEntityComprehensive:
             get_entity(s, IRI(":Nonexistent"))
 
     def test_axiom_counts_include_annotation_assertions(self, s):
-        # get_entity now reports the full axiom-type breakdown including
+        # get_entity reports the full axiom-type breakdown including
         # AnnotationAssertion, matching describe_ontology's top-by-axiom-count.
-        # The Annotations section of the rendered output still shows the values
-        # explicitly; the count is informational here.
         add_axioms(s, AXIOMS)
         info = get_entity(s, IRI(":Dog"))
         assert info is not None
-        assert info.axiom_counts.get("AnnotationAssertion", 0) > 0
+        assert info.axiom_counts.get(AxiomTag.ANNOTATION_ASSERTION, 0) > 0
 
 
 class TestEnhancedEntitySearch:

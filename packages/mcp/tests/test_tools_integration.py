@@ -10,8 +10,7 @@ from ontoloom.connection import Ontology
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.query._selection_ref import SelectionRef
-from ontoloom.selections.types import LockedSelection, SelectionKind, SelectionName
+from ontoloom.selections.types import EntitySelectionName, SelectionName
 from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
@@ -76,7 +75,7 @@ def test_get_entity_returns_info(populated_db):
 def test_search_entities_creates_selection(populated_db):
     result = search_entities(
         path=populated_db,
-        into=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs"),
+        into=EntitySelectionName("entities:dogs"),
         query="Dog",
     )
     assert "dogs@" in result
@@ -85,12 +84,10 @@ def test_search_entities_creates_selection(populated_db):
 def test_read_selection_after_search(populated_db):
     search_entities(
         path=populated_db,
-        into=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs"),
+        into=EntitySelectionName("entities:dogs"),
         query="Dog",
     )
-    result = read_selection(
-        path=populated_db, name=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs")
-    )
+    result = read_selection(path=populated_db, name=EntitySelectionName("entities:dogs"))
     assert "ex:Dog" in result
 
 
@@ -169,9 +166,9 @@ def test_find_duplicates_within_missing_selection_translates(populated_db):
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
-            into=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="dups"),
+            into=EntitySelectionName("entities:dups"),
             annotation_property=IRI("rdfs:label"),
-            within=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="nonexistent"),
+            within=EntitySelectionName("entities:nonexistent"),
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
@@ -235,12 +232,10 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
     )
     search_entities(
         path=empty_db,
-        into=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="undeclared"),
+        into=EntitySelectionName("entities:undeclared"),
         declared=False,
     )
-    page = read_selection(
-        path=empty_db, name=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="undeclared")
-    )
+    page = read_selection(path=empty_db, name=EntitySelectionName("entities:undeclared"))
     assert "0 missing" in page
     assert "ex:Wolf" in page
     assert "*missing*" not in page
@@ -275,7 +270,7 @@ def test_read_selection_not_found_translates(populated_db):
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
-            name=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="nonexistent"),
+            name=EntitySelectionName("entities:nonexistent"),
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
@@ -283,24 +278,24 @@ def test_read_selection_not_found_translates(populated_db):
 
 
 def test_remove_axioms_stale_selection_translates(populated_db):
-    # Create an axiom selection, then mutate it, then try to use the stale hash.
-    search_entities(
-        path=populated_db,
-        into=SelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs_ent"),
-        query="Dog",
-    )
-    # Manually create an axiom selection from those entities (use create_selection directly)
-    from ontoloom.axioms.types import BySelection
+    # Create an axiom selection, then try to use a wrong hash prefix on it.
     from ontoloom.selections.expr import AxiomsForExpr
+    from ontoloom.selections.types import AxiomSelectionName
+    from ontoloom_mcp.components.locking import LockedAxiomSelectionName
+    from ontoloom_mcp.tools.axioms.remove_axioms import BySelection
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
+    search_entities(
+        path=populated_db,
+        into=EntitySelectionName("entities:dogs_ent"),
+        query="Dog",
+    )
     create_selection(
         path=populated_db,
-        name=SelectionRef(kind=SelectionKind.AXIOMS, bare_name="dogs_ax"),
+        name=AxiomSelectionName("axioms:dogs_ax"),
         expr=AxiomsForExpr(axioms_for=SelectionName("dogs_ent")),
     )
-    # Build a LockedSelection with a wrong hash to trigger StaleSelectionError.
-    stale = LockedSelection("dogs_ax@deadbeef")
+    stale = LockedAxiomSelectionName("axioms:dogs_ax@deadbeef")
 
     wrapped = translate_errors(remove_axioms)
     with pytest.raises(ToolError) as exc_info:

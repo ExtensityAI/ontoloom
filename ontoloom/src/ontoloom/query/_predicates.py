@@ -1,165 +1,186 @@
-"""SQL fragment helpers and CompiledSql — pure outputs, no DB access."""
+"""Predicate dispatchers and SQL fragments — internal to the query DSL.
+
+All emitted fragments reference the bind-aliases `ae` (axiom_entities)
+and `a` (axioms). Per-query render functions must use these aliases.
+"""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ontoloom.connection import escape_like
-from ontoloom.query._constraints import (
+from ontoloom.owl.axioms import Declaration
+from ontoloom.query._normalize import normalize_axiom, normalize_entity
+from ontoloom.query.constraints import (
     AlwaysFalse,
     AxiomConstraint,
     Declared,
+    Deprecated,
     EntityConstraint,
-    HasEntityRole,
+    HasAnyProperty,
+    HasRole,
+    InIRIs,
     InNamespaces,
     InPositions,
     InSelection,
-    MentionedInAxioms,
+    MentionedIn,
     MentionsAll,
     MentionsAny,
-    NotDeprecated,
-    OfTypes,
-    WithAnyProperty,
-    WithIRIs,
     WithRoles,
+    WithTypes,
 )
-from ontoloom.selections.types import SelectionKind
-from ontoloom.text_index import DECLARED_EXISTS, DECLARED_NOT_EXISTS, NOT_DEPRECATED
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+
+DECLARED_EXISTS = (
+    "EXISTS (SELECT 1 FROM axiom_entities ae_d "
+    "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
+)
+DECLARED_NOT_EXISTS = (
+    "NOT EXISTS (SELECT 1 FROM axiom_entities ae_d "
+    "JOIN axioms a_d ON a_d.id = ae_d.axiom_id "
+    f"WHERE ae_d.entity_iri = ae.entity_iri AND a_d.type = '{Declaration.tag()}')"
+)
+NOT_DEPRECATED = (
+    "NOT EXISTS (SELECT 1 FROM entity_text et_dep "
+    "WHERE et_dep.entity_iri = ae.entity_iri "
+    "AND et_dep.property LIKE '%deprecated%' AND LOWER(et_dep.text) = 'true')"
+)
 
 
 @dataclass(frozen=True, slots=True)
-class CompiledSql:
+class Predicate:
+    """An AND-joined SQL fragment with bind params.
+
+    `sql == "1"` is the tautology produced when no constraints are present
+    (caller emits `WHERE 1`; SQLite folds this away). `sql == "0"` is the
+    contradiction produced by `AlwaysFalse` (caller emits `WHERE 0`; SQLite
+    short-circuits). Callers always embed `pred.sql` literally; no special-case
+    inspection of these values is needed.
+    """
+
     sql: str
     params: tuple[object, ...]
 
 
-def _entity_predicates(constraints: Sequence[EntityConstraint]) -> tuple[str, list[object]]:  # noqa: C901
-    """Compile entity-domain constraints into an AND-joined SQL predicate.
+def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  # noqa: C901
+    constraints = normalize_entity(constraints)
 
-    Returns `("1", [])` for no constraints and `("0", [])` when any
-    `AlwaysFalse` is present. Otherwise returns the conjunction of
-    per-constraint fragments plus their bind parameters.
-    """
     if not constraints:
-        return ("1", [])
+        return Predicate(sql="1", params=())
 
     fragments: list[str] = []
     params: list[object] = []
 
     for c in constraints:
-        if isinstance(c, AlwaysFalse):
-            return ("0", [])
+        match c:
+            case AlwaysFalse():
+                return Predicate(sql="0", params=())
+            case InIRIs(iris=iris):
+                placeholders = ",".join("?" for _ in iris)
+                fragments.append(f"ae.entity_iri IN ({placeholders})")
+                params.extend(iris)
+            case WithRoles(roles=roles):
+                placeholders = ",".join("?" for _ in roles)
+                fragments.append(f"ae.role IN ({placeholders})")
+                params.extend(roles)
+            case HasRole():
+                fragments.append("ae.role IS NOT NULL")
+            case InNamespaces(namespaces=namespaces):
+                ns_terms = [r"ae.entity_iri LIKE ? || ':%' ESCAPE '\'" for _ in namespaces]
 
-        if isinstance(c, WithIRIs):
-            placeholders = ",".join("?" for _ in c.iris)
-            fragments.append(f"ae.entity_iri IN ({placeholders})")
-            params.extend(c.iris)
-        elif isinstance(c, WithRoles):
-            placeholders = ",".join("?" for _ in c.roles)
-            fragments.append(f"ae.role IN ({placeholders})")
-            params.extend(c.roles)
-        elif isinstance(c, HasEntityRole):
-            fragments.append("ae.role IS NOT NULL")
-        elif isinstance(c, InNamespaces):
-            ns_terms = [r"ae.entity_iri LIKE ? || ':%' ESCAPE '\'" for _ in c.namespaces]
+                if len(ns_terms) == 1:
+                    fragments.append(ns_terms[0])
+                else:
+                    fragments.append("(" + " OR ".join(ns_terms) + ")")
 
-            if len(ns_terms) == 1:
-                fragments.append(ns_terms[0])
-            else:
-                fragments.append("(" + " OR ".join(ns_terms) + ")")
-
-            params.extend(escape_like(ns) for ns in c.namespaces)
-        elif isinstance(c, Declared):
-            fragments.append(DECLARED_EXISTS if c.state else DECLARED_NOT_EXISTS)
-        elif isinstance(c, NotDeprecated):
-            fragments.append(NOT_DEPRECATED)
-        elif isinstance(c, WithAnyProperty):
-            placeholders = ",".join("?" for _ in c.properties)
-            fragments.append(
-                "EXISTS (SELECT 1 FROM entity_text et_p "
-                "WHERE et_p.entity_iri = ae.entity_iri "
-                f"AND et_p.property IN ({placeholders}))"
-            )
-            params.extend(c.properties)
-        elif isinstance(c, MentionedInAxioms):
-            placeholders = ",".join("?" for _ in c.hashes)
-            fragments.append(
-                "EXISTS (SELECT 1 FROM axioms a_m "
-                "WHERE a_m.id = ae.axiom_id "
-                f"AND a_m.hash IN ({placeholders}))"
-            )
-            params.extend(c.hashes)
-        elif isinstance(c, InPositions):
-            placeholders = ",".join("?" for _ in c.positions)
-            fragments.append(f"ae.position IN ({placeholders})")
-            params.extend(c.positions)
-        elif isinstance(c, InSelection):
-            if c.ref.kind == SelectionKind.ENTITIES:
+                params.extend(escape_like(ns) for ns in namespaces)
+            case Declared(state=state):
+                fragments.append(DECLARED_EXISTS if state else DECLARED_NOT_EXISTS)
+            case Deprecated(state=False):
+                fragments.append(NOT_DEPRECATED)
+            case HasAnyProperty(properties=properties):
+                placeholders = ",".join("?" for _ in properties)
+                fragments.append(
+                    "EXISTS (SELECT 1 FROM entity_text et_p "
+                    "WHERE et_p.entity_iri = ae.entity_iri "
+                    f"AND et_p.property IN ({placeholders}))"
+                )
+                params.extend(properties)
+            case MentionedIn(hashes=hashes):
+                placeholders = ",".join("?" for _ in hashes)
+                fragments.append(
+                    "EXISTS (SELECT 1 FROM axioms a_m "
+                    "WHERE a_m.id = ae.axiom_id "
+                    f"AND a_m.hash IN ({placeholders}))"
+                )
+                params.extend(hashes)
+            case InPositions(positions=positions):
+                placeholders = ",".join("?" for _ in positions)
+                fragments.append(f"ae.position IN ({placeholders})")
+                params.extend(positions)
+            case InSelection(ref=EntitySelectionName() as ref):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM selection_items si_w "
                     "WHERE si_w.item = ae.entity_iri "
                     "AND si_w.selection_name = ?)"
                 )
-            else:
+                params.append(ref.bare)
+            case InSelection(ref=AxiomSelectionName() as ref):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM selection_items si_w "
                     "JOIN axioms a_w ON a_w.hash = si_w.item "
                     "WHERE a_w.id = ae.axiom_id "
                     "AND si_w.selection_name = ?)"
                 )
+                params.append(ref.bare)
+            case _:
+                msg = f"unknown entity constraint variant: {type(c).__name__}"
+                raise ValueError(msg)
 
-            params.append(c.ref.bare_name)
-        else:
-            msg = f"unknown entity constraint variant: {type(c).__name__}"
-            raise ValueError(msg)
-
-    return (" AND ".join(fragments), params)
+    return Predicate(sql=" AND ".join(fragments), params=tuple(params))
 
 
-def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> tuple[str, list[object]]:
-    """Compile axiom-domain constraints into an AND-joined SQL predicate.
+def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
+    constraints = normalize_axiom(constraints)
 
-    Returns `("1", [])` for no constraints and `("0", [])` when any
-    `AlwaysFalse` is present. Otherwise returns the conjunction of
-    per-constraint fragments plus their bind parameters.
-    """
     if not constraints:
-        return ("1", [])
+        return Predicate(sql="1", params=())
 
     fragments: list[str] = []
     params: list[object] = []
 
     for c in constraints:
-        if isinstance(c, AlwaysFalse):
-            return ("0", [])
-
-        if isinstance(c, OfTypes):
-            placeholders = ",".join("?" for _ in c.tags)
-            fragments.append(f"a.type IN ({placeholders})")
-            params.extend(c.tags)
-        elif isinstance(c, MentionsAll):
-            for iri in c.iris:
+        match c:
+            case AlwaysFalse():
+                return Predicate(sql="0", params=())
+            case WithTypes(tags=tags):
+                placeholders = ",".join("?" for _ in tags)
+                fragments.append(f"a.type IN ({placeholders})")
+                params.extend(tags)
+            case MentionsAll(iris=iris):
+                for iri in iris:
+                    fragments.append(
+                        "EXISTS (SELECT 1 FROM axiom_entities ae_m "
+                        "WHERE ae_m.axiom_id = a.id "
+                        "AND ae_m.entity_iri = ?)"
+                    )
+                    params.append(iri)
+            case MentionsAny(iris=iris):
+                placeholders = ",".join("?" for _ in iris)
                 fragments.append(
                     "EXISTS (SELECT 1 FROM axiom_entities ae_m "
                     "WHERE ae_m.axiom_id = a.id "
-                    "AND ae_m.entity_iri = ?)"
+                    f"AND ae_m.entity_iri IN ({placeholders}))"
                 )
-                params.append(iri)
-        elif isinstance(c, MentionsAny):
-            placeholders = ",".join("?" for _ in c.iris)
-            fragments.append(
-                "EXISTS (SELECT 1 FROM axiom_entities ae_m "
-                "WHERE ae_m.axiom_id = a.id "
-                f"AND ae_m.entity_iri IN ({placeholders}))"
-            )
-            params.extend(c.iris)
-        elif isinstance(c, InSelection):
-            if c.ref.kind == SelectionKind.AXIOMS:
+                params.extend(iris)
+            case InSelection(ref=AxiomSelectionName() as ref):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM selection_items si_w "
                     "WHERE si_w.item = a.hash "
                     "AND si_w.selection_name = ?)"
                 )
-            else:
+                params.append(ref.bare)
+            case InSelection(ref=EntitySelectionName() as ref):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM axiom_entities ae_w "
                     "WHERE ae_w.axiom_id = a.id "
@@ -167,10 +188,9 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> tuple[str, list
                     "WHERE si_w.item = ae_w.entity_iri "
                     "AND si_w.selection_name = ?))"
                 )
+                params.append(ref.bare)
+            case _:
+                msg = f"unknown axiom constraint variant: {type(c).__name__}"
+                raise ValueError(msg)
 
-            params.append(c.ref.bare_name)
-        else:
-            msg = f"unknown axiom constraint variant: {type(c).__name__}"
-            raise ValueError(msg)
-
-    return (" AND ".join(fragments), params)
+    return Predicate(sql=" AND ".join(fragments), params=tuple(params))

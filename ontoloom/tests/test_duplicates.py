@@ -4,9 +4,8 @@ from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.query._selection_ref import ResolvedSelection
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import EntitySelectionName, SelectionKind
 
 
 def _add_label(s, subject: str, label: str):
@@ -114,7 +113,7 @@ def test_find_duplicates_within(s):
     result = find_duplicate_entities(
         s,
         annotation_property="rdfs:label",
-        within=ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="subset"),
+        within=EntitySelectionName("entities:subset"),
     )
 
     assert result.total_groups == 1

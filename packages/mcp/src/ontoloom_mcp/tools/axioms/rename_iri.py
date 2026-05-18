@@ -3,14 +3,18 @@ from ontoloom.axioms.store import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.types import AxiomSelectionName, SelectionKind
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.selection_refs import LockedSelectionRefParam, SelectionRefParam
+from ontoloom_mcp.components.locking import (
+    LockedAxiomSelectionName,
+    format_locked,
+    verify_lock,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -19,8 +23,8 @@ def rename_iri(
     path: OntologyPath,
     old_iri: IRI,
     new_iri: IRI,
-    within: LockedSelectionRefParam | None = None,
-    into: SelectionRefParam | None = None,
+    within: LockedAxiomSelectionName | None = None,
+    into: AxiomSelectionName | None = None,
     confirm: str | None = None,
 ):
     """Rename an IRI across all (or restricted) axioms.
@@ -33,7 +37,7 @@ def rename_iri(
     - `old_iri`: IRI to replace.
     - `new_iri`: New IRI to use in its place.
     - `within`: Optional locked axiom selection reference
-      `"axioms:name@hash_prefix"` (e.g. `"axioms:my_sel@a3f1b2c4"`). The hash
+      `"axioms:NAME@hash_prefix"` (e.g. `"axioms:my_sel@a3f1b2c4"`). The hash
       prefix verifies the selection hasn't changed since you last observed it.
     - `into`: Optional axiom selection (e.g. `"axioms:renamed"`) to populate
       with the post-rename hashes of every replaced axiom. Use to inspect or
@@ -43,13 +47,10 @@ def rename_iri(
       call raises `ConfirmationRequiredError` with a token. Pass that token
       here to apply the change.
     """
-    if into is not None and into.kind != SelectionKind.AXIOMS:
-        msg = f"rename_iri produces an AXIOMS selection; got 'into={into}' with kind={into.kind}"
-        raise ValueError(msg)
-
     ont = Ontology(path)
     with session(ont) as s:
-        result = core_rename_iri(s, old_iri, new_iri, within=within)
+        verified = verify_lock(s, within) if within is not None else None
+        result = core_rename_iri(s, old_iri, new_iri, within=verified)
 
         if result.colliding_hashes:
             token = confirmation_token(
@@ -69,7 +70,7 @@ def rename_iri(
             new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
             upserted = upsert_selection(
                 s,
-                SelectionName(into.bare_name),
+                into.bare,
                 SelectionKind.AXIOMS,
                 new_hashes,
                 f"rename_iri({old_iri} -> {new_iri})",
@@ -88,7 +89,7 @@ def rename_iri(
     parts.append(f"Batch: {result.batch_id}")
     if upserted is not None:
         sel = upserted.selection
-        parts.append(f"Saved to {dquoted(sel.locked)} ({sel.size} items).")
+        parts.append(f"Saved to {dquoted(format_locked(sel))} ({sel.size} items).")
     return " ".join(parts)
 
 

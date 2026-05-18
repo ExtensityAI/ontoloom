@@ -1,26 +1,25 @@
 import pytest
 from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import EntityType, Position
+from ontoloom.owl.markers import AxiomTag, EntityType, Position
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query._constraints import (
+from ontoloom.query.constraints import (
     AlwaysFalse,
     Declared,
-    HasEntityRole,
+    Deprecated,
+    HasAnyProperty,
+    HasRole,
+    InIRIs,
     InNamespaces,
     InPositions,
     InSelection,
-    MentionedInAxioms,
+    MentionedIn,
     MentionsAll,
     MentionsAny,
-    NotDeprecated,
-    OfTypes,
-    WithAnyProperty,
-    WithIRIs,
     WithRoles,
+    WithTypes,
 )
-from ontoloom.query._selection_ref import ResolvedSelection
-from ontoloom.selections.types import SelectionKind, SelectionKindError
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 from pydantic import ValidationError
 
 # -- Helpers --
@@ -34,26 +33,26 @@ HASH_B = AxiomHash("b" * 64)
 HASH_C = AxiomHash("c" * 64)
 
 
-# -- WithIRIs --
+# -- InIRIs --
 
 
 def test_with_iris_empty_raises():
     with pytest.raises(ValidationError):
-        WithIRIs(iris=())
+        InIRIs(iris=())
 
 
 def test_with_iris_set_semantics_order_insensitive():
-    assert WithIRIs(iris=(B, A)) == WithIRIs(iris=(A, B))
+    assert InIRIs(iris=(B, A)) == InIRIs(iris=(A, B))
 
 
 def test_with_iris_dedupe():
-    result = WithIRIs(iris=(A, A, B))
+    result = InIRIs(iris=(A, A, B))
     assert len(result.iris) == 2
     assert set(result.iris) == {A, B}
 
 
 def test_with_iris_sorted():
-    result = WithIRIs(iris=(B, A))
+    result = InIRIs(iris=(B, A))
     assert result.iris == tuple(sorted({A, B}))
 
 
@@ -77,12 +76,12 @@ def test_with_roles_dedupe():
     assert set(result.roles) == {EntityType.CLASS, EntityType.DATA_PROPERTY}
 
 
-# -- HasEntityRole --
+# -- HasRole --
 
 
 def test_has_entity_role_constructs():
-    r = HasEntityRole()
-    assert isinstance(r, HasEntityRole)
+    r = HasRole()
+    assert isinstance(r, HasRole)
 
 
 # -- InNamespaces --
@@ -123,45 +122,50 @@ def test_declared_no_default_raises():
         Declared()  # pyright: ignore[reportCallIssue]
 
 
-# -- NotDeprecated --
+# -- Deprecated --
 
 
-def test_not_deprecated_constructs():
-    nd = NotDeprecated()
-    assert isinstance(nd, NotDeprecated)
+def test_deprecated_state_false_constructs():
+    nd = Deprecated(state=False)
+    assert isinstance(nd, Deprecated)
 
 
-# -- WithAnyProperty --
+def test_deprecated_state_true_raises():
+    with pytest.raises(NotImplementedError):
+        Deprecated(state=True)
+
+
+# -- HasAnyProperty --
 
 
 def test_with_any_property_empty_raises():
     with pytest.raises(ValidationError):
-        WithAnyProperty(properties=())
+        HasAnyProperty(properties=())
 
 
 def test_with_any_property_set_semantics():
-    assert WithAnyProperty(properties=(B, A)) == WithAnyProperty(properties=(A, B))
+    assert HasAnyProperty(properties=(B, A)) == HasAnyProperty(properties=(A, B))
 
 
 def test_with_any_property_dedupe():
-    result = WithAnyProperty(properties=(A, A, B))
+    result = HasAnyProperty(properties=(A, A, B))
     assert len(result.properties) == 2
 
 
-# -- MentionedInAxioms --
+# -- MentionedIn --
 
 
 def test_mentioned_in_axioms_empty_raises():
     with pytest.raises(ValidationError):
-        MentionedInAxioms(hashes=())
+        MentionedIn(hashes=())
 
 
 def test_mentioned_in_axioms_set_semantics():
-    assert MentionedInAxioms(hashes=(HASH_B, HASH_A)) == MentionedInAxioms(hashes=(HASH_A, HASH_B))
+    assert MentionedIn(hashes=(HASH_B, HASH_A)) == MentionedIn(hashes=(HASH_A, HASH_B))
 
 
 def test_mentioned_in_axioms_dedupe():
-    result = MentionedInAxioms(hashes=(HASH_A, HASH_A, HASH_B))
+    result = MentionedIn(hashes=(HASH_A, HASH_A, HASH_B))
     assert len(result.hashes) == 2
 
 
@@ -187,37 +191,21 @@ def test_in_positions_dedupe():
 # -- InSelection --
 
 
-def test_in_selection_no_expected_kind_axioms():
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="x")
+def test_in_selection_holds_axiom_ref():
+    ref = AxiomSelectionName("axioms:x")
     c = InSelection(ref=ref)
-    assert c.ref is ref
-    assert c.expected_kind is None
+    assert c.ref == ref
 
 
-def test_in_selection_no_expected_kind_entities():
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="x")
+def test_in_selection_holds_entity_ref():
+    ref = EntitySelectionName("entities:x")
     c = InSelection(ref=ref)
-    assert c.expected_kind is None
+    assert c.ref == ref
 
 
-def test_in_selection_matching_expected_kind():
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="x")
-    c = InSelection(ref=ref, expected_kind=SelectionKind.AXIOMS)
-    assert c.expected_kind == SelectionKind.AXIOMS
-
-
-def test_in_selection_kind_mismatch_raises():
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="x")
-
-    with pytest.raises(SelectionKindError):
-        InSelection(ref=ref, expected_kind=SelectionKind.AXIOMS)
-
-
-def test_in_selection_kind_mismatch_other_direction_raises():
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="x")
-
-    with pytest.raises(SelectionKindError):
-        InSelection(ref=ref, expected_kind=SelectionKind.ENTITIES)
+def test_in_selection_rejects_bare_string():
+    with pytest.raises(ValidationError):
+        InSelection(ref="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
 
 
 # -- AlwaysFalse --
@@ -232,29 +220,36 @@ def test_always_false_constructs():
 
 
 def test_nullary_variants_distinct():
-    assert HasEntityRole() != NotDeprecated()
-    assert HasEntityRole() != AlwaysFalse()
-    assert NotDeprecated() != AlwaysFalse()
+    assert HasRole() != Deprecated(state=False)
+    assert HasRole() != AlwaysFalse()
+    assert Deprecated(state=False) != AlwaysFalse()
 
 
-# -- OfTypes --
+# -- WithTypes --
 
 
 def test_of_types_empty_raises():
     with pytest.raises(ValidationError):
-        OfTypes(tags=())
+        WithTypes(tags=())
 
 
 def test_of_types_set_semantics_order_insensitive():
-    assert OfTypes(tags=("SubClassOf", "EquivalentClasses")) == OfTypes(
-        tags=("EquivalentClasses", "SubClassOf")
+    assert WithTypes(tags=(AxiomTag.SUB_CLASS_OF, AxiomTag.EQUIVALENT_CLASSES)) == WithTypes(
+        tags=(AxiomTag.EQUIVALENT_CLASSES, AxiomTag.SUB_CLASS_OF)
     )
 
 
 def test_of_types_dedupe():
-    result = OfTypes(tags=("SubClassOf", "SubClassOf", "EquivalentClasses"))
+    result = WithTypes(
+        tags=(AxiomTag.SUB_CLASS_OF, AxiomTag.SUB_CLASS_OF, AxiomTag.EQUIVALENT_CLASSES)
+    )
     assert len(result.tags) == 2
-    assert set(result.tags) == {"SubClassOf", "EquivalentClasses"}
+    assert set(result.tags) == {AxiomTag.SUB_CLASS_OF, AxiomTag.EQUIVALENT_CLASSES}
+
+
+def test_of_types_rejects_unknown_tag():
+    with pytest.raises(ValidationError):
+        WithTypes(tags=("NotAnAxiomType",))  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
 
 
 # -- MentionsAll --

@@ -12,12 +12,11 @@ from ontoloom.connection import (
 )
 from ontoloom.prefixes.store import list_prefixes
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.query._constraints import AxiomConstraint, InSelection
-from ontoloom.query._dispatch import run
-from ontoloom.query._selection_ref import ResolvedSelection
+from ontoloom.query.constraints import AxiomConstraint, InSelection
+from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 
 FORMAT_VERSION = 4
@@ -41,7 +40,7 @@ class ExportResult:
 
 
 def export_to_jsonl(
-    s: Session, output_path: Path, *, within: ResolvedSelection | None = None
+    s: Session, output_path: Path, *, within: AxiomSelectionName | None = None
 ) -> ExportResult:
     """Export axioms as JSONL with a header line."""
     assert_within_workspace(output_path)
@@ -54,9 +53,9 @@ def export_to_jsonl(
     constraints: list[AxiomConstraint] = []
 
     if within is not None:
-        meta = get_selection(s, SelectionName(within.bare_name))
+        meta = get_selection(s, within.bare)
         selection_size = meta.size
-        constraints.append(InSelection(ref=within, expected_kind=SelectionKind.AXIOMS))
+        constraints.append(InSelection(ref=within))
 
     header = HeaderRecord(
         format="ontoloom-jsonl",

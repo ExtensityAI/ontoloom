@@ -15,13 +15,13 @@ from ontoloom.errors import (
 from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError, UndeclaredPrefixError
 from ontoloom.selections.types import (
     SelectionExprError,
-    SelectionKindError,
     SelectionNotFoundError,
-    StaleSelectionError,
 )
 from ontoloom.utils import dquoted
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
+
+from ontoloom_mcp.components.locking import StaleSelectionError
 
 
 def _format_one_error(err: ErrorDetails) -> str:
@@ -67,11 +67,6 @@ def format_error(e: Exception) -> str:  # noqa: C901
                 else " It no longer exists."
             )
             return f"Selection {dquoted(e.name)} has changed since you last observed it.{current}"
-        case SelectionKindError():
-            return (
-                f"{dquoted(e.operation)} requires an {e.expected} selection, "
-                f"but {dquoted(e.name)} is an {e.actual} selection."
-            )
         case SelectionExprError():
             return f"Invalid set expression: {e}"
         case AxiomNotFoundError():

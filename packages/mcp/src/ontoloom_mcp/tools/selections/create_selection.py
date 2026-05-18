@@ -2,17 +2,17 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.store import create_selection as core_create_selection
-from ontoloom.selections.types import SelectionName
+from ontoloom.selections.types import SelectionRef
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
+from ontoloom_mcp.components.locking import format_locked
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
 def create_selection(
     path: OntologyPath,
-    name: SelectionRefParam,
+    name: SelectionRef,
     expr: SetExpr,
 ):
     """Create a selection by evaluating a set-expression tree.
@@ -27,7 +27,7 @@ def create_selection(
     - `{"intersect": [<operand>, ...]}` - items in all operands (>= 2)
     - `{"diff": [<operand>, ...]}` - first operand minus the rest (>= 2)
     - `{"axioms_for": <operand>}` - axioms mentioning entities in the operand
-    - `{"entities_in": <operand>, "field": <position>?}` - entities mentioned
+    - `{"entities_in": <operand>, "position": <position>?}` - entities mentioned
       by axioms in the operand, optionally restricted to a structural slot
       (e.g. "sub_class", "filler")
 
@@ -41,11 +41,11 @@ def create_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        upserted = core_create_selection(s, SelectionName(name.bare_name), expr)
+        upserted = core_create_selection(s, name.bare, expr)
         s.commit()
 
     sel = upserted.selection
-    parts = [f"Selection {dquoted(sel.locked)}: {sel.size} {sel.kind}"]
+    parts = [f"Selection {dquoted(format_locked(sel))}: {sel.size} {sel.kind}"]
     if upserted.previous_size is not None:
         parts.append(f"(overwrote previous: {upserted.previous_size} items)")
     return " ".join(parts)

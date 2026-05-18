@@ -8,9 +8,8 @@ from ontoloom.entities.store import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query._selection_ref import ResolvedSelection, resolve_selection
 from ontoloom.selections.store import get_selection, upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionRef
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
@@ -19,20 +18,20 @@ from ontoloom_mcp.components.formatting import (
     format_entity_search_page,
     format_selection_result,
 )
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
+from ontoloom_mcp.components.locking import format_locked
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
 def search_entities(
     path: OntologyPath,
-    into: SelectionRefParam,
+    into: EntitySelectionName,
     query: Annotated[str, MinLen(1)] | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
     declared: bool | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
-    within: SelectionRefParam | None = None,
+    within: SelectionRef | None = None,
     exclude_deprecated: bool = True,
 ):
     """Search for entities by name, type, or namespace; save the result as a selection.
@@ -55,39 +54,28 @@ def search_entities(
       an axiom selection restricts to entities mentioned in those axioms.
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
-    if into.kind != SelectionKind.ENTITIES:
-        msg = (
-            f"search_entities produces an ENTITIES selection; "
-            f"got 'into={into}' with kind={into.kind}"
-        )
-        raise ValueError(msg)
-
     ont = Ontology(path)
     with session(ont) as s:
-        resolved_within = resolve_selection(s, within) if within is not None else None
         kwargs = {
             "query": query,
             "role": role,
             "namespace": namespace,
-            "within": resolved_within,
+            "within": within,
             "declared": declared,
             "properties": properties,
             "exclude_deprecated": exclude_deprecated,
         }
 
         iris = collect_entity_iris(s, **kwargs)
-        source = _build_source(query, role, namespace, declared, properties, resolved_within)
-        upserted = upsert_selection(
-            s, SelectionName(into.bare_name), SelectionKind.ENTITIES, iris, source
-        )
+        source = _build_source(query, role, namespace, declared, properties, within)
+        upserted = upsert_selection(s, into.bare, SelectionKind.ENTITIES, iris, source)
         sel = upserted.selection
+        sel_locked = format_locked(sel)
 
         if not iris:
-            no_results = _no_results_msg(
-                query, role, namespace, declared, properties, resolved_within
-            )
+            no_results = _no_results_msg(query, role, namespace, declared, properties, within)
             s.commit()
-            return f"0 entities -> {dquoted(sel.locked)}.\n{no_results}"
+            return f"0 entities -> {dquoted(sel_locked)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
@@ -95,17 +83,17 @@ def search_entities(
 
         result = format_selection_result("entities", upserted, page_text)
 
-        if resolved_within is not None:
-            result += "\n" + _within_metadata(s, resolved_within)
+        if within is not None:
+            result += "\n" + _within_metadata(s, within)
 
         s.commit()
 
     return result
 
 
-def _within_metadata(s: Session, within: ResolvedSelection):
-    sel = get_selection(s, SelectionName(within.bare_name))
-    return f"\nWithin selection {dquoted(sel.locked)} ({sel.kind}, {sel.size} items)"
+def _within_metadata(s: Session, within: SelectionRef):
+    sel = get_selection(s, within.bare)
+    return f"\nWithin selection {dquoted(format_locked(sel))} ({sel.kind}, {sel.size} items)"
 
 
 def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:

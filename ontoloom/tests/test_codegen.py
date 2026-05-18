@@ -147,21 +147,20 @@ def test_exprslot_and_axiomslot_exact_membership():
 
 def test_expression_container_types_reflective_derivation():
     """_EXPRESSION_CONTAINER_TYPES must match the axiom types that actually carry ClassExpression fields."""
+    from ontoloom.owl.markers import AxiomTag
     from ontoloom.patterns.store import _EXPRESSION_CONTAINER_TYPES
 
-    expected = frozenset(
-        {
-            "ClassAssertion",
-            "DataPropertyDomain",
-            "DisjointClasses",
-            "EquivalentClasses",
-            "HasKey",
-            "ObjectPropertyDomain",
-            "ObjectPropertyRange",
-            "SubClassOf",
-        }
-    )
-    assert expected == _EXPRESSION_CONTAINER_TYPES
+    expected = {
+        AxiomTag.CLASS_ASSERTION,
+        AxiomTag.DATA_PROPERTY_DOMAIN,
+        AxiomTag.DISJOINT_CLASSES,
+        AxiomTag.EQUIVALENT_CLASSES,
+        AxiomTag.HAS_KEY,
+        AxiomTag.OBJECT_PROPERTY_DOMAIN,
+        AxiomTag.OBJECT_PROPERTY_RANGE,
+        AxiomTag.SUB_CLASS_OF,
+    }
+    assert expected == set(_EXPRESSION_CONTAINER_TYPES)
 
 
 def test_gen_patterns_field_type_transformations():

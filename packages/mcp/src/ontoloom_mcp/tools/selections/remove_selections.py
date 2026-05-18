@@ -4,17 +4,16 @@ from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.selections.store import remove_selections as core_remove_selections
-from ontoloom.selections.types import SelectionName
+from ontoloom.selections.types import SelectionRef
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
 def remove_selections(
     path: OntologyPath,
-    names: Annotated[tuple[SelectionRefParam, ...], MinLen(1)],
+    names: Annotated[tuple[SelectionRef, ...], MinLen(1)],
 ):
     """Remove selections by exact name. Best-effort -> reports any not found.
 
@@ -25,7 +24,7 @@ def remove_selections(
     To delete selections matching a glob, call `list_selections` first to
     discover the matching names, then pass them here.
     """
-    bare_names = [SelectionName(ref.bare_name) for ref in names]
+    bare_names = [ref.bare for ref in names]
     ont = Ontology(path)
     with session(ont) as s:
         result = core_remove_selections(s, bare_names)

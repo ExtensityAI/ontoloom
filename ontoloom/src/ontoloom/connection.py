@@ -148,13 +148,13 @@ class Session:
     """Active transactional session. Returned by `session()`."""
 
     ontology: Ontology
-    _conn: sqlite3.Connection
+    conn: sqlite3.Connection
 
     def commit(self):
-        self._conn.execute("COMMIT")
+        self.conn.execute("COMMIT")
 
     def rollback(self):
-        self._conn.execute("ROLLBACK")
+        self.conn.execute("ROLLBACK")
 
 
 @contextmanager
@@ -180,7 +180,7 @@ def session(ont: Ontology) -> Iterator[Session]:
             raise OntoloomError(msg) from e
         _validate_schema(raw)
         raw.execute("BEGIN")
-        s = Session(ontology=ont, _conn=raw)
+        s = Session(ontology=ont, conn=raw)
         try:
             yield s
         except:

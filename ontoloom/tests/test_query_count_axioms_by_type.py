@@ -6,30 +6,34 @@ from ontoloom.axioms.store import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import EntityType
-from ontoloom.query._constraints import (
+from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.query.constraints import (
     AlwaysFalse,
     InSelection,
     MentionsAll,
     MentionsAny,
-    OfTypes,
+    WithTypes,
 )
-from ontoloom.query._selection_ref import ResolvedSelection
-from ontoloom.query.count_axioms_by_type import CountAxiomsByType, _run, render
+from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+    SelectionKind,
+    SelectionName,
+)
 
 # -- render snapshots: no DB --
 
 
 def test_render_no_constraints():
-    compiled = render(CountAxiomsByType(constraints=()))
-    assert compiled.sql == "SELECT a.type, COUNT(*) FROM axioms a GROUP BY a.type"
+    compiled = (CountAxiomsByType(constraints=())).render()
+    assert compiled.sql == "SELECT a.type, COUNT(*) FROM axioms a WHERE 1 GROUP BY a.type"
     assert compiled.params == ()
 
 
 def test_render_of_types_single():
-    compiled = render(CountAxiomsByType(constraints=(OfTypes(tags=("Declaration",)),)))
+    compiled = (CountAxiomsByType(constraints=(WithTypes(tags=(AxiomTag.DECLARATION,)),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE a.type IN (?) GROUP BY a.type"
     )
@@ -37,7 +41,11 @@ def test_render_of_types_single():
 
 
 def test_render_of_types_many():
-    compiled = render(CountAxiomsByType(constraints=(OfTypes(tags=("SubClassOf", "Declaration")),)))
+    compiled = (
+        CountAxiomsByType(
+            constraints=(WithTypes(tags=(AxiomTag.SUB_CLASS_OF, AxiomTag.DECLARATION)),)
+        )
+    ).render()
     # tags are deduped and sorted by the field validator.
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE a.type IN (?,?) GROUP BY a.type"
@@ -46,7 +54,7 @@ def test_render_of_types_many():
 
 
 def test_render_mentions_all_single():
-    compiled = render(CountAxiomsByType(constraints=(MentionsAll(iris=(IRI("ex:A"),)),)))
+    compiled = (CountAxiomsByType(constraints=(MentionsAll(iris=(IRI("ex:A"),)),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM axiom_entities ae_m "
@@ -57,9 +65,9 @@ def test_render_mentions_all_single():
 
 
 def test_render_mentions_all_multi_emits_one_exists_per_iri():
-    compiled = render(
+    compiled = (
         CountAxiomsByType(constraints=(MentionsAll(iris=(IRI("ex:B"), IRI("ex:A"))),))
-    )
+    ).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM axiom_entities ae_m "
@@ -73,7 +81,7 @@ def test_render_mentions_all_multi_emits_one_exists_per_iri():
 
 
 def test_render_mentions_any_single():
-    compiled = render(CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:A"),)),)))
+    compiled = (CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:A"),)),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM axiom_entities ae_m "
@@ -84,9 +92,9 @@ def test_render_mentions_any_single():
 
 
 def test_render_mentions_any_many():
-    compiled = render(
+    compiled = (
         CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:B"), IRI("ex:A"))),))
-    )
+    ).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM axiom_entities ae_m "
@@ -97,8 +105,8 @@ def test_render_mentions_any_many():
 
 
 def test_render_in_selection_axioms():
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="my_axiom_sel")
-    compiled = render(CountAxiomsByType(constraints=(InSelection(ref=ref),)))
+    ref = AxiomSelectionName("axioms:my_axiom_sel")
+    compiled = (CountAxiomsByType(constraints=(InSelection(ref=ref),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM selection_items si_w "
@@ -109,8 +117,8 @@ def test_render_in_selection_axioms():
 
 
 def test_render_in_selection_entities():
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="my_entity_sel")
-    compiled = render(CountAxiomsByType(constraints=(InSelection(ref=ref),)))
+    ref = EntitySelectionName("entities:my_entity_sel")
+    compiled = (CountAxiomsByType(constraints=(InSelection(ref=ref),))).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
         "EXISTS (SELECT 1 FROM axiom_entities ae_w "
@@ -123,47 +131,47 @@ def test_render_in_selection_entities():
 
 
 def test_render_always_false():
-    compiled = render(CountAxiomsByType(constraints=(AlwaysFalse(),)))
+    compiled = (CountAxiomsByType(constraints=(AlwaysFalse(),))).render()
     assert compiled.sql == "SELECT a.type, COUNT(*) FROM axioms a WHERE 0 GROUP BY a.type"
     assert compiled.params == ()
 
 
 def test_render_always_false_short_circuits_other_constraints():
-    compiled = render(
+    compiled = (
         CountAxiomsByType(
             constraints=(
-                OfTypes(tags=("Declaration",)),
+                WithTypes(tags=(AxiomTag.DECLARATION,)),
                 AlwaysFalse(),
                 MentionsAny(iris=(IRI("ex:A"),)),
             )
         )
-    )
+    ).render()
     assert compiled.sql == "SELECT a.type, COUNT(*) FROM axioms a WHERE 0 GROUP BY a.type"
     assert compiled.params == ()
 
 
 def test_render_conjunction():
-    # render() does not normalize: fragments emit in the input-constraint order.
-    compiled = render(
+    # ().render() normalizes (sorts constraints by repr) before emitting fragments.
+    compiled = (
         CountAxiomsByType(
-            constraints=(OfTypes(tags=("Declaration",)), MentionsAny(iris=(IRI("ex:A"),)))
+            constraints=(WithTypes(tags=(AxiomTag.DECLARATION,)), MentionsAny(iris=(IRI("ex:A"),)))
         )
-    )
+    ).render()
     assert compiled.sql == (
         "SELECT a.type, COUNT(*) FROM axioms a WHERE "
-        "a.type IN (?) AND "
         "EXISTS (SELECT 1 FROM axiom_entities ae_m "
         "WHERE ae_m.axiom_id = a.id AND ae_m.entity_iri IN (?)) "
+        "AND a.type IN (?) "
         "GROUP BY a.type"
     )
-    assert compiled.params == ("Declaration", "ex:A")
+    assert compiled.params == ("ex:A", "Declaration")
 
 
 # -- _run integration --
 
 
 def test_run_empty_ontology(s):
-    assert _run(s, CountAxiomsByType(constraints=())) == Counter()
+    assert (CountAxiomsByType(constraints=()))._run(s) == Counter()
 
 
 def test_run_groups_by_type(s):
@@ -178,8 +186,8 @@ def test_run_groups_by_type(s):
         ],
     )
 
-    result = _run(s, CountAxiomsByType(constraints=()))
-    assert result == Counter({"Declaration": 3, "SubClassOf": 2})
+    result = (CountAxiomsByType(constraints=()))._run(s)
+    assert result == Counter({AxiomTag.DECLARATION: 3, AxiomTag.SUB_CLASS_OF: 2})
 
 
 def test_run_filter_by_of_types(s):
@@ -190,8 +198,8 @@ def test_run_filter_by_of_types(s):
             SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
         ],
     )
-    result = _run(s, CountAxiomsByType(constraints=(OfTypes(tags=("SubClassOf",)),)))
-    assert result == Counter({"SubClassOf": 1})
+    result = (CountAxiomsByType(constraints=(WithTypes(tags=(AxiomTag.SUB_CLASS_OF,)),)))._run(s)
+    assert result == Counter({AxiomTag.SUB_CLASS_OF: 1})
 
 
 def test_run_mentions_all_requires_all_iris_present(s):
@@ -203,11 +211,10 @@ def test_run_mentions_all_requires_all_iris_present(s):
             SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Mammal")),
         ],
     )
-    result = _run(
-        s,
-        CountAxiomsByType(constraints=(MentionsAll(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)),
-    )
-    assert result == Counter({"SubClassOf": 1})
+    result = CountAxiomsByType(
+        constraints=(MentionsAll(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)
+    )._run(s)
+    assert result == Counter({AxiomTag.SUB_CLASS_OF: 1})
 
 
 def test_run_mentions_any_any_of_iris(s):
@@ -219,21 +226,19 @@ def test_run_mentions_any_any_of_iris(s):
             SubClassOf(sub_class=IRI("ex:Fish"), super_class=IRI("ex:Vertebrate")),
         ],
     )
-    result = _run(
-        s,
-        CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),)),
-    )
-    assert result == Counter({"SubClassOf": 2})
+    result = CountAxiomsByType(
+        constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),)
+    )._run(s)
+    assert result == Counter({AxiomTag.SUB_CLASS_OF: 2})
 
 
 def test_run_count_star_no_row_multiplicity_with_mentions_any(s):
     # An axiom mentioning BOTH iris in a MentionsAny list must still count once.
     add_axioms(s, [SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))])
-    result = _run(
-        s,
-        CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)),
-    )
-    assert result == Counter({"SubClassOf": 1})
+    result = CountAxiomsByType(
+        constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)
+    )._run(s)
+    assert result == Counter({AxiomTag.SUB_CLASS_OF: 1})
 
 
 def test_run_in_selection_axioms(s):
@@ -250,9 +255,9 @@ def test_run_in_selection_axioms(s):
         [HashedAxiom.of(dog_decl).hash, HashedAxiom.of(sub).hash],
         source="test",
     )
-    ref = ResolvedSelection(kind=SelectionKind.AXIOMS, bare_name="axiom_pair")
-    result = _run(s, CountAxiomsByType(constraints=(InSelection(ref=ref),)))
-    assert result == Counter({"Declaration": 1, "SubClassOf": 1})
+    ref = AxiomSelectionName("axioms:axiom_pair")
+    result = (CountAxiomsByType(constraints=(InSelection(ref=ref),)))._run(s)
+    assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
 
 
 def test_run_in_selection_entities(s):
@@ -271,22 +276,22 @@ def test_run_in_selection_entities(s):
         ["ex:Dog"],
         source="test",
     )
-    ref = ResolvedSelection(kind=SelectionKind.ENTITIES, bare_name="dog_only")
-    result = _run(s, CountAxiomsByType(constraints=(InSelection(ref=ref),)))
+    ref = EntitySelectionName("entities:dog_only")
+    result = (CountAxiomsByType(constraints=(InSelection(ref=ref),)))._run(s)
     # Dog declaration mentions ex:Dog; SubClassOf mentions ex:Dog.
     # Cat declaration does not mention ex:Dog.
-    assert result == Counter({"Declaration": 1, "SubClassOf": 1})
+    assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
 
 
 def test_run_always_false(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert _run(s, CountAxiomsByType(constraints=(AlwaysFalse(),))) == Counter()
+    assert (CountAxiomsByType(constraints=(AlwaysFalse(),)))._run(s) == Counter()
 
 
-def test_run_returns_str_keys(s):
+def test_run_returns_axiom_tag_keys(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = _run(s, CountAxiomsByType(constraints=()))
+    result = (CountAxiomsByType(constraints=()))._run(s)
     assert len(result) == 1
     key = next(iter(result))
-    assert isinstance(key, str)
-    assert key == "Declaration"
+    assert isinstance(key, AxiomTag)
+    assert key is AxiomTag.DECLARATION

@@ -6,57 +6,39 @@ from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.query._selection_ref import ResolvedSelection
-from ontoloom.query.read_entity_selection import ReadEntitySelection, _run, render
+from ontoloom.query.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import (
+    EntitySelectionName,
     SelectionKind,
-    SelectionKindError,
     SelectionNotFoundError,
     ShowFilter,
 )
+from pydantic import ValidationError
 
 
-def _ref(name: str, kind: SelectionKind = SelectionKind.ENTITIES) -> ResolvedSelection:
-    return ResolvedSelection(kind=kind, bare_name=name)
+def _ref(name: str) -> EntitySelectionName:
+    return EntitySelectionName(f"entities:{name}")
 
 
 # -- field validator: wrong kind --
 
 
 def test_field_validator_rejects_axiom_kind():
-    with pytest.raises(SelectionKindError):
-        ReadEntitySelection(selection=_ref("foo", SelectionKind.AXIOMS))
+    with pytest.raises(ValidationError):
+        ReadEntitySelection(selection="axioms:foo")  # pyright: ignore[reportArgumentType]
 
 
 def test_field_validator_accepts_entity_kind():
-    q = ReadEntitySelection(selection=_ref("foo", SelectionKind.ENTITIES))
+    q = ReadEntitySelection(selection=_ref("foo"))
     assert q.selection.kind == SelectionKind.ENTITIES
-
-
-# -- pagination validators --
-
-
-def test_validator_rejects_negative_offset():
-    with pytest.raises(ValueError, match="offset must be >= 0"):
-        ReadEntitySelection(selection=_ref("foo"), offset=-1)
-
-
-def test_validator_rejects_negative_limit():
-    with pytest.raises(ValueError, match="limit must be >= 0 if set"):
-        ReadEntitySelection(selection=_ref("foo"), limit=-1)
-
-
-def test_validator_rejects_offset_without_limit():
-    with pytest.raises(ValueError, match="offset > 0 requires limit to be set"):
-        ReadEntitySelection(selection=_ref("foo"), offset=3, limit=None)
 
 
 # -- render snapshots --
 
 
 def test_render_default_show_all_no_pagination():
-    compiled = render(ReadEntitySelection(selection=_ref("sel")))
+    compiled = (ReadEntitySelection(selection=_ref("sel"))).render()
     assert compiled.sql == (
         "SELECT si.item, "
         "EXISTS (SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item) AS is_present "
@@ -68,7 +50,7 @@ def test_render_default_show_all_no_pagination():
 
 
 def test_render_show_present_uses_exists():
-    compiled = render(ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.PRESENT))
+    compiled = (ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.PRESENT)).render()
     assert " AND EXISTS (SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item)" in (
         compiled.sql
     )
@@ -76,14 +58,14 @@ def test_render_show_present_uses_exists():
 
 
 def test_render_show_missing_uses_not_exists():
-    compiled = render(ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.MISSING))
+    compiled = (ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.MISSING)).render()
     assert " AND NOT EXISTS (SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item)" in (
         compiled.sql
     )
 
 
 def test_render_limit_and_offset():
-    compiled = render(ReadEntitySelection(selection=_ref("sel"), limit=5, offset=2))
+    compiled = (ReadEntitySelection(selection=_ref("sel"), limit=5, offset=2)).render()
     assert compiled.sql.endswith("ORDER BY si.rowid LIMIT ? OFFSET ?")
     assert compiled.params == ("sel", 5, 2)
 
@@ -93,14 +75,14 @@ def test_render_limit_and_offset():
 
 def test_run_missing_selection_raises(s):
     with pytest.raises(SelectionNotFoundError):
-        _run(s, ReadEntitySelection(selection=_ref("nope")))
+        (ReadEntitySelection(selection=_ref("nope")))._run(s)
 
 
 def test_run_present_and_missing_classified(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
 
-    page = _run(s, ReadEntitySelection(selection=_ref("sel")))
+    page = (ReadEntitySelection(selection=_ref("sel")))._run(s)
     assert page.meta.kind == SelectionKind.ENTITIES
     assert page.meta.size == 2
     assert page.total_filtered == 2
@@ -118,7 +100,7 @@ def test_run_show_present(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
 
-    page = _run(s, ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.PRESENT))
+    page = (ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.PRESENT))._run(s)
     assert page.total_filtered == 1
     assert len(page.items) == 1
     assert page.items[0].iri == IRI("ex:Dog")
@@ -129,7 +111,7 @@ def test_run_show_missing(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
 
-    page = _run(s, ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.MISSING))
+    page = (ReadEntitySelection(selection=_ref("sel"), show=ShowFilter.MISSING))._run(s)
     assert page.total_filtered == 1
     assert len(page.items) == 1
     assert page.items[0].iri == IRI("ex:Ghost")
@@ -150,7 +132,7 @@ def test_run_labels_populated_for_present_entities(s):
     )
     upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
-    page = _run(s, ReadEntitySelection(selection=_ref("sel")))
+    page = (ReadEntitySelection(selection=_ref("sel")))._run(s)
     assert len(page.items) == 1
     assert page.items[0].label == "Dog"
 
@@ -168,11 +150,11 @@ def test_run_pagination_in_insertion_order(s):
         s, "sel", SelectionKind.ENTITIES, ["ex:Zebra", "ex:Antelope", "ex:Mongoose"], "test"
     )
 
-    full = _run(s, ReadEntitySelection(selection=_ref("sel")))
+    full = (ReadEntitySelection(selection=_ref("sel")))._run(s)
     iris_full = [i.iri for i in full.items]
 
-    page1 = _run(s, ReadEntitySelection(selection=_ref("sel"), limit=2))
-    page2 = _run(s, ReadEntitySelection(selection=_ref("sel"), limit=2, offset=2))
+    page1 = (ReadEntitySelection(selection=_ref("sel"), limit=2))._run(s)
+    page2 = (ReadEntitySelection(selection=_ref("sel"), limit=2, offset=2))._run(s)
     iris_paged = [i.iri for i in page1.items] + [i.iri for i in page2.items]
 
     assert iris_paged == iris_full
@@ -180,7 +162,7 @@ def test_run_pagination_in_insertion_order(s):
 
 def test_run_empty_selection(s):
     upsert_selection(s, "empty", SelectionKind.ENTITIES, [], "test")
-    page = _run(s, ReadEntitySelection(selection=_ref("empty")))
+    page = (ReadEntitySelection(selection=_ref("empty")))._run(s)
     assert page.items == ()
     assert page.total_filtered == 0
     assert page.present == 0
@@ -196,7 +178,7 @@ def test_run_punned_entity_present_missing_invariant(s):
         ],
     )
     upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
-    page = _run(s, ReadEntitySelection(selection=_ref("sel")))
+    page = (ReadEntitySelection(selection=_ref("sel")))._run(s)
     assert page.present + page.missing == page.meta.size
     assert page.present == 1
     assert page.missing == 1

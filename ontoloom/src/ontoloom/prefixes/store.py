@@ -14,9 +14,9 @@ from ontoloom.prefixes.types import (
     PrefixNotFoundError,
     UndeclaredPrefixError,
 )
-from ontoloom.query._constraints import InNamespaces
-from ontoloom.query._dispatch import run
+from ontoloom.query.constraints import InNamespaces
 from ontoloom.query.count_entities import CountEntities
+from ontoloom.query.dispatch import run
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +26,7 @@ class SetPrefixResult:
 
 
 def _get_metadata(s: Session) -> Metadata:
-    row = s._conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
+    row = s.conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
     try:
         return Metadata.model_validate_json(row[0])
     except ValidationError as e:
@@ -35,7 +35,7 @@ def _get_metadata(s: Session) -> Metadata:
 
 
 def _save_metadata(s: Session, meta: Metadata):
-    s._conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
+    s.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
 
 
 def list_prefixes(s: Session) -> dict[PrefixName, NamespaceIRI]:
@@ -85,7 +85,7 @@ def prefix_usage_counts(s: Session) -> dict[PrefixName, int]:
     registered = list_prefixes(s)
     db_counts = {
         PrefixName(row[0]): row[1]
-        for row in s._conn.execute(
+        for row in s.conn.execute(
             "SELECT substr(entity_iri, 1, instr(entity_iri, ':') - 1) AS prefix, "
             "COUNT(DISTINCT entity_iri) "
             "FROM axiom_entities WHERE instr(entity_iri, ':') > 0 "

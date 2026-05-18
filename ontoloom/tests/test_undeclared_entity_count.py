@@ -36,7 +36,7 @@ def test_undeclared_count_excludes_annotation_only_iris(s):
         ],
     )
 
-    # Only ex:Undeclared satisfies (HasEntityRole AND no Declaration).
+    # Only ex:Undeclared satisfies (HasRole AND no Declaration).
     # ex:OnlyAsAnnotationValue has role=None, so it is excluded.
     assert undeclared_entity_count(s) == 1
 

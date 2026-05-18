@@ -8,14 +8,14 @@ from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query._constraints import AlwaysFalse, InNamespaces, WithRoles
-from ontoloom.query.count_entities_by_role import CountEntitiesByRole, _run, render
+from ontoloom.query.constraints import AlwaysFalse, InNamespaces, WithRoles
+from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 
 # -- render snapshots: no DB --
 
 
 def test_render_no_constraints():
-    compiled = render(CountEntitiesByRole(constraints=()))
+    compiled = (CountEntitiesByRole(constraints=())).render()
     assert compiled.sql == (
         "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE 1 AND ae.role IS NOT NULL "
@@ -25,7 +25,7 @@ def test_render_no_constraints():
 
 
 def test_render_with_one_constraint():
-    compiled = render(CountEntitiesByRole(constraints=(WithRoles(roles=(EntityType.CLASS,)),)))
+    compiled = (CountEntitiesByRole(constraints=(WithRoles(roles=(EntityType.CLASS,)),))).render()
     assert compiled.sql == (
         "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE ae.role IN (?) AND ae.role IS NOT NULL "
@@ -35,7 +35,9 @@ def test_render_with_one_constraint():
 
 
 def test_render_always_false():
-    compiled = render(CountEntitiesByRole(constraints=(AlwaysFalse(),)))
+    # AlwaysFalse → WHERE 0 short-circuits the query; the role filter still
+    # appears (SQLite folds `0 AND ...` to 0 — same plan, simpler render).
+    compiled = (CountEntitiesByRole(constraints=(AlwaysFalse(),))).render()
     assert compiled.sql == (
         "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
         "WHERE 0 AND ae.role IS NOT NULL "
@@ -44,16 +46,17 @@ def test_render_always_false():
     assert compiled.params == ()
 
 
-def test_render_always_has_role_not_null_and_group_by():
-    # Every snapshot must contain the unconditional role-guard and GROUP BY.
+def test_render_always_excludes_null_roles_and_groups():
+    # Every rendered query must exclude role=NULL rows (either via the explicit
+    # filter, or via WHERE 0 which returns no rows at all) and GROUP BY role.
     for q in [
         CountEntitiesByRole(constraints=()),
         CountEntitiesByRole(constraints=(WithRoles(roles=(EntityType.CLASS,)),)),
         CountEntitiesByRole(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)),
         CountEntitiesByRole(constraints=(AlwaysFalse(),)),
     ]:
-        sql = render(q).sql
-        assert "AND ae.role IS NOT NULL" in sql
+        sql = q.render().sql
+        assert "ae.role IS NOT NULL" in sql or "WHERE 0" in sql
         assert "GROUP BY ae.role" in sql
 
 
@@ -61,7 +64,7 @@ def test_render_always_has_role_not_null_and_group_by():
 
 
 def test_run_empty_ontology(s):
-    assert _run(s, CountEntitiesByRole(constraints=())) == Counter()
+    assert (CountEntitiesByRole(constraints=()))._run(s) == Counter()
 
 
 def test_run_groups_by_role(s):
@@ -78,7 +81,7 @@ def test_run_groups_by_role(s):
         ],
     )
 
-    result = _run(s, CountEntitiesByRole(constraints=()))
+    result = (CountEntitiesByRole(constraints=()))._run(s)
     assert result == Counter(
         {
             EntityType.CLASS: 3,
@@ -91,7 +94,7 @@ def test_run_groups_by_role(s):
 
 def test_run_returns_entity_type_keys(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = _run(s, CountEntitiesByRole(constraints=()))
+    result = (CountEntitiesByRole(constraints=()))._run(s)
     assert len(result) == 1
     key = next(iter(result))
     assert isinstance(key, EntityType)
@@ -122,7 +125,7 @@ def test_run_excludes_iris_appearing_only_in_non_role_positions(s):
         ],
     )
 
-    result = _run(s, CountEntitiesByRole(constraints=()))
+    result = (CountEntitiesByRole(constraints=()))._run(s)
     # 2 classes (Dog, Cat). `ex:OnlyAsAnnotationValue` has no role so does
     # not appear under any key. `rdfs:seeAlso` carries role=ANNOTATION_PROPERTY.
     assert result[EntityType.CLASS] == 2
@@ -143,13 +146,12 @@ def test_run_filtered_by_namespace(s):
         ],
     )
 
-    result = _run(
-        s,
-        CountEntitiesByRole(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)),
+    result = CountEntitiesByRole(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))._run(
+        s
     )
     assert result == Counter({EntityType.CLASS: 1, EntityType.OBJECT_PROPERTY: 1})
 
 
 def test_run_always_false(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert _run(s, CountEntitiesByRole(constraints=(AlwaysFalse(),))) == Counter()
+    assert (CountEntitiesByRole(constraints=(AlwaysFalse(),)))._run(s) == Counter()

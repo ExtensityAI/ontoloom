@@ -41,7 +41,7 @@ from ontoloom.owl.axioms import (
 from ontoloom.owl.expressions import ObjectSomeValuesFrom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
-from ontoloom.owl.markers import EntityType, Position
+from ontoloom.owl.markers import AxiomTag, EntityType, Position
 from ontoloom.prefixes.store import (
     list_prefixes,
     prefix_usage_counts,
@@ -49,7 +49,6 @@ from ontoloom.prefixes.store import (
     set_prefix,
 )
 from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError
-from ontoloom.query._selection_ref import LockedSelectionRef
 from ontoloom.selections.expr import EntitiesInExpr
 from ontoloom.selections.store import (
     create_selection,
@@ -58,9 +57,8 @@ from ontoloom.selections.store import (
     upsert_selection,
 )
 from ontoloom.selections.types import (
-    LockedSelection,
+    AxiomSelectionName,
     SelectionKind,
-    SelectionKindError,
     SelectionName,
 )
 from pydantic import TypeAdapter
@@ -220,7 +218,7 @@ def test_replace_preserves_old_annotations(s):
     result = replace_axiom(s, old_h, new)
     assert not result.was_noop
 
-    row = s._conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -242,30 +240,12 @@ def test_replace_discards_new_axiom_annotations(s):
     )
     result = replace_axiom(s, old_h, new)
 
-    row = s._conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
     # Old axiom had no annotations; new_axiom's annotations are discarded.
     assert stored["annotations"] == []
-
-
-def test_rename_iri_rejects_entity_selection(s):
-    add_axioms(
-        s,
-        [
-            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
-            SubClassOf(
-                sub_class=IRI("ex:Dog"),
-                super_class=IRI("ex:Animal"),
-            ),
-        ],
-    )
-    h = upsert_selection(s, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
-    locked = LockedSelectionRef(kind=SelectionKind.ENTITIES, bare_name="dogs", hash_prefix=h)
-
-    with pytest.raises(SelectionKindError):
-        rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
 
 
 def test_rename_iri_preserves_annotations(s):
@@ -281,7 +261,7 @@ def test_rename_iri_preserves_annotations(s):
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    row = s._conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -301,7 +281,7 @@ def test_rename_iri_does_not_corrupt_literal_values(s):
     result = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"))
     assert len(result.replaced) == 1
 
-    row = s._conn.execute(
+    row = s.conn.execute(
         "SELECT json(data) FROM axioms WHERE hash = ?", (result.replaced[0].new.hash,)
     ).fetchone()
     stored = json.loads(row[0])
@@ -338,21 +318,6 @@ def test_entity_selection_present_count_punned_entity(s):
     assert page.present >= 0
     assert page.missing >= 0
     assert page.present + page.missing == page.meta.size
-
-
-# -- LockedSelection minimum prefix length --
-
-
-def test_locked_selection_min_prefix_length():
-    import pytest
-
-    for short in ("a", "ab", "abcdefg"):
-        with pytest.raises(ValueError, match="at least 8"):
-            LockedSelection(f"sel@{short}")
-
-    # 8 chars is the minimum -> must not raise
-    LockedSelection("sel@abcdef01")
-    LockedSelection("sel@" + "a" * 16)
 
 
 # -- Prefix management --
@@ -510,7 +475,7 @@ def test_get_entity_found(populated):
     assert info is not None
     assert EntityType.CLASS in info.roles
     assert any(a.value == "Dog" for a in info.annotations)
-    assert "SubClassOf" in info.axiom_counts
+    assert AxiomTag.SUB_CLASS_OF in info.axiom_counts
 
 
 def test_get_entity_not_found(s):
@@ -669,7 +634,7 @@ def test_workspace_root_allows_inside(tmp_path, monkeypatch):
     inside = workspace / "ok.db"
     Ontology.create(inside)
     with session(Ontology(inside)) as s:
-        assert s._conn is not None
+        assert s.conn is not None
         s.commit()
 
 
@@ -678,7 +643,7 @@ def test_workspace_root_unset_unrestricted(tmp_path, monkeypatch):
     path = tmp_path / "anywhere.db"
     Ontology.create(path)
     with session(Ontology(path)) as s:
-        assert s._conn is not None
+        assert s.conn is not None
         s.commit()
 
 
@@ -718,7 +683,7 @@ def test_batch_remove_rollback_on_failure(s):
         remove_by_hash(s, [h, AxiomHash("dead" + "0" * 60)])
 
     # The first axiom should still exist (rollback)
-    count = s._conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
+    count = s.conn.execute("SELECT COUNT(*) FROM axioms").fetchone()[0]
     assert count == 1
 
 
@@ -761,11 +726,11 @@ def test_entities_in_with_field_sub_class(axiom_selection):
     create_selection(
         axiom_selection,
         "sub_classes",
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.SUB_CLASS),
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUB_CLASS),
     )
     items = [
         r[0]
-        for r in axiom_selection._conn.execute(
+        for r in axiom_selection.conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("sub_classes",)
         )
     ]
@@ -776,11 +741,11 @@ def test_entities_in_with_field_super_class(axiom_selection):
     create_selection(
         axiom_selection,
         "super_classes",
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.SUPER_CLASS),
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUPER_CLASS),
     )
     items = [
         r[0]
-        for r in axiom_selection._conn.execute(
+        for r in axiom_selection.conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("super_classes",)
         )
     ]
@@ -793,11 +758,11 @@ def test_entities_in_with_field_filler(axiom_selection):
     create_selection(
         axiom_selection,
         "fillers",
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), field=Position.FILLER),
+        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.FILLER),
     )
     items = [
         r[0]
-        for r in axiom_selection._conn.execute(
+        for r in axiom_selection.conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("fillers",)
         )
     ]
@@ -810,7 +775,7 @@ def test_entities_in_without_field(axiom_selection):
     )
     items = [
         r[0]
-        for r in axiom_selection._conn.execute(
+        for r in axiom_selection.conn.execute(
             "SELECT item FROM selection_items WHERE selection_name = ?", ("all_ents",)
         )
     ]
@@ -852,11 +817,11 @@ def test_ambiguous_hash_error(s):
     prefix = "aaaa"
     h1 = prefix + "0" * 60
     h2 = prefix + "1" + "0" * 59
-    s._conn.execute(
+    s.conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
         (h1, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
     )
-    s._conn.execute(
+    s.conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
         (h2, '{"type":"Declaration","iri":"ex:Y","entity_type":"Class","annotations":[]}'),
     )
@@ -869,12 +834,12 @@ def test_ambiguous_hash_error(s):
 
 def test_store_corruption_error(s):
     h = "b" * 64
-    s._conn.execute(
+    s.conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Unknown', jsonb(?))",
         (h, '{"type":"UnknownAxiomType","garbage":true}'),
     )
 
-    row = s._conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
+    row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     assert row is not None
     with pytest.raises(StoreCorruptionError):
         load_axiom(row[0], "test context")
@@ -884,7 +849,7 @@ def test_store_corruption_error(s):
 
 
 def test_export_jsonl_hash_roundtrip(populated, tmp_path):
-    original_hashes = {r[0] for r in populated._conn.execute("SELECT hash FROM axioms")}
+    original_hashes = {r[0] for r in populated.conn.execute("SELECT hash FROM axioms")}
 
     export_path = tmp_path / "export.jsonl"
     export_to_jsonl(populated, export_path)
@@ -918,7 +883,7 @@ def test_rename_iri_noop_same_iri(s):
     result = rename_iri(s, IRI("ex:Dog"), IRI("ex:Dog"))
     assert len(result.replaced) == 1
     assert result.replaced[0].was_noop is True
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h,)).fetchone() is not None
 
 
 def test_rename_iri_collision_with_existing(s):
@@ -932,8 +897,8 @@ def test_rename_iri_collision_with_existing(s):
     assert len(result.replaced) == 1
     assert not result.replaced[0].was_noop
 
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (old_h,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (new_h,)).fetchone() is not None
 
 
 def test_rename_iri_collision_sets_merged_flag_and_colliding_hashes(s):
@@ -974,16 +939,15 @@ def test_rename_iri_scoped_to_selection(s):
     h_in = next(ha.hash for ha in result.added if ha.axiom == ax_in)
     h_out = HashedAxiom.of(ax_out).hash
 
-    sel_hash = upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test").selection.hash
-    locked = LockedSelectionRef(
-        kind=SelectionKind.AXIOMS, bare_name="scope", hash_prefix=sel_hash[:8]
-    )
+    upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test")
 
-    renamed = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=locked)
+    renamed = rename_iri(
+        s, IRI("ex:Animal"), IRI("ex:Mammal"), within=AxiomSelectionName("axioms:scope")
+    )
     assert len(renamed.replaced) == 1
 
     # ax_out is outside the scope -> its hash should be unchanged
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_out,)).fetchone() is not None
 
 
 # -- P-03-11: Additional small coverage gaps --
@@ -1007,8 +971,8 @@ def test_replace_to_existing_hash(s):
     assert result.new.hash == h_b
 
     # Old axiom gone; new (pre-existing) axiom survives unmodified
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
-    assert s._conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_a,)).fetchone() is None
+    assert s.conn.execute("SELECT 1 FROM axioms WHERE hash = ?", (h_b,)).fetchone() is not None
 
 
 def test_prefix_remove_while_in_use(s):
@@ -1079,7 +1043,7 @@ def test_list_all_selections_order(s):
     # Force identical created_at on two selections; tiebreaker by name must sort a_sel first.
     upsert_selection(s, "z_sel", SelectionKind.ENTITIES, ["ex:A"], "test")
     upsert_selection(s, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
-    s._conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
+    s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
     names = [ls.meta.name for ls in list_selections(s)]
     assert names == ["a_sel", "z_sel"]

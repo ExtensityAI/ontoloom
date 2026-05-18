@@ -3,15 +3,14 @@ from pathlib import Path
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.export import export_to_jsonl
-from ontoloom.query._selection_ref import resolve_selection
+from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.selection_refs import SelectionRefParam
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionRefParam | None = None):
+def export_jsonl(path: OntologyPath, output_path: Path, within: AxiomSelectionName | None = None):
     """Export axioms to a JSONL file (one axiom per line, sorted by hash).
 
     - `within`: Export only axioms in this axiom selection (e.g.
@@ -22,8 +21,7 @@ def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionRefPara
     """
     ont = Ontology(path)
     with session(ont) as s:
-        resolved = resolve_selection(s, within) if within is not None else None
-        result = export_to_jsonl(s, output_path, within=resolved)
+        result = export_to_jsonl(s, output_path, within=within)
         s.commit()
 
     if within is not None:

@@ -4,19 +4,18 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Annotated
 
-from annotated_types import MinLen
-
-from ontoloom.hashing import AxiomHash, AxiomHashPrefix, HashedAxiom
+from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.types import LockedSelection
+from ontoloom.owl.markers import AxiomTag
+from ontoloom.selections.types import SelectionMeta
 
 
 @dataclass(frozen=True, slots=True)
 class AxiomSummary:
     total: int
-    by_type: Counter[str]
+    by_type: Counter[AxiomTag]
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +33,7 @@ class RemoveResult:
 class RemoveBySelectionResult:
     removed: tuple[HashedAxiom, ...]
     absent: int
+    meta: SelectionMeta
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,28 +69,6 @@ class RenameResult:
     def colliding_hashes(self) -> tuple[AxiomHash, ...]:
         """New hashes whose insertion was a no-op because an axiom with that hash already existed."""
         return tuple(sorted(r.new.hash for r in self.replaced if r.was_merged_into_existing))
-
-
-class ByHashes(FrozenModel):
-    """Target a set of axioms by hash (full or unambiguous prefix)."""
-
-    hashes: Annotated[tuple[AxiomHashPrefix, ...], MinLen(1)]
-
-
-class BySelection(FrozenModel):
-    """Target every axiom in a locked axiom-selection."""
-
-    selection: LockedSelection
-
-
-_get_remove_axioms_target_tag = make_tag_resolver(
-    (ByHashes, BySelection), union_name="RemoveAxiomsTarget"
-)
-
-RemoveAxiomsTarget = Annotated[
-    tagged(ByHashes) | tagged(BySelection),
-    *tagged_union_meta(_get_remove_axioms_target_tag),
-]
 
 
 class AddAnnotation(FrozenModel):

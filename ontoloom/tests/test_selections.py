@@ -13,18 +13,15 @@ from ontoloom.selections.expr import (
 )
 from ontoloom.selections.store import (
     create_selection,
-    get_locked_selection,
     get_selection,
     read_selection,
     upsert_selection,
 )
 from ontoloom.selections.types import (
-    LockedSelection,
     SelectionExprError,
     SelectionKind,
     SelectionName,
     ShowFilter,
-    StaleSelectionError,
 )
 
 # -- P-03-3: Selection set algebra --
@@ -169,25 +166,6 @@ def test_overwrite_produces_new_hash(s):
     assert get_selection(s, "s").size == 1
 
 
-def test_write_if_hash_matches(s):
-    h1 = upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
-    _r = upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash=h1[:8])
-    h2, card2 = _r.selection.hash, _r.selection.size
-    assert card2 == 1
-    assert h2 != h1
-
-
-def test_write_if_hash_mismatch_raises(s):
-    upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    with pytest.raises(StaleSelectionError):
-        upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash="deadbeef")
-
-
-def test_write_if_hash_missing_selection_raises(s):
-    with pytest.raises(StaleSelectionError):
-        upsert_selection(s, "ghost", SelectionKind.ENTITIES, ["ex:Cat"], "test", if_hash="abcd1234")
-
-
 def test_single_input_intersection_rejected(s):
     upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(SelectionExprError, match="at least two"):
@@ -270,15 +248,6 @@ def test_selection_name_accepts_valid_shapes(good):
     assert SelectionName(good) == good
 
 
-def test_verify_hash_match_and_mismatch(s):
-    hash1 = upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
-
-    get_locked_selection(s, LockedSelection(f"sel@{hash1[:8]}"))  # should not raise
-
-    with pytest.raises(StaleSelectionError):
-        get_locked_selection(s, LockedSelection("sel@00000000"))
-
-
 def test_read_with_show_filters(s):
     ax = SubClassOf(
         sub_class=IRI("ex:Dog"),
@@ -298,23 +267,6 @@ def test_read_with_show_filters(s):
 
     page_all = read_selection(s, "sel", show=ShowFilter.ALL)
     assert len(page_all.items) == 2
-
-
-# -- P-03-8: LockedSelection validation --
-
-
-def test_locked_selection_missing_at():
-    with pytest.raises(ValueError):
-        LockedSelection("no_at_sign_here")
-
-
-def test_locked_selection_nonhex_prefix():
-    with pytest.raises(ValueError):
-        LockedSelection("sel@zzzzzzzz")
-
-
-def test_locked_selection_full_64_char_accepted():
-    LockedSelection("sel@" + "a" * 64)
 
 
 # -- P-03-8: punned entity present+missing invariant --
@@ -390,11 +342,11 @@ def test_set_expr_validates_axioms_for_dict():
     assert result.axioms_for == SelectionName("ents")
 
 
-def test_set_expr_validates_entities_in_dict_with_field():
+def test_set_expr_validates_entities_in_dict_with_position():
     from ontoloom.selections.expr import SetExpr
     from pydantic import TypeAdapter
 
-    result = TypeAdapter(SetExpr).validate_python({"entities_in": "axs", "field": "sub_class"})
+    result = TypeAdapter(SetExpr).validate_python({"entities_in": "axs", "position": "sub_class"})
     assert isinstance(result, EntitiesInExpr)
     assert result.entities_in == SelectionName("axs")
 

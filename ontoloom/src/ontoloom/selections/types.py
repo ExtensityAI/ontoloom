@@ -6,7 +6,7 @@ Pure types -> no I/O. Persistence and operations live in `selections/store.py`.
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import override
+from typing import Literal, override
 
 from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
@@ -23,47 +23,6 @@ class SelectionNotFoundError(OntoloomError):
         super().__init__(f"Selection {dquoted(name)} does not exist.")
 
 
-class StaleSelectionError(OntoloomError):
-    """Selection has changed since the caller last observed it."""
-
-    def __init__(
-        self,
-        name: "SelectionName",
-        supplied_prefix: str,
-        current_hash: str | None,
-        current_size: int | None = None,
-    ):
-        self.name = name
-        self.supplied_prefix = supplied_prefix
-        self.current_hash = current_hash
-        self.current_size = current_size
-        current = current_hash[:12] if current_hash else "<absent>"
-        super().__init__(
-            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
-            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
-        )
-
-
-class SelectionKindError(OntoloomError):
-    """Wrong selection kind for the requested operation."""
-
-    def __init__(
-        self,
-        name: "SelectionName",
-        expected: "SelectionKind",
-        actual: "SelectionKind",
-        operation: str,
-    ):
-        self.name = name
-        self.expected = expected
-        self.actual = actual
-        self.operation = operation
-        super().__init__(
-            f"{dquoted(operation)} requires an {expected} selection, "
-            f"but {dquoted(name)} is an {actual} selection."
-        )
-
-
 class SelectionExprError(OntoloomError):
     """Set-expression evaluation precondition violated.
 
@@ -74,15 +33,10 @@ class SelectionExprError(OntoloomError):
 
 
 MAX_SELECTION_NAME_LEN = 64
-LOCKED_PREFIX_MIN = 8
 
-# Pattern fragments — single source of truth, composed by SelectionName /
-# LockedSelection regexes and JSON-schema patterns.
 _NAME_FRAGMENT = rf"[a-zA-Z][a-zA-Z0-9._/:-]{{0,{MAX_SELECTION_NAME_LEN - 1}}}"
-_HASH_FRAGMENT = rf"[0-9a-fA-F]{{{LOCKED_PREFIX_MIN},}}"
 
 _NAME_PATTERN = re.compile(rf"^{_NAME_FRAGMENT}$")
-_LOCKED_PATTERN = re.compile(rf"^{_HASH_FRAGMENT}$")
 
 
 class SelectionKind(StrEnum):
@@ -144,12 +98,7 @@ def _validate_name(value: str):
 
 
 class SelectionName(TypedStr):
-    """A bare selection name. Rejects any `@hash` suffix.
-
-    Used for `within=` on read tools, where reads always reflect current state.
-    Write tools that need optimistic locking on the scoped selection use
-    `LockedSelection`, which carries the hash and enforces it.
-    """
+    """A bare selection name. Rejects any `@hash` suffix."""
 
     description = "Selection name"
     pattern = rf"^{_NAME_FRAGMENT}$"
@@ -162,50 +111,67 @@ class SelectionName(TypedStr):
         return value
 
 
-class LockedSelection(TypedStr):
-    """A selection reference with optimistic-locking hash: `name@hash_prefix`.
+class EntitySelectionName(TypedStr):
+    """Kind-typed reference to an entity selection. Wire form `entities:NAME`."""
 
-    Used for `within=` on tools whose operation mutates the scoped selection
-    (remove_axioms, rename_iri). The hash prefix verifies the selection hasn't
-    changed since the caller last observed it.
-
-    Read paths take bare `SelectionName` and always reflect current state.
-
-    The decomposed parts (`name`, `hash_prefix`) are computed once at
-    construction and cached as instance attributes — no re-parsing on access.
-
-    Examples:
-        LockedSelection("my_sel@a3f1b2c4") -> my_sel@a3f1b2c4
-    """
-
-    description = "Selection reference with optimistic locking, in 'name@hash_prefix' format"
-    pattern = rf"^{_NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
-    examples = ("my_selection@a3f1b2c4",)
-
-    name: SelectionName
-    hash_prefix: str
+    description = "Entity-kind selection reference (wire form: 'entities:NAME')"
+    pattern = rf"^entities:{_NAME_FRAGMENT}$"
+    examples = ("entities:my_selection",)
 
     @override
     @classmethod
     def parse(cls, value: str):
-        name, sep, hash_prefix = value.partition("@")
+        prefix, sep, name = value.partition(":")
 
-        if not sep or not _LOCKED_PATTERN.match(hash_prefix):
+        if not sep or prefix != SelectionKind.ENTITIES.value:
             msg = (
-                f"LockedSelection must be 'name@hash_prefix' with at least "
-                f"{LOCKED_PREFIX_MIN} hex chars (e.g. 'my_sel@a3f1b2c4'), got {dquoted(value)}"
+                f"EntitySelectionName must be 'entities:NAME' "
+                f"(e.g. 'entities:my_sel'), got {dquoted(value)}"
             )
             raise ValueError(msg)
         _validate_name(name)
         return value
 
+    @property
+    def bare(self) -> SelectionName:
+        return SelectionName(self.removeprefix("entities:"))
+
+    @property
+    def kind(self) -> Literal[SelectionKind.ENTITIES]:
+        return SelectionKind.ENTITIES
+
+
+class AxiomSelectionName(TypedStr):
+    """Kind-typed reference to an axiom selection. Wire form `axioms:NAME`."""
+
+    description = "Axiom-kind selection reference (wire form: 'axioms:NAME')"
+    pattern = rf"^axioms:{_NAME_FRAGMENT}$"
+    examples = ("axioms:my_selection",)
+
     @override
-    def __new__(cls, value: str):
-        inst = super().__new__(cls, value)
-        name, _, hash_prefix = inst.partition("@")
-        inst.name = SelectionName(name)
-        inst.hash_prefix = hash_prefix
-        return inst
+    @classmethod
+    def parse(cls, value: str):
+        prefix, sep, name = value.partition(":")
+
+        if not sep or prefix != SelectionKind.AXIOMS.value:
+            msg = (
+                f"AxiomSelectionName must be 'axioms:NAME' "
+                f"(e.g. 'axioms:my_sel'), got {dquoted(value)}"
+            )
+            raise ValueError(msg)
+        _validate_name(name)
+        return value
+
+    @property
+    def bare(self) -> SelectionName:
+        return SelectionName(self.removeprefix("axioms:"))
+
+    @property
+    def kind(self) -> Literal[SelectionKind.AXIOMS]:
+        return SelectionKind.AXIOMS
+
+
+type SelectionRef = EntitySelectionName | AxiomSelectionName
 
 
 @dataclass(frozen=True, slots=True)
@@ -215,14 +181,6 @@ class SelectionMeta:
     hash: SelectionContentHash
     size: int
     source: str = ""
-
-    @property
-    def locked(self):
-        return f"{self.name}@{self.hash}"
-
-    @override
-    def __str__(self):
-        return self.locked
 
 
 @dataclass(frozen=True, slots=True)
