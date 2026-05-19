@@ -2,10 +2,19 @@
 
 from ontoloom.axioms.store import add_axioms
 from ontoloom.hashing import AxiomHash, HashedAxiom
+from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import AxiomTag, EntityType
-from ontoloom.query.constraints import AlwaysFalse, MentionsAny, WithTypes
+from ontoloom.query.constraints import (
+    AlwaysFalse,
+    HasAnyAnnotation,
+    MentionsAny,
+    TextMatchKind,
+    WithAnnotationText,
+    WithTypes,
+)
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 
 # -- render snapshots --
@@ -149,3 +158,176 @@ def test_run_filter_by_of_types(s):
 def test_run_always_false(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     assert (ListAxiomHashes(constraints=(AlwaysFalse(),)))._run(s) == []
+
+
+# -- WithAnnotationText render --
+
+
+def test_render_with_annotation_text_substring_no_properties():
+    compiled = ListAxiomHashes(
+        constraints=(WithAnnotationText(text="TODO"),),
+    ).render()
+    assert "EXISTS (SELECT 1 FROM axiom_text at" in compiled.sql
+    assert "INSTR(LOWER(at.text), ?) > 0" in compiled.sql
+    assert "at.property IN" not in compiled.sql
+    assert compiled.params == ("todo",)
+
+
+def test_render_with_annotation_text_substring_with_properties():
+    compiled = ListAxiomHashes(
+        constraints=(WithAnnotationText(text="TODO", properties=(IRI("ex:p1"), IRI("ex:p2"))),),
+    ).render()
+    assert "at.property IN (?,?)" in compiled.sql
+    assert "INSTR(LOWER(at.text), ?) > 0" in compiled.sql
+    assert compiled.params == (IRI("ex:p1"), IRI("ex:p2"), "todo")
+
+
+def test_render_with_annotation_text_exact_no_properties():
+    compiled = ListAxiomHashes(
+        constraints=(WithAnnotationText(text="TODO", match_kind=TextMatchKind.EXACT),),
+    ).render()
+    assert "LOWER(at.text) = ?" in compiled.sql
+    assert "INSTR" not in compiled.sql
+    assert "at.property IN" not in compiled.sql
+    assert compiled.params == ("todo",)
+
+
+def test_render_with_annotation_text_exact_with_properties():
+    compiled = ListAxiomHashes(
+        constraints=(
+            WithAnnotationText(
+                text="TODO",
+                properties=(IRI("ex:p1"),),
+                match_kind=TextMatchKind.EXACT,
+            ),
+        ),
+    ).render()
+    assert "at.property IN (?)" in compiled.sql
+    assert "LOWER(at.text) = ?" in compiled.sql
+    assert "INSTR" not in compiled.sql
+    assert compiled.params == (IRI("ex:p1"), "todo")
+
+
+# -- WithAnnotationText run --
+
+
+def _comment(text: str) -> Annotation:
+    return Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value=text))
+
+
+def _label(text: str) -> Annotation:
+    return Annotation(property=IRI("rdfs:label"), value=LangLiteral(value=text))
+
+
+def test_run_with_annotation_text_substring_matches_partial(s):
+    matching = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("this is a TODO note"),),
+    )
+    other = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("unrelated content"),),
+    )
+    add_axioms(s, [matching, other])
+
+    result = (ListAxiomHashes(constraints=(WithAnnotationText(text="TODO"),)))._run(s)
+    assert result == [HashedAxiom.of(matching).hash]
+
+
+def test_run_with_annotation_text_exact_no_substring(s):
+    exact = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("TODO"),),
+    )
+    superstring = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("TODO and more"),),
+    )
+    add_axioms(s, [exact, superstring])
+
+    result = (
+        ListAxiomHashes(
+            constraints=(WithAnnotationText(text="TODO", match_kind=TextMatchKind.EXACT),),
+        )
+    )._run(s)
+    assert result == [HashedAxiom.of(exact).hash]
+
+
+def test_run_with_annotation_text_restricts_to_properties(s):
+    commented = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("X"),),
+    )
+    labelled = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_label("X"),),
+    )
+    add_axioms(s, [commented, labelled])
+
+    result = (
+        ListAxiomHashes(
+            constraints=(WithAnnotationText(text="X", properties=(IRI("rdfs:comment"),)),),
+        )
+    )._run(s)
+    assert result == [HashedAxiom.of(commented).hash]
+
+
+def test_run_with_annotation_text_empty_result(s):
+    add_axioms(
+        s,
+        [
+            SubClassOf(
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
+                annotations=(_comment("hello"),),
+            ),
+        ],
+    )
+    result = (ListAxiomHashes(constraints=(WithAnnotationText(text="nonexistent"),)))._run(s)
+    assert result == []
+
+
+# -- HasAnyAnnotation --
+
+
+def test_render_has_any_annotation():
+    compiled = ListAxiomHashes(
+        constraints=(HasAnyAnnotation(properties=(IRI("ex:p1"), IRI("ex:p2"))),),
+    ).render()
+    assert (
+        "EXISTS (SELECT 1 FROM axiom_text at WHERE at.axiom_id = a.id AND at.property IN (?,?))"
+    ) in compiled.sql
+    assert compiled.params == (IRI("ex:p1"), IRI("ex:p2"))
+
+
+def test_run_has_any_annotation_existence(s):
+    sourced = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(
+            Annotation(property=IRI("rdfs:isDefinedBy"), value=LangLiteral(value="imported")),
+        ),
+    )
+    commented = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(_comment("doc"),),
+    )
+    unannotated = SubClassOf(
+        sub_class=IRI("ex:Fox"),
+        super_class=IRI("ex:Animal"),
+    )
+    add_axioms(s, [sourced, commented, unannotated])
+
+    result = (
+        ListAxiomHashes(
+            constraints=(HasAnyAnnotation(properties=(IRI("rdfs:isDefinedBy"),)),),
+        )
+    )._run(s)
+    assert result == [HashedAxiom.of(sourced).hash]

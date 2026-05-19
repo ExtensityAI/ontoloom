@@ -10,6 +10,7 @@ from ontoloom.query.constraints import (
     AlwaysFalse,
     Declared,
     Deprecated,
+    HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
     InIRIs,
@@ -20,6 +21,7 @@ from ontoloom.query.constraints import (
     MentionsAll,
     MentionsAllOverflowError,
     MentionsAny,
+    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -344,6 +346,21 @@ def test_mentions_any_stay_separate():
     result = normalize_axiom([c1, c2])
     assert len(result) == 2
     assert set(result) == {c1, c2}
+
+
+# == Axiom: annotation-constraint dedupe ==
+
+
+def test_normalize_axiom_dedupes_with_annotation_text():
+    c = WithAnnotationText(text="x", properties=(IRI("ex:p"),))
+    result = normalize_axiom([c, c])
+    assert result == (c,)
+
+
+def test_normalize_axiom_dedupes_has_any_annotation():
+    c = HasAnyAnnotation(properties=(IRI("ex:p"),))
+    result = normalize_axiom([c, c])
+    assert result == (c,)
 
 
 # == Axiom: InSelection ==

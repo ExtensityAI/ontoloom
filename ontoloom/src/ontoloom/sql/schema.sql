@@ -65,9 +65,14 @@ CREATE TABLE IF NOT EXISTS axiom_text (
     property TEXT NOT NULL
 );
 
+DROP INDEX IF EXISTS idx_axiom_text_text;
+DROP INDEX IF EXISTS idx_axiom_text_property;
+
 CREATE INDEX IF NOT EXISTS idx_axiom_text_axiom ON axiom_text(axiom_id);
-CREATE INDEX IF NOT EXISTS idx_axiom_text_text ON axiom_text(text);
-CREATE INDEX IF NOT EXISTS idx_axiom_text_property ON axiom_text(property);
+CREATE INDEX IF NOT EXISTS idx_axiom_text_lower_text
+    ON axiom_text(LOWER(text));
+CREATE INDEX IF NOT EXISTS idx_axiom_text_prop_lower_text
+    ON axiom_text(property, LOWER(text));
 
 -- Named selections: persistent sets of axiom hashes or entity IRIs.
 -- Kind is inferred from the producing operation. Content hash enables

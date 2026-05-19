@@ -6,11 +6,13 @@ Each test calls a tool function directly (the same callable wrapped by
 
 import pytest
 from fastmcp.exceptions import ToolError
-from ontoloom.connection import Ontology
+from ontoloom.connection import Ontology, session
+from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
+from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.selections.types import EntitySelectionName, SelectionName
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionName
 from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
@@ -89,6 +91,255 @@ def test_read_selection_after_search(populated_db):
     )
     result = read_selection(path=populated_db, name=EntitySelectionName("entities:dogs"))
     assert "ex:Dog" in result
+
+
+def test_search_axioms_by_text(empty_db):
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    todo_comment = Annotation(
+        property=IRI("rdfs:comment"),
+        value=LangLiteral(value="this is a TODO note"),
+    )
+    other_comment = Annotation(
+        property=IRI("rdfs:comment"),
+        value=LangLiteral(value="unrelated content"),
+    )
+    axiom_a = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(todo_comment,),
+    )
+    axiom_b = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(other_comment,),
+    )
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            axiom_a,
+            axiom_b,
+        ],
+    )
+
+    result = search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:todos"),
+        query="TODO",
+    )
+
+    assert "axioms:todos@" in result
+    assert "1 axioms" in result
+    assert "SubClassOf" in result
+
+    page = read_selection(path=empty_db, name=AxiomSelectionName("axioms:todos"))
+    assert "ex:Dog" in page
+    assert "ex:Cat" not in page
+    assert "TODO" in page
+
+
+def test_search_axioms_by_property_only(empty_db):
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    is_defined_by = Annotation(
+        property=IRI("rdfs:isDefinedBy"),
+        value=LangLiteral(value="http://example.org/ontology"),
+    )
+    plain_comment = Annotation(
+        property=IRI("rdfs:comment"),
+        value=LangLiteral(value="just a comment"),
+    )
+    defined_axiom = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(is_defined_by,),
+    )
+    commented_axiom = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(plain_comment,),
+    )
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            defined_axiom,
+            commented_axiom,
+        ],
+    )
+
+    search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:defined"),
+        properties=[IRI("rdfs:isDefinedBy")],
+    )
+
+    from ontoloom.hashing import HashedAxiom
+
+    defined_hash = HashedAxiom.of(defined_axiom).hash
+    commented_hash = HashedAxiom.of(commented_axiom).hash
+
+    with session(Ontology(empty_db)) as s:
+        rows = s.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?",
+            ("defined",),
+        ).fetchall()
+        s.commit()
+    hashes = {r[0] for r in rows}
+    assert defined_hash in hashes
+    assert commented_hash not in hashes
+
+
+def test_search_axioms_with_within_scope(empty_db):
+    from ontoloom.hashing import HashedAxiom
+    from ontoloom.selections.store import upsert_selection
+    from ontoloom.selections.types import SelectionKind, SelectionName
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    todo = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
+    in_scope_todo = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(todo,),
+    )
+    out_of_scope_todo = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(todo,),
+    )
+    no_anno = SubClassOf(
+        sub_class=IRI("ex:Wolf"),
+        super_class=IRI("ex:Animal"),
+    )
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Wolf")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            in_scope_todo,
+            out_of_scope_todo,
+            no_anno,
+        ],
+    )
+
+    in_scope_hash = HashedAxiom.of(in_scope_todo).hash
+    no_anno_hash = HashedAxiom.of(no_anno).hash
+    out_of_scope_hash = HashedAxiom.of(out_of_scope_todo).hash
+
+    # Pre-build a scope selection containing the in-scope TODO and the no-anno axiom,
+    # but NOT the out-of-scope TODO.
+    with session(Ontology(empty_db)) as s:
+        upsert_selection(
+            s,
+            SelectionName("scope"),
+            SelectionKind.AXIOMS,
+            [in_scope_hash, no_anno_hash],
+            "test fixture",
+        )
+        s.commit()
+
+    search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:hits"),
+        query="TODO",
+        within=AxiomSelectionName("axioms:scope"),
+    )
+
+    with session(Ontology(empty_db)) as s:
+        rows = s.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ?",
+            ("hits",),
+        ).fetchall()
+        s.commit()
+    hashes = {r[0] for r in rows}
+    assert hashes == {in_scope_hash}
+    assert out_of_scope_hash not in hashes
+    assert no_anno_hash not in hashes
+
+
+def test_search_axioms_exact_ranked_before_substring(empty_db):
+    from ontoloom.hashing import HashedAxiom
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    exact = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
+    substring = Annotation(
+        property=IRI("rdfs:comment"),
+        value=LangLiteral(value="TODO and more text"),
+    )
+    axiom_a = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(exact,),
+    )
+    axiom_b = SubClassOf(
+        sub_class=IRI("ex:Cat"),
+        super_class=IRI("ex:Animal"),
+        annotations=(substring,),
+    )
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            axiom_a,
+            axiom_b,
+        ],
+    )
+
+    search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:ranked"),
+        query="TODO",
+    )
+
+    hash_a = HashedAxiom.of(axiom_a).hash
+    hash_b = HashedAxiom.of(axiom_b).hash
+
+    # `read_selection` re-orders by hash, so verify ranking via raw rowid order
+    # (insertion order, which `upsert_selection` preserves from the search's
+    # exact-first ranking).
+    with session(Ontology(empty_db)) as s:
+        rows = s.conn.execute(
+            "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
+            ("ranked",),
+        ).fetchall()
+        s.commit()
+    ordered = [r[0] for r in rows]
+    assert ordered == [hash_a, hash_b]
+
+
+def test_search_axioms_no_results_message(empty_db):
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))],
+    )
+
+    result = search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:empty"),
+        query="nonexistent",
+    )
+
+    assert result.startswith("0 axioms ->")
+    assert "search_axioms(query=" in result
+    assert "No axioms found" in result
+
+
+def test_search_axioms_requires_query_or_properties(empty_db):
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    with pytest.raises(ValueError, match="search_axioms requires at least one of"):
+        search_axioms(path=empty_db, into=AxiomSelectionName("axioms:x"))
 
 
 # -- Error translation --

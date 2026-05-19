@@ -7,6 +7,7 @@ from ontoloom_mcp.tools.axioms.match_axioms import tool_match_axioms
 from ontoloom_mcp.tools.axioms.remove_axioms import tool_remove_axioms
 from ontoloom_mcp.tools.axioms.rename_iri import tool_rename_iri
 from ontoloom_mcp.tools.axioms.replace_axiom import tool_replace_axiom
+from ontoloom_mcp.tools.axioms.search_axioms import tool_search_axioms
 from ontoloom_mcp.tools.entities.find_duplicates import tool_find_duplicates
 from ontoloom_mcp.tools.entities.get_entity import tool_get_entity
 from ontoloom_mcp.tools.entities.search_entities import tool_search_entities
@@ -49,6 +50,7 @@ mcp.add_tool(tool_find_duplicates)
 mcp.add_tool(tool_get_entity)
 mcp.add_tool(tool_search_entities)
 mcp.add_tool(tool_match_axioms)
+mcp.add_tool(tool_search_axioms)
 mcp.add_tool(tool_set_prefix)
 mcp.add_tool(tool_remove_prefix)
 mcp.add_tool(tool_export_jsonl)

@@ -17,6 +17,7 @@ from ontoloom.query.constraints import (
     Declared,
     Deprecated,
     EntityConstraint,
+    HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
     InIRIs,
@@ -26,6 +27,8 @@ from ontoloom.query.constraints import (
     MentionedIn,
     MentionsAll,
     MentionsAny,
+    TextMatchKind,
+    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -142,7 +145,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
     return Predicate(sql=" AND ".join(fragments), params=tuple(params))
 
 
-def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
+def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
     constraints = normalize_axiom(constraints)
 
     if not constraints:
@@ -175,6 +178,35 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
                     f"AND ae_m.entity_iri IN ({placeholders}))"
                 )
                 params.extend(iris)
+            case WithAnnotationText(text=text, properties=properties, match_kind=kind):
+                text_op = (
+                    "LOWER(at.text) = ?"
+                    if kind == TextMatchKind.EXACT
+                    else "INSTR(LOWER(at.text), ?) > 0"
+                )
+
+                if properties:
+                    placeholders = ",".join("?" for _ in properties)
+                    fragments.append(
+                        f"EXISTS (SELECT 1 FROM axiom_text at "
+                        f"WHERE at.axiom_id = a.id "
+                        f"AND at.property IN ({placeholders}) AND {text_op})"
+                    )
+                    params.extend(properties)
+                    params.append(text.lower())
+                else:
+                    fragments.append(
+                        f"EXISTS (SELECT 1 FROM axiom_text at "
+                        f"WHERE at.axiom_id = a.id AND {text_op})"
+                    )
+                    params.append(text.lower())
+            case HasAnyAnnotation(properties=properties):
+                placeholders = ",".join("?" for _ in properties)
+                fragments.append(
+                    "EXISTS (SELECT 1 FROM axiom_text at "
+                    f"WHERE at.axiom_id = a.id AND at.property IN ({placeholders}))"
+                )
+                params.extend(properties)
             case InSelection(ref=AxiomSelectionName() as ref):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM selection_items si_w "

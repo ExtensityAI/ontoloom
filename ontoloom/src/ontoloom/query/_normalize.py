@@ -9,6 +9,7 @@ from ontoloom.query.constraints import (
     Declared,
     Deprecated,
     EntityConstraint,
+    HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
     InIRIs,
@@ -19,6 +20,7 @@ from ontoloom.query.constraints import (
     MentionsAll,
     MentionsAllOverflowError,
     MentionsAny,
+    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -155,23 +157,29 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
     with_types: list[WithTypes] = []
     mentions_all: list[MentionsAll] = []
     mentions_any: list[MentionsAny] = []
+    with_annotation_text: list[WithAnnotationText] = []
+    has_any_annotation: list[HasAnyAnnotation] = []
     in_selection: list[InSelection] = []
 
     for c in cs:
-        if isinstance(c, AlwaysFalse):
-            return (AlwaysFalse(),)
-
-        if isinstance(c, WithTypes):
-            with_types.append(c)
-        elif isinstance(c, MentionsAll):
-            mentions_all.append(c)
-        elif isinstance(c, MentionsAny):
-            mentions_any.append(c)
-        elif isinstance(c, InSelection):
-            in_selection.append(c)
-        else:
-            msg = f"unknown axiom constraint variant: {type(c).__name__}"
-            raise ValueError(msg)
+        match c:
+            case AlwaysFalse():
+                return (AlwaysFalse(),)
+            case WithTypes():
+                with_types.append(c)
+            case MentionsAll():
+                mentions_all.append(c)
+            case MentionsAny():
+                mentions_any.append(c)
+            case WithAnnotationText():
+                with_annotation_text.append(c)
+            case HasAnyAnnotation():
+                has_any_annotation.append(c)
+            case InSelection():
+                in_selection.append(c)
+            case _:
+                msg = f"unknown axiom constraint variant: {type(c).__name__}"
+                raise ValueError(msg)
 
     if len(in_selection) > 1:
         msg = "a query may have at most one selection scope"
@@ -199,6 +207,8 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
 
     # Non-mergeable: dedupe exact-value-equal duplicates only.
     result.extend(dedupe(mentions_any))
+    result.extend(dedupe(with_annotation_text))
+    result.extend(dedupe(has_any_annotation))
 
     return tuple(sorted(result, key=repr))
 

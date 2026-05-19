@@ -458,9 +458,8 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
         text_rows,
     )
 
-    # axiom_text holds the axiom-level metadata annotations (separate from
-    # entity-level entity_text); FTS over this powers `match_axioms` searches
-    # by annotation content.
+    # axiom_text indexes axiom-level annotation values, keyed by axiom id and
+    # annotation property. Powers `search_axioms`.
     axiom_text_rows = [
         (axiom_id, _annotation_value_to_text(ann.value), str(ann.property))
         for ann in axiom.annotations

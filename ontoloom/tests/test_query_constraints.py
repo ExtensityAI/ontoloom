@@ -7,6 +7,7 @@ from ontoloom.query.constraints import (
     AlwaysFalse,
     Declared,
     Deprecated,
+    HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
     InIRIs,
@@ -16,6 +17,8 @@ from ontoloom.query.constraints import (
     MentionedIn,
     MentionsAll,
     MentionsAny,
+    TextMatchKind,
+    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -293,3 +296,42 @@ def test_mentions_any_dedupe():
     result = MentionsAny(iris=(A, A, B))
     assert len(result.iris) == 2
     assert set(result.iris) == {A, B}
+
+
+# -- WithAnnotationText --
+
+
+def test_with_annotation_text_empty_text_raises():
+    with pytest.raises(ValidationError):
+        WithAnnotationText(text="")
+
+
+def test_with_annotation_text_default_properties_empty():
+    assert WithAnnotationText(text="x").properties == ()
+
+
+def test_with_annotation_text_properties_sorted():
+    assert WithAnnotationText(text="x", properties=(B, A)).properties == (A, B)
+
+
+def test_with_annotation_text_properties_deduped():
+    assert WithAnnotationText(text="x", properties=(A, A)).properties == (A,)
+
+
+def test_with_annotation_text_default_match_kind_substring():
+    assert WithAnnotationText(text="x").match_kind == TextMatchKind.SUBSTRING
+
+
+# -- HasAnyAnnotation --
+
+
+def test_has_any_annotation_empty_raises():
+    with pytest.raises(ValidationError):
+        HasAnyAnnotation(properties=())
+
+
+def test_has_any_annotation_properties_sorted_and_deduped():
+    assert HasAnyAnnotation(properties=(IRI("ex:b"), IRI("ex:a"), IRI("ex:a"))).properties == (
+        IRI("ex:a"),
+        IRI("ex:b"),
+    )
