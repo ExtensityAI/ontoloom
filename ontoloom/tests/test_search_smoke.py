@@ -358,60 +358,77 @@ class TestSearchEntitiesComprehensive:
         results = _search_entities_text(s, "Alice Smith")
         assert ":Alice" in results
 
-    def test_search_by_role_class(self, s):
+    @pytest.mark.parametrize(
+        ("role", "expected_includes", "expected_excludes"),
+        [
+            pytest.param(
+                EntityType.CLASS,
+                (":Dog", ":Cat", ":Animal", ":Person"),
+                (":Alice", ":Fido"),
+                id="class",
+            ),
+            pytest.param(
+                EntityType.OBJECT_PROPERTY,
+                (
+                    ":owns",
+                    ":hasPart",
+                    ":hasParent",
+                    ":hasMother",
+                    ":likes",
+                    ":hasCreator",
+                    ":hasPet",
+                ),
+                (),
+                id="object_property",
+            ),
+            pytest.param(
+                EntityType.DATA_PROPERTY,
+                (
+                    ":hasAge",
+                    ":hasName",
+                    ":hasWeight",
+                    ":hasMeasurement",
+                    ":fullName",
+                    ":hasSSN",
+                ),
+                (),
+                id="data_property",
+            ),
+            pytest.param(
+                EntityType.ANNOTATION_PROPERTY,
+                ("rdfs:label", "rdfs:comment", "skos:definition"),
+                (),
+                id="annotation_property",
+            ),
+            pytest.param(
+                EntityType.NAMED_INDIVIDUAL,
+                (
+                    ":Alice",
+                    ":Bob",
+                    ":Fido",
+                    ":Rex",
+                    ":Whiskers",
+                    ":TheOne",
+                    ":Robert",
+                ),
+                (),
+                id="named_individual",
+            ),
+            pytest.param(
+                EntityType.DATATYPE,
+                ("ex:PositiveAge",),
+                (),
+                id="datatype",
+            ),
+        ],
+    )
+    def test_search_by_role(self, s, role, expected_includes, expected_excludes):
         add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.CLASS)
-        assert ":Dog" in results
-        assert ":Cat" in results
-        assert ":Animal" in results
-        assert ":Person" in results
-        # Individuals should NOT appear
-        assert ":Alice" not in results
-        assert ":Fido" not in results
-
-    def test_search_by_role_object_property(self, s):
-        add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.OBJECT_PROPERTY)
-        assert ":owns" in results
-        assert ":hasPart" in results
-        assert ":hasParent" in results
-        assert ":hasMother" in results
-        assert ":likes" in results
-        assert ":hasCreator" in results
-        assert ":hasPet" in results
-
-    def test_search_by_role_data_property(self, s):
-        add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.DATA_PROPERTY)
-        assert ":hasAge" in results
-        assert ":hasName" in results
-        assert ":hasWeight" in results
-        assert ":hasMeasurement" in results
-        assert ":fullName" in results
-        assert ":hasSSN" in results
-
-    def test_search_by_role_annotation_property(self, s):
-        add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.ANNOTATION_PROPERTY)
-        assert "rdfs:label" in results
-        assert "rdfs:comment" in results
-        assert "skos:definition" in results
-
-    def test_search_by_role_named_individual(self, s):
-        add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.NAMED_INDIVIDUAL)
-        assert ":Alice" in results
-        assert ":Bob" in results
-        assert ":Fido" in results
-        assert ":Rex" in results
-        assert ":Whiskers" in results
-        assert ":TheOne" in results
-        assert ":Robert" in results
-
-    def test_search_by_role_datatype(self, s):
-        add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, EntityType.DATATYPE)
-        assert "ex:PositiveAge" in results
+        results = _search_entities_role(s, role)
+        for iri in expected_includes:
+            assert iri in results, f"{iri} should be in role={role} results"
+        for iri in expected_excludes:
+            assert iri not in results, f"{iri} should not be in role={role} results"
 
     def test_search_by_namespace(self, s):
         add_axioms(s, AXIOMS)
@@ -554,61 +571,107 @@ class TestGetEntityComprehensive:
         assert info.axiom_counts.get(AxiomTag.ANNOTATION_ASSERTION, 0) > 0
 
 
+_OBSOLETE_AXIOMS = (
+    Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
+    AnnotationAssertion(
+        property=IRI("rdfs:label"),
+        subject=IRI(":Obsolete"),
+        value=LangLiteral(value="Obsolete Class"),
+    ),
+    AnnotationAssertion(
+        property=IRI("owl:deprecated"),
+        subject=IRI(":Obsolete"),
+        value=TypedLiteral(value="true"),
+    ),
+)
+
+
 class TestEnhancedEntitySearch:
     """Tests for declared, properties, and exclude_deprecated filters."""
 
-    def test_declared_true_list(self, s):
-        add_axioms(s, AXIOMS)
-        page = search_entities(s, declared=True, exclude_deprecated=False, limit=1000)
-        declared_iris = {str(m.iri) for m in page.matches}
-        # All Declaration IRIs should be present
-        for ax in AXIOMS:
-            if isinstance(ax, Declaration):
-                assert str(ax.iri) in declared_iris, f"{ax.iri} should be declared"
-        # Undeclared entities (only appear in expressions) should NOT be present
-        assert ":Heart" not in declared_iris
-        assert ":Rational" not in declared_iris
-        assert ":TheOne" not in declared_iris
-
-    def test_declared_false_list(self, s):
-        add_axioms(s, AXIOMS)
-        page = search_entities(s, declared=False, exclude_deprecated=False, limit=1000)
-        undeclared_iris = {str(m.iri) for m in page.matches}
-        # Entities only referenced in expressions, never declared
-        assert ":Heart" in undeclared_iris
-        assert ":Rational" in undeclared_iris
-        assert ":TheOne" in undeclared_iris
-        # Declared entities should NOT appear
-        assert ":Dog" not in undeclared_iris
-        assert ":Alice" not in undeclared_iris
-
-    def test_declared_true_text_search(self, s):
-        add_axioms(s, AXIOMS)
-        # "has" matches many entities by local_name substring
-        page = search_entities(s, query="has", declared=True, exclude_deprecated=False, limit=1000)
+    @pytest.mark.parametrize(
+        ("extra_axioms", "kwargs", "expected_includes", "expected_excludes"),
+        [
+            pytest.param(
+                (),
+                {"declared": True, "exclude_deprecated": False},
+                (),  # Declaration loop handled separately in the test body
+                (":Heart", ":Rational", ":TheOne"),
+                id="declared_true_list",
+            ),
+            pytest.param(
+                (),
+                {"declared": False, "exclude_deprecated": False},
+                (":Heart", ":Rational", ":TheOne"),
+                (":Dog", ":Alice"),
+                id="declared_false_list",
+            ),
+            pytest.param(
+                (),
+                {"query": "has", "declared": True, "exclude_deprecated": False},
+                (":hasAge", ":hasPart"),
+                (":hasCreator",),
+                id="declared_true_text_search",
+            ),
+            pytest.param(
+                (),
+                {"query": "has", "declared": False, "exclude_deprecated": False},
+                (":hasCreator",),
+                (":hasAge",),
+                id="declared_false_text_search",
+            ),
+            pytest.param(
+                (),
+                {"declared": None, "exclude_deprecated": False},
+                (":Dog", ":Heart"),
+                (),
+                id="declared_none_returns_all",
+            ),
+            pytest.param(
+                _OBSOLETE_AXIOMS,
+                {},  # defaults: exclude_deprecated=True
+                (":Dog",),
+                (":Obsolete",),
+                id="exclude_deprecated_true",
+            ),
+            pytest.param(
+                _OBSOLETE_AXIOMS,
+                {"exclude_deprecated": False},
+                (":Obsolete",),
+                (),
+                id="exclude_deprecated_false",
+            ),
+            pytest.param(
+                _OBSOLETE_AXIOMS,
+                {"query": "Obsolete", "exclude_deprecated": True},
+                (),
+                (":Obsolete",),
+                id="exclude_deprecated_text_search_excluded",
+            ),
+            pytest.param(
+                _OBSOLETE_AXIOMS,
+                {"query": "Obsolete", "exclude_deprecated": False},
+                (":Obsolete",),
+                (),
+                id="exclude_deprecated_text_search_included",
+            ),
+        ],
+    )
+    def test_search_with_filter(
+        self, s, extra_axioms, kwargs, expected_includes, expected_excludes
+    ):
+        add_axioms(s, [*AXIOMS, *extra_axioms])
+        page = search_entities(s, limit=1000, **kwargs)
         iris = {str(m.iri) for m in page.matches}
-        # Declared properties with "has" in the name
-        assert ":hasAge" in iris
-        assert ":hasPart" in iris
-        # :hasCreator is NOT declared (only appears in ObjectHasValue expression)
-        assert ":hasCreator" not in iris
-
-    def test_declared_false_text_search(self, s):
-        add_axioms(s, AXIOMS)
-        page = search_entities(s, query="has", declared=False, exclude_deprecated=False, limit=1000)
-        iris = {str(m.iri) for m in page.matches}
-        # :hasCreator is undeclared
-        assert ":hasCreator" in iris
-        # :hasAge is declared, should NOT appear
-        assert ":hasAge" not in iris
-
-    def test_declared_none_returns_all(self, s):
-        add_axioms(s, AXIOMS)
-        all_page = search_entities(s, declared=None, exclude_deprecated=False, limit=1000)
-        all_iris = {str(m.iri) for m in all_page.matches}
-        # Both declared and undeclared
-        assert ":Dog" in all_iris
-        assert ":Heart" in all_iris
+        # Special case: declared=True must cover every Declaration IRI in AXIOMS
+        if kwargs.get("declared") is True and "query" not in kwargs:
+            for ax in AXIOMS:
+                if isinstance(ax, Declaration):
+                    assert str(ax.iri) in iris, f"{ax.iri} should be declared"
+        for iri in expected_includes:
+            assert iri in iris, f"{iri} should be in results for kwargs={kwargs}"
+        for iri in expected_excludes:
+            assert iri not in iris, f"{iri} should not be in results for kwargs={kwargs}"
 
     def test_properties_filter_with_query(self, s):
         add_axioms(s, AXIOMS)
@@ -658,74 +721,6 @@ class TestEnhancedEntitySearch:
         assert ":Pet" in iris
         # :Dog has rdfs:label but NOT skos:definition
         assert ":Dog" not in iris
-
-    def test_exclude_deprecated_true(self, s):
-        # Add the standard fixture plus a deprecated entity
-        extra = [
-            *AXIOMS,
-            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
-            AnnotationAssertion(
-                property=IRI("rdfs:label"),
-                subject=IRI(":Obsolete"),
-                value=LangLiteral(value="Obsolete Class"),
-            ),
-            AnnotationAssertion(
-                property=IRI("owl:deprecated"),
-                subject=IRI(":Obsolete"),
-                value=TypedLiteral(value="true"),
-            ),
-        ]
-        add_axioms(s, extra)
-
-        # Default (exclude_deprecated=True): :Obsolete should be excluded
-        page = search_entities(s, limit=1000)
-        iris = {str(m.iri) for m in page.matches}
-        assert ":Dog" in iris
-        assert ":Obsolete" not in iris
-
-    def test_exclude_deprecated_false(self, s):
-        extra = [
-            *AXIOMS,
-            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
-            AnnotationAssertion(
-                property=IRI("owl:deprecated"),
-                subject=IRI(":Obsolete"),
-                value=TypedLiteral(value="true"),
-            ),
-        ]
-        add_axioms(s, extra)
-
-        # exclude_deprecated=False: :Obsolete should be included
-        page = search_entities(s, exclude_deprecated=False, limit=1000)
-        iris = {str(m.iri) for m in page.matches}
-        assert ":Obsolete" in iris
-
-    def test_exclude_deprecated_text_search(self, s):
-        extra = [
-            *AXIOMS,
-            Declaration(entity_type=EntityType.CLASS, iri=IRI(":Obsolete")),
-            AnnotationAssertion(
-                property=IRI("rdfs:label"),
-                subject=IRI(":Obsolete"),
-                value=LangLiteral(value="Obsolete Class"),
-            ),
-            AnnotationAssertion(
-                property=IRI("owl:deprecated"),
-                subject=IRI(":Obsolete"),
-                value=TypedLiteral(value="true"),
-            ),
-        ]
-        add_axioms(s, extra)
-
-        # Text search for "Obsolete" with exclude_deprecated=True
-        page = search_entities(s, query="Obsolete", exclude_deprecated=True, limit=1000)
-        iris = {str(m.iri) for m in page.matches}
-        assert ":Obsolete" not in iris
-
-        # Text search with exclude_deprecated=False
-        page2 = search_entities(s, query="Obsolete", exclude_deprecated=False, limit=1000)
-        iris2 = {str(m.iri) for m in page2.matches}
-        assert ":Obsolete" in iris2
 
     def test_collect_iris_declared(self, s):
         add_axioms(s, AXIOMS)

@@ -14,7 +14,7 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import UpsertResult
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
@@ -177,7 +177,7 @@ def format_selection_result(
     page_text: str,
 ):
     sel = upserted.selection
-    parts = [f"{sel.size} {kind_label} -> {dquoted(format_locked(sel))}."]
+    parts = [f"{sel.size} {kind_label} -> {format_locked_quoted(sel)}."]
     if upserted.previous_size is not None:
         parts.append(f"Overwrote previous ({upserted.previous_size} items).")
 

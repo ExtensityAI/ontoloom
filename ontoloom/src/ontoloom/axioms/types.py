@@ -63,7 +63,6 @@ class RenameResult:
     old_iri: IRI
     new_iri: IRI
     replaced: tuple[ReplaceResult, ...]
-    batch_id: str
 
     @property
     def colliding_hashes(self) -> tuple[AxiomHash, ...]:

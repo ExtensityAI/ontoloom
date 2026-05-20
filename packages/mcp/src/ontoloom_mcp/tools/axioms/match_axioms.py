@@ -12,7 +12,6 @@ from ontoloom.selections.types import (
     SelectionRef,
     ShowFilter,
 )
-from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -21,7 +20,7 @@ from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
     format_selection_result,
 )
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -65,7 +64,6 @@ def match_axioms(
             "match_axioms",
         )
         sel = upserted.selection
-        sel_locked = format_locked(sel)
 
         truncated_hint = (
             f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
@@ -74,7 +72,7 @@ def match_axioms(
 
         if not result.axiom_hashes:
             s.commit()
-            return f"{header} -> {dquoted(sel_locked)}."
+            return f"{header} -> {format_locked_quoted(sel)}."
 
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = run(

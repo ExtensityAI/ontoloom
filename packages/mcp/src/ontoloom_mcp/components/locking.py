@@ -68,6 +68,26 @@ class HashPrefix(TypedStr):
         return value
 
 
+def _parse_kinded_locked(value: str, kind: SelectionKind, type_name: str) -> str:
+    """Validate `kind:NAME@HASH_PREFIX` wire form; lowercase the hash portion."""
+    prefix, sep, rest = value.partition(":")
+
+    if not sep or prefix != kind.value:
+        msg = f"{type_name} must be '{kind.value}:NAME@HASH_PREFIX', got {dquoted(value)}"
+        raise ValueError(msg)
+
+    name, at_sep, hash_prefix = rest.partition("@")
+
+    if not at_sep or not _HASH_PATTERN.match(hash_prefix):
+        msg = (
+            f"{type_name} must include '@HASH_PREFIX' "
+            f"(>= {LOCKED_PREFIX_MIN} hex chars), got {dquoted(value)}"
+        )
+        raise ValueError(msg)
+    _validate_name(name)
+    return f"{prefix}:{name}@{hash_prefix.lower()}"
+
+
 class LockedEntitySelectionName(TypedStr):
     """Locked entity selection ref. Wire form `entities:NAME@HASH_PREFIX`."""
 
@@ -78,25 +98,7 @@ class LockedEntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        prefix, sep, rest = value.partition(":")
-
-        if not sep or prefix != SelectionKind.ENTITIES.value:
-            msg = (
-                f"LockedEntitySelectionName must be 'entities:NAME@HASH_PREFIX', "
-                f"got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-
-        name, at_sep, hash_prefix = rest.partition("@")
-
-        if not at_sep or not _HASH_PATTERN.match(hash_prefix):
-            msg = (
-                f"LockedEntitySelectionName must include '@HASH_PREFIX' "
-                f"(>= {LOCKED_PREFIX_MIN} hex chars), got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-        _validate_name(name)
-        return value
+        return _parse_kinded_locked(value, SelectionKind.ENTITIES, "LockedEntitySelectionName")
 
     @property
     def bare(self) -> EntitySelectionName:
@@ -123,24 +125,7 @@ class LockedAxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        prefix, sep, rest = value.partition(":")
-
-        if not sep or prefix != SelectionKind.AXIOMS.value:
-            msg = (
-                f"LockedAxiomSelectionName must be 'axioms:NAME@HASH_PREFIX', got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-
-        name, at_sep, hash_prefix = rest.partition("@")
-
-        if not at_sep or not _HASH_PATTERN.match(hash_prefix):
-            msg = (
-                f"LockedAxiomSelectionName must include '@HASH_PREFIX' "
-                f"(>= {LOCKED_PREFIX_MIN} hex chars), got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-        _validate_name(name)
-        return value
+        return _parse_kinded_locked(value, SelectionKind.AXIOMS, "LockedAxiomSelectionName")
 
     @property
     def bare(self) -> AxiomSelectionName:
@@ -193,5 +178,9 @@ def verify_lock(s: Session, locked: LockedSelectionRef):
 
 def format_locked(meta: SelectionMeta) -> str:
     """Render `meta` as the wire-form locked ref the LLM can use for a follow-up call."""
-    kind_prefix = "axioms" if meta.kind == SelectionKind.AXIOMS else "entities"
-    return f"{kind_prefix}:{meta.name}@{meta.hash}"
+    return f"{meta.kind}:{meta.name}@{meta.hash}"
+
+
+def format_locked_quoted(meta: SelectionMeta) -> str:
+    """Render `meta` as a double-quoted wire-form locked ref for embedding in MCP messages."""
+    return dquoted(format_locked(meta))

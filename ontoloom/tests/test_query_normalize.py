@@ -1,4 +1,6 @@
 import random
+from collections.abc import Sequence
+from typing import Any
 
 import pytest
 from ontoloom.hashing import AxiomHash
@@ -50,78 +52,67 @@ def test_normalize_entity_empty():
 
 # == Entity: intersection variants ==
 
-
-def test_with_iris_intersection():
-    result = normalize_entity([InIRIs(iris=(A, B, C)), InIRIs(iris=(B, C, D))])
-    assert result == (InIRIs(iris=(B, C)),)
-
-
-def test_with_iris_empty_intersection_gives_always_false():
-    result = normalize_entity([InIRIs(iris=(A,)), InIRIs(iris=(B,))])
-    assert result == (AlwaysFalse(),)
+_NS_A = PrefixName("owl")
+_NS_B = PrefixName("rdfs")
+_NS_C = PrefixName("rdf")
 
 
-def test_with_roles_intersection():
-    result = normalize_entity(
-        [
+@pytest.mark.parametrize(
+    ("a", "b", "merged"),
+    [
+        pytest.param(
+            InIRIs(iris=(A, B, C)),
+            InIRIs(iris=(B, C, D)),
+            InIRIs(iris=(B, C)),
+            id="in_iris",
+        ),
+        pytest.param(
             WithRoles(roles=(EntityType.CLASS, EntityType.OBJECT_PROPERTY)),
             WithRoles(roles=(EntityType.CLASS, EntityType.DATA_PROPERTY)),
-        ]
-    )
-    assert result == (WithRoles(roles=(EntityType.CLASS,)),)
-
-
-def test_with_roles_empty_intersection_gives_always_false():
-    result = normalize_entity(
-        [
             WithRoles(roles=(EntityType.CLASS,)),
-            WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),
-        ]
-    )
-    assert result == (AlwaysFalse(),)
-
-
-def test_in_namespaces_intersection():
-    ns_a = PrefixName("owl")
-    ns_b = PrefixName("rdfs")
-    ns_c = PrefixName("rdf")
-    result = normalize_entity(
-        [
-            InNamespaces(namespaces=(ns_a, ns_b)),
-            InNamespaces(namespaces=(ns_b, ns_c)),
-        ]
-    )
-    assert result == (InNamespaces(namespaces=(ns_b,)),)
-
-
-def test_in_namespaces_empty_intersection_gives_always_false():
-    result = normalize_entity(
-        [
-            InNamespaces(namespaces=(PrefixName("owl"),)),
-            InNamespaces(namespaces=(PrefixName("rdfs"),)),
-        ]
-    )
-    assert result == (AlwaysFalse(),)
-
-
-def test_in_positions_intersection():
-    result = normalize_entity(
-        [
+            id="with_roles",
+        ),
+        pytest.param(
+            InNamespaces(namespaces=(_NS_A, _NS_B)),
+            InNamespaces(namespaces=(_NS_B, _NS_C)),
+            InNamespaces(namespaces=(_NS_B,)),
+            id="in_namespaces",
+        ),
+        pytest.param(
             InPositions(positions=(Position.DOMAIN, Position.RANGE)),
             InPositions(positions=(Position.RANGE, Position.SUBJECT)),
-        ]
-    )
-    assert result == (InPositions(positions=(Position.RANGE,)),)
+            InPositions(positions=(Position.RANGE,)),
+            id="in_positions",
+        ),
+    ],
+)
+def test_entity_intersection(a: Any, b: Any, merged: Any):
+    assert normalize_entity([a, b]) == (merged,)
 
 
-def test_in_positions_empty_intersection_gives_always_false():
-    result = normalize_entity(
-        [
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        pytest.param(InIRIs(iris=(A,)), InIRIs(iris=(B,)), id="in_iris"),
+        pytest.param(
+            WithRoles(roles=(EntityType.CLASS,)),
+            WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),
+            id="with_roles",
+        ),
+        pytest.param(
+            InNamespaces(namespaces=(PrefixName("owl"),)),
+            InNamespaces(namespaces=(PrefixName("rdfs"),)),
+            id="in_namespaces",
+        ),
+        pytest.param(
             InPositions(positions=(Position.DOMAIN,)),
             InPositions(positions=(Position.RANGE,)),
-        ]
-    )
-    assert result == (AlwaysFalse(),)
+            id="in_positions",
+        ),
+    ],
+)
+def test_entity_empty_intersection_gives_always_false(a: Any, b: Any):
+    assert normalize_entity([a, b]) == (AlwaysFalse(),)
 
 
 # == Entity: single instances pass through unchanged ==
@@ -136,32 +127,26 @@ def test_with_iris_single_passthrough():
 # == Entity: non-mergeable dedupe ==
 
 
-def test_with_any_property_dedupe_equals():
-    c = HasAnyProperty(properties=(A, B))
-    result = normalize_entity([c, c])
-    assert result == (c,)
-
-
-def test_with_any_property_stay_separate():
-    c1 = HasAnyProperty(properties=(A, B))
-    c2 = HasAnyProperty(properties=(A,))
-    result = normalize_entity([c1, c2])
+@pytest.mark.parametrize(
+    ("equal", "distinct"),
+    [
+        pytest.param(
+            HasAnyProperty(properties=(A, B)),
+            HasAnyProperty(properties=(A,)),
+            id="has_any_property",
+        ),
+        pytest.param(
+            MentionedIn(hashes=(HASH_A, HASH_B)),
+            MentionedIn(hashes=(HASH_A,)),
+            id="mentioned_in",
+        ),
+    ],
+)
+def test_entity_non_mergeable_dedupe(equal: Any, distinct: Any):
+    assert normalize_entity([equal, equal]) == (equal,)
+    result = normalize_entity([equal, distinct])
     assert len(result) == 2
-    assert set(result) == {c1, c2}
-
-
-def test_mentioned_in_axioms_dedupe_equals():
-    c = MentionedIn(hashes=(HASH_A, HASH_B))
-    result = normalize_entity([c, c])
-    assert result == (c,)
-
-
-def test_mentioned_in_axioms_stay_separate():
-    c1 = MentionedIn(hashes=(HASH_A,))
-    c2 = MentionedIn(hashes=(HASH_B,))
-    result = normalize_entity([c1, c2])
-    assert len(result) == 2
-    assert set(result) == {c1, c2}
+    assert set(result) == {equal, distinct}
 
 
 # == Entity: Declared ==
@@ -209,19 +194,19 @@ def test_in_selection_multiple_raises():
 # == Entity: AlwaysFalse short-circuit ==
 
 
-def test_always_false_swallows_everything():
-    result = normalize_entity([InIRIs(iris=(A,)), AlwaysFalse(), HasRole(), Declared(state=True)])
-    assert result == (AlwaysFalse(),)
-
-
-def test_always_false_at_start():
-    result = normalize_entity([AlwaysFalse(), InIRIs(iris=(A,))])
-    assert result == (AlwaysFalse(),)
-
-
-def test_always_false_at_end():
-    result = normalize_entity([InIRIs(iris=(A,)), AlwaysFalse()])
-    assert result == (AlwaysFalse(),)
+@pytest.mark.parametrize(
+    "cs",
+    [
+        pytest.param(
+            [InIRIs(iris=(A,)), AlwaysFalse(), HasRole(), Declared(state=True)],
+            id="middle",
+        ),
+        pytest.param([AlwaysFalse(), InIRIs(iris=(A,))], id="start"),
+        pytest.param([InIRIs(iris=(A,)), AlwaysFalse()], id="end"),
+    ],
+)
+def test_always_false_swallows_everything(cs: Sequence[Any]):
+    assert normalize_entity(cs) == (AlwaysFalse(),)
 
 
 # == Entity: idempotency ==
@@ -331,36 +316,44 @@ def test_normalize_axiom_mentions_all_overflow_raises_clear_error():
     assert "8" in msg
 
 
-# == Axiom: MentionsAny non-mergeable ==
+# == Axiom: non-mergeable dedupe ==
 
 
-def test_mentions_any_dedupe_equals():
-    c = MentionsAny(iris=(A, B))
-    result = normalize_axiom([c, c])
-    assert result == (c,)
-
-
-def test_mentions_any_stay_separate():
-    c1 = MentionsAny(iris=(A, B))
-    c2 = MentionsAny(iris=(A,))
-    result = normalize_axiom([c1, c2])
+@pytest.mark.parametrize(
+    ("equal", "distinct"),
+    [
+        pytest.param(
+            MentionsAny(iris=(A, B)),
+            MentionsAny(iris=(A,)),
+            id="mentions_any",
+        ),
+    ],
+)
+def test_axiom_non_mergeable_dedupe(equal: Any, distinct: Any):
+    assert normalize_axiom([equal, equal]) == (equal,)
+    result = normalize_axiom([equal, distinct])
     assert len(result) == 2
-    assert set(result) == {c1, c2}
+    assert set(result) == {equal, distinct}
 
 
 # == Axiom: annotation-constraint dedupe ==
 
 
-def test_normalize_axiom_dedupes_with_annotation_text():
-    c = WithAnnotationText(text="x", properties=(IRI("ex:p"),))
-    result = normalize_axiom([c, c])
-    assert result == (c,)
-
-
-def test_normalize_axiom_dedupes_has_any_annotation():
-    c = HasAnyAnnotation(properties=(IRI("ex:p"),))
-    result = normalize_axiom([c, c])
-    assert result == (c,)
+@pytest.mark.parametrize(
+    "c",
+    [
+        pytest.param(
+            WithAnnotationText(text="x", properties=(IRI("ex:p"),)),
+            id="with_annotation_text",
+        ),
+        pytest.param(
+            HasAnyAnnotation(properties=(IRI("ex:p"),)),
+            id="has_any_annotation",
+        ),
+    ],
+)
+def test_normalize_axiom_annotation_dedupe(c: Any):
+    assert normalize_axiom([c, c]) == (c,)
 
 
 # == Axiom: InSelection ==

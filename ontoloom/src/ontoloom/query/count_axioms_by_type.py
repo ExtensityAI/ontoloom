@@ -6,9 +6,8 @@ from typing import override
 from ontoloom.connection import Session
 from ontoloom.owl.markers import AxiomTag
 from ontoloom.query._predicates import _axiom_predicates
-from ontoloom.query.base import Query
+from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasAxiomConstraints
-from ontoloom.query.rendered import RenderedSql
 
 
 class CountAxiomsByType(HasAxiomConstraints, Query[Counter[AxiomTag]]):

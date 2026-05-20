@@ -3,9 +3,8 @@ from ontoloom.connection import Ontology, session
 from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.store import create_selection as core_create_selection
 from ontoloom.selections.types import SelectionRef
-from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -45,7 +44,7 @@ def create_selection(
         s.commit()
 
     sel = upserted.selection
-    parts = [f"Selection {dquoted(format_locked(sel))}: {sel.size} {sel.kind}"]
+    parts = [f"Selection {format_locked_quoted(sel)}: {sel.size} {sel.kind}"]
     if upserted.previous_size is not None:
         parts.append(f"(overwrote previous: {upserted.previous_size} items)")
     return " ".join(parts)

@@ -6,10 +6,13 @@ from ontoloom.axioms.store import remove_by_hash, remove_by_selection, resolve_h
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
-from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_diff
-from ontoloom_mcp.components.locking import LockedAxiomSelectionName, format_locked, verify_lock
+from ontoloom_mcp.components.locking import (
+    LockedAxiomSelectionName,
+    format_locked_quoted,
+    verify_lock,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -57,7 +60,7 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget):
                 summary = (
                     f"Removed {len(sel_result.removed)} axioms "
                     f"({sel_result.absent} already absent). "
-                    f"Selection {dquoted(format_locked(sel_result.meta))} retained."
+                    f"Selection {format_locked_quoted(sel_result.meta)} retained."
                 )
                 return format_diff(entries, summary, max_rows=20)
 

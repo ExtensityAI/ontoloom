@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 from ontoloom.connection import Session
 from ontoloom.entities.types import (
     AnnotationRow,
@@ -46,8 +48,8 @@ from ontoloom.utils import dquoted
 class EntityNotFoundError(OntoloomError):
     """No entity with the given IRI exists in the ontology.
 
-    `near_matches` are IRIs of entities with similar local names -> populated by
-    `entities.get` so callers can show "did you mean…?" without re-querying.
+    `near_matches` are IRIs of entities with similar local names, for
+    surfacing "did you mean…?" hints without a follow-up query.
     """
 
     def __init__(self, iri: str, near_matches: list[str] | None = None):
@@ -55,8 +57,6 @@ class EntityNotFoundError(OntoloomError):
         self.near_matches = near_matches or []
         super().__init__(f"Entity {dquoted(iri)} not found.")
 
-
-# A: this file is huge. we need to look at it separately
 
 _TEXT_SCAN_CAP = 1000
 
@@ -119,7 +119,7 @@ def search_entities(
     namespace: PrefixName | None = None,
     within: SelectionRef | None = None,
     declared: bool | None = None,
-    properties: list[IRI] | None = None,
+    properties: Sequence[IRI] = (),
     exclude_deprecated: bool = True,
     limit: int = 50,
     offset: int = 0,
@@ -167,7 +167,7 @@ def collect_entity_iris(
     namespace: PrefixName | None = None,
     within: SelectionRef | None = None,
     declared: bool | None = None,
-    properties: list[IRI] | None = None,
+    properties: Sequence[IRI] = (),
     exclude_deprecated: bool = True,
 ) -> list[IRI]:
     """Return all matching entity IRIs (no display data). For select workflows."""
@@ -183,7 +183,7 @@ def collect_entity_iris(
         return run(s, ListEntities(constraints=constraints))
 
     # Text search path
-    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -220,7 +220,7 @@ def _build_entity_constraints(
     namespace: PrefixName | None,
     within: SelectionRef | None,
     declared: bool | None,
-    properties: list[IRI] | None,
+    properties: Sequence[IRI],
     exclude_deprecated: bool,
 ) -> tuple[EntityConstraint, ...]:
     """Build the constraint tuple for the non-text entity search path."""
@@ -234,7 +234,7 @@ def _build_entity_constraints(
         constraints.append(InSelection(ref=within))
     if declared is not None:
         constraints.append(Declared(state=declared))
-    if properties is not None:
+    if properties:
         constraints.append(HasAnyProperty(properties=tuple(properties)))
     if exclude_deprecated:
         constraints.append(Deprecated(state=False))
@@ -279,7 +279,7 @@ def _list_entities(
     namespace: PrefixName | None,
     within: SelectionRef | None,
     declared: bool | None,
-    properties: list[IRI] | None,
+    properties: Sequence[IRI],
     exclude_deprecated: bool,
     limit: int,
     offset: int,
@@ -323,12 +323,12 @@ def _text_search_entities(
     namespace: PrefixName | None,
     within: SelectionRef | None,
     declared: bool | None,
-    properties: list[IRI] | None,
+    properties: Sequence[IRI],
     exclude_deprecated: bool,
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI, properties=None)
+    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
     matches.update(
         _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
     )
@@ -401,18 +401,18 @@ def _find_text_matches(
     property_filter: str | None,
     source_label: MatchSource,
     *,
-    properties: list[IRI] | None = None,
+    properties: Sequence[IRI] = (),
 ) -> dict[str, tuple[MatchSource, MatchQuality]]:
     """Returns {iri: (source_label, quality)}.
 
-    properties: when set, restrict annotation search to these property IRIs.
+    properties: when non-empty, restrict annotation search to these property IRIs.
     Only applies when property_filter is None (annotation search path).
     """
     params: list[str] = []
     if property_filter is not None:
         prop_cond = "property = ?"
         params.append(property_filter)
-    elif properties is not None:
+    elif properties:
         ph = ",".join("?" for _ in properties)
         prop_cond = f"property IN ({ph})"
         params.extend(properties)

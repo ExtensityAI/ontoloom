@@ -31,7 +31,7 @@ from ontoloom_mcp.components.formatting import (
     format_axiom_listing,
     format_selection_result,
 )
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -108,11 +108,10 @@ def search_axioms(
         source = _build_source(query, properties, within)
         upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
         sel = upserted.selection
-        sel_locked = format_locked(sel)
 
         if not hashes:
             s.commit()
-            return f"0 axioms -> {dquoted(sel_locked)}.\nNo axioms found ({source})."
+            return f"0 axioms -> {format_locked_quoted(sel)}.\nNo axioms found ({source})."
 
         page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = run(

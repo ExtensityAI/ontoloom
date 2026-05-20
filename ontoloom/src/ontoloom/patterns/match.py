@@ -8,11 +8,10 @@ from typing import get_args
 
 from pydantic.fields import FieldInfo
 
-from ontoloom.canonical import SKIP
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.expressions import BaseClassExpression
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
-from ontoloom.owl.markers import is_unordered
+from ontoloom.owl.markers import SKIP, is_unordered
 from ontoloom.patterns.slot import BaseSlot, IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import (
     BasePattern,
@@ -23,11 +22,6 @@ from ontoloom.patterns.types import (
 Bindings = dict[str, str]
 
 _EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 
 def match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
@@ -50,11 +44,6 @@ def match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
         return [result] if result is not None else []
 
     return []
-
-
-# ---------------------------------------------------------------------------
-# Model matching (recursive structural comparison)
-# ---------------------------------------------------------------------------
 
 
 def _match_model(
@@ -140,11 +129,6 @@ def _match_field(  # noqa: C901
     return None
 
 
-# ---------------------------------------------------------------------------
-# Slot matching
-# ---------------------------------------------------------------------------
-
-
 def _match_slot_vs_str(slot: BaseSlot, actual: str, bindings: Bindings) -> Bindings | None:
     """Match a Slot against a plain string (IRI field, EntityType, etc.)."""
     match slot:
@@ -192,11 +176,6 @@ def _bind_variable(name: str, value: str, bindings: Bindings) -> Bindings | None
     return {**bindings, name: value}
 
 
-# ---------------------------------------------------------------------------
-# Tuple and Contains matching
-# ---------------------------------------------------------------------------
-
-
 def _match_tuple(pattern_items: tuple, actual_items: tuple, bindings: Bindings) -> Bindings | None:
     """Exact list match: same length, each element matched in order."""
     if len(pattern_items) != len(actual_items):
@@ -235,11 +214,6 @@ def _match_contains(
             return trial_bindings
 
     return None
-
-
-# ---------------------------------------------------------------------------
-# Expression tree traversal
-# ---------------------------------------------------------------------------
 
 
 def _iter_expressions(obj: BaseAxiom | BaseClassExpression) -> Iterator[BaseClassExpression | str]:

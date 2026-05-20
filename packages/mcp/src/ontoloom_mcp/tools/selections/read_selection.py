@@ -11,7 +11,7 @@ from ontoloom.selections.types import (
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_axiom_annotations
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
@@ -43,7 +43,7 @@ def read_selection(
 
     meta = page.meta
     header = (
-        f"Selection {dquoted(format_locked(meta))} ({meta.kind}): "
+        f"Selection {format_locked_quoted(meta)} ({meta.kind}): "
         f"{meta.size} total ({page.present} present, {page.missing} missing)"
     )
 

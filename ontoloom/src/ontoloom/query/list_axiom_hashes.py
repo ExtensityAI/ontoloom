@@ -5,9 +5,8 @@ from typing import override
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash
 from ontoloom.query._predicates import _axiom_predicates
-from ontoloom.query.base import Query
+from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasAxiomConstraints, HasPagination
-from ontoloom.query.rendered import RenderedSql
 
 
 class ListAxiomHashes(HasAxiomConstraints, HasPagination, Query[list[AxiomHash]]):
@@ -19,15 +18,7 @@ class ListAxiomHashes(HasAxiomConstraints, HasPagination, Query[list[AxiomHash]]
             "ORDER BY a.hash",
         ]
         params: list[object] = list(pred.params)
-
-        if self.limit is not None:
-            sql_parts.append("LIMIT ?")
-            params.append(self.limit)
-
-            if self.offset > 0:
-                sql_parts.append("OFFSET ?")
-                params.append(self.offset)
-
+        append_pagination(sql_parts, params, self.limit, self.offset)
         return RenderedSql(sql=" ".join(sql_parts), params=tuple(params))
 
     @override

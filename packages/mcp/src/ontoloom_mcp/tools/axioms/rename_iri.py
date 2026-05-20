@@ -4,7 +4,6 @@ from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import AxiomSelectionName, SelectionKind
-from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -12,7 +11,7 @@ from ontoloom_mcp.components.confirmation import (
 )
 from ontoloom_mcp.components.locking import (
     LockedAxiomSelectionName,
-    format_locked,
+    format_locked_quoted,
     verify_lock,
 )
 from ontoloom_mcp.components.tool import create_tool
@@ -29,9 +28,8 @@ def rename_iri(
 ):
     """Rename an IRI across all (or restricted) axioms.
 
-    Finds every axiom mentioning `old_iri`, replaces it with `new_iri`, and
-    saves each as an atomic replace event. All events share one batch_id for
-    atomic revert. No-op if `old_iri` is not in use.
+    Finds every axiom mentioning `old_iri`, replaces it with `new_iri`. No-op
+    if `old_iri` is not in use.
 
     Args:
     - `old_iri`: IRI to replace.
@@ -86,10 +84,9 @@ def rename_iri(
     parts = [f"Renamed {old_iri} -> {new_iri}: {len(actual)} axioms replaced."]
     if merged:
         parts.append(f"{len(merged)} merged into existing axioms.")
-    parts.append(f"Batch: {result.batch_id}")
     if upserted is not None:
         sel = upserted.selection
-        parts.append(f"Saved to {dquoted(format_locked(sel))} ({sel.size} items).")
+        parts.append(f"Saved to {format_locked_quoted(sel)} ({sel.size} items).")
     return " ".join(parts)
 
 

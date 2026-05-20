@@ -1,8 +1,11 @@
+import functools
+import operator
 from typing import Annotated, Literal, override
 
-from pydantic import Field, Tag, model_validator
+from pydantic import Field, model_validator
 
-from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
+from ontoloom.owl._render import format_owl_struct
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
@@ -17,6 +20,10 @@ from ontoloom.owl.markers import AxiomTag, EntityType, Position, Unordered
 
 class BaseAxiom(FrozenModel):
     annotations: tuple[Annotation, ...] = ()
+
+    @override
+    def __str__(self) -> str:
+        return format_owl_struct(self)
 
 
 # -- Annotation axioms --
@@ -39,10 +46,6 @@ class AnnotationAssertion(BaseAxiom):
         Position.VALUE,
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"AnnotationAssertion({self.property}, {self.subject}, {self.value})"
-
 
 # -- TBox: class axioms --
 
@@ -58,10 +61,6 @@ class SubClassOf(BaseAxiom):
 
     sub_class: Annotated[ClassExpression, Position.SUB_CLASS]
     super_class: Annotated[ClassExpression, Position.SUPER_CLASS]
-
-    @override
-    def __str__(self) -> str:
-        return f"SubClassOf({self.sub_class}, {self.super_class})"
 
 
 class EquivalentClasses(BaseAxiom):
@@ -79,10 +78,6 @@ class EquivalentClasses(BaseAxiom):
         Field(min_length=2),
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"EquivalentClasses({', '.join(str(e) for e in self.equivalent_classes)})"
-
 
 class DisjointClasses(BaseAxiom):
     """Classes share no instances.
@@ -96,10 +91,6 @@ class DisjointClasses(BaseAxiom):
         Position.MEMBER,
         Field(min_length=2),
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"DisjointClasses({', '.join(str(e) for e in self.disjoint_classes)})"
 
 
 # -- RBox: object property axioms --
@@ -121,10 +112,6 @@ class SubObjectPropertyOf(BaseAxiom):
         EntityType.OBJECT_PROPERTY,
         Position.SUPER_PROPERTY,
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"SubObjectPropertyOf({self.sub_object_property}, {self.super_object_property})"
 
 
 class SubObjectPropertyOfChain(BaseAxiom):
@@ -148,11 +135,6 @@ class SubObjectPropertyOfChain(BaseAxiom):
         Position.SUPER_PROPERTY,
     ]
 
-    @override
-    def __str__(self) -> str:
-        chain = ", ".join(str(p) for p in self.chain)
-        return f"SubObjectPropertyOfChain([{chain}], {self.super_property})"
-
 
 class EquivalentObjectProperties(BaseAxiom):
     """r₁ ≡ r₂ -> properties relate the same pairs of individuals."""
@@ -164,10 +146,6 @@ class EquivalentObjectProperties(BaseAxiom):
         Position.MEMBER,
         Field(min_length=2),
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"EquivalentObjectProperties({', '.join(str(p) for p in self.object_properties)})"
 
 
 class TransitiveObjectProperty(BaseAxiom):
@@ -182,10 +160,6 @@ class TransitiveObjectProperty(BaseAxiom):
         Position.PROPERTY,
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"TransitiveObjectProperty({self.transitive_property})"
-
 
 class ReflexiveObjectProperty(BaseAxiom):
     """r(x,x) for every individual x.
@@ -198,10 +172,6 @@ class ReflexiveObjectProperty(BaseAxiom):
         EntityType.OBJECT_PROPERTY,
         Position.PROPERTY,
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"ReflexiveObjectProperty({self.reflexive_property})"
 
 
 class ObjectPropertyDomain(BaseAxiom):
@@ -218,10 +188,6 @@ class ObjectPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[ClassExpression, Position.DOMAIN]
 
-    @override
-    def __str__(self) -> str:
-        return f"ObjectPropertyDomain({self.object_property}, {self.domain})"
-
 
 class ObjectPropertyRange(BaseAxiom):
     """If anything is related to y by r, then y ∈ C.
@@ -235,10 +201,6 @@ class ObjectPropertyRange(BaseAxiom):
         Position.PROPERTY,
     ]
     range: Annotated[ClassExpression, Position.RANGE]
-
-    @override
-    def __str__(self) -> str:
-        return f"ObjectPropertyRange({self.object_property}, {self.range})"
 
 
 # -- RBox: data property axioms --
@@ -258,10 +220,6 @@ class SubDataPropertyOf(BaseAxiom):
         Position.SUPER_PROPERTY,
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"SubDataPropertyOf({self.sub_data_property}, {self.super_data_property})"
-
 
 class EquivalentDataProperties(BaseAxiom):
     """dp₁ ≡ dp₂ -> data properties have the same values for all individuals."""
@@ -274,10 +232,6 @@ class EquivalentDataProperties(BaseAxiom):
         Field(min_length=2),
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"EquivalentDataProperties({', '.join(str(p) for p in self.data_properties)})"
-
 
 class DataPropertyDomain(BaseAxiom):
     """If x has any value for dp, then x ∈ C."""
@@ -289,10 +243,6 @@ class DataPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[ClassExpression, Position.DOMAIN]
 
-    @override
-    def __str__(self) -> str:
-        return f"DataPropertyDomain({self.data_property}, {self.domain})"
-
 
 class DataPropertyRange(BaseAxiom):
     """All values of dp fall within this data range."""
@@ -303,10 +253,6 @@ class DataPropertyRange(BaseAxiom):
         Position.PROPERTY,
     ]
     range: Annotated[DataRange, Position.RANGE]
-
-    @override
-    def __str__(self) -> str:
-        return f"DataPropertyRange({self.data_property}, {self.range})"
 
 
 class FunctionalDataProperty(BaseAxiom):
@@ -320,10 +266,6 @@ class FunctionalDataProperty(BaseAxiom):
         EntityType.DATA_PROPERTY,
         Position.PROPERTY,
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"FunctionalDataProperty({self.functional_property})"
 
 
 # -- Annotation property axioms --
@@ -341,10 +283,6 @@ class SubAnnotationPropertyOf(BaseAxiom):
         Position.SUPER_PROPERTY,
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"SubAnnotationPropertyOf({self.sub_annotation_property}, {self.super_annotation_property})"
-
 
 class AnnotationPropertyDomain(BaseAxiom):
     """No logical semantics."""
@@ -356,10 +294,6 @@ class AnnotationPropertyDomain(BaseAxiom):
     ]
     domain: Annotated[IRI, Position.DOMAIN]
 
-    @override
-    def __str__(self) -> str:
-        return f"AnnotationPropertyDomain({self.annotation_property}, {self.domain})"
-
 
 class AnnotationPropertyRange(BaseAxiom):
     """No logical semantics."""
@@ -370,10 +304,6 @@ class AnnotationPropertyRange(BaseAxiom):
         Position.PROPERTY,
     ]
     range: Annotated[IRI, Position.RANGE]
-
-    @override
-    def __str__(self) -> str:
-        return f"AnnotationPropertyRange({self.annotation_property}, {self.range})"
 
 
 # -- Schema axioms --
@@ -406,12 +336,6 @@ class HasKey(BaseAxiom):
             raise ValueError(msg)
         return self
 
-    @override
-    def __str__(self) -> str:
-        obj = ", ".join(str(p) for p in self.object_properties)
-        data = ", ".join(str(p) for p in self.data_properties)
-        return f"HasKey({self.class_expression}, [{obj}], [{data}])"
-
 
 class DatatypeDefinition(BaseAxiom):
     datatype: Annotated[
@@ -421,18 +345,10 @@ class DatatypeDefinition(BaseAxiom):
     ]
     data_range: Annotated[DataRange, Position.RANGE]
 
-    @override
-    def __str__(self) -> str:
-        return f"DatatypeDefinition({self.datatype}, {self.data_range})"
-
 
 class Declaration(BaseAxiom):
     entity_type: EntityType
     iri: Annotated[IRI, Position.ENTITY]
-
-    @override
-    def __str__(self) -> str:
-        return f"Declaration({self.entity_type}, {self.iri})"
 
 
 # -- ABox: assertions --
@@ -447,10 +363,6 @@ class ClassAssertion(BaseAxiom):
     class_expression: Annotated[ClassExpression, Position.CLASS]
     individual: Annotated[IRI, EntityType.NAMED_INDIVIDUAL, Position.INDIVIDUAL]
 
-    @override
-    def __str__(self) -> str:
-        return f"ClassAssertion({self.class_expression}, {self.individual})"
-
 
 class ObjectPropertyAssertion(BaseAxiom):
     """r(a, b) -> a is related to b by r.
@@ -461,10 +373,6 @@ class ObjectPropertyAssertion(BaseAxiom):
     property: Annotated[IRI, EntityType.OBJECT_PROPERTY, Position.PROPERTY]
     source: Annotated[IRI, EntityType.NAMED_INDIVIDUAL, Position.SOURCE]
     target: Annotated[IRI, EntityType.NAMED_INDIVIDUAL, Position.TARGET]
-
-    @override
-    def __str__(self) -> str:
-        return f"ObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
 
 
 class NegativeObjectPropertyAssertion(BaseAxiom):
@@ -478,10 +386,6 @@ class NegativeObjectPropertyAssertion(BaseAxiom):
     target: Annotated[IRI, EntityType.NAMED_INDIVIDUAL, Position.TARGET]
     negated: Literal[True] = True
 
-    @override
-    def __str__(self) -> str:
-        return f"NegativeObjectPropertyAssertion({self.property}, {self.source}, {self.target})"
-
 
 class DataPropertyAssertion(BaseAxiom):
     """dp(a, v) -> a has value v for dp.
@@ -492,10 +396,6 @@ class DataPropertyAssertion(BaseAxiom):
     property: Annotated[IRI, EntityType.DATA_PROPERTY, Position.PROPERTY]
     individual: Annotated[IRI, EntityType.NAMED_INDIVIDUAL, Position.INDIVIDUAL]
     value: LiteralValue
-
-    @override
-    def __str__(self) -> str:
-        return f"DataPropertyAssertion({self.property}, {self.individual}, {self.value})"
 
 
 class NegativeDataPropertyAssertion(BaseAxiom):
@@ -509,10 +409,6 @@ class NegativeDataPropertyAssertion(BaseAxiom):
     value: LiteralValue
     negated: Literal[True] = True
 
-    @override
-    def __str__(self) -> str:
-        return f"NegativeDataPropertyAssertion({self.property}, {self.individual}, {self.value})"
-
 
 class SameIndividual(BaseAxiom):
     """a = b -> both IRIs denote the same entity."""
@@ -525,10 +421,6 @@ class SameIndividual(BaseAxiom):
         Field(min_length=2),
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"SameIndividual({', '.join(str(i) for i in self.same_individuals)})"
-
 
 class DifferentIndividuals(BaseAxiom):
     """a ≠ b -> all listed individuals are pairwise distinct."""
@@ -540,10 +432,6 @@ class DifferentIndividuals(BaseAxiom):
         Position.MEMBER,
         Field(min_length=2),
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"DifferentIndividuals({', '.join(str(i) for i in self.different_individuals)})"
 
 
 # -- Discriminated union of all axiom types --
@@ -593,36 +481,6 @@ if _TAGS != _CLASS_NAMES:
 
 
 Axiom = Annotated[
-    (
-        Annotated[AnnotationAssertion, Tag(AnnotationAssertion.tag())]
-        | Annotated[SubClassOf, Tag(SubClassOf.tag())]
-        | Annotated[EquivalentClasses, Tag(EquivalentClasses.tag())]
-        | Annotated[DisjointClasses, Tag(DisjointClasses.tag())]
-        | Annotated[SubObjectPropertyOf, Tag(SubObjectPropertyOf.tag())]
-        | Annotated[SubObjectPropertyOfChain, Tag(SubObjectPropertyOfChain.tag())]
-        | Annotated[EquivalentObjectProperties, Tag(EquivalentObjectProperties.tag())]
-        | Annotated[TransitiveObjectProperty, Tag(TransitiveObjectProperty.tag())]
-        | Annotated[ReflexiveObjectProperty, Tag(ReflexiveObjectProperty.tag())]
-        | Annotated[ObjectPropertyDomain, Tag(ObjectPropertyDomain.tag())]
-        | Annotated[ObjectPropertyRange, Tag(ObjectPropertyRange.tag())]
-        | Annotated[SubDataPropertyOf, Tag(SubDataPropertyOf.tag())]
-        | Annotated[EquivalentDataProperties, Tag(EquivalentDataProperties.tag())]
-        | Annotated[DataPropertyDomain, Tag(DataPropertyDomain.tag())]
-        | Annotated[DataPropertyRange, Tag(DataPropertyRange.tag())]
-        | Annotated[FunctionalDataProperty, Tag(FunctionalDataProperty.tag())]
-        | Annotated[SubAnnotationPropertyOf, Tag(SubAnnotationPropertyOf.tag())]
-        | Annotated[AnnotationPropertyDomain, Tag(AnnotationPropertyDomain.tag())]
-        | Annotated[AnnotationPropertyRange, Tag(AnnotationPropertyRange.tag())]
-        | Annotated[HasKey, Tag(HasKey.tag())]
-        | Annotated[DatatypeDefinition, Tag(DatatypeDefinition.tag())]
-        | Annotated[Declaration, Tag(Declaration.tag())]
-        | Annotated[ClassAssertion, Tag(ClassAssertion.tag())]
-        | Annotated[ObjectPropertyAssertion, Tag(ObjectPropertyAssertion.tag())]
-        | Annotated[NegativeObjectPropertyAssertion, Tag(NegativeObjectPropertyAssertion.tag())]
-        | Annotated[DataPropertyAssertion, Tag(DataPropertyAssertion.tag())]
-        | Annotated[NegativeDataPropertyAssertion, Tag(NegativeDataPropertyAssertion.tag())]
-        | Annotated[SameIndividual, Tag(SameIndividual.tag())]
-        | Annotated[DifferentIndividuals, Tag(DifferentIndividuals.tag())]
-    ),
+    functools.reduce(operator.or_, (tagged(c) for c in _AXIOM_CLASSES)),
     *tagged_union_meta(_get_axiom_tag),
 ]

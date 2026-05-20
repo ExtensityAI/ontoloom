@@ -8,7 +8,6 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Annotated, get_args, get_origin
 
-from ontoloom.canonical import SKIP
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.load import load_axiom
@@ -16,7 +15,7 @@ from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag
+from ontoloom.owl.markers import SKIP, AxiomTag
 from ontoloom.patterns.match import match_pattern
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern

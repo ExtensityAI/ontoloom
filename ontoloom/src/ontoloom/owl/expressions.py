@@ -5,6 +5,7 @@ from typing import Annotated, Any, override
 from pydantic import Field
 
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
+from ontoloom.owl._render import format_owl_struct
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import (
     DataRange,
@@ -14,7 +15,9 @@ from ontoloom.owl.markers import EntityType, Position, Unordered
 
 
 class BaseClassExpression(FrozenModel):
-    pass
+    @override
+    def __str__(self) -> str:
+        return format_owl_struct(self)
 
 
 # -- Object property restrictions --
@@ -34,10 +37,6 @@ class ObjectSomeValuesFrom(BaseClassExpression):
     ]
     filler: Annotated[ClassExpression, Position.FILLER]
 
-    @override
-    def __str__(self) -> str:
-        return f"ObjectSomeValuesFrom({self.property}, {self.filler})"
-
 
 class ObjectIntersectionOf(BaseClassExpression):
     """C ⊓ D -> things in ALL listed classes simultaneously.
@@ -51,10 +50,6 @@ class ObjectIntersectionOf(BaseClassExpression):
         Field(min_length=2),
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"ObjectIntersectionOf({', '.join(str(o) for o in self.operands)})"
-
 
 class ObjectOneOf(BaseClassExpression):
     """Nominal: {a} -> class containing exactly one individual.
@@ -63,10 +58,6 @@ class ObjectOneOf(BaseClassExpression):
     """
 
     individual: Annotated[IRI, EntityType.NAMED_INDIVIDUAL]
-
-    @override
-    def __str__(self) -> str:
-        return f"ObjectOneOf({self.individual})"
 
 
 class ObjectHasValue(BaseClassExpression):
@@ -88,10 +79,6 @@ class ObjectHasValue(BaseClassExpression):
         Position.FILLER,
     ]
 
-    @override
-    def __str__(self) -> str:
-        return f"ObjectHasValue({self.property}, {self.individual})"
-
 
 class ObjectHasSelf(BaseClassExpression):
     """∃r.Self -> things related to themselves by r."""
@@ -101,10 +88,6 @@ class ObjectHasSelf(BaseClassExpression):
         EntityType.OBJECT_PROPERTY,
         Position.RESTRICTION_PROPERTY,
     ]
-
-    @override
-    def __str__(self) -> str:
-        return f"ObjectHasSelf({self.self_property})"
 
 
 # -- Data property restrictions --
@@ -124,10 +107,6 @@ class DataSomeValuesFrom(BaseClassExpression):
     ]
     range: DataRange
 
-    @override
-    def __str__(self) -> str:
-        return f"DataSomeValuesFrom({self.property}, {self.range})"
-
 
 class DataHasValue(BaseClassExpression):
     """Things whose data property has exactly this value.
@@ -141,10 +120,6 @@ class DataHasValue(BaseClassExpression):
         Position.RESTRICTION_PROPERTY,
     ]
     value: LiteralValue
-
-    @override
-    def __str__(self) -> str:
-        return f"DataHasValue({self.property}, {self.value})"
 
 
 _resolve_class_expression = make_tag_resolver(

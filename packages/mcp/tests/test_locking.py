@@ -16,6 +16,7 @@ from ontoloom_mcp.components.locking import (
     LockedEntitySelectionName,
     StaleSelectionError,
     format_locked,
+    format_locked_quoted,
     verify_lock,
 )
 
@@ -100,6 +101,16 @@ def test_locked_axiom_rejects_entity_prefix():
         LockedAxiomSelectionName("entities:my_sel@a1b2c3d4")
 
 
+def test_locked_axiom_selection_name_lowercases_uppercase_hash_prefix():
+    locked = LockedAxiomSelectionName("axioms:x@A3F1B2C4")
+    assert locked.hash_prefix == "a3f1b2c4"
+
+
+def test_locked_entity_selection_name_lowercases_uppercase_hash_prefix():
+    locked = LockedEntitySelectionName("entities:x@A3F1B2C4")
+    assert locked.hash_prefix == "a3f1b2c4"
+
+
 # -- verify_lock --
 
 
@@ -148,6 +159,11 @@ def test_format_locked_axiom(s):
 def test_format_locked_entity(s):
     result = upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Cat"], "test")
     assert format_locked(result.selection) == f"entities:ent_sel@{result.selection.hash}"
+
+
+def test_format_locked_quoted_wraps_in_double_quotes(s):
+    result = upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
+    assert format_locked_quoted(result.selection) == f'"axioms:ax_sel@{result.selection.hash}"'
 
 
 # -- StaleSelectionError message format --

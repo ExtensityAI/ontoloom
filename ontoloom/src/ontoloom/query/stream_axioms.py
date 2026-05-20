@@ -7,9 +7,8 @@ from typing import override
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash
 from ontoloom.query._predicates import _axiom_predicates
-from ontoloom.query.base import Query
+from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasAxiomConstraints
-from ontoloom.query.rendered import RenderedSql
 
 
 class StreamAxioms(

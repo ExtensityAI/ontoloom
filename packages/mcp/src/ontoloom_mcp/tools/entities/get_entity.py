@@ -8,7 +8,7 @@ from ontoloom.selections.types import AxiomSelectionName, SelectionKind
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import build_refs, format_entity_inspect
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -41,7 +41,7 @@ def get_entity(
             source = f"get_entity(iri={dquoted(iri)})"
             upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
             sel = upserted.selection
-            sel_msg = f"\n\n{sel.size} axiom hashes -> {dquoted(format_locked(sel))}."
+            sel_msg = f"\n\n{sel.size} axiom hashes -> {format_locked_quoted(sel)}."
             if upserted.previous_size is not None:
                 sel_msg += f" Overwrote previous ({upserted.previous_size} items)."
             result += sel_msg

@@ -4,9 +4,9 @@ import re
 from enum import StrEnum
 from typing import Annotated, override
 
-from pydantic import Field, Tag
+from pydantic import Field
 
-from ontoloom.models import FrozenModel, TypedStr, make_tag_resolver, tagged_union_meta
+from ontoloom.models import FrozenModel, TypedStr, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.markers import Unordered
 from ontoloom.utils import dquoted
 
@@ -88,8 +88,7 @@ _get_literal_value_tag = make_tag_resolver((TypedLiteral, LangLiteral), union_na
 
 
 LiteralValue = Annotated[
-    Annotated[TypedLiteral, Tag(TypedLiteral.tag())]
-    | Annotated[LangLiteral, Tag(LangLiteral.tag())],
+    tagged(TypedLiteral) | tagged(LangLiteral),
     *tagged_union_meta(_get_literal_value_tag),
 ]
 
@@ -102,8 +101,7 @@ class DataTypeRef(FrozenModel):
 
     Without this wrapper, `DataRange` mixes a bare-string member (`DataType` is a
     `StrEnum`) with discriminated-model members, producing a nested
-    `anyOf[oneOf, string]` JSON Schema that LLMs mishandle. See
-    `feedback_no_nested_annotated_unions.md`.
+    `anyOf[oneOf, string]` JSON Schema that LLMs mishandle.
     """
 
     datatype: DataType
@@ -143,9 +141,7 @@ _get_data_range_tag = make_tag_resolver(
 
 
 DataRange = Annotated[
-    Annotated[DataTypeRef, Tag(DataTypeRef.tag())]
-    | Annotated[DataIntersectionOf, Tag(DataIntersectionOf.tag())]
-    | Annotated[DataOneOf, Tag(DataOneOf.tag())],
+    tagged(DataTypeRef) | tagged(DataIntersectionOf) | tagged(DataOneOf),
     *tagged_union_meta(_get_data_range_tag),
 ]
 

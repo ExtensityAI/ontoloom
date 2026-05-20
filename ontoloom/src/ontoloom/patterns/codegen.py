@@ -21,12 +21,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, get_args, get_origin
 
-from ontoloom.canonical import SKIP
 from ontoloom.owl.axioms import Axiom
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import DataRange
-from ontoloom.owl.markers import is_unordered
+from ontoloom.owl.markers import SKIP, is_unordered
 
 _TARGET = Path(__file__).parent / "types.py"
 _MARKER = "# ---- AUTOGEN BELOW: do not edit; regenerate via `uv run ontoloom-gen-patterns` ----"

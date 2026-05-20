@@ -27,11 +27,12 @@ CREATE TABLE IF NOT EXISTS axiom_entities (
     position TEXT
 );
 
+DROP INDEX IF EXISTS idx_axiom_entities_iri_pos;
+DROP INDEX IF EXISTS idx_axiom_entities_axiom_pos;
+
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri ON axiom_entities(entity_iri);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_role ON axiom_entities(entity_iri, role);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom ON axiom_entities(axiom_id);
-CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_pos ON axiom_entities(entity_iri, position, axiom_id);
-CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom_pos ON axiom_entities(axiom_id, position);
 -- Covering probe for MentionsAll's EXISTS chains: lets each per-IRI EXISTS hit
 -- (axiom_id=? AND entity_iri=?) without re-filtering after an axiom_id scan.
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom_iri ON axiom_entities(axiom_id, entity_iri);

@@ -1,4 +1,3 @@
-import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -326,13 +325,12 @@ def rename_iri(
     *,
     within: AxiomSelectionName | None = None,
 ) -> RenameResult:
-    """Replace old_iri with new_iri across all (or scoped) axioms. One batch_id.
+    """Replace old_iri with new_iri across all (or scoped) axioms.
 
     `within`: optional axiom selection to restrict the rename. The kind is
     enforced by the parameter type.
     """
     check_iri_prefixes(s, [new_iri])
-    batch = uuid.uuid4().hex[:12]
     results: list[ReplaceResult] = []
 
     constraints: list[AxiomConstraint] = [MentionsAll(iris=(old_iri,))]
@@ -364,7 +362,7 @@ def rename_iri(
             )
         )
 
-    return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results), batch_id=batch)
+    return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results))
 
 
 def axiom_summary(s: Session, *, within: SelectionRef | None = None) -> AxiomSummary:

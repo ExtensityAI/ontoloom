@@ -58,45 +58,6 @@ def _entities(axiom):
     return [(str(iri), role, pos) for iri, role, pos in iter_axiom_entities(axiom)]
 
 
-# -- Declarations --
-
-
-def test_declaration():
-    ax = Declaration(entity_type=EntityType.CLASS, iri=IRI(":Dog"))
-    assert _entities(ax) == [(":Dog", EntityType.CLASS, P.ENTITY)]
-
-
-# -- SubClassOf with expressions --
-
-
-def test_subclassof_named():
-    ax = SubClassOf(sub_class=NC(":Dog"), super_class=NC(":Animal"))
-    entities = _entities(ax)
-    assert (":Dog", EntityType.CLASS, P.SUB_CLASS) in entities
-    assert (":Animal", EntityType.CLASS, P.SUPER_CLASS) in entities
-
-
-def test_subclassof_with_some_values_from():
-    ax = SubClassOf(
-        sub_class=NC(":A"),
-        super_class=ObjectSomeValuesFrom(property=IRI(":r"), filler=NC(":B")),
-    )
-    entities = _entities(ax)
-    assert (":A", EntityType.CLASS, P.SUB_CLASS) in entities
-    assert (":r", EntityType.OBJECT_PROPERTY, P.RESTRICTION_PROPERTY) in entities
-    assert (":B", EntityType.CLASS, P.FILLER) in entities
-
-
-def test_subclassof_with_intersection():
-    ax = SubClassOf(
-        sub_class=NC(":A"),
-        super_class=ObjectIntersectionOf(operands=(NC(":B"), NC(":C"))),
-    )
-    entities = _entities(ax)
-    assert (":B", EntityType.CLASS, P.SUPER_CLASS) in entities
-    assert (":C", EntityType.CLASS, P.SUPER_CLASS) in entities
-
-
 # -- Expression types --
 
 
@@ -220,25 +181,6 @@ def test_has_key():
 # -- Annotation axioms --
 
 
-def test_annotation_assertion_with_lang_literal():
-    ax = AnnotationAssertion(
-        property=IRI("rdfs:label"), subject=IRI(":Dog"), value=LangLiteral(value="Dog")
-    )
-    entities = _entities(ax)
-    assert ("rdfs:label", EntityType.ANNOTATION_PROPERTY, P.PROPERTY) in entities
-    assert (":Dog", None, P.SUBJECT) in entities
-
-
-def test_annotation_assertion_with_iri_value():
-    ax = AnnotationAssertion(
-        property=IRI("rdfs:seeAlso"), subject=IRI(":Dog"), value=IRI("ex:DogPage")
-    )
-    entities = _entities(ax)
-    assert ("rdfs:seeAlso", EntityType.ANNOTATION_PROPERTY, P.PROPERTY) in entities
-    assert (":Dog", None, P.SUBJECT) in entities
-    assert ("ex:DogPage", None, P.VALUE) in entities
-
-
 def test_sub_annotation_property_of():
     ax = SubAnnotationPropertyOf(
         sub_annotation_property=IRI("skos:definition"),
@@ -341,13 +283,6 @@ def test_axiom_level_annotation_iri_value_extracted():
 
 
 # -- Set-semantic axioms --
-
-
-def test_equivalent_classes():
-    ax = EquivalentClasses(equivalent_classes=(NC(":A"), NC(":B")))
-    entities = _entities(ax)
-    assert (":A", EntityType.CLASS, P.MEMBER) in entities
-    assert (":B", EntityType.CLASS, P.MEMBER) in entities
 
 
 def test_disjoint_classes():

@@ -6,7 +6,7 @@ from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -54,7 +54,7 @@ def find_duplicates(
 
     lines = [
         f"Found {result.total_groups} duplicate {annotation_property} values "
-        f"across {sel.size} entities -> {dquoted(format_locked(sel))}."
+        f"across {sel.size} entities -> {format_locked_quoted(sel)}."
     ]
     if upserted.previous_size is not None:
         lines.append(f"Overwrote previous ({upserted.previous_size} items).")

@@ -31,14 +31,11 @@ class BasePattern(FrozenModel):
         return cls.__name__.removesuffix("Pattern")
 
 
-# Implementation note: each unordered tuple pattern field gets a sibling
-# `<field>_match: TupleMatch` emitted by codegen. The matcher reads it to
-# pick set-equality vs subset semantics. We use a sibling enum (not a
-# wrapper class like `Match[T]`) to keep the bare-tuple shorthand for the
-# common case and avoid extra wrapper types in the schema.
-# Ordered tuple fields stay bare and match positionally. If partial-match
-# is ever needed for ordered fields (prefix / contains / subsequence), add
-# a separate `SequenceMatch` enum + sibling there.
+# Each unordered tuple pattern field gets a sibling `<field>_match: TupleMatch`
+# emitted by codegen. The matcher reads it to pick set-equality vs subset
+# semantics. A sibling enum (rather than a wrapper class like `Match[T]`) keeps
+# the bare-tuple shorthand for the common case and avoids extra wrapper types
+# in the schema. Ordered tuple fields stay bare and match positionally.
 class TupleMatch(StrEnum):
     """Match mode for an unordered tuple field on a pattern.
 

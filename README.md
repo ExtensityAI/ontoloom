@@ -34,7 +34,7 @@ Added 6, skipped 0 axioms.
 After a few more rounds of additions, the ontology has grown to 42 entities and 172 axioms. The Moon constraint is too loose — moons should orbit planets, not any celestial body:
 
 ``````
-remove_axioms(path="solar.db", axiom_hashes=["caf67282"])
+remove_axioms(path="solar.db", target={"hashes": ["caf67282"]})
 Removed 1 axioms.
 
 ```diff
@@ -52,7 +52,7 @@ Added 1, skipped 0 axioms.
 To add Saturn's missing moons, the agent first checks the pattern by looking at an existing one:
 
 ```
-get_entity(path="solar.db", iri="sol:Europa", into="europa_axioms")
+get_entity(path="solar.db", iri="sol:Europa", into="axioms:europa_axioms")
 sol:Europa (NamedIndividual)
 
 Axioms (asserted): 4
@@ -60,10 +60,10 @@ Axioms (asserted): 4
   1 Declaration
   1 ClassAssertion
 
-4 axiom hashes → 'europa_axioms' (sel@a3f1c2).
+4 axiom hashes -> "axioms:europa_axioms@a3f1c2b4d5e6f708".
 
-read_selection(path="solar.db", name="europa_axioms")
-Selection 'europa_axioms' (axioms, sel@a3f1c2): 4 total (4 present, 0 missing)
+read_selection(path="solar.db", name="axioms:europa_axioms")
+Selection "axioms:europa_axioms@a3f1c2b4d5e6f708" (axioms): 4 total (4 present, 0 missing)
 Showing 1-4 of 4 (filter: all):
 
 [4a485089] Declaration(NamedIndividual, sol:Europa)

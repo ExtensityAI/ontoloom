@@ -18,7 +18,7 @@ from ontoloom_mcp.components.formatting import (
     format_entity_search_page,
     format_selection_result,
 )
-from ontoloom_mcp.components.locking import format_locked
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -62,7 +62,7 @@ def search_entities(
             "namespace": namespace,
             "within": within,
             "declared": declared,
-            "properties": properties,
+            "properties": properties or (),
             "exclude_deprecated": exclude_deprecated,
         }
 
@@ -70,12 +70,11 @@ def search_entities(
         source = _build_source(query, role, namespace, declared, properties, within)
         upserted = upsert_selection(s, into.bare, SelectionKind.ENTITIES, iris, source)
         sel = upserted.selection
-        sel_locked = format_locked(sel)
 
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties, within)
             s.commit()
-            return f"0 entities -> {dquoted(sel_locked)}.\n{no_results}"
+            return f"0 entities -> {format_locked_quoted(sel)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
@@ -93,7 +92,7 @@ def search_entities(
 
 def _within_metadata(s: Session, within: SelectionRef):
     sel = get_selection(s, within.bare)
-    return f"\nWithin selection {dquoted(format_locked(sel))} ({sel.kind}, {sel.size} items)"
+    return f"\nWithin selection {format_locked_quoted(sel)} ({sel.kind}, {sel.size} items)"
 
 
 def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:

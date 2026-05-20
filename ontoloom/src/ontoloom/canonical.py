@@ -4,8 +4,7 @@ OWL 2 treats certain axiom fields as unordered sets (e.g. EquivalentClasses).
 This module walks model_fields metadata to find Unordered() markers and sorts
 those fields before serialization. All other fields pass through.
 
-Used by content hashing (`hashing.py`) and structural matching (`patterns/`)
-to compare axioms by logical content rather than authoring order.
+Lets axioms be compared by logical content rather than authoring order.
 """
 
 import json
@@ -14,11 +13,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from ontoloom.owl.axioms import BaseAxiom
-from ontoloom.owl.markers import is_unordered
-
-# Annotations and the `negated` flag (Literal[True] tag on Negative*Assertion) aren't
-# part of an axiom's logical content.
-SKIP = ("annotations", "negated")
+from ontoloom.owl.markers import SKIP, is_unordered
 
 
 def canonical_json(axiom: BaseAxiom):

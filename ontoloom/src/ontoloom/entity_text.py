@@ -1,9 +1,8 @@
 """Schema vocabulary and label lookups for the `entity_text` SQL table.
 
-Both the axiom writer (`axioms.store`) and the readers (`entities.store`,
-`selections.store`) depend on these names. Hosting them here keeps the
-stores from reaching into each other and breaks what would otherwise be
-a near-circular dependency.
+Hosting these names here keeps axiom writers and readers from reaching
+into each other and breaks what would otherwise be a near-circular
+dependency.
 """
 
 from collections.abc import Iterable
@@ -16,8 +15,7 @@ from ontoloom.owl.iri import RDFS_LABEL
 LOCAL_NAME_PROPERTY = "local_name"
 
 # Compact form of `owl:deprecated`. The codebase stores IRIs as CURIEs
-# throughout, so this single literal is the only form seen by the property
-# column in `entity_text`. Used by the `NOT_DEPRECATED` predicate.
+# throughout, so this is the only form seen by the `entity_text.property` column.
 OWL_DEPRECATED_PROPERTY = "owl:deprecated"
 
 _LABEL_BATCH_SIZE = 500

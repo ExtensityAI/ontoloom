@@ -111,6 +111,20 @@ class SelectionName(TypedStr):
         return value
 
 
+def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
+    """Validate `kind:NAME` wire form; return `value` unchanged."""
+    prefix, sep, name = value.partition(":")
+
+    if not sep or prefix != kind.value:
+        msg = (
+            f"{type_name} must be '{kind.value}:NAME' "
+            f"(e.g. '{kind.value}:my_sel'), got {dquoted(value)}"
+        )
+        raise ValueError(msg)
+    _validate_name(name)
+    return value
+
+
 class EntitySelectionName(TypedStr):
     """Kind-typed reference to an entity selection. Wire form `entities:NAME`."""
 
@@ -121,16 +135,7 @@ class EntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        prefix, sep, name = value.partition(":")
-
-        if not sep or prefix != SelectionKind.ENTITIES.value:
-            msg = (
-                f"EntitySelectionName must be 'entities:NAME' "
-                f"(e.g. 'entities:my_sel'), got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-        _validate_name(name)
-        return value
+        return _parse_kinded_name(value, SelectionKind.ENTITIES, "EntitySelectionName")
 
     @property
     def bare(self) -> SelectionName:
@@ -151,16 +156,7 @@ class AxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        prefix, sep, name = value.partition(":")
-
-        if not sep or prefix != SelectionKind.AXIOMS.value:
-            msg = (
-                f"AxiomSelectionName must be 'axioms:NAME' "
-                f"(e.g. 'axioms:my_sel'), got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-        _validate_name(name)
-        return value
+        return _parse_kinded_name(value, SelectionKind.AXIOMS, "AxiomSelectionName")
 
     @property
     def bare(self) -> SelectionName:

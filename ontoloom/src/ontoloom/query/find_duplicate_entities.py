@@ -6,8 +6,7 @@ from typing import override
 from ontoloom.connection import Session
 from ontoloom.entities.types import DuplicateGroup, DuplicateResult
 from ontoloom.owl.iri import IRI
-from ontoloom.query.base import Query
-from ontoloom.query.rendered import RenderedSql
+from ontoloom.query.base import Query, RenderedSql
 from ontoloom.selections.types import EntitySelectionName
 
 

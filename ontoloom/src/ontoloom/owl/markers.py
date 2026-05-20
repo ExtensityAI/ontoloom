@@ -14,6 +14,10 @@ from enum import StrEnum
 
 from pydantic.fields import FieldInfo
 
+# Field names excluded from an axiom's logical content. Read by canonical
+# normalization, content hashing, struct rendering, and pattern matching.
+SKIP = ("annotations", "negated")
+
 
 @dataclass(frozen=True, slots=True)
 class Unordered:
