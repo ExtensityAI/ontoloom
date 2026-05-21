@@ -1,6 +1,6 @@
 """Direct unit tests for iter_axiom_entities -> verify exact IRIs, roles, and positions."""
 
-from ontoloom.entity_walker import iter_axiom_entities
+from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
     AnnotationAssertion,

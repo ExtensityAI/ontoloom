@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from typing import cast
 
+from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.axioms.hashes import AxiomNotFoundError, load_axiom_row
 from ontoloom.axioms.types import (
     AddResult,
@@ -12,7 +13,6 @@ from ontoloom.axioms.types import (
 )
 from ontoloom.connection import Session
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
-from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError
 from ontoloom.hashing import AxiomHash, HashedAxiom, short_hash
 from ontoloom.load import load_axiom

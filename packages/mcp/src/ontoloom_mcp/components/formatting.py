@@ -2,11 +2,11 @@ from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
+from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.axioms.types import AxiomSummary
 from ontoloom.connection import Session
 from ontoloom.entities.reader import lookup_entity_labels
 from ontoloom.entities.types import EntityInfo, EntitySearchPage, EntitySummary
-from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.hashing import HashedAxiom, short_hash
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI, RDFS_LABEL

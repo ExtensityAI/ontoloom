@@ -1,5 +1,5 @@
+from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.canonical import canonical_json
-from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.owl.axioms import SubClassOf
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI

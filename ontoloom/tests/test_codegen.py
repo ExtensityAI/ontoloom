@@ -56,8 +56,8 @@ def test_new_axiom_type_works_without_module_edits():
     purely from the field metadata, no edits to canonical.py or extract.py needed."""
     from typing import Annotated, Literal
 
+    from ontoloom.axioms.entity_walker import iter_axiom_entities
     from ontoloom.canonical import canonical_json
-    from ontoloom.entity_walker import iter_axiom_entities
     from ontoloom.owl.axioms import BaseAxiom
     from ontoloom.owl.iri import IRI
     from ontoloom.owl.markers import EntityType, Position, Unordered

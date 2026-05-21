@@ -7,7 +7,7 @@ type form to find it. Position propagation must remain unchanged.
 
 from typing import Annotated, Literal
 
-from ontoloom.entity_walker import _walk_model, iter_axiom_entities
+from ontoloom.axioms.entity_walker import _walk_model, iter_axiom_entities
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import EquivalentClasses, ObjectPropertyDomain
 from ontoloom.owl.expressions import ObjectSomeValuesFrom
