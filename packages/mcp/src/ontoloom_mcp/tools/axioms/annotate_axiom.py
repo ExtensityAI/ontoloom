@@ -4,9 +4,9 @@ from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.hashes import resolve_hash_prefix
 from ontoloom.axioms.mutations import annotate_axiom as core_annotate_axiom
-from ontoloom.axioms.types import AddAnnotation, AnnotationChange, RemoveAnnotation
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix
+from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.annotations import Annotation
 from ontoloom.utils import dedupe
 
@@ -16,6 +16,28 @@ from ontoloom_mcp.components.formatting import (
 )
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
+
+
+class AddAnnotation(FrozenModel):
+    """Add one annotation to an axiom (idempotent: skipped if already present)."""
+
+    add: Annotation
+
+
+class RemoveAnnotation(FrozenModel):
+    """Remove one annotation from an axiom (no-op if absent)."""
+
+    remove: Annotation
+
+
+_get_annotation_change_tag = make_tag_resolver(
+    (AddAnnotation, RemoveAnnotation), union_name="AnnotationChange"
+)
+
+AnnotationChange = Annotated[
+    tagged(AddAnnotation) | tagged(RemoveAnnotation),
+    *tagged_union_meta(_get_annotation_change_tag),
+]
 
 
 def annotate_axiom(

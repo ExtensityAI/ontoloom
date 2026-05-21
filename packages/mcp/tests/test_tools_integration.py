@@ -435,10 +435,13 @@ def test_find_duplicates_within_missing_selection_translates(populated_db):
 
 
 def test_annotate_axiom_reports_applied_counts(populated_db):
-    from ontoloom.axioms.types import AddAnnotation, RemoveAnnotation
     from ontoloom.owl.annotations import Annotation
     from ontoloom.owl.literals import LangLiteral
-    from ontoloom_mcp.tools.axioms.annotate_axiom import annotate_axiom
+    from ontoloom_mcp.tools.axioms.annotate_axiom import (
+        AddAnnotation,
+        RemoveAnnotation,
+        annotate_axiom,
+    )
 
     note = LangLiteral(value="A subclass relation.")
     add_ann = Annotation(property=IRI("rdfs:comment"), value=note)
