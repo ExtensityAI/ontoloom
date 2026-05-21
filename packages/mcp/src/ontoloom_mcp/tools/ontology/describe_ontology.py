@@ -1,10 +1,10 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.reader import axiom_summary as compute_axiom_summary
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.store import (
+from ontoloom.entities.reader import (
     entity_summary as compute_entity_summary,
 )
-from ontoloom.entities.store import (
+from ontoloom.entities.reader import (
     top_entities_by_axiom_count,
     undeclared_entity_count,
 )

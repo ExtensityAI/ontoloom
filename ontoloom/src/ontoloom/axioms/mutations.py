@@ -11,7 +11,7 @@ from ontoloom.axioms.types import (
     ReplaceResult,
 )
 from ontoloom.connection import Session
-from ontoloom.entity_text import LOCAL_NAME_PROPERTY
+from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entity_walker import iter_axiom_entities
 from ontoloom.errors import InternalError
 from ontoloom.hashing import AxiomHash, HashedAxiom, short_hash

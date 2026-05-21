@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.store import axiom_hashes_for_entity
-from ontoloom.entities.store import get_entity as core_get_entity
+from ontoloom.entities.reader import axiom_hashes_for_entity
+from ontoloom.entities.reader import get_entity as core_get_entity
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import AxiomSelectionName, SelectionKind

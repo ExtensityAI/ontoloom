@@ -7,7 +7,7 @@ every entity is discoverable through the applicable search paths.
 import pytest
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.connection import Session
-from ontoloom.entities.store import (
+from ontoloom.entities.reader import (
     EntityNotFoundError,
     collect_entity_iris,
     get_entity,

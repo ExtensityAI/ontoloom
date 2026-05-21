@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.store import find_duplicate_entities
+from ontoloom.entities.reader import find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind

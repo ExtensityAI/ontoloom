@@ -6,7 +6,7 @@ appear only as annotation values (role=None) are excluded.
 """
 
 from ontoloom.axioms.mutations import add_axioms
-from ontoloom.entities.store import undeclared_entity_count
+from ontoloom.entities.reader import undeclared_entity_count
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI

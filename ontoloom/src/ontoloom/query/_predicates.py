@@ -7,7 +7,7 @@ and `a` (axioms). Per-query render functions must use these aliases.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ontoloom.entity_text import OWL_DEPRECATED_PROPERTY
+from ontoloom.entities.text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
 from ontoloom.query._normalize import normalize_axiom, normalize_entity
 from ontoloom.query.constraints import (

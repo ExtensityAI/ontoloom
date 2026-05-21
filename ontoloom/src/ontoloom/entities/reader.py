@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 
 from ontoloom.connection import Session
+from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entities.types import (
     AnnotationRow,
     DuplicateResult,
@@ -11,7 +12,6 @@ from ontoloom.entities.types import (
     MatchQuality,
     MatchSource,
 )
-from ontoloom.entity_text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI, RDFS_LABEL

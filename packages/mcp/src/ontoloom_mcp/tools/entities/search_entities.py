@@ -3,8 +3,8 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, Session, session
-from ontoloom.entities.store import collect_entity_iris
-from ontoloom.entities.store import search_entities as core_search_entities
+from ontoloom.entities.reader import collect_entity_iris
+from ontoloom.entities.reader import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName

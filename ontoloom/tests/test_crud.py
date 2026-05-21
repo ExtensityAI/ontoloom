@@ -24,7 +24,7 @@ from ontoloom.connection import (
     OntologySchemaError,
     session,
 )
-from ontoloom.entities.store import (
+from ontoloom.entities.reader import (
     EntityNotFoundError,
     find_duplicate_entities,
     get_entity,

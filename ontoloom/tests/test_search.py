@@ -6,7 +6,7 @@ removal.
 """
 
 from ontoloom.axioms.mutations import add_axioms, remove_by_hash
-from ontoloom.entities.store import collect_entity_iris, search_entities
+from ontoloom.entities.reader import collect_entity_iris, search_entities
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
