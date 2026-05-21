@@ -11,8 +11,8 @@ from pydantic import Field
 
 from ontoloom.connection import Session
 from ontoloom.query.dispatch import run
-from ontoloom.query.read_axiom_selection import ReadAxiomSelection
-from ontoloom.query.read_entity_selection import ReadEntitySelection
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     AxiomSelectionPage,

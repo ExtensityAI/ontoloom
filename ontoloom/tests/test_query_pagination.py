@@ -7,8 +7,8 @@ from ontoloom.query.base import Query
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities
-from ontoloom.query.read_axiom_selection import ReadAxiomSelection
-from ontoloom.query.read_entity_selection import ReadEntitySelection
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
 

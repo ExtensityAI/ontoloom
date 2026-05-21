@@ -4,8 +4,8 @@ from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.query.dispatch import run
-from ontoloom.query.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     SelectionKind,
