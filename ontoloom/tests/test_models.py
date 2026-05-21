@@ -4,8 +4,7 @@ discriminated union in the codebase."""
 from typing import Annotated
 
 import pytest
-from ontoloom.errors import UnionDispatchError
-from ontoloom.models import FrozenModel, make_tag_resolver, tagged_union_meta
+from ontoloom.models import FrozenModel, UnionDispatchError, make_tag_resolver, tagged_union_meta
 from pydantic import Tag, TypeAdapter
 
 # -- fixtures ---------------------------------------------------------------

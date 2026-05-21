@@ -2,7 +2,8 @@
 
 from pydantic import TypeAdapter, ValidationError
 
-from ontoloom.errors import StoreCorruptionError, UnionDispatchError
+from ontoloom.errors import StoreCorruptionError
+from ontoloom.models import UnionDispatchError
 from ontoloom.owl.axioms import Axiom
 
 _AXIOM_ADAPTER: TypeAdapter[Axiom] = TypeAdapter(Axiom)
