@@ -41,21 +41,6 @@ class Metadata(FrozenModel):
     schema_version: int
 
 
-# Backslash chosen as the LIKE-ESCAPE character; pair every use with `ESCAPE '\\'`.
-LIKE_ESCAPE = "\\"
-
-
-def escape_like(value: str):
-    """Escape SQL LIKE metacharacters (`\\`, `%`, `_`) so a parameter is matched literally.
-    Use with `LIKE ? ESCAPE '\\'`.
-    """
-    return (
-        value.replace(LIKE_ESCAPE, LIKE_ESCAPE * 2)
-        .replace("%", LIKE_ESCAPE + "%")
-        .replace("_", LIKE_ESCAPE + "_")
-    )
-
-
 def _apply_pragmas(conn: sqlite3.Connection):
     conn.executescript(_PRAGMAS)
 

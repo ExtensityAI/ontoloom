@@ -7,7 +7,6 @@ and `a` (axioms). Per-query render functions must use these aliases.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from ontoloom.connection import escape_like
 from ontoloom.entity_text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
 from ontoloom.query._normalize import normalize_axiom, normalize_entity
@@ -33,6 +32,21 @@ from ontoloom.query.constraints import (
     WithTypes,
 )
 from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+
+# Backslash chosen as the LIKE-ESCAPE character; pair every use with `ESCAPE '\\'`.
+LIKE_ESCAPE = "\\"
+
+
+def escape_like(value: str):
+    """Escape SQL LIKE metacharacters (`\\`, `%`, `_`) so a parameter is matched literally.
+    Use with `LIKE ? ESCAPE '\\'`.
+    """
+    return (
+        value.replace(LIKE_ESCAPE, LIKE_ESCAPE * 2)
+        .replace("%", LIKE_ESCAPE + "%")
+        .replace("_", LIKE_ESCAPE + "_")
+    )
+
 
 DECLARED_EXISTS = (
     "EXISTS (SELECT 1 FROM axiom_entities ae_d "
