@@ -4,6 +4,7 @@ from collections import Counter
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
+from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.axioms import AxiomTag, Declaration
 from ontoloom.owl.iri import IRI
@@ -13,7 +14,6 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
-from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities

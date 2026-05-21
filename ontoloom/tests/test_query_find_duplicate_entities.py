@@ -2,12 +2,12 @@
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
+from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
-from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
 from pydantic import ValidationError

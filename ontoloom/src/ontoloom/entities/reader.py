@@ -1,6 +1,7 @@
 from collections.abc import Iterable, Sequence
 
 from ontoloom.connection import Session
+from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entities.types import (
     AnnotationRow,
@@ -34,7 +35,6 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
-from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.types import (
