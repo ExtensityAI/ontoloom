@@ -12,13 +12,13 @@ from ontoloom.axioms.types import (
     ReplaceResult,
 )
 from ontoloom.connection import Session
-from ontoloom.entities.text import LOCAL_NAME_PROPERTY
+from ontoloom.entities.text import record_annotation_value, record_local_name
 from ontoloom.errors import InternalError
 from ontoloom.hashing import AxiomHash, HashedAxiom, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
-from ontoloom.owl.axioms import AnnotationAssertion, BaseAxiom
+from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
@@ -334,10 +334,9 @@ def repopulate_axiom_text(s: Session, axiom_id: int, annotations: tuple[Annotati
 def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
     """Populate axiom_entities, entity_text, and axiom_text for a newly inserted axiom."""
     # Walk entities once: each yielded (iri, role, position) emits an
-    # axiom_entities row, and the first occurrence of each iri also emits an
-    # entity_text row keyed by local-name (used for IRI-based search).
+    # axiom_entities row, and the first occurrence of each iri delegates the
+    # entity_text local_name row to the entities/text writer.
     entity_rows = []
-    text_rows = []
     seen_iris: set[str] = set()
 
     for iri, role, position in iter_axiom_entities(axiom):
@@ -347,28 +346,13 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
         entity_rows.append((axiom_id, iri_str, role_val, pos_val))
         if iri_str not in seen_iris:
             seen_iris.add(iri_str)
-            text_rows.append((axiom_id, iri_str, iri.local_name, LOCAL_NAME_PROPERTY))
+            record_local_name(s, axiom_id, iri)
 
-    # AnnotationAssertion adds one extra entity_text row indexing the value
-    # under the annotation property (e.g. rdfs:label -> "Dog"), enabling
-    # property-scoped text search.
-    if isinstance(axiom, AnnotationAssertion):
-        text_rows.append(
-            (
-                axiom_id,
-                str(axiom.subject),
-                _annotation_value_to_text(axiom.value),
-                str(axiom.property),
-            )
-        )
+    record_annotation_value(s, axiom_id, axiom)
 
     s.conn.executemany(
         "INSERT INTO axiom_entities (axiom_id, entity_iri, role, position) VALUES (?, ?, ?, ?)",
         entity_rows,
-    )
-    s.conn.executemany(
-        "INSERT INTO entity_text (axiom_id, entity_iri, text, property) VALUES (?, ?, ?, ?)",
-        text_rows,
     )
 
     # axiom_text indexes axiom-level annotation values, keyed by axiom id and

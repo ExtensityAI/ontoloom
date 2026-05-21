@@ -29,6 +29,7 @@ from ontoloom.entities.reader import (
     find_duplicate_entities,
     get_entity,
 )
+from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import StoreCorruptionError
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.load import load_axiom
@@ -139,6 +140,39 @@ def test_set_semantic_dedup(s):
     result = add_axioms(s, [ax1, ax2])
     assert len(result.added) == 1
     assert len(result.skipped) == 1
+
+
+def test_populate_indexes_writes_local_name_and_annotation_value(s):
+    """Adding a Declaration plus an AnnotationAssertion populates entity_text
+    with both a local_name row for the entity IRI and a property-keyed row
+    for the annotation value."""
+    add_axioms(
+        s,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Foo")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Foo"),
+                value=LangLiteral(value="Foo Label"),
+            ),
+        ],
+    )
+
+    local_rows = list(
+        s.conn.execute(
+            "SELECT entity_iri, text FROM entity_text WHERE entity_iri = ? AND property = ?",
+            ("ex:Foo", LOCAL_NAME_PROPERTY),
+        )
+    )
+    assert ("ex:Foo", "Foo") in local_rows
+
+    label_rows = list(
+        s.conn.execute(
+            "SELECT entity_iri, text FROM entity_text WHERE entity_iri = ? AND property = ?",
+            ("ex:Foo", "rdfs:label"),
+        )
+    )
+    assert label_rows == [("ex:Foo", "Foo Label")]
 
 
 # -- Annotate axiom --

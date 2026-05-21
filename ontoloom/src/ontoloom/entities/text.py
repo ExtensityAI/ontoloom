@@ -5,7 +5,7 @@ need to know what `entity_text.property` rows look like.
 """
 
 from ontoloom.connection import Session
-from ontoloom.owl.axioms import BaseAxiom
+from ontoloom.owl.axioms import AnnotationAssertion, BaseAxiom
 from ontoloom.owl.iri import IRI
 
 # Sentinel for `entity_text.property` rows that index an IRI's local-name
@@ -29,10 +29,15 @@ def record_local_name(s: Session, axiom_id: int, iri: IRI) -> None:
 
 
 def record_annotation_value(s: Session, axiom_id: int, axiom: BaseAxiom) -> None:
-    """If `axiom` is an AnnotationAssertion with a string value, index it.
+    """If `axiom` is an AnnotationAssertion, index its value under entity_text
+    keyed by the annotation property (e.g. rdfs:label -> "Dog")."""
+    if not isinstance(axiom, AnnotationAssertion):
+        return
 
-    Implemented in Task 2.4 once the writer is exposed; this stub raises so any
-    accidental early caller fails loudly.
-    """
-    msg = "record_annotation_value: implemented in Task 2.4"
-    raise NotImplementedError(msg)
+    value = axiom.value
+    text = str(value) if isinstance(value, IRI) else value.value
+
+    s.conn.execute(
+        "INSERT INTO entity_text (axiom_id, entity_iri, text, property) VALUES (?, ?, ?, ?)",
+        (axiom_id, str(axiom.subject), text, str(axiom.property)),
+    )
