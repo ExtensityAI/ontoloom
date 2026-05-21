@@ -2,6 +2,10 @@ from collections.abc import Iterable, Sequence
 
 from ontoloom.connection import Session
 from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
+from ontoloom.entities.projections import (
+    batch_fetch_entity_display,
+    find_text_matches,
+)
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entities.types import (
     AnnotationRow,
@@ -56,9 +60,6 @@ class EntityNotFoundError(OntoloomError):
         self.iri = iri
         self.near_matches = near_matches or []
         super().__init__(f"Entity {dquoted(iri)} not found.")
-
-
-_TEXT_SCAN_CAP = 1000
 
 
 _NEAR_MATCH_LIMIT = 3
@@ -203,10 +204,8 @@ def collect_entity_iris(
         return run(s, ListEntities(constraints=constraints))
 
     # Text search path
-    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
-    matches.update(
-        _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
-    )
+    matches = find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
+    matches.update(find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties))
     matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
     return [IRI(k) for k in matches]
 
@@ -318,7 +317,7 @@ def _list_entities(
     if not page_iris:
         return EntitySearchPage(matches=(), total=total, offset=offset)
 
-    display = _batch_fetch_entity_display(s, [str(i) for i in page_iris])
+    display = batch_fetch_entity_display(s, [str(i) for i in page_iris])
 
     return EntitySearchPage(
         matches=tuple(
@@ -348,10 +347,8 @@ def _text_search_entities(
     limit: int,
     offset: int,
 ) -> EntitySearchPage:
-    matches = _find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
-    matches.update(
-        _find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties)
-    )
+    matches = find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
+    matches.update(find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties))
     matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
 
     quality_order = {MatchQuality.EXACT: 0, MatchQuality.SUBSTRING: 1}
@@ -370,7 +367,7 @@ def _text_search_entities(
     if not page_iris:
         return EntitySearchPage(matches=(), total=total, offset=offset)
 
-    display = _batch_fetch_entity_display(s, page_iris)
+    display = batch_fetch_entity_display(s, page_iris)
     return EntitySearchPage(
         matches=tuple(
             EntityMatch(
@@ -385,98 +382,6 @@ def _text_search_entities(
         total=total,
         offset=offset,
     )
-
-
-def _batch_fetch_entity_display(s: Session, iris: list[str]):
-    placeholders = ",".join("?" for _ in iris)
-
-    roles_by_iri: dict[str, set[EntityType]] = {}
-    for iri_str, role_val in s.conn.execute(
-        f"SELECT entity_iri, role FROM axiom_entities WHERE entity_iri IN ({placeholders}) AND role IS NOT NULL",
-        iris,
-    ):
-        roles_by_iri.setdefault(iri_str, set()).add(EntityType(role_val))
-
-    anns_by_iri: dict[str, list[AnnotationRow]] = {}
-    for iri_str, prop, text in s.conn.execute(
-        f"SELECT DISTINCT entity_iri, property, text FROM entity_text "
-        f"WHERE entity_iri IN ({placeholders}) AND property != ? "
-        f"ORDER BY entity_iri, property, text",
-        [*iris, LOCAL_NAME_PROPERTY],
-    ):
-        anns_by_iri.setdefault(iri_str, []).append(AnnotationRow(property=IRI(prop), value=text))
-
-    return {
-        iri_str: (
-            frozenset(roles_by_iri.get(iri_str, ())),
-            tuple(anns_by_iri.get(iri_str, ())),
-        )
-        for iri_str in iris
-    }
-
-
-def _find_text_matches(
-    s: Session,
-    query: str,
-    property_filter: str | None,
-    source_label: MatchSource,
-    *,
-    properties: Sequence[IRI] = (),
-) -> dict[str, tuple[MatchSource, MatchQuality]]:
-    """Returns {iri: (source_label, quality)}.
-
-    properties: when non-empty, restrict annotation search to these property IRIs.
-    Only applies when property_filter is None (annotation search path).
-    """
-    params: list[str] = []
-    if property_filter is not None:
-        prop_cond = "property = ?"
-        params.append(property_filter)
-    elif properties:
-        ph = ",".join("?" for _ in properties)
-        prop_cond = f"property IN ({ph})"
-        params.extend(properties)
-    else:
-        prop_cond = "property != ?"
-        params.append(LOCAL_NAME_PROPERTY)
-
-    # ORDER BY entity_iri: insertion order determines `_text_search_entities`
-    # pagination output. Without it, page-1 contents drift across runs.
-    # LIMIT _TEXT_SCAN_CAP: bound memory for runaway substring queries; user
-    # sees first-N alphabetical IRIs rather than all matches.
-    matches: dict[str, tuple[MatchSource, MatchQuality]] = {}
-    query_lower = query.lower()
-
-    for (iri_str,) in s.conn.execute(
-        f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND LOWER(text) = ? ORDER BY entity_iri LIMIT ?",
-        [*params, query_lower, _TEXT_SCAN_CAP],
-    ):
-        if iri_str not in matches:
-            matches[iri_str] = (source_label, MatchQuality.EXACT)
-
-    for (iri_str,) in s.conn.execute(
-        f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0 ORDER BY entity_iri LIMIT ?",
-        [*params, query_lower, _TEXT_SCAN_CAP],
-    ):
-        if iri_str not in matches:
-            matches[iri_str] = (source_label, MatchQuality.SUBSTRING)
-
-    return matches
-
-
-def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
-    """Top n entities by number of distinct axioms they appear in."""
-    return [
-        (IRI(row[0]), row[1])
-        for row in s.conn.execute(
-            "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
-            "FROM axiom_entities ae "
-            "GROUP BY ae.entity_iri "
-            "ORDER BY cnt DESC "
-            "LIMIT ?",
-            (n,),
-        ).fetchall()
-    ]
 
 
 def undeclared_entity_count(
