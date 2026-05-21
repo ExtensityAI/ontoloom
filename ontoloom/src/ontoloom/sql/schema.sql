@@ -1,7 +1,15 @@
--- Single-row key/value store for ontology-wide metadata (currently just prefixes).
+-- Single-row store for ontoloom-internal state (currently schema version).
+-- Per-ontology user data (prefixes) lives in its own table.
 CREATE TABLE IF NOT EXISTS metadata (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     data TEXT NOT NULL
+);
+
+-- Per-ontology declared prefix mappings. One row per prefix. `name` is unique;
+-- built-in prefixes (rdf, rdfs, owl, xsd) are accepted everywhere without a row.
+CREATE TABLE IF NOT EXISTS prefixes (
+    name TEXT PRIMARY KEY,
+    namespace_iri TEXT NOT NULL
 );
 
 -- Canonical axiom store. `hash` is a canonical hash of the axiom content and

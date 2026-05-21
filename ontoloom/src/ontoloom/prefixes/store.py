@@ -1,10 +1,7 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from pydantic import ValidationError
-
-from ontoloom.connection import Metadata, Session
-from ontoloom.errors import StoreCorruptionError
+from ontoloom.connection import Session
 from ontoloom.owl.iri import IRI
 from ontoloom.prefixes.types import (
     BUILTIN_PREFIXES,
@@ -25,21 +22,11 @@ class SetPrefixResult:
     in_use_count: int
 
 
-def _get_metadata(s: Session) -> Metadata:
-    row = s.conn.execute("SELECT data FROM metadata WHERE id = 1").fetchone()
-    try:
-        return Metadata.model_validate_json(row[0])
-    except ValidationError as e:
-        msg = "metadata row is malformed"
-        raise StoreCorruptionError(msg, e) from e
-
-
-def _save_metadata(s: Session, meta: Metadata):
-    s.conn.execute("UPDATE metadata SET data = ? WHERE id = 1", (meta.model_dump_json(),))
-
-
 def list_prefixes(s: Session) -> dict[PrefixName, NamespaceIRI]:
-    return {PrefixName(k): NamespaceIRI(v) for k, v in _get_metadata(s).prefixes.items()}
+    return {
+        PrefixName(name): NamespaceIRI(iri)
+        for name, iri in s.conn.execute("SELECT name, namespace_iri FROM prefixes ORDER BY name")
+    }
 
 
 def check_iri_prefixes(s: Session, iris: Iterable[IRI]):
@@ -55,29 +42,31 @@ def check_iri_prefixes(s: Session, iris: Iterable[IRI]):
 
 def set_prefix(s: Session, name: PrefixName, iri: NamespaceIRI) -> SetPrefixResult:
     """Save a prefix mapping. Reports the previous IRI and how many entities used it."""
-    meta = _get_metadata(s)
-    previous_raw = meta.prefixes.get(name)
-    previous_iri = NamespaceIRI(previous_raw) if previous_raw is not None else None
+    row = s.conn.execute("SELECT namespace_iri FROM prefixes WHERE name = ?", (name,)).fetchone()
+    previous_iri = NamespaceIRI(row[0]) if row is not None else None
     in_use_count = 0
 
     if previous_iri is not None and previous_iri != iri:
         in_use_count = run(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
 
-    _save_metadata(s, meta.model_copy(update={"prefixes": {**meta.prefixes, name: iri}}))
+    s.conn.execute(
+        "INSERT INTO prefixes (name, namespace_iri) VALUES (?, ?) "
+        "ON CONFLICT(name) DO UPDATE SET namespace_iri = excluded.namespace_iri",
+        (name, iri),
+    )
     return SetPrefixResult(previous_iri=previous_iri, in_use_count=in_use_count)
 
 
 def remove_prefix(s: Session, name: PrefixName):
-    meta = _get_metadata(s)
-    if name not in meta.prefixes:
+    row = s.conn.execute("SELECT 1 FROM prefixes WHERE name = ?", (name,)).fetchone()
+    if row is None:
         raise PrefixNotFoundError(name)
 
     count = run(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
     if count > 0:
         raise PrefixInUseError(name, count)
 
-    new_prefixes = {k: v for k, v in meta.prefixes.items() if k != name}
-    _save_metadata(s, meta.model_copy(update={"prefixes": new_prefixes}))
+    s.conn.execute("DELETE FROM prefixes WHERE name = ?", (name,))
 
 
 def prefix_usage_counts(s: Session) -> dict[PrefixName, int]:

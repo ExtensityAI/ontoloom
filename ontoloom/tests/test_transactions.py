@@ -16,17 +16,16 @@ def _make_ont(tmp_path):
 def _read_prefixes(path):
     conn = sqlite3.connect(str(path))
     try:
-        row = conn.execute(
-            "SELECT json_extract(data, '$.prefixes.ex') FROM metadata WHERE id = 1"
-        ).fetchone()
-        return row[0]
+        row = conn.execute("SELECT namespace_iri FROM prefixes WHERE name = 'ex'").fetchone()
+        return row[0] if row is not None else None
     finally:
         conn.close()
 
 
 def _set_prefix(s, value: str):
     s.conn.execute(
-        "UPDATE metadata SET data = json_set(data, '$.prefixes.ex', ?) WHERE id = 1",
+        "INSERT INTO prefixes (name, namespace_iri) VALUES ('ex', ?) "
+        "ON CONFLICT(name) DO UPDATE SET namespace_iri = excluded.namespace_iri",
         (value,),
     )
 

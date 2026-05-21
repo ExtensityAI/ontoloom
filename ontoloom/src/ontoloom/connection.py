@@ -16,7 +16,7 @@ _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
 _PRAGMAS = _SQL.joinpath("pragmas.sql").read_text()
 
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 # Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`
@@ -35,9 +35,12 @@ def assert_within_workspace(path: Path):
 
 
 class Metadata(FrozenModel):
-    """Typed shape of the singleton row in the `metadata` table."""
+    """Typed shape of the singleton row in the `metadata` table.
 
-    prefixes: dict[str, str]
+    Holds ontoloom-internal state only (currently schema version). Per-ontology
+    user data (prefixes) lives in its own table.
+    """
+
     schema_version: int
 
 
@@ -126,7 +129,7 @@ class Ontology:
             conn.executescript(_SCHEMA)
             conn.execute(
                 "INSERT OR IGNORE INTO metadata (id, data) VALUES (1, ?)",
-                (Metadata(prefixes={}, schema_version=CURRENT_SCHEMA_VERSION).model_dump_json(),),
+                (Metadata(schema_version=CURRENT_SCHEMA_VERSION).model_dump_json(),),
             )
         finally:
             conn.close()
