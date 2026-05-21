@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, get_args, get_origin
 
-from ontoloom.owl.axioms import Axiom
+from ontoloom.owl.axioms import AXIOM_CLASSES
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import DataRange
@@ -44,10 +44,7 @@ _EXPR_CLASSES: tuple[type, ...] = tuple(
     for raw in get_args(get_args(ClassExpression)[0])
     if (m := _peel_union_member(raw)) is not None
 )
-_AXIOM_CLASSES: tuple[type, ...] = tuple(
-    m for raw in get_args(get_args(Axiom)[0]) if (m := _peel_union_member(raw)) is not None
-)
-_PATTERN_CLASSES: frozenset[type] = frozenset(_EXPR_CLASSES) | frozenset(_AXIOM_CLASSES)
+_PATTERN_CLASSES: frozenset[type] = frozenset(_EXPR_CLASSES) | frozenset(AXIOM_CLASSES)
 
 # The raw ClassExpression union (without the Annotated wrapper).
 # Annotated[ClassExpression, marker] flattens nested Annotated to
@@ -74,7 +71,7 @@ def generate_body():
     lines.append(f"ExprSlot = Slot | {' | '.join(c.__name__ + 'Pattern' for c in _EXPR_CLASSES)}")
     lines.append("")
 
-    for cls in _AXIOM_CLASSES:
+    for cls in AXIOM_CLASSES:
         emitted = _emit_class(cls)
         lines.extend(emitted.lines)
         lines.append("")
@@ -82,8 +79,8 @@ def generate_body():
             needs_rebuild.append(cls.__name__ + "Pattern")
 
     expr_names = " | ".join(c.__name__ + "Pattern" for c in _EXPR_CLASSES)
-    axiom_names = " | ".join(c.__name__ + "Pattern" for c in _AXIOM_CLASSES)
-    all_pattern_classes = [c.__name__ + "Pattern" for c in (*_EXPR_CLASSES, *_AXIOM_CLASSES)]
+    axiom_names = " | ".join(c.__name__ + "Pattern" for c in AXIOM_CLASSES)
+    all_pattern_classes = [c.__name__ + "Pattern" for c in (*_EXPR_CLASSES, *AXIOM_CLASSES)]
     tagged_union = " | ".join(f'Annotated[{n}, Tag("{n}")]' for n in all_pattern_classes)
     lines += [
         f"ExpressionPattern = {expr_names}",

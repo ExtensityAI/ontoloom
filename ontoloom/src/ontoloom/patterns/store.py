@@ -12,7 +12,7 @@ from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
-from ontoloom.owl.axioms import Axiom, AxiomTag
+from ontoloom.owl.axioms import AXIOM_CLASSES, AxiomTag
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import SKIP
@@ -74,13 +74,6 @@ def match_axioms(
 
 _EXPRESSION_PATTERN_CLASSES: tuple[type, ...] = get_args(ExpressionPattern)
 
-
-def _peel(member: object) -> type:
-    # Axiom union members are Annotated[Cls, Tag("...")] for callable-discriminator wiring.
-    return get_args(member)[0] if get_origin(member) is Annotated else member  # pyright: ignore[reportReturnType]
-
-
-_AXIOM_CLASSES: tuple[type, ...] = tuple(_peel(m) for m in get_args(get_args(Axiom)[0]))
 # The raw ClassExpression union (no Annotated wrapper). Annotated[ClassExpression, marker]
 # flattens via PEP 593, so checking args[0] is _EXPR_UNION is the correct identity test.
 _EXPR_UNION = get_args(ClassExpression)[0]
@@ -105,7 +98,7 @@ def _has_class_expression_field(cls: type) -> bool:
 
 
 _EXPRESSION_CONTAINER_TYPES: tuple[AxiomTag, ...] = tuple(
-    AxiomTag(cls.__name__) for cls in _AXIOM_CLASSES if _has_class_expression_field(cls)
+    AxiomTag(cls.__name__) for cls in AXIOM_CLASSES if _has_class_expression_field(cls)
 )
 
 
