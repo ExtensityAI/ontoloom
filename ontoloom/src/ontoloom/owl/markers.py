@@ -1,9 +1,11 @@
 """Field-level metadata markers for OWL axiom declarations.
 
-Markers declare OWL-domain facts about Pydantic fields. `EntityType`,
-`Position`, and `AxiomTag` enum values are placed *directly* in `Annotated[]`
-metadata (no wrapper class); the walker dispatches with
-`isinstance(meta, Enum)`.
+Markers declare OWL-domain facts about Pydantic fields.
+
+`EntityType`, `Position`, and `AxiomTag` enum values are placed *directly* in
+`Annotated[]` metadata (no wrapper class). The walker dispatches with
+`isinstance(meta, Enum)`. A wrapper around a single enum value would be
+indirection without semantic gain.
 """
 
 from dataclasses import dataclass

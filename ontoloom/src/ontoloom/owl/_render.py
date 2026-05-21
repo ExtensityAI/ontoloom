@@ -1,9 +1,8 @@
 """Single renderer for OWL structs.
 
-Replaces 36 near-identical per-class `__str__` overrides across axioms.py and
-expressions.py. Format: `ClassName(field, field, ...)` walking `model_fields`
-in declaration order. Fields named `annotations` or `negated` are skipped —
-they aren't part of the human-facing logical content.
+Format: `ClassName(field, field, ...)` walking `model_fields` in declaration
+order. Fields named `annotations` or `negated` are skipped — they aren't part
+of the human-facing logical content.
 
 Tuple-valued fields render as `[a, b, c]` when the struct has other fields
 alongside (e.g. `HasKey`, `SubObjectPropertyOfChain`); when the tuple is the
