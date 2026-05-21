@@ -15,6 +15,7 @@ from ontoloom.selections.expr import (
 from ontoloom.selections.persistence import (
     get_selection,
     remove_selections,
+    selection_exists,
     upsert_selection,
 )
 from ontoloom.selections.reader import read_selection
@@ -433,3 +434,22 @@ def test_remove_selections_tolerates_missing(s):
     result = remove_selections(s, [_ent("ghost")])
     assert result.dropped == ()
     assert result.not_found == (SelectionName("ghost"),)
+
+
+# -- selection_exists helper --
+
+
+def test_selection_exists_true_when_kind_matches(s):
+    upsert_selection(s, SelectionName("foo"), SelectionKind.AXIOMS, [], source="test")
+
+    assert selection_exists(s, SelectionName("foo"), SelectionKind.AXIOMS) is True
+
+
+def test_selection_exists_false_when_missing(s):
+    assert selection_exists(s, SelectionName("nope"), SelectionKind.AXIOMS) is False
+
+
+def test_selection_exists_false_when_kind_mismatch(s):
+    upsert_selection(s, SelectionName("bar"), SelectionKind.ENTITIES, [], source="test")
+
+    assert selection_exists(s, SelectionName("bar"), SelectionKind.AXIOMS) is False

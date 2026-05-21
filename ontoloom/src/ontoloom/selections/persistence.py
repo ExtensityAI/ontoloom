@@ -69,6 +69,15 @@ def get_selection(s: Session, name: SelectionName) -> SelectionMeta:
     )
 
 
+def selection_exists(s: Session, name: SelectionName, kind: SelectionKind) -> bool:
+    """True iff a selection row with the given name and kind exists."""
+    row = s.conn.execute(
+        "SELECT 1 FROM selections WHERE name = ? AND kind = ?",
+        (name, kind),
+    ).fetchone()
+    return row is not None
+
+
 def upsert_selection(
     s: Session,
     name: SelectionName,

@@ -8,6 +8,7 @@ selection surfaces as `SelectionNotFoundError` instead of an empty result.
 from ontoloom.connection import Session
 from ontoloom.query.base import Query
 from ontoloom.query.constraints import InSelection
+from ontoloom.selections.persistence import selection_exists
 from ontoloom.selections.types import SelectionNotFoundError
 
 
@@ -25,12 +26,7 @@ def _verify_in_selection_refs[T](s: Session, q: Query[T]) -> None:
         if not isinstance(c, InSelection):
             continue
 
-        row = s.conn.execute(
-            "SELECT 1 FROM selections WHERE name = ? AND kind = ?",
-            (c.ref.bare, c.ref.kind),
-        ).fetchone()
-
-        if row is None:
+        if not selection_exists(s, c.ref.bare, c.ref.kind):
             raise SelectionNotFoundError(c.ref.bare)
 
 

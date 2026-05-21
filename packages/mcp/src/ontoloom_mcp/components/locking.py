@@ -12,6 +12,7 @@ from typing import Literal, overload, override
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
 from ontoloom.models import TypedStr
+from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import (
     _NAME_FRAGMENT,
     AxiomSelectionName,
@@ -161,17 +162,13 @@ def verify_lock(s: Session, locked: LockedSelectionRef):
     """
     bare = locked.bare
     name = bare.bare
-    row = s.conn.execute(
-        "SELECT hash, size FROM selections WHERE name = ? AND kind = ?",
-        (name, locked.kind),
-    ).fetchone()
+    meta = get_selection(s, name)
 
-    if row is None:
+    if meta.kind != locked.kind:
         raise SelectionNotFoundError(name)
 
-    current_hash, current_size = SelectionContentHash(row[0]), row[1]
-    if not current_hash.startswith(locked.hash_prefix):
-        raise StaleSelectionError(name, locked.hash_prefix, current_hash, current_size)
+    if not meta.hash.startswith(locked.hash_prefix):
+        raise StaleSelectionError(name, locked.hash_prefix, meta.hash, meta.size)
 
     return bare
 
