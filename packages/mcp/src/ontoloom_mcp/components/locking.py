@@ -14,7 +14,7 @@ from ontoloom.errors import OntoloomError
 from ontoloom.models import TypedStr
 from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import (
-    _NAME_FRAGMENT,
+    NAME_FRAGMENT,
     AxiomSelectionName,
     EntitySelectionName,
     SelectionContentHash,
@@ -22,7 +22,7 @@ from ontoloom.selections.types import (
     SelectionMeta,
     SelectionName,
     SelectionNotFoundError,
-    _validate_name,
+    validate_selection_name,
 )
 from ontoloom.utils import dquoted
 
@@ -85,7 +85,7 @@ def _parse_kinded_locked(value: str, kind: SelectionKind, type_name: str) -> str
             f"(>= {LOCKED_PREFIX_MIN} hex chars), got {dquoted(value)}"
         )
         raise ValueError(msg)
-    _validate_name(name)
+    validate_selection_name(name)
     return f"{prefix}:{name}@{hash_prefix.lower()}"
 
 
@@ -93,7 +93,7 @@ class LockedEntitySelectionName(TypedStr):
     """Locked entity selection ref. Wire form `entities:NAME@HASH_PREFIX`."""
 
     description = "Locked entity selection (wire: 'entities:NAME@HASH_PREFIX')"
-    pattern = rf"^entities:{_NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
+    pattern = rf"^entities:{NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
     examples = ("entities:my_selection@a3f1b2c4",)
 
     @override
@@ -120,7 +120,7 @@ class LockedAxiomSelectionName(TypedStr):
     """Locked axiom selection ref. Wire form `axioms:NAME@HASH_PREFIX`."""
 
     description = "Locked axiom selection (wire: 'axioms:NAME@HASH_PREFIX')"
-    pattern = rf"^axioms:{_NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
+    pattern = rf"^axioms:{NAME_FRAGMENT}@{_HASH_FRAGMENT}$"
     examples = ("axioms:my_selection@a3f1b2c4",)
 
     @override

@@ -27,15 +27,12 @@ class SelectionNotFoundError(OntoloomError):
 class SelectionKindMismatchError(OntoloomError):
     """Caller's kind-prefixed ref disagrees with the stored selection's kind."""
 
-    def __init__(
-        self, name: "SelectionName", expected: "SelectionKind", actual: "SelectionKind"
-    ):
+    def __init__(self, name: "SelectionName", expected: "SelectionKind", actual: "SelectionKind"):
         self.name = name
         self.expected = expected
         self.actual = actual
         super().__init__(
-            f"Selection {dquoted(name)} is kind {actual}, "
-            f"but caller referenced it as {expected}."
+            f"Selection {dquoted(name)} is kind {actual}, but caller referenced it as {expected}."
         )
 
 
@@ -50,9 +47,9 @@ class SelectionExprError(OntoloomError):
 
 MAX_SELECTION_NAME_LEN = 64
 
-_NAME_FRAGMENT = rf"[a-zA-Z][a-zA-Z0-9._/:-]{{0,{MAX_SELECTION_NAME_LEN - 1}}}"
+NAME_FRAGMENT = rf"[a-zA-Z][a-zA-Z0-9._/:-]{{0,{MAX_SELECTION_NAME_LEN - 1}}}"
 
-_NAME_PATTERN = re.compile(rf"^{_NAME_FRAGMENT}$")
+_NAME_PATTERN = re.compile(rf"^{NAME_FRAGMENT}$")
 
 
 class SelectionKind(StrEnum):
@@ -103,7 +100,8 @@ class SelectionContentHash(TypedStr):
         return normalized
 
 
-def _validate_name(value: str):
+def validate_selection_name(value: str):
+    """Raise ValueError if `value` is not a syntactically valid bare selection name."""
     if not _NAME_PATTERN.match(value):
         msg = (
             f"Selection name must start with a letter and contain only letters, "
@@ -117,13 +115,13 @@ class SelectionName(TypedStr):
     """A bare selection name. Rejects any `@hash` suffix."""
 
     description = "Selection name"
-    pattern = rf"^{_NAME_FRAGMENT}$"
+    pattern = rf"^{NAME_FRAGMENT}$"
     examples = ("my_selection",)
 
     @override
     @classmethod
     def parse(cls, value: str):
-        _validate_name(value)
+        validate_selection_name(value)
         return value
 
 
@@ -137,7 +135,7 @@ def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
             f"(e.g. '{kind.value}:my_sel'), got {dquoted(value)}"
         )
         raise ValueError(msg)
-    _validate_name(name)
+    validate_selection_name(name)
     return value
 
 
@@ -145,7 +143,7 @@ class EntitySelectionName(TypedStr):
     """Kind-typed reference to an entity selection. Wire form `entities:NAME`."""
 
     description = "Entity-kind selection reference (wire form: 'entities:NAME')"
-    pattern = rf"^entities:{_NAME_FRAGMENT}$"
+    pattern = rf"^entities:{NAME_FRAGMENT}$"
     examples = ("entities:my_selection",)
 
     @override
@@ -166,7 +164,7 @@ class AxiomSelectionName(TypedStr):
     """Kind-typed reference to an axiom selection. Wire form `axioms:NAME`."""
 
     description = "Axiom-kind selection reference (wire form: 'axioms:NAME')"
-    pattern = rf"^axioms:{_NAME_FRAGMENT}$"
+    pattern = rf"^axioms:{NAME_FRAGMENT}$"
     examples = ("axioms:my_selection",)
 
     @override
