@@ -27,9 +27,6 @@ CREATE TABLE IF NOT EXISTS axiom_entities (
     position TEXT
 );
 
-DROP INDEX IF EXISTS idx_axiom_entities_iri_pos;
-DROP INDEX IF EXISTS idx_axiom_entities_axiom_pos;
-
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri ON axiom_entities(entity_iri);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_iri_role ON axiom_entities(entity_iri, role);
 CREATE INDEX IF NOT EXISTS idx_axiom_entities_axiom ON axiom_entities(axiom_id);
@@ -65,9 +62,6 @@ CREATE TABLE IF NOT EXISTS axiom_text (
     text TEXT NOT NULL,
     property TEXT NOT NULL
 );
-
-DROP INDEX IF EXISTS idx_axiom_text_text;
-DROP INDEX IF EXISTS idx_axiom_text_property;
 
 CREATE INDEX IF NOT EXISTS idx_axiom_text_axiom ON axiom_text(axiom_id);
 CREATE INDEX IF NOT EXISTS idx_axiom_text_lower_text
