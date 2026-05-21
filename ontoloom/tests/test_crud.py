@@ -58,13 +58,14 @@ from ontoloom.prefixes.types import (
     PrefixName,
     PrefixNotFoundError,
 )
+from ontoloom.query.dispatch import run
 from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import EntitiesInExpr
 from ontoloom.selections.persistence import (
     list_selections,
     upsert_selection,
 )
-from ontoloom.selections.reader import read_selection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
@@ -467,7 +468,7 @@ def test_entity_selection_present_count_punned_entity(s):
     )
     upsert_selection(s, SelectionName("punned"), SelectionKind.ENTITIES, ["ex:Pun"], "test")
 
-    page = read_selection(s, _ent("punned"))
+    page = run(s, ReadEntitySelection(selection=_ent("punned")))
     assert page.present >= 0
     assert page.missing >= 0
     assert page.present + page.missing == page.meta.size

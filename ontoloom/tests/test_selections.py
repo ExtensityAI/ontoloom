@@ -4,6 +4,7 @@ from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.query.dispatch import run
 from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import (
     AxiomsForExpr,
@@ -18,7 +19,8 @@ from ontoloom.selections.persistence import (
     selection_exists,
     upsert_selection,
 )
-from ontoloom.selections.reader import read_selection
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
@@ -68,7 +70,7 @@ def test_intersection(s):
     ).selection.size
     assert card == 1
 
-    page = read_selection(s, _ent("inter"))
+    page = run(s, ReadEntitySelection(selection=_ent("inter")))
     assert [item.iri for item in page.items] == ["ex:Cat"]
 
     upsert_selection(s, SelectionName("c"), SelectionKind.ENTITIES, ["ex:Fish"], "test")
@@ -89,7 +91,7 @@ def test_difference(s):
     ).selection.size
     assert card_a_minus_b == 2
 
-    page = read_selection(s, _ent("diff_ab"))
+    page = run(s, ReadEntitySelection(selection=_ent("diff_ab")))
     assert {item.iri for item in page.items} == {"ex:Dog", "ex:Fish"}
 
     card_b_minus_a = create_selection(
@@ -132,7 +134,7 @@ def test_entities_in(s):
     meta = get_selection(s, SelectionName("ent_in"))
     assert meta.kind == SelectionKind.ENTITIES
 
-    page = read_selection(s, _ent("ent_in"))
+    page = run(s, ReadEntitySelection(selection=_ent("ent_in")))
     keys = {item.iri for item in page.items}
     assert "ex:Dog" in keys
     assert "ex:Animal" in keys
@@ -283,13 +285,13 @@ def test_read_with_show_filters(s):
     fake_hash = "d" * 64
     upsert_selection(s, SelectionName("sel"), SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
 
-    page_present = read_selection(s, _ax("sel"), show=ShowFilter.PRESENT)
+    page_present = run(s, ReadAxiomSelection(selection=_ax("sel"), show=ShowFilter.PRESENT))
     assert all(not item.missing for item in page_present.items)
 
-    page_missing = read_selection(s, _ax("sel"), show=ShowFilter.MISSING)
+    page_missing = run(s, ReadAxiomSelection(selection=_ax("sel"), show=ShowFilter.MISSING))
     assert all(item.missing for item in page_missing.items)
 
-    page_all = read_selection(s, _ax("sel"), show=ShowFilter.ALL)
+    page_all = run(s, ReadAxiomSelection(selection=_ax("sel"), show=ShowFilter.ALL))
     assert len(page_all.items) == 2
 
 
@@ -308,7 +310,7 @@ def test_read_entities_selection_punned_entity_present_missing_sum(s):
     )
     # :ex:Ghost has no Declaration -> should be counted as missing.
     upsert_selection(s, SelectionName("s"), SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
-    page = read_selection(s, _ent("s"))
+    page = run(s, ReadEntitySelection(selection=_ent("s")))
     assert page.present + page.missing == page.meta.size
     assert page.present == 1  # ex:X is declared (punned, but COUNT(DISTINCT) = 1)
     assert page.missing == 1  # ex:Ghost has no Declaration
@@ -323,7 +325,7 @@ def test_selection_hash_round_trip(s):
     # _selection_hash sorts internally.
     items = ["ex:C", "ex:A", "ex:B"]
     result1 = upsert_selection(s, SelectionName("s"), SelectionKind.ENTITIES, items, "test")
-    page = read_selection(s, _ent("s"))
+    page = run(s, ReadEntitySelection(selection=_ent("s")))
     read_back = [item.iri for item in page.items]
     result2 = upsert_selection(s, SelectionName("s2"), SelectionKind.ENTITIES, read_back, "test")
     assert result1.selection.hash == result2.selection.hash

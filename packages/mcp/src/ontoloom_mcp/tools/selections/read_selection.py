@@ -1,9 +1,14 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
+from ontoloom.errors import InternalError
 from ontoloom.hashing import short_hash
-from ontoloom.selections.reader import read_selection as core_read_selection
+from ontoloom.query.dispatch import run
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import (
+    AxiomSelectionName,
     AxiomSelectionPage,
+    EntitySelectionName,
     EntitySelectionPage,
     SelectionRef,
     ShowFilter,
@@ -38,7 +43,18 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        page = core_read_selection(s, name, limit=limit, offset=offset, show=show)
+        match name:
+            case AxiomSelectionName():
+                page = run(
+                    s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
+                )
+            case EntitySelectionName():
+                page = run(
+                    s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
+                )
+            case _:
+                msg = f"Unexpected selection ref kind: {name!r}"
+                raise InternalError(msg)
         s.commit()
 
     meta = page.meta
