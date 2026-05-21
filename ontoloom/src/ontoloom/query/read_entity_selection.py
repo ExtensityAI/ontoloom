@@ -3,7 +3,7 @@
 from typing import override
 
 from ontoloom.connection import Session
-from ontoloom.entity_text import lookup_entity_labels
+from ontoloom.entities.store import lookup_entity_labels
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType

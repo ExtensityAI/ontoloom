@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
 from ontoloom.connection import Session
 from ontoloom.entities.types import (
@@ -14,7 +14,7 @@ from ontoloom.entities.types import (
 from ontoloom.entity_text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
-from ontoloom.owl.iri import IRI
+from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
@@ -62,6 +62,26 @@ _TEXT_SCAN_CAP = 1000
 
 
 _NEAR_MATCH_LIMIT = 3
+
+
+_LABEL_BATCH_SIZE = 500
+
+
+def lookup_entity_labels(s: Session, iris: Iterable[str]) -> dict[str, str | None]:
+    """Return {iri: rdfs:label | None} for each IRI in the input."""
+    iri_list = list(iris)
+    result: dict[str, str | None] = dict.fromkeys(iri_list)
+    for i in range(0, len(iri_list), _LABEL_BATCH_SIZE):
+        batch = iri_list[i : i + _LABEL_BATCH_SIZE]
+        ph = ",".join("?" for _ in batch)
+        result.update(
+            s.conn.execute(
+                f"SELECT entity_iri, text FROM entity_text "
+                f"WHERE entity_iri IN ({ph}) AND property = ?",
+                (*batch, RDFS_LABEL),
+            ).fetchall()
+        )
+    return result
 
 
 def get_entity(s: Session, iri: IRI, *, within: AxiomSelectionName | None = None) -> EntityInfo:
