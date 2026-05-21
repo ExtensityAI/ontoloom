@@ -1,7 +1,8 @@
 import pytest
 from ontoloom.hashing import AxiomHash
+from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag, EntityType, Position
+from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
     AlwaysFalse,

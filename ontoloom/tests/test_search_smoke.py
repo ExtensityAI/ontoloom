@@ -18,6 +18,7 @@ from ontoloom.owl.axioms import (
     AnnotationAssertion,
     AnnotationPropertyDomain,
     AnnotationPropertyRange,
+    AxiomTag,
     ClassAssertion,
     DataPropertyAssertion,
     DataPropertyDomain,
@@ -63,7 +64,7 @@ from ontoloom.owl.literals import (
     LangLiteral,
     TypedLiteral,
 )
-from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
 
 # ---------------------------------------------------------------------------

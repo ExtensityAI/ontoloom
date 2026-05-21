@@ -1,5 +1,6 @@
 import functools
 import operator
+from enum import StrEnum
 from typing import Annotated, Literal, override
 
 from pydantic import Field, model_validator
@@ -15,7 +16,7 @@ from ontoloom.owl.literals import (
     LiteralValue,
     TypedLiteral,
 )
-from ontoloom.owl.markers import AxiomTag, EntityType, Position, Unordered
+from ontoloom.owl.markers import EntityType, Position, Unordered
 
 
 class BaseAxiom(FrozenModel):
@@ -437,7 +438,7 @@ class DifferentIndividuals(BaseAxiom):
 # -- Discriminated union of all axiom types --
 
 
-_AXIOM_CLASSES = (
+AXIOM_CLASSES = (
     AnnotationAssertion,
     SubClassOf,
     EquivalentClasses,
@@ -468,19 +469,57 @@ _AXIOM_CLASSES = (
     SameIndividual,
     DifferentIndividuals,
 )
-_get_axiom_tag = make_tag_resolver(_AXIOM_CLASSES, union_name="Axiom")
+
+
+class AxiomTag(StrEnum):
+    """Structural tag for an OWL axiom — matches the axiom class's `__name__`.
+
+    Stored in `axioms.type` and used as the discriminator in `WithTypes`.
+    """
+
+    ANNOTATION_ASSERTION = "AnnotationAssertion"
+    SUB_CLASS_OF = "SubClassOf"
+    EQUIVALENT_CLASSES = "EquivalentClasses"
+    DISJOINT_CLASSES = "DisjointClasses"
+    SUB_OBJECT_PROPERTY_OF = "SubObjectPropertyOf"
+    SUB_OBJECT_PROPERTY_OF_CHAIN = "SubObjectPropertyOfChain"
+    EQUIVALENT_OBJECT_PROPERTIES = "EquivalentObjectProperties"
+    TRANSITIVE_OBJECT_PROPERTY = "TransitiveObjectProperty"
+    REFLEXIVE_OBJECT_PROPERTY = "ReflexiveObjectProperty"
+    OBJECT_PROPERTY_DOMAIN = "ObjectPropertyDomain"
+    OBJECT_PROPERTY_RANGE = "ObjectPropertyRange"
+    SUB_DATA_PROPERTY_OF = "SubDataPropertyOf"
+    EQUIVALENT_DATA_PROPERTIES = "EquivalentDataProperties"
+    DATA_PROPERTY_DOMAIN = "DataPropertyDomain"
+    DATA_PROPERTY_RANGE = "DataPropertyRange"
+    FUNCTIONAL_DATA_PROPERTY = "FunctionalDataProperty"
+    SUB_ANNOTATION_PROPERTY_OF = "SubAnnotationPropertyOf"
+    ANNOTATION_PROPERTY_DOMAIN = "AnnotationPropertyDomain"
+    ANNOTATION_PROPERTY_RANGE = "AnnotationPropertyRange"
+    HAS_KEY = "HasKey"
+    DATATYPE_DEFINITION = "DatatypeDefinition"
+    DECLARATION = "Declaration"
+    CLASS_ASSERTION = "ClassAssertion"
+    OBJECT_PROPERTY_ASSERTION = "ObjectPropertyAssertion"
+    NEGATIVE_OBJECT_PROPERTY_ASSERTION = "NegativeObjectPropertyAssertion"
+    DATA_PROPERTY_ASSERTION = "DataPropertyAssertion"
+    NEGATIVE_DATA_PROPERTY_ASSERTION = "NegativeDataPropertyAssertion"
+    SAME_INDIVIDUAL = "SameIndividual"
+    DIFFERENT_INDIVIDUALS = "DifferentIndividuals"
 
 
 _TAGS = frozenset(t.value for t in AxiomTag)
-_CLASS_NAMES = frozenset(cls.__name__ for cls in _AXIOM_CLASSES)
+_CLASS_NAMES = frozenset(cls.__name__ for cls in AXIOM_CLASSES)
 if _TAGS != _CLASS_NAMES:
     _missing = _CLASS_NAMES - _TAGS
     _extra = _TAGS - _CLASS_NAMES
-    msg = f"AxiomTag/_AXIOM_CLASSES drift — missing tags: {_missing}; extra tags: {_extra}"
+    msg = f"AxiomTag/AXIOM_CLASSES drift — missing tags: {_missing}; extra tags: {_extra}"
     raise RuntimeError(msg)
 
 
+_get_axiom_tag = make_tag_resolver(AXIOM_CLASSES, union_name="Axiom")
+
 Axiom = Annotated[
-    functools.reduce(operator.or_, (tagged(c) for c in _AXIOM_CLASSES)),
+    functools.reduce(operator.or_, (tagged(c) for c in AXIOM_CLASSES)),
     *tagged_union_meta(_get_axiom_tag),
 ]

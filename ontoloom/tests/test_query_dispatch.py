@@ -5,9 +5,9 @@ from collections import Counter
 import pytest
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import AxiomHash, HashedAxiom
-from ontoloom.owl.axioms import Declaration
+from ontoloom.owl.axioms import AxiomTag, Declaration
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import InSelection
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities

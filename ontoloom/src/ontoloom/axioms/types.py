@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.annotations import Annotation
+from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag
 from ontoloom.selections.types import SelectionMeta
 
 

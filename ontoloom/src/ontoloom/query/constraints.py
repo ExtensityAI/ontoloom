@@ -8,8 +8,9 @@ from pydantic import AfterValidator, Field, model_validator
 from ontoloom.errors import OntoloomError
 from ontoloom.hashing import AxiomHash
 from ontoloom.models import FrozenModel
+from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag, EntityType, Position
+from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.selections.types import SelectionRef
 

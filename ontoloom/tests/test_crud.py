@@ -35,6 +35,7 @@ from ontoloom.load import load_axiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
     AnnotationAssertion,
+    AxiomTag,
     Declaration,
     EquivalentClasses,
     HasKey,
@@ -43,7 +44,7 @@ from ontoloom.owl.axioms import (
 from ontoloom.owl.expressions import ObjectSomeValuesFrom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
-from ontoloom.owl.markers import AxiomTag, EntityType, Position
+from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.store import (
     list_prefixes,
     prefix_usage_counts,

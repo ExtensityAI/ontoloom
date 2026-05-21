@@ -17,10 +17,10 @@ from ontoloom.axioms.mutations import add_axioms
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.annotations import Annotation
-from ontoloom.owl.axioms import Declaration, SubClassOf
+from ontoloom.owl.axioms import AxiomTag, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
-from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import (
     AlwaysFalse,
     HasAnyAnnotation,

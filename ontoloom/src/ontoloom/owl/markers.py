@@ -1,12 +1,9 @@
 """Field-level metadata markers for OWL axiom declarations.
 
-Markers declare OWL-domain facts about Pydantic fields. Read by canonical
-normalization, entity extraction, pattern matching, and codegen.
-
-`EntityType`, `Position`, and `AxiomTag` enum values are placed *directly* in
-`Annotated[]` metadata (no wrapper class). The walker dispatches with
-`isinstance(meta, Enum)`. A wrapper around a single enum value would be
-indirection without semantic gain.
+Markers declare OWL-domain facts about Pydantic fields. `EntityType`,
+`Position`, and `AxiomTag` enum values are placed *directly* in `Annotated[]`
+metadata (no wrapper class); the walker dispatches with
+`isinstance(meta, Enum)`.
 """
 
 from dataclasses import dataclass
@@ -14,18 +11,13 @@ from enum import StrEnum
 
 from pydantic.fields import FieldInfo
 
-# Field names excluded from an axiom's logical content. Read by canonical
-# normalization, content hashing, struct rendering, and pattern matching.
+# Field names excluded from an axiom's logical content.
 SKIP = ("annotations", "negated")
 
 
 @dataclass(frozen=True, slots=True)
 class Unordered:
-    """The field is a tuple whose order has no semantic meaning in OWL.
-
-    Read by canonical normalization (sorts), pattern matching (permutes),
-    and pattern codegen (allows partial-set Contains in generated patterns).
-    """
+    """The field is a tuple whose order has no semantic meaning in OWL."""
 
 
 class EntityType(StrEnum):
@@ -37,43 +29,6 @@ class EntityType(StrEnum):
     ANNOTATION_PROPERTY = "AnnotationProperty"
     NAMED_INDIVIDUAL = "NamedIndividual"
     DATATYPE = "Datatype"
-
-
-class AxiomTag(StrEnum):
-    """Structural tag for an OWL axiom — matches the axiom class's `__name__`.
-
-    Stored in `axioms.type` and used as the discriminator in `WithTypes`.
-    """
-
-    ANNOTATION_ASSERTION = "AnnotationAssertion"
-    SUB_CLASS_OF = "SubClassOf"
-    EQUIVALENT_CLASSES = "EquivalentClasses"
-    DISJOINT_CLASSES = "DisjointClasses"
-    SUB_OBJECT_PROPERTY_OF = "SubObjectPropertyOf"
-    SUB_OBJECT_PROPERTY_OF_CHAIN = "SubObjectPropertyOfChain"
-    EQUIVALENT_OBJECT_PROPERTIES = "EquivalentObjectProperties"
-    TRANSITIVE_OBJECT_PROPERTY = "TransitiveObjectProperty"
-    REFLEXIVE_OBJECT_PROPERTY = "ReflexiveObjectProperty"
-    OBJECT_PROPERTY_DOMAIN = "ObjectPropertyDomain"
-    OBJECT_PROPERTY_RANGE = "ObjectPropertyRange"
-    SUB_DATA_PROPERTY_OF = "SubDataPropertyOf"
-    EQUIVALENT_DATA_PROPERTIES = "EquivalentDataProperties"
-    DATA_PROPERTY_DOMAIN = "DataPropertyDomain"
-    DATA_PROPERTY_RANGE = "DataPropertyRange"
-    FUNCTIONAL_DATA_PROPERTY = "FunctionalDataProperty"
-    SUB_ANNOTATION_PROPERTY_OF = "SubAnnotationPropertyOf"
-    ANNOTATION_PROPERTY_DOMAIN = "AnnotationPropertyDomain"
-    ANNOTATION_PROPERTY_RANGE = "AnnotationPropertyRange"
-    HAS_KEY = "HasKey"
-    DATATYPE_DEFINITION = "DatatypeDefinition"
-    DECLARATION = "Declaration"
-    CLASS_ASSERTION = "ClassAssertion"
-    OBJECT_PROPERTY_ASSERTION = "ObjectPropertyAssertion"
-    NEGATIVE_OBJECT_PROPERTY_ASSERTION = "NegativeObjectPropertyAssertion"
-    DATA_PROPERTY_ASSERTION = "DataPropertyAssertion"
-    NEGATIVE_DATA_PROPERTY_ASSERTION = "NegativeDataPropertyAssertion"
-    SAME_INDIVIDUAL = "SameIndividual"
-    DIFFERENT_INDIVIDUALS = "DifferentIndividuals"
 
 
 class Position(StrEnum):

@@ -11,9 +11,9 @@ import pytest
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.annotations import Annotation
-from ontoloom.owl.axioms import Declaration, SubClassOf
+from ontoloom.owl.axioms import AxiomTag, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
     AlwaysFalse,

@@ -4,8 +4,9 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 
+from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.owl.markers import EntityType
 
 
 class MatchSource(StrEnum):
