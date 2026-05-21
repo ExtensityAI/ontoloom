@@ -1,6 +1,7 @@
 """Selection vocabulary: kinds, ops, validated identifiers, and read-shape DTOs.
 
-Pure types -> no I/O. Persistence and operations live in `selections/store.py`.
+Pure types -> no I/O. Persistence lives in `selections/persistence.py`; set-expression
+evaluation lives in `selections/compose.py`; paginated reads live in `selections/reader.py`.
 """
 
 import re
@@ -21,6 +22,21 @@ class SelectionNotFoundError(OntoloomError):
     def __init__(self, name: "SelectionName"):
         self.name = name
         super().__init__(f"Selection {dquoted(name)} does not exist.")
+
+
+class SelectionKindMismatchError(OntoloomError):
+    """Caller's kind-prefixed ref disagrees with the stored selection's kind."""
+
+    def __init__(
+        self, name: "SelectionName", expected: "SelectionKind", actual: "SelectionKind"
+    ):
+        self.name = name
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"Selection {dquoted(name)} is kind {actual}, "
+            f"but caller referenced it as {expected}."
+        )
 
 
 class SelectionExprError(OntoloomError):

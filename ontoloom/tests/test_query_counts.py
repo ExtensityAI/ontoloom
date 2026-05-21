@@ -8,7 +8,7 @@ of each section.
 from collections import Counter
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import Declaration, SubClassOf
@@ -30,7 +30,7 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,

@@ -1,5 +1,5 @@
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import (
     AnnotationAssertion,
@@ -9,7 +9,7 @@ from ontoloom.owl.axioms import (
     SubObjectPropertyOfChain,
 )
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.literals import LangLiteral, TypedLiteral
+from ontoloom.owl.literals import BCP47Tag, LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.patterns.match import _match_slot_vs_expression
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
@@ -22,8 +22,13 @@ from ontoloom.patterns.types import (
     SubObjectPropertyOfChainPattern,
     TupleMatch,
 )
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionKind
+from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+    SelectionKind,
+    SelectionName,
+)
 
 
 @pytest.fixture()
@@ -86,7 +91,9 @@ def test_within_axiom_selection(populated):
     dog_ax = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
     dog_hash = HashedAxiom.of(dog_ax).hash
 
-    upsert_selection(populated, "dog_only", SelectionKind.AXIOMS, [dog_hash], source="test")
+    upsert_selection(
+        populated, SelectionName("dog_only"), SelectionKind.AXIOMS, [dog_hash], source="test"
+    )
 
     pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(
@@ -99,7 +106,13 @@ def test_within_axiom_selection(populated):
 
 
 def test_within_entity_selection(populated):
-    upsert_selection(populated, "cat_entities", SelectionKind.ENTITIES, ["ex:Cat"], source="test")
+    upsert_selection(
+        populated,
+        SelectionName("cat_entities"),
+        SelectionKind.ENTITIES,
+        ["ex:Cat"],
+        source="test",
+    )
 
     pattern = SubClassOfPattern(sub_class=WildcardSlot("*"), super_class=WildcardSlot("*"))
     result = match_axioms(
@@ -213,12 +226,12 @@ def labeled(s):
             AnnotationAssertion(
                 property=IRI("rdfs:label"),
                 subject=IRI("ex:Dog"),
-                value=LangLiteral(value="Dog", lang="en"),
+                value=LangLiteral(value="Dog", lang=BCP47Tag("en")),
             ),
             AnnotationAssertion(
                 property=IRI("rdfs:label"),
                 subject=IRI("ex:Cat"),
-                value=LangLiteral(value="Cat", lang="en"),
+                value=LangLiteral(value="Cat", lang=BCP47Tag("en")),
             ),
             AnnotationAssertion(
                 property=IRI("rdfs:comment"),

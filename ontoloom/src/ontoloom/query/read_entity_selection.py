@@ -9,11 +9,13 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.metadata import get_selection_meta
+from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import (
     EntityItem,
     EntitySelectionName,
     EntitySelectionPage,
+    SelectionKind,
+    SelectionKindMismatchError,
     ShowFilter,
 )
 
@@ -66,7 +68,10 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
     @override
     def _run(self, s: Session) -> EntitySelectionPage:
         name = self.selection.bare
-        meta = get_selection_meta(s, name)
+        meta = get_selection(s, name)
+        if meta.kind != SelectionKind.ENTITIES:
+            raise SelectionKindMismatchError(name, SelectionKind.ENTITIES, meta.kind)
+
         filter_clause = _show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(

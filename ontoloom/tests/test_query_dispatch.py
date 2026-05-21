@@ -3,11 +3,11 @@
 from collections import Counter
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
-from ontoloom.owl.markers import EntityType
+from ontoloom.owl.markers import AxiomTag, EntityType
 from ontoloom.query.constraints import InSelection
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
@@ -20,13 +20,14 @@ from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.read_axiom_selection import ReadAxiomSelection
 from ontoloom.query.read_entity_selection import ReadEntitySelection
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     AxiomSelectionPage,
     EntitySelectionName,
     EntitySelectionPage,
     SelectionKind,
+    SelectionName,
     SelectionNotFoundError,
 )
 
@@ -82,7 +83,7 @@ def test_dispatch_count_axioms_by_type(s):
     _seed(s)
     result = run(s, CountAxiomsByType(constraints=()))
     assert isinstance(result, Counter)
-    assert result["Declaration"] == 2
+    assert result[AxiomTag.DECLARATION] == 2
 
 
 def test_dispatch_stream_axioms_is_context_manager(s):
@@ -99,7 +100,7 @@ def test_dispatch_stream_axioms_is_context_manager(s):
 def test_dispatch_read_axiom_selection(s):
     dog, _ = _seed(s)
     dog_hash = HashedAxiom.of(dog).hash
-    upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, [dog_hash], "test")
+    upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, [dog_hash], "test")
 
     ref = AxiomSelectionName("axioms:ax_sel")
     result = run(s, ReadAxiomSelection(selection=ref))
@@ -109,7 +110,7 @@ def test_dispatch_read_axiom_selection(s):
 
 def test_dispatch_read_entity_selection(s):
     _seed(s)
-    upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SelectionName("ent_sel"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
     ref = EntitySelectionName("entities:ent_sel")
     result = run(s, ReadEntitySelection(selection=ref))

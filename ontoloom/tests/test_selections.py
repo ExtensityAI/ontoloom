@@ -1,9 +1,10 @@
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import (
     AxiomsForExpr,
     DiffExpr,
@@ -11,29 +12,45 @@ from ontoloom.selections.expr import (
     IntersectExpr,
     UnionExpr,
 )
-from ontoloom.selections.store import (
-    create_selection,
+from ontoloom.selections.persistence import (
     get_selection,
-    read_selection,
+    remove_selections,
     upsert_selection,
 )
+from ontoloom.selections.reader import read_selection
 from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
     SelectionExprError,
     SelectionKind,
+    SelectionKindMismatchError,
     SelectionName,
     ShowFilter,
 )
+
+
+def _ax(name: str) -> AxiomSelectionName:
+    return AxiomSelectionName(f"axioms:{name}")
+
+
+def _ent(name: str) -> EntitySelectionName:
+    return EntitySelectionName(f"entities:{name}")
+
 
 # -- P-03-3: Selection set algebra --
 
 
 def test_union_commutativity(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    upsert_selection(s, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
+    upsert_selection(s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(s, SelectionName("b"), SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
-    _r = create_selection(s, "u_ab", UnionExpr(union=(SelectionName("a"), SelectionName("b"))))
+    _r = create_selection(
+        s, _ent("u_ab"), UnionExpr(union=(SelectionName("a"), SelectionName("b")))
+    )
     hash_ab, card_ab = _r.selection.hash, _r.selection.size
-    _r = create_selection(s, "u_ba", UnionExpr(union=(SelectionName("b"), SelectionName("a"))))
+    _r = create_selection(
+        s, _ent("u_ba"), UnionExpr(union=(SelectionName("b"), SelectionName("a")))
+    )
     hash_ba, card_ba = _r.selection.hash, _r.selection.size
 
     assert card_ab == 3
@@ -42,38 +59,40 @@ def test_union_commutativity(s):
 
 
 def test_intersection(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    upsert_selection(s, "b", SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
+    upsert_selection(s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(s, SelectionName("b"), SelectionKind.ENTITIES, ["ex:Cat", "ex:Fish"], "test")
 
     card = create_selection(
-        s, "inter", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b")))
+        s, _ent("inter"), IntersectExpr(intersect=(SelectionName("a"), SelectionName("b")))
     ).selection.size
     assert card == 1
 
-    page = read_selection(s, "inter")
+    page = read_selection(s, _ent("inter"))
     assert [item.iri for item in page.items] == ["ex:Cat"]
 
-    upsert_selection(s, "c", SelectionKind.ENTITIES, ["ex:Fish"], "test")
+    upsert_selection(s, SelectionName("c"), SelectionKind.ENTITIES, ["ex:Fish"], "test")
     card_disjoint = create_selection(
-        s, "inter_disjoint", IntersectExpr(intersect=(SelectionName("a"), SelectionName("c")))
+        s, _ent("inter_disjoint"), IntersectExpr(intersect=(SelectionName("a"), SelectionName("c")))
     ).selection.size
     assert card_disjoint == 0
 
 
 def test_difference(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test")
-    upsert_selection(s, "b", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    upsert_selection(
+        s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
+    )
+    upsert_selection(s, SelectionName("b"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
 
     card_a_minus_b = create_selection(
-        s, "diff_ab", DiffExpr(diff=(SelectionName("a"), SelectionName("b")))
+        s, _ent("diff_ab"), DiffExpr(diff=(SelectionName("a"), SelectionName("b")))
     ).selection.size
     assert card_a_minus_b == 2
 
-    page = read_selection(s, "diff_ab")
+    page = read_selection(s, _ent("diff_ab"))
     assert {item.iri for item in page.items} == {"ex:Dog", "ex:Fish"}
 
     card_b_minus_a = create_selection(
-        s, "diff_ba", DiffExpr(diff=(SelectionName("b"), SelectionName("a")))
+        s, _ent("diff_ba"), DiffExpr(diff=(SelectionName("b"), SelectionName("a")))
     ).selection.size
     assert card_b_minus_a == 0
 
@@ -86,12 +105,12 @@ def test_axioms_for(s):
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     add_axioms(s, [ax1, ax2])
 
-    upsert_selection(s, "ents", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SelectionName("ents"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
     card = create_selection(
-        s, "ax_for_dog", AxiomsForExpr(axioms_for=SelectionName("ents"))
+        s, _ax("ax_for_dog"), AxiomsForExpr(axioms_for=SelectionName("ents"))
     ).selection.size
 
-    meta = get_selection(s, "ax_for_dog")
+    meta = get_selection(s, SelectionName("ax_for_dog"))
     assert meta.kind == SelectionKind.AXIOMS
     assert card == 2
 
@@ -104,33 +123,35 @@ def test_entities_in(s):
     add_axioms(s, [ax])
     h = HashedAxiom.of(ax).hash
 
-    upsert_selection(s, "axsel", SelectionKind.AXIOMS, [h], "test")
+    upsert_selection(s, SelectionName("axsel"), SelectionKind.AXIOMS, [h], "test")
     _card = create_selection(
-        s, "ent_in", EntitiesInExpr(entities_in=SelectionName("axsel"))
+        s, _ent("ent_in"), EntitiesInExpr(entities_in=SelectionName("axsel"))
     ).selection.size
 
-    meta = get_selection(s, "ent_in")
+    meta = get_selection(s, SelectionName("ent_in"))
     assert meta.kind == SelectionKind.ENTITIES
 
-    page = read_selection(s, "ent_in")
+    page = read_selection(s, _ent("ent_in"))
     keys = {item.iri for item in page.items}
     assert "ex:Dog" in keys
     assert "ex:Animal" in keys
 
 
 def test_mixed_kind_raises(s):
-    upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
-    upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, ["a" * 64], "test")
+    upsert_selection(s, SelectionName("ent_sel"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
 
     with pytest.raises(SelectionExprError):
         create_selection(
-            s, "mixed_union", UnionExpr(union=(SelectionName("ax_sel"), SelectionName("ent_sel")))
+            s,
+            _ent("mixed_union"),
+            UnionExpr(union=(SelectionName("ax_sel"), SelectionName("ent_sel"))),
         )
 
 
 def test_empty_inputs_raises(s):
     with pytest.raises(SelectionExprError):
-        create_selection(s, "x", UnionExpr(union=()))
+        create_selection(s, _ent("x"), UnionExpr(union=()))
 
 
 def test_nested_expression(s):
@@ -142,8 +163,8 @@ def test_nested_expression(s):
     ax2 = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
     add_axioms(s, [ax1, ax2])
 
-    upsert_selection(s, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    upsert_selection(s, "cats", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    upsert_selection(s, SelectionName("dogs"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SelectionName("cats"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
 
     expr = UnionExpr(
         union=(
@@ -151,36 +172,38 @@ def test_nested_expression(s):
             AxiomsForExpr(axioms_for=SelectionName("cats")),
         )
     )
-    result = create_selection(s, "all_axs", expr)
+    result = create_selection(s, _ax("all_axs"), expr)
     assert result.selection.kind == SelectionKind.AXIOMS
     assert result.selection.size == 2  # dog SubClassOf + cat Declaration
 
 
 def test_overwrite_produces_new_hash(s):
-    hash1 = upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Dog"], "test").selection.hash
-    _r = upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    hash1 = upsert_selection(
+        s, SelectionName("s"), SelectionKind.ENTITIES, ["ex:Dog"], "test"
+    ).selection.hash
+    _r = upsert_selection(s, SelectionName("s"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
     hash2, card2 = _r.selection.hash, _r.selection.size
 
     assert hash2 != hash1
     assert card2 == 1
-    assert get_selection(s, "s").size == 1
+    assert get_selection(s, SelectionName("s")).size == 1
 
 
 def test_single_input_intersection_rejected(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(SelectionExprError, match="at least two"):
-        create_selection(s, "r", IntersectExpr(intersect=(SelectionName("a"),)))
+        create_selection(s, _ent("r"), IntersectExpr(intersect=(SelectionName("a"),)))
 
 
 def test_single_input_difference_rejected(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    upsert_selection(s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
     with pytest.raises(SelectionExprError, match="at least two"):
-        create_selection(s, "r", DiffExpr(diff=(SelectionName("a"),)))
+        create_selection(s, _ent("r"), DiffExpr(diff=(SelectionName("a"),)))
 
 
 def test_single_input_union_returns_copy(s):
-    upsert_selection(s, "a", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
-    card = create_selection(s, "r", UnionExpr(union=(SelectionName("a"),))).selection.size
+    upsert_selection(s, SelectionName("a"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat"], "test")
+    card = create_selection(s, _ent("r"), UnionExpr(union=(SelectionName("a"),))).selection.size
     assert card == 2
 
 
@@ -257,15 +280,15 @@ def test_read_with_show_filters(s):
     real_hash = HashedAxiom.of(ax).hash
 
     fake_hash = "d" * 64
-    upsert_selection(s, "sel", SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
+    upsert_selection(s, SelectionName("sel"), SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
 
-    page_present = read_selection(s, "sel", show=ShowFilter.PRESENT)
+    page_present = read_selection(s, _ax("sel"), show=ShowFilter.PRESENT)
     assert all(not item.missing for item in page_present.items)
 
-    page_missing = read_selection(s, "sel", show=ShowFilter.MISSING)
+    page_missing = read_selection(s, _ax("sel"), show=ShowFilter.MISSING)
     assert all(item.missing for item in page_missing.items)
 
-    page_all = read_selection(s, "sel", show=ShowFilter.ALL)
+    page_all = read_selection(s, _ax("sel"), show=ShowFilter.ALL)
     assert len(page_all.items) == 2
 
 
@@ -283,8 +306,8 @@ def test_read_entities_selection_punned_entity_present_missing_sum(s):
         ],
     )
     # :ex:Ghost has no Declaration -> should be counted as missing.
-    upsert_selection(s, "s", SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
-    page = read_selection(s, "s")
+    upsert_selection(s, SelectionName("s"), SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
+    page = read_selection(s, _ent("s"))
     assert page.present + page.missing == page.meta.size
     assert page.present == 1  # ex:X is declared (punned, but COUNT(DISTINCT) = 1)
     assert page.missing == 1  # ex:Ghost has no Declaration
@@ -298,10 +321,10 @@ def test_selection_hash_round_trip(s):
     # they came back). The content hash must be stable across both writes because
     # _selection_hash sorts internally.
     items = ["ex:C", "ex:A", "ex:B"]
-    result1 = upsert_selection(s, "s", SelectionKind.ENTITIES, items, "test")
-    page = read_selection(s, "s")
+    result1 = upsert_selection(s, SelectionName("s"), SelectionKind.ENTITIES, items, "test")
+    page = read_selection(s, _ent("s"))
     read_back = [item.iri for item in page.items]
-    result2 = upsert_selection(s, "s2", SelectionKind.ENTITIES, read_back, "test")
+    result2 = upsert_selection(s, SelectionName("s2"), SelectionKind.ENTITIES, read_back, "test")
     assert result1.selection.hash == result2.selection.hash
 
 
@@ -376,3 +399,37 @@ def test_set_expr_json_schema_marks_object_type():
 
     schema = TypeAdapter(SetExpr).json_schema()
     assert schema.get("type") == "object"
+
+
+# -- Kind-prefix strict matching --
+
+
+def test_create_selection_raises_when_ref_kind_disagrees_with_expr(s):
+    """`axioms:` prefix on a ref whose expr evaluates to entities should fail."""
+    upsert_selection(s, SelectionName("ents"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    with pytest.raises(SelectionKindMismatchError):
+        create_selection(s, _ax("wrong"), UnionExpr(union=(SelectionName("ents"),)))
+
+
+def test_create_selection_does_not_write_on_mismatch(s):
+    """Strict check fires before upsert; no selection materializes on mismatch."""
+    upsert_selection(s, SelectionName("ents"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    with pytest.raises(SelectionKindMismatchError):
+        create_selection(s, _ax("wrong"), UnionExpr(union=(SelectionName("ents"),)))
+    with pytest.raises(Exception):  # noqa: B017
+        get_selection(s, SelectionName("wrong"))
+
+
+def test_remove_selections_raises_on_kind_mismatch(s):
+    """`axioms:foo` ref when `foo` is stored as entities should fail loud, no removal."""
+    upsert_selection(s, SelectionName("foo"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    with pytest.raises(SelectionKindMismatchError):
+        remove_selections(s, [_ax("foo")])
+    assert get_selection(s, SelectionName("foo")).size == 1  # still there
+
+
+def test_remove_selections_tolerates_missing(s):
+    """Missing names still surface in not_found, not as an exception."""
+    result = remove_selections(s, [_ent("ghost")])
+    assert result.dropped == ()
+    assert result.not_found == (SelectionName("ghost"),)

@@ -2,8 +2,8 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import annotate_axiom as core_annotate_axiom
-from ontoloom.axioms.store import resolve_hash_prefix
+from ontoloom.axioms.hashes import resolve_hash_prefix
+from ontoloom.axioms.mutations import annotate_axiom as core_annotate_axiom
 from ontoloom.axioms.types import AddAnnotation, AnnotationChange, RemoveAnnotation
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix

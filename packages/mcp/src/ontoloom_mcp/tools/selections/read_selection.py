@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import short_hash
-from ontoloom.selections.store import read_selection as core_read_selection
+from ontoloom.selections.reader import read_selection as core_read_selection
 from ontoloom.selections.types import (
     AxiomSelectionPage,
     EntitySelectionPage,
@@ -26,8 +26,8 @@ def read_selection(
     """Paginated view of a selection's contents with missing-item visibility.
 
     - `name`: Kind-prefixed selection reference (e.g. `"axioms:my_sel"` or
-      `"entities:my_sel"`). The actual kind is read from the stored selection;
-      the prefix is informational.
+      `"entities:my_sel"`). The prefix must match the stored selection's kind
+      or the call raises.
     - `show`: "all" (default), "present" (only items still in ontology),
       "missing" (only items removed since the selection was created).
       Use "missing" to audit a selection after ontology modifications.
@@ -38,7 +38,7 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        page = core_read_selection(s, name.bare, limit=limit, offset=offset, show=show)
+        page = core_read_selection(s, name, limit=limit, offset=offset, show=show)
         s.commit()
 
     meta = page.meta

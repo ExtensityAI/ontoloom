@@ -1,5 +1,5 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import axiom_summary as compute_axiom_summary
+from ontoloom.axioms.reader import axiom_summary as compute_axiom_summary
 from ontoloom.connection import Ontology, session
 from ontoloom.entities.store import (
     entity_summary as compute_entity_summary,
@@ -9,7 +9,7 @@ from ontoloom.entities.store import (
     undeclared_entity_count,
 )
 from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import SelectionRef
 
 from ontoloom_mcp.components.formatting import (

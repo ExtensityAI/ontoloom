@@ -1,14 +1,14 @@
 """Tests for the FindDuplicateEntities query."""
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI, RDFS_LABEL
-from ontoloom.owl.literals import LangLiteral
+from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
 from ontoloom.query.find_duplicate_entities import FindDuplicateEntities
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
 from pydantic import ValidationError
 
@@ -25,7 +25,7 @@ def _label(iri: str, text: str) -> AnnotationAssertion:
     return AnnotationAssertion(
         property=IRI(RDFS_LABEL),
         subject=IRI(iri),
-        value=LangLiteral(value=text, lang="en"),
+        value=LangLiteral(value=text, lang=BCP47Tag("en")),
     )
 
 

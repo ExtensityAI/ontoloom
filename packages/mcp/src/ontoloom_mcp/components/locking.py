@@ -16,6 +16,7 @@ from ontoloom.selections.types import (
     _NAME_FRAGMENT,
     AxiomSelectionName,
     EntitySelectionName,
+    SelectionContentHash,
     SelectionKind,
     SelectionMeta,
     SelectionName,
@@ -23,28 +24,6 @@ from ontoloom.selections.types import (
     _validate_name,
 )
 from ontoloom.utils import dquoted
-
-
-class StaleSelectionError(OntoloomError):
-    """Selection has changed since the caller last observed it."""
-
-    def __init__(
-        self,
-        name: SelectionName,
-        supplied_prefix: str,
-        current_hash: str | None,
-        current_size: int | None = None,
-    ):
-        self.name = name
-        self.supplied_prefix = supplied_prefix
-        self.current_hash = current_hash
-        self.current_size = current_size
-        current = current_hash if current_hash else "<absent>"
-        super().__init__(
-            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
-            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
-        )
-
 
 LOCKED_PREFIX_MIN = 8
 
@@ -66,6 +45,27 @@ class HashPrefix(TypedStr):
             msg = f"HashPrefix must be at least {LOCKED_PREFIX_MIN} hex chars, got {dquoted(value)}"
             raise ValueError(msg)
         return value
+
+
+class StaleSelectionError(OntoloomError):
+    """Selection has changed since the caller last observed it."""
+
+    def __init__(
+        self,
+        name: SelectionName,
+        supplied_prefix: HashPrefix,
+        current_hash: SelectionContentHash | None,
+        current_size: int | None = None,
+    ):
+        self.name = name
+        self.supplied_prefix = supplied_prefix
+        self.current_hash = current_hash
+        self.current_size = current_size
+        current = current_hash if current_hash else "<absent>"
+        super().__init__(
+            f"Selection {dquoted(name)} has changed (your prefix: {dquoted(supplied_prefix)}, "
+            f"current hash: {dquoted(current)}). Re-read the selection to get the current hash."
+        )
 
 
 def _parse_kinded_locked(value: str, kind: SelectionKind, type_name: str) -> str:
@@ -169,7 +169,7 @@ def verify_lock(s: Session, locked: LockedSelectionRef):
     if row is None:
         raise SelectionNotFoundError(name)
 
-    current_hash, current_size = row[0], row[1]
+    current_hash, current_size = SelectionContentHash(row[0]), row[1]
     if not current_hash.startswith(locked.hash_prefix):
         raise StaleSelectionError(name, locked.hash_prefix, current_hash, current_size)
 

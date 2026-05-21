@@ -10,17 +10,18 @@ itself and need to start from a clean prefix table.
 import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.prefixes.store import set_prefix
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 
-_TEST_PREFIXES = {
-    "ex": "http://example.org/",
-    "other": "http://other.org/",
-    "bio": "http://bio.org/",
-    "ns": "http://ns.example/",
-    "my_ont": "http://myont.example/",
-    "a_b": "http://a-b.example/",
-    "aXb": "http://a-x-b.example/",
-    "prefix": "http://prefix.example/",
-    "skos": "http://www.w3.org/2004/02/skos/core#",
+_TEST_PREFIXES: dict[PrefixName, NamespaceIRI] = {
+    PrefixName("ex"): NamespaceIRI("http://example.org/"),
+    PrefixName("other"): NamespaceIRI("http://other.org/"),
+    PrefixName("bio"): NamespaceIRI("http://bio.org/"),
+    PrefixName("ns"): NamespaceIRI("http://ns.example/"),
+    PrefixName("my_ont"): NamespaceIRI("http://myont.example/"),
+    PrefixName("a_b"): NamespaceIRI("http://a-b.example/"),
+    PrefixName("aXb"): NamespaceIRI("http://a-x-b.example/"),
+    PrefixName("prefix"): NamespaceIRI("http://prefix.example/"),
+    PrefixName("skos"): NamespaceIRI("http://www.w3.org/2004/02/skos/core#"),
 }
 
 

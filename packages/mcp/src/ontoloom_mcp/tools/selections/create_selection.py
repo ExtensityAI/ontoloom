@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
+from ontoloom.selections.compose import create_selection as core_create_selection
 from ontoloom.selections.expr import SetExpr
-from ontoloom.selections.store import create_selection as core_create_selection
 from ontoloom.selections.types import SelectionRef
 
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -17,8 +17,8 @@ def create_selection(
     """Create a selection by evaluating a set-expression tree.
 
     `name` is a kind-prefixed reference (e.g. `"axioms:my_sel"` or
-    `"entities:my_sel"`); the prefix is informational, as the kind of the
-    resulting selection is determined by `expr`.
+    `"entities:my_sel"`); the prefix must match the kind the expression
+    evaluates to, or the call raises before any write.
 
     `expr` is an object with exactly one of:
 
@@ -40,7 +40,7 @@ def create_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        upserted = core_create_selection(s, name.bare, expr)
+        upserted = core_create_selection(s, name, expr)
         s.commit()
 
     sel = upserted.selection

@@ -7,11 +7,13 @@ Each test calls a tool function directly (the same callable wrapped by
 import pytest
 from fastmcp.exceptions import ToolError
 from ontoloom.connection import Ontology, session
+from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionName
 from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
 from ontoloom_mcp.components.errors import translate_errors
@@ -24,12 +26,18 @@ from ontoloom_mcp.tools.ontology.create_ontology import create_ontology
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
 from ontoloom_mcp.tools.selections.read_selection import read_selection
 
+EX = PrefixName("ex")
+EX_IRI = NamespaceIRI("http://example.org/")
+FOO = PrefixName("foo")
+FOO_IRI = NamespaceIRI("http://example.org/foo/")
+OTHER_EX_IRI = NamespaceIRI("http://other.example.org/")
+
 
 @pytest.fixture()
 def empty_db(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
-    set_prefix(path=path, name="ex", iri="http://example.org/")
+    set_prefix(path=path, name=EX, iri=EX_IRI)
     return path
 
 
@@ -197,7 +205,7 @@ def test_search_axioms_by_property_only(empty_db):
 
 def test_search_axioms_with_within_scope(empty_db):
     from ontoloom.hashing import HashedAxiom
-    from ontoloom.selections.store import upsert_selection
+    from ontoloom.selections.persistence import upsert_selection
     from ontoloom.selections.types import SelectionKind, SelectionName
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
@@ -445,7 +453,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     # Fresh add: +1 added, no skipped
     fresh = annotate_axiom(
         path=populated_db,
-        axiom_hash=target_hash[:8],
+        axiom_hash=AxiomHashPrefix(target_hash[:8]),
         changes=(AddAnnotation(add=add_ann),),
     )
     assert "+1 added, 0 removed" in fresh
@@ -455,7 +463,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     # Duplicate adds: applied 0 fresh, 1 already present
     dup = annotate_axiom(
         path=populated_db,
-        axiom_hash=target_hash[:8],
+        axiom_hash=AxiomHashPrefix(target_hash[:8]),
         changes=(AddAnnotation(add=add_ann), AddAnnotation(add=add_ann)),
     )
     assert "+0 added, 0 removed" in dup
@@ -466,7 +474,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     absent_ann = Annotation(property=IRI("rdfs:comment"), value=absent)
     res = annotate_axiom(
         path=populated_db,
-        axiom_hash=target_hash[:8],
+        axiom_hash=AxiomHashPrefix(target_hash[:8]),
         changes=(RemoveAnnotation(remove=absent_ann),),
     )
     assert "+0 added, 0 removed" in res
@@ -498,7 +506,7 @@ def test_bcp47_lang_validation_error_message():
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError) as exc_info:
-        LangLiteral(value="x", lang="invalid lang!")
+        LangLiteral(value="x", lang="invalid lang!")  # pyright: ignore[reportArgumentType]
     msg = _format_validation_error(exc_info.value)
     assert "BCP 47" in msg
     assert '"invalid lang!"' in msg
@@ -584,21 +592,25 @@ def test_axiom_dispatch_failure_renders_focused_mcp_message():
 
 
 def test_set_prefix_new_prefix_succeeds_without_confirm(empty_db):
-    result = set_prefix(path=empty_db, name="myns", iri="http://example.org/myns/")
+    result = set_prefix(
+        path=empty_db,
+        name=PrefixName("myns"),
+        iri=NamespaceIRI("http://example.org/myns/"),
+    )
     assert "myns" in result
     assert "http://example.org/myns/" in result
 
 
 def test_set_prefix_same_iri_returns_unchanged(empty_db):
-    set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
-    result = set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
+    set_prefix(path=empty_db, name=FOO, iri=FOO_IRI)
+    result = set_prefix(path=empty_db, name=FOO, iri=FOO_IRI)
     assert "(unchanged)" in result
 
 
 def test_set_prefix_reassign_unused_prefix_no_confirm_required(empty_db):
     # Set a fresh prefix, then reassign before any entity uses it.
-    set_prefix(path=empty_db, name="foo", iri="http://example.org/foo/")
-    result = set_prefix(path=empty_db, name="foo", iri="http://example.org/foo2/")
+    set_prefix(path=empty_db, name=FOO, iri=FOO_IRI)
+    result = set_prefix(path=empty_db, name=FOO, iri=NamespaceIRI("http://example.org/foo2/"))
     assert "foo" in result
     assert "http://example.org/foo2/" in result
 
@@ -606,25 +618,25 @@ def test_set_prefix_reassign_unused_prefix_no_confirm_required(empty_db):
 def test_set_prefix_reassign_in_use_without_confirm_raises(populated_db):
     # populated_db has ex:Dog, ex:Animal, etc. as entities. After registering 'ex'
     # as a prefix mapping, those entities count as "in use" of that prefix.
-    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+    set_prefix(path=populated_db, name=EX, iri=EX_IRI)
 
     with pytest.raises(ConfirmationRequiredError) as exc_info:
-        set_prefix(path=populated_db, name="ex", iri="http://other.example.org/")
+        set_prefix(path=populated_db, name=EX, iri=OTHER_EX_IRI)
     assert exc_info.value.token
     assert "confirm=" in str(exc_info.value)
 
 
 def test_set_prefix_reassign_in_use_with_correct_token_succeeds(populated_db):
-    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+    set_prefix(path=populated_db, name=EX, iri=EX_IRI)
 
     with pytest.raises(ConfirmationRequiredError) as exc_info:
-        set_prefix(path=populated_db, name="ex", iri="http://other.example.org/")
+        set_prefix(path=populated_db, name=EX, iri=OTHER_EX_IRI)
     token = exc_info.value.token
 
     result = set_prefix(
         path=populated_db,
-        name="ex",
-        iri="http://other.example.org/",
+        name=EX,
+        iri=OTHER_EX_IRI,
         confirm=token,
     )
     assert "ex" in result
@@ -632,13 +644,13 @@ def test_set_prefix_reassign_in_use_with_correct_token_succeeds(populated_db):
 
 
 def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
-    set_prefix(path=populated_db, name="ex", iri="http://example.org/")
+    set_prefix(path=populated_db, name=EX, iri=EX_IRI)
 
     with pytest.raises(ConfirmationRequiredError):
         set_prefix(
             path=populated_db,
-            name="ex",
-            iri="http://other.example.org/",
+            name=EX,
+            iri=OTHER_EX_IRI,
             confirm="00000000",
         )
     # State unchanged: ex still maps to its original IRI.
@@ -648,7 +660,7 @@ def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
     with session(Ontology(populated_db)) as s:
         prefixes = list_prefixes(s)
         s.commit()
-    assert prefixes["ex"] == "http://example.org/"
+    assert prefixes[EX] == "http://example.org/"
 
 
 # -- rename_iri confirmation flow --

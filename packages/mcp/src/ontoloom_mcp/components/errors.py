@@ -3,10 +3,11 @@
 import functools
 
 from fastmcp.exceptions import ToolError
-from ontoloom.axioms.store import AmbiguousHashError, AxiomNotFoundError
+from ontoloom.axioms.hashes import AmbiguousHashError, AxiomNotFoundError
 from ontoloom.connection import OntologyNotFoundError
 from ontoloom.entities.store import EntityNotFoundError
 from ontoloom.errors import (
+    ConcurrentWriteError,
     InternalError,
     OntoloomError,
     StoreCorruptionError,
@@ -99,6 +100,8 @@ def format_error(e: Exception) -> str:  # noqa: C901
             )
         case StoreCorruptionError():
             return f"Data integrity error: {e.detail}. This may indicate database corruption."
+        case ConcurrentWriteError():
+            return f"Another writer holds the database lock: {e.detail}. Retry the operation."
         case InternalError():
             return f"Internal error: {e.detail}. Please file a bug report."
         case UnionDispatchError():

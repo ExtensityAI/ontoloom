@@ -1,16 +1,16 @@
-"""Store CRUD: add, remove, replace, annotate, rename_iri, get_entity,
+"""CRUD: add, remove, replace, annotate, rename_iri, get_entity,
 prefix management, selection-derived counts, lifecycle, and corruption.
 
-Search-overlap tests live in test_store_search.py; IRI validator tests in
+Search-overlap tests live in test_search.py; IRI validator tests in
 test_iri.py; hash-prefix tests in test_resolve_hash_prefix.py; export tests
-in test_store_export.py.
+in test_export.py.
 """
 
 import json
 
 import pytest
-from ontoloom.axioms.store import (
-    AxiomNotFoundError,
+from ontoloom.axioms.hashes import AxiomNotFoundError
+from ontoloom.axioms.mutations import (
     add_axioms,
     annotate_axiom,
     remove_by_hash,
@@ -50,19 +50,35 @@ from ontoloom.prefixes.store import (
     remove_prefix,
     set_prefix,
 )
-from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError
+from ontoloom.prefixes.types import (
+    NamespaceIRI,
+    PrefixInUseError,
+    PrefixName,
+    PrefixNotFoundError,
+)
+from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import EntitiesInExpr
-from ontoloom.selections.store import (
-    create_selection,
+from ontoloom.selections.persistence import (
     list_selections,
-    read_selection,
     upsert_selection,
 )
+from ontoloom.selections.reader import read_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
+    EntitySelectionName,
     SelectionKind,
     SelectionName,
 )
+
+
+def _ent(name: str) -> EntitySelectionName:
+    return EntitySelectionName(f"entities:{name}")
+
+
+EX = PrefixName("ex")
+EX_NS = NamespaceIRI("http://example.org/")
+EX_NS_V1 = NamespaceIRI("http://example.org/v1/")
+SEL = SelectionName("sel")
 
 
 @pytest.fixture()
@@ -365,7 +381,7 @@ def test_rename_iri_scoped_to_selection(s):
     h_in = next(ha.hash for ha in result.added if ha.axiom == ax_in)
     h_out = HashedAxiom.of(ax_out).hash
 
-    upsert_selection(s, "scope", SelectionKind.AXIOMS, [h_in], "test")
+    upsert_selection(s, SelectionName("scope"), SelectionKind.AXIOMS, [h_in], "test")
 
     renamed = rename_iri(
         s, IRI("ex:Animal"), IRI("ex:Mammal"), within=AxiomSelectionName("axioms:scope")
@@ -414,9 +430,9 @@ def test_entity_selection_present_count_punned_entity(s):
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:Pun")),
         ],
     )
-    upsert_selection(s, "punned", SelectionKind.ENTITIES, ["ex:Pun"], "test")
+    upsert_selection(s, SelectionName("punned"), SelectionKind.ENTITIES, ["ex:Pun"], "test")
 
-    page = read_selection(s, "punned")
+    page = read_selection(s, _ent("punned"))
     assert page.present >= 0
     assert page.missing >= 0
     assert page.present + page.missing == page.meta.size
@@ -426,8 +442,10 @@ def test_entity_selection_present_count_punned_entity(s):
 
 
 def test_set_and_list_prefixes(bare_session):
-    set_prefix(bare_session, "ex", "http://example.org/")
-    set_prefix(bare_session, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
+    set_prefix(bare_session, EX, EX_NS)
+    set_prefix(
+        bare_session, PrefixName("rdfs"), NamespaceIRI("http://www.w3.org/2000/01/rdf-schema#")
+    )
     assert list_prefixes(bare_session) == {
         "ex": "http://example.org/",
         "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
@@ -435,34 +453,36 @@ def test_set_and_list_prefixes(bare_session):
 
 
 def test_set_prefix_overwrites_when_unused(bare_session):
-    set_prefix(bare_session, "ex", "http://example.org/v1/")
-    set_prefix(bare_session, "ex", "http://example.org/v2/")
-    assert list_prefixes(bare_session)["ex"] == "http://example.org/v2/"
+    set_prefix(bare_session, EX, EX_NS_V1)
+    set_prefix(bare_session, EX, NamespaceIRI("http://example.org/v2/"))
+    assert list_prefixes(bare_session)[EX] == "http://example.org/v2/"
 
 
 def test_set_prefix_reports_previous_iri_and_in_use_count(bare_session):
     # First insert: no previous, no usage.
-    result = set_prefix(bare_session, "ex", "http://example.org/v1/")
+    result = set_prefix(bare_session, EX, EX_NS_V1)
     assert result.previous_iri is None
     assert result.in_use_count == 0
 
     # Idempotent reassignment to the same IRI: previous set, no usage.
-    result = set_prefix(bare_session, "ex", "http://example.org/v1/")
+    result = set_prefix(bare_session, EX, EX_NS_V1)
     assert result.previous_iri == "http://example.org/v1/"
     assert result.in_use_count == 0
 
     # Real reassignment with axioms using the prefix.
     add_axioms(bare_session, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = set_prefix(bare_session, "ex", "http://example.org/v2/")
+    result = set_prefix(bare_session, EX, NamespaceIRI("http://example.org/v2/"))
     assert result.previous_iri == "http://example.org/v1/"
     assert result.in_use_count == 1
-    assert list_prefixes(bare_session)["ex"] == "http://example.org/v2/"
+    assert list_prefixes(bare_session)[EX] == "http://example.org/v2/"
 
 
 def test_remove_prefix(bare_session):
-    set_prefix(bare_session, "ex", "http://example.org/")
-    set_prefix(bare_session, "rdfs", "http://www.w3.org/2000/01/rdf-schema#")
-    remove_prefix(bare_session, "ex")
+    set_prefix(bare_session, EX, EX_NS)
+    set_prefix(
+        bare_session, PrefixName("rdfs"), NamespaceIRI("http://www.w3.org/2000/01/rdf-schema#")
+    )
+    remove_prefix(bare_session, EX)
     result = list_prefixes(bare_session)
     assert "ex" not in result
     assert "rdfs" in result
@@ -470,15 +490,15 @@ def test_remove_prefix(bare_session):
 
 def test_remove_nonexistent_prefix_raises(s):
     with pytest.raises(PrefixNotFoundError):
-        remove_prefix(s, "nonexistent")
+        remove_prefix(s, PrefixName("nonexistent"))
 
 
 def test_prefix_remove_while_in_use(s):
-    set_prefix(s, "ex", "http://example.org/")
+    set_prefix(s, EX, EX_NS)
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
 
     with pytest.raises(PrefixInUseError) as exc:
-        remove_prefix(s, "ex")
+        remove_prefix(s, EX)
     assert exc.value.name == "ex"
     assert exc.value.count == 1
 
@@ -486,9 +506,9 @@ def test_prefix_remove_while_in_use(s):
 
 
 def test_prefix_usage_counts(s):
-    set_prefix(s, "ex", "http://example.org/")
-    set_prefix(s, "other", "http://other.org/")
-    set_prefix(s, "unused", "http://unused.org/")
+    set_prefix(s, EX, EX_NS)
+    set_prefix(s, PrefixName("other"), NamespaceIRI("http://other.org/"))
+    set_prefix(s, PrefixName("unused"), NamespaceIRI("http://unused.org/"))
 
     add_axioms(
         s,
@@ -500,9 +520,9 @@ def test_prefix_usage_counts(s):
     )
 
     counts = prefix_usage_counts(s)
-    assert counts["ex"] == 2
-    assert counts["other"] == 1
-    assert counts["unused"] == 0
+    assert counts[EX] == 2
+    assert counts[PrefixName("other")] == 1
+    assert counts[PrefixName("unused")] == 0
 
 
 # -- get_entity --
@@ -672,14 +692,14 @@ def axiom_selection(s):
         ],
     )
     hashes = [ha.hash for ha in result.added]
-    upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, hashes, "test")
+    upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, hashes, "test")
     return s
 
 
 def test_entities_in_with_field_sub_class(axiom_selection):
     create_selection(
         axiom_selection,
-        "sub_classes",
+        _ent("sub_classes"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUB_CLASS),
     )
     items = [
@@ -694,7 +714,7 @@ def test_entities_in_with_field_sub_class(axiom_selection):
 def test_entities_in_with_field_super_class(axiom_selection):
     create_selection(
         axiom_selection,
-        "super_classes",
+        _ent("super_classes"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUPER_CLASS),
     )
     items = [
@@ -711,7 +731,7 @@ def test_entities_in_with_field_super_class(axiom_selection):
 def test_entities_in_with_field_filler(axiom_selection):
     create_selection(
         axiom_selection,
-        "fillers",
+        _ent("fillers"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.FILLER),
     )
     items = [
@@ -725,7 +745,7 @@ def test_entities_in_with_field_filler(axiom_selection):
 
 def test_entities_in_without_field(axiom_selection):
     create_selection(
-        axiom_selection, "all_ents", EntitiesInExpr(entities_in=SelectionName("ax_sel"))
+        axiom_selection, _ent("all_ents"), EntitiesInExpr(entities_in=SelectionName("ax_sel"))
     )
     items = [
         r[0]
@@ -795,7 +815,7 @@ def test_find_duplicates_tie_break_order(s):
         ],
     )
 
-    result = find_duplicate_entities(s, "rdfs:label")
+    result = find_duplicate_entities(s, IRI("rdfs:label"))
     assert result.total_groups == 2
     # Groups have equal count; stable sort preserves SQL text order → "Alpha" < "Beta"
     assert [g.value for g in result.groups] == ["Alpha", "Beta"]
@@ -806,8 +826,8 @@ def test_find_duplicates_tie_break_order(s):
 
 def test_list_all_selections_order(s):
     # Force identical created_at on two selections; tiebreaker by name must sort a_sel first.
-    upsert_selection(s, "z_sel", SelectionKind.ENTITIES, ["ex:A"], "test")
-    upsert_selection(s, "a_sel", SelectionKind.ENTITIES, ["ex:B"], "test")
+    upsert_selection(s, SelectionName("z_sel"), SelectionKind.ENTITIES, ["ex:A"], "test")
+    upsert_selection(s, SelectionName("a_sel"), SelectionKind.ENTITIES, ["ex:B"], "test")
     s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
     names = [ls.meta.name for ls in list_selections(s)]
@@ -824,18 +844,18 @@ def test_list_selections_present_count_no_double_count(s):
             SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Mammal")),
         ],
     )
-    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
+    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
 
     listings = {ls.meta.name: ls for ls in list_selections(s)}
-    assert listings["sel"].present_count == 1
+    assert listings[SEL].present_count == 1
 
 
 def test_list_selections_entity_selection_unaffected_by_axiom_growth(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:Dog"], "test")
     before = {ls.meta.name: ls.present_count for ls in list_selections(s)}
 
     add_axioms(s, [SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))])
     after = {ls.meta.name: ls.present_count for ls in list_selections(s)}
 
-    assert before["sel"] == after["sel"] == 1
+    assert before[SEL] == after[SEL] == 1

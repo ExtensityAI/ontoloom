@@ -2,7 +2,7 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import add_axioms as core_add_axioms
+from ontoloom.axioms.mutations import add_axioms as core_add_axioms
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.axioms import Axiom
 

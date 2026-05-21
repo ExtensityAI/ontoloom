@@ -13,7 +13,7 @@ from collections.abc import Callable
 from typing import Any
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash, HashedAxiom
 from ontoloom.owl.annotations import Annotation

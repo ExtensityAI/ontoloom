@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.export import export_to_jsonl
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import (

@@ -5,7 +5,7 @@ every entity is discoverable through the applicable search paths.
 """
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.connection import Session
 from ontoloom.entities.store import (
     EntityNotFoundError,
@@ -56,6 +56,7 @@ from ontoloom.owl.expressions import (
 )
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import (
+    BCP47Tag,
     DataOneOf,
     DataType,
     DataTypeRef,
@@ -63,6 +64,7 @@ from ontoloom.owl.literals import (
     TypedLiteral,
 )
 from ontoloom.owl.markers import AxiomTag, EntityType
+from ontoloom.prefixes.types import PrefixName
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -87,12 +89,12 @@ def _search_entities_text(s: Session, query: str) -> set[str]:
     return {str(m.iri) for m in page.matches}
 
 
-def _search_entities_role(s: Session, role: str) -> set[str]:
+def _search_entities_role(s: Session, role: EntityType) -> set[str]:
     page = search_entities(s, role=role, limit=1000)
     return {str(m.iri) for m in page.matches}
 
 
-def _search_entities_ns(s: Session, namespace: str) -> set[str]:
+def _search_entities_ns(s: Session, namespace: PrefixName) -> set[str]:
     page = search_entities(s, namespace=namespace, limit=1000)
     return {str(m.iri) for m in page.matches}
 
@@ -135,17 +137,17 @@ AXIOMS = [
     AnnotationAssertion(
         property=IRI("rdfs:label"),
         subject=IRI(":Dog"),
-        value=LangLiteral(value="Dog", lang="en"),
+        value=LangLiteral(value="Dog", lang=BCP47Tag("en")),
     ),
     AnnotationAssertion(
         property=IRI("rdfs:label"),
         subject=IRI(":Dog"),
-        value=LangLiteral(value="Hund", lang="de"),
+        value=LangLiteral(value="Hund", lang=BCP47Tag("de")),
     ),
     AnnotationAssertion(
         property=IRI("rdfs:label"),
         subject=IRI(":Cat"),
-        value=LangLiteral(value="Cat", lang="en"),
+        value=LangLiteral(value="Cat", lang=BCP47Tag("en")),
     ),
     AnnotationAssertion(
         property=IRI("rdfs:comment"),
@@ -432,7 +434,7 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_by_namespace(self, s):
         add_axioms(s, AXIOMS)
-        rdfs_ns = _search_entities_ns(s, "rdfs")
+        rdfs_ns = _search_entities_ns(s, PrefixName("rdfs"))
         assert "rdfs:label" in rdfs_ns
         assert "rdfs:comment" in rdfs_ns
         assert ":Dog" not in rdfs_ns
@@ -448,7 +450,7 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_combined_query_and_namespace(self, s):
         add_axioms(s, AXIOMS)
-        page = search_entities(s, query="label", namespace="rdfs", limit=1000)
+        page = search_entities(s, query="label", namespace=PrefixName("rdfs"), limit=1000)
         iris = {str(m.iri) for m in page.matches}
         assert "rdfs:label" in iris
         # skos:definition should not match (wrong namespace)
@@ -677,7 +679,7 @@ class TestEnhancedEntitySearch:
         add_axioms(s, AXIOMS)
         # "Dog" appears in rdfs:label and as local_name. Restrict annotation search to rdfs:label.
         page = search_entities(
-            s, query="Dog", properties=["rdfs:label"], exclude_deprecated=False, limit=1000
+            s, query="Dog", properties=[IRI("rdfs:label")], exclude_deprecated=False, limit=1000
         )
         iris = {str(m.iri) for m in page.matches}
         # :Dog has rdfs:label "Dog", so it should match
@@ -690,7 +692,7 @@ class TestEnhancedEntitySearch:
         page = search_entities(
             s,
             query="domesticated",
-            properties=["rdfs:label"],
+            properties=[IRI("rdfs:label")],
             exclude_deprecated=False,
             limit=1000,
         )
@@ -703,7 +705,7 @@ class TestEnhancedEntitySearch:
         page = search_entities(
             s,
             query="domesticated",
-            properties=["skos:definition"],
+            properties=[IRI("skos:definition")],
             exclude_deprecated=False,
             limit=1000,
         )
@@ -714,7 +716,7 @@ class TestEnhancedEntitySearch:
         add_axioms(s, AXIOMS)
         # Without query: find entities that have skos:definition annotations
         page = search_entities(
-            s, properties=["skos:definition"], exclude_deprecated=False, limit=1000
+            s, properties=[IRI("skos:definition")], exclude_deprecated=False, limit=1000
         )
         iris = {str(m.iri) for m in page.matches}
         # :Pet has skos:definition
@@ -755,13 +757,13 @@ class TestEnhancedEntitySearch:
         add_axioms(s, AXIOMS)
         # "domesticated" in skos:definition for :Pet
         iris = collect_entity_iris(
-            s, query="domesticated", properties=["skos:definition"], exclude_deprecated=False
+            s, query="domesticated", properties=[IRI("skos:definition")], exclude_deprecated=False
         )
         assert ":Pet" in iris
 
         # Same query restricted to rdfs:label -> should not find :Pet
         iris2 = collect_entity_iris(
-            s, query="domesticated", properties=["rdfs:label"], exclude_deprecated=False
+            s, query="domesticated", properties=[IRI("rdfs:label")], exclude_deprecated=False
         )
         assert ":Pet" not in iris2
 

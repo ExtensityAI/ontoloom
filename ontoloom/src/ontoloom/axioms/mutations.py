@@ -1,11 +1,10 @@
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import cast
 
+from ontoloom.axioms.hashes import AxiomNotFoundError, load_axiom_row
 from ontoloom.axioms.types import (
     AddResult,
     AnnotateResult,
-    AxiomSummary,
     RemoveBySelectionResult,
     RemoveResult,
     RenameResult,
@@ -14,14 +13,8 @@ from ontoloom.axioms.types import (
 from ontoloom.connection import Session
 from ontoloom.entity_text import LOCAL_NAME_PROPERTY
 from ontoloom.entity_walker import iter_axiom_entities
-from ontoloom.errors import InternalError, OntoloomError
-from ontoloom.hashing import (
-    AxiomHash,
-    AxiomHashPrefix,
-    HashedAxiom,
-    disambiguating_prefixes,
-    short_hash,
-)
+from ontoloom.errors import InternalError
+from ontoloom.hashing import AxiomHash, HashedAxiom, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
@@ -31,81 +24,11 @@ from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.store import check_iri_prefixes
 from ontoloom.query.constraints import AxiomConstraint, InSelection, MentionsAll
-from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import AxiomSelectionName, SelectionRef
+from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dedupe
-
-
-class AxiomNotFoundError(OntoloomError):
-    """No axiom matches the given hash prefix or full hash."""
-
-    def __init__(self, needle: AxiomHashPrefix | AxiomHash):
-        self.needle = needle
-        super().__init__(f"No axiom matching hash [{needle}].")
-
-
-class AmbiguousHashError(OntoloomError):
-    """Hash prefix matches multiple axioms.
-
-    `distinguishing_prefixes` are the minimum-length prefixes that uniquely
-    identify each match -> the caller can copy any of them verbatim to retry.
-    """
-
-    def __init__(self, prefix: AxiomHashPrefix, count: int, distinguishing_prefixes: Sequence[str]):
-        self.prefix = prefix
-        self.count = count
-        self.distinguishing_prefixes = distinguishing_prefixes
-        max_shown = 10
-        shown = ", ".join(distinguishing_prefixes[:max_shown])
-        suffix = f", ... ({count - max_shown} more)" if count > max_shown else ""
-        super().__init__(f"[{prefix}] matches {count} axioms: {shown}{suffix}.")
-
-
-@dataclass(frozen=True, slots=True)
-class ResolvedAxiom:
-    axiom_id: int
-    hash: AxiomHash
-    json_data: str
-
-
-def _prefix_upper_bound(prefix: str) -> str:
-    """Lexicographic upper bound for `LIKE prefix || '%'` on a BINARY column.
-
-    Increments the last character of the prefix by one code point. The prefix
-    is constrained to lowercase hex by `AxiomHashPrefix`, so the increment
-    never wraps past printable ASCII (`'9' -> ':'`, `'a' -> 'b'`, ...).
-    """
-    return prefix[:-1] + chr(ord(prefix[-1]) + 1)
-
-
-def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
-    """Resolve a hash prefix to a full axiom hash; raise on missing or ambiguous.
-
-    Mutation paths in core take `AxiomHash` directly; prefix → full resolution
-    happens at the MCP boundary (or any other adapter that takes user input).
-    """
-    upper = _prefix_upper_bound(prefix)
-    rows = s.conn.execute(
-        "SELECT hash FROM axioms WHERE hash >= ? AND hash < ?",
-        (prefix, upper),
-    ).fetchall()
-    if not rows:
-        raise AxiomNotFoundError(prefix)
-    if len(rows) > 1:
-        full_hashes = [r[0] for r in rows]
-        raise AmbiguousHashError(prefix, len(rows), disambiguating_prefixes(full_hashes))
-    return AxiomHash(rows[0][0])
-
-
-def _load_axiom_row(s: Session, h: AxiomHash) -> ResolvedAxiom:
-    """Fetch the row backing `h`. Raises AxiomNotFoundError if absent (race-safe)."""
-    row = s.conn.execute("SELECT id, json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
-    if row is None:
-        raise AxiomNotFoundError(h)
-    return ResolvedAxiom(axiom_id=row[0], hash=h, json_data=row[1])
 
 
 def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
@@ -207,7 +130,7 @@ def annotate_axiom(
     add_annotations = add_annotations or []
     remove_annotations = remove_annotations or []
 
-    resolved = _load_axiom_row(s, axiom_hash)
+    resolved = load_axiom_row(s, axiom_hash)
     axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in annotate")
 
     current = list(axiom.annotations)
@@ -255,7 +178,7 @@ def replace_axiom(s: Session, old_hash: AxiomHash, new_axiom: BaseAxiom) -> Repl
 
     new_h = HashedAxiom.of(new_axiom).hash
 
-    resolved = _load_axiom_row(s, old_hash)
+    resolved = load_axiom_row(s, old_hash)
     old_axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in replace")
     old_hashed = HashedAxiom(axiom=old_axiom, hash=resolved.hash)
 
@@ -363,14 +286,6 @@ def rename_iri(
         )
 
     return RenameResult(old_iri=old_iri, new_iri=new_iri, replaced=tuple(results))
-
-
-def axiom_summary(s: Session, *, within: SelectionRef | None = None) -> AxiomSummary:
-    constraints: tuple[AxiomConstraint, ...] = (
-        (InSelection(ref=within),) if within is not None else ()
-    )
-    by_type = run(s, CountAxiomsByType(constraints=constraints))
-    return AxiomSummary(total=sum(by_type.values()), by_type=by_type)
 
 
 def _annotation_value_to_text(value: IRI | TypedLiteral | LangLiteral):

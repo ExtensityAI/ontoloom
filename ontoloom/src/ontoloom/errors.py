@@ -20,6 +20,18 @@ class StoreCorruptionError(OntoloomError):
         super().__init__(f"Corrupted stored data: {detail}")
 
 
+class ConcurrentWriteError(OntoloomError):
+    """Another writer held the SQLite write lock past the busy_timeout.
+
+    The transaction has been rolled back. Safe to retry — persistent failures
+    usually mean another process is holding a long write transaction open.
+    """
+
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(f"Database is locked by another writer: {detail}. Retry the operation.")
+
+
 class InternalError(OntoloomError):
     """Internal invariant violated. Indicates a bug in ontoloom itself, not user input."""
 

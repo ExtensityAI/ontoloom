@@ -11,7 +11,7 @@ from ontoloom.hashing import HashedAxiom, short_hash
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
-from ontoloom.selections.store import UpsertResult
+from ontoloom.selections.persistence import UpsertResult
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.locking import format_locked_quoted

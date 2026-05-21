@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.store import replace_axiom as core_replace_axiom
-from ontoloom.axioms.store import resolve_hash_prefix
+from ontoloom.axioms.hashes import resolve_hash_prefix
+from ontoloom.axioms.mutations import replace_axiom as core_replace_axiom
 from ontoloom.connection import Ontology, session
 from ontoloom.hashing import AxiomHashPrefix, short_hash
 from ontoloom.owl.axioms import Axiom

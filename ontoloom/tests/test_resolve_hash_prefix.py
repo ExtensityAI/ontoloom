@@ -1,7 +1,7 @@
 """Hash-prefix resolution and AxiomHashPrefix validation."""
 
 import pytest
-from ontoloom.axioms.store import (
+from ontoloom.axioms.hashes import (
     AmbiguousHashError,
     AxiomNotFoundError,
     resolve_hash_prefix,

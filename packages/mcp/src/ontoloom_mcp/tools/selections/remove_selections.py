@@ -3,7 +3,7 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.selections.store import remove_selections as core_remove_selections
+from ontoloom.selections.persistence import remove_selections as core_remove_selections
 from ontoloom.selections.types import SelectionRef
 from ontoloom.utils import dquoted
 
@@ -18,16 +18,16 @@ def remove_selections(
     """Remove selections by exact name. Best-effort -> reports any not found.
 
     Each entry in `names` is kind-prefixed (e.g. `"axioms:foo"` or
-    `"entities:bar"`); removal is by bare name only -- the kind prefix is
-    informational and not verified against the stored selection.
+    `"entities:bar"`); the prefix must match the stored selection's kind, or
+    the entire call fails (no partial removal). Missing names are tolerated
+    and listed in the result.
 
     To delete selections matching a glob, call `list_selections` first to
     discover the matching names, then pass them here.
     """
-    bare_names = [ref.bare for ref in names]
     ont = Ontology(path)
     with session(ont) as s:
-        result = core_remove_selections(s, bare_names)
+        result = core_remove_selections(s, names)
         s.commit()
         parts = []
         if result.dropped:

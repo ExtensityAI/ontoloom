@@ -7,6 +7,7 @@ from ontoloom.connection import Session
 from ontoloom.entities.types import DuplicateGroup, DuplicateResult
 from ontoloom.owl.iri import IRI
 from ontoloom.query.base import Query, RenderedSql
+from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import EntitySelectionName
 
 
@@ -54,6 +55,9 @@ class FindDuplicateEntities(Query[DuplicateResult]):
 
     @override
     def _run(self, s: Session) -> DuplicateResult:
+        if self.within is not None:
+            get_selection(s, self.within.bare)  # raises SelectionNotFoundError if absent
+
         compiled = self.render()
         rows = s.conn.execute(compiled.sql, compiled.params).fetchall()
 

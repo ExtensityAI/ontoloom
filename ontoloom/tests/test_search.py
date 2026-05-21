@@ -1,15 +1,16 @@
-"""Search-related store tests not covered by test_search_smoke.py.
+"""Search-related tests not covered by test_search_smoke.py.
 
 Smoke tests cover search-by-text, role, namespace, pagination, and tiebreakers.
-This file covers store-level invariants: LIKE-escape safety and entity_text
-cleanup on partial axiom removal.
+This file covers LIKE-escape safety and entity_text cleanup on partial axiom
+removal.
 """
 
-from ontoloom.axioms.store import add_axioms, remove_by_hash
+from ontoloom.axioms.mutations import add_axioms, remove_by_hash
 from ontoloom.entities.store import collect_entity_iris, search_entities
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes.types import PrefixName
 
 
 def test_entity_text_survives_partial_removal(s):
@@ -56,7 +57,7 @@ def test_namespace_filter_escapes_underscore(s):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("aXb:Y")),
         ],
     )
-    iris = collect_entity_iris(s, namespace="a_b")
+    iris = collect_entity_iris(s, namespace=PrefixName("a_b"))
     # Without ESCAPE, `a_b:%` would match `aXb:Y` because `_` is a LIKE wildcard.
     assert "a_b:X" in iris
     assert "aXb:Y" not in iris

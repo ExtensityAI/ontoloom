@@ -28,8 +28,8 @@ from ontoloom.owl.literals import (
     LangLiteral,
     TypedLiteral,
 )
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.types import SelectionKind, SelectionName
 
 # -- Annotation exclusion --
 
@@ -278,10 +278,10 @@ def test_selection_hash_order_independent(tmp_path):
     Ontology.create(path)
     with session(Ontology(path)) as s:
         h1 = upsert_selection(
-            s, "s1", SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
+            s, SelectionName("s1"), SelectionKind.ENTITIES, ["ex:Dog", "ex:Cat", "ex:Fish"], "test"
         ).selection.hash
         h2 = upsert_selection(
-            s, "s2", SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
+            s, SelectionName("s2"), SelectionKind.ENTITIES, ["ex:Fish", "ex:Dog", "ex:Cat"], "test"
         ).selection.hash
         assert h1 == h2
         s.commit()
@@ -302,9 +302,11 @@ def test_selection_pagination_stable_across_processes(tmp_path):
     Ontology.create(db_path)
     script = textwrap.dedent(f"""\
         from pathlib import Path
+        from ontoloom.selections.compose import create_selection
         from ontoloom.selections.expr import IntersectExpr
-        from ontoloom.selections.store import create_selection, read_selection, upsert_selection
-        from ontoloom.selections.types import SelectionKind, SelectionName
+        from ontoloom.selections.persistence import upsert_selection
+        from ontoloom.selections.reader import read_selection
+        from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
         from ontoloom.connection import Ontology
         from ontoloom.connection import session
 
@@ -313,8 +315,9 @@ def test_selection_pagination_stable_across_processes(tmp_path):
                 ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
             upsert_selection(s, "b", SelectionKind.ENTITIES,
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
-            create_selection(s, "r", IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
-            page = read_selection(s, "r", limit=5)
+            r = EntitySelectionName("entities:r")
+            create_selection(s, r, IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
+            page = read_selection(s, r, limit=5)
             print(",".join(item.iri for item in page.items))
             s.commit()
     """)

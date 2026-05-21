@@ -3,11 +3,14 @@
 import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.prefixes.store import set_prefix
-from ontoloom.selections.store import upsert_selection
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
+from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
+    SelectionContentHash,
     SelectionKind,
+    SelectionName,
     SelectionNotFoundError,
 )
 from ontoloom_mcp.components.locking import (
@@ -26,7 +29,7 @@ def s(tmp_path):
     path = tmp_path / "test.ontology.db"
     Ontology.create(path)
     with session(Ontology(path)) as sess:
-        set_prefix(sess, "ex", "http://example.org/")
+        set_prefix(sess, PrefixName("ex"), NamespaceIRI("http://example.org/"))
         yield sess
         sess.commit()
 
@@ -115,7 +118,7 @@ def test_locked_entity_selection_name_lowercases_uppercase_hash_prefix():
 
 
 def test_verify_lock_returns_bare_on_match(s):
-    result = upsert_selection(s, "cats", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    result = upsert_selection(s, SelectionName("cats"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
     locked = LockedEntitySelectionName(f"entities:cats@{result.selection.hash[:8]}")
 
     bare = verify_lock(s, locked)
@@ -131,7 +134,7 @@ def test_verify_lock_raises_not_found_on_missing(s):
 
 
 def test_verify_lock_raises_stale_on_hash_mismatch(s):
-    upsert_selection(s, "cats", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    upsert_selection(s, SelectionName("cats"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
     locked = LockedEntitySelectionName("entities:cats@00000000")
 
     with pytest.raises(StaleSelectionError):
@@ -141,7 +144,7 @@ def test_verify_lock_raises_stale_on_hash_mismatch(s):
 def test_verify_lock_kind_mismatch_treated_as_missing(s):
     # A selection named "dogs" exists as ENTITIES; an AXIOMS lock with the same
     # name must not match -- separate (name, kind) row, so it's not found.
-    upsert_selection(s, "dogs", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SelectionName("dogs"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
     locked = LockedAxiomSelectionName("axioms:dogs@deadbeef")
 
     with pytest.raises(SelectionNotFoundError):
@@ -152,17 +155,19 @@ def test_verify_lock_kind_mismatch_treated_as_missing(s):
 
 
 def test_format_locked_axiom(s):
-    result = upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
+    result = upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, ["a" * 64], "test")
     assert format_locked(result.selection) == f"axioms:ax_sel@{result.selection.hash}"
 
 
 def test_format_locked_entity(s):
-    result = upsert_selection(s, "ent_sel", SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    result = upsert_selection(
+        s, SelectionName("ent_sel"), SelectionKind.ENTITIES, ["ex:Cat"], "test"
+    )
     assert format_locked(result.selection) == f"entities:ent_sel@{result.selection.hash}"
 
 
 def test_format_locked_quoted_wraps_in_double_quotes(s):
-    result = upsert_selection(s, "ax_sel", SelectionKind.AXIOMS, ["a" * 64], "test")
+    result = upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, ["a" * 64], "test")
     assert format_locked_quoted(result.selection) == f'"axioms:ax_sel@{result.selection.hash}"'
 
 
@@ -170,10 +175,10 @@ def test_format_locked_quoted_wraps_in_double_quotes(s):
 
 
 def test_stale_selection_error_shows_full_hash():
-    full_hash = "0123456789abcdef"
+    full_hash = SelectionContentHash("0123456789abcdef")
     err = StaleSelectionError(
-        EntitySelectionName("entities:cats"),
-        "deadbeef",
+        SelectionName("cats"),
+        HashPrefix("deadbeef"),
         full_hash,
         current_size=3,
     )
@@ -182,8 +187,8 @@ def test_stale_selection_error_shows_full_hash():
 
 def test_stale_selection_error_absent_hash_uses_placeholder():
     err = StaleSelectionError(
-        EntitySelectionName("entities:cats"),
-        "deadbeef",
+        SelectionName("cats"),
+        HashPrefix("deadbeef"),
         None,
     )
     assert "<absent>" in str(err)

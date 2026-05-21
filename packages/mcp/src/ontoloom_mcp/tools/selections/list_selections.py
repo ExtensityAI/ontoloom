@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.selections.store import list_selections as core_list_selections
+from ontoloom.selections.persistence import list_selections as core_list_selections
 
 from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool

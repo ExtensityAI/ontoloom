@@ -1,3 +1,4 @@
+import contextlib
 import importlib.resources
 import os
 import sqlite3
@@ -7,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from ontoloom.errors import OntoloomError
+from ontoloom.errors import ConcurrentWriteError, OntoloomError
 from ontoloom.models import FrozenModel
 from ontoloom.utils import dquoted
 
@@ -15,7 +16,7 @@ _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
 _PRAGMAS = _SQL.joinpath("pragmas.sql").read_text()
 
-CURRENT_SCHEMA_VERSION = 3
+CURRENT_SCHEMA_VERSION = 5
 
 
 # Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`
@@ -57,6 +58,16 @@ def escape_like(value: str):
 
 def _apply_pragmas(conn: sqlite3.Connection):
     conn.executescript(_PRAGMAS)
+
+
+def _is_lock_error(e: sqlite3.OperationalError) -> bool:
+    """True if the OperationalError is SQLite's busy/lock signal.
+
+    Matches both `database is locked` (write contention) and
+    `database table is locked` (shared-lock-after-write under WAL).
+    """
+    msg = str(e).lower()
+    return "database is locked" in msg or "database table is locked" in msg
 
 
 def _validate_schema(conn: sqlite3.Connection):
@@ -183,9 +194,12 @@ def session(ont: Ontology) -> Iterator[Session]:
         s = Session(ontology=ont, conn=raw)
         try:
             yield s
-        except:
+        except BaseException as e:
             if raw.in_transaction:
-                raw.execute("ROLLBACK")
+                with contextlib.suppress(sqlite3.OperationalError):
+                    raw.execute("ROLLBACK")
+            if isinstance(e, sqlite3.OperationalError) and _is_lock_error(e):
+                raise ConcurrentWriteError(str(e)) from e
             raise
         else:
             if raw.in_transaction:

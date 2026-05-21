@@ -1,45 +1,39 @@
-"""Public `run()` — verifies selection refs, then delegates to the query's `_run` method."""
+"""Public `run()` — verifies `InSelection` constraint refs, then delegates to `_run`.
+
+`selection` / `within` fields on a query are the query's own responsibility:
+each `_run` calls `get_selection` upfront on any such ref so a missing
+selection surfaces as `SelectionNotFoundError` instead of an empty result.
+"""
 
 from ontoloom.connection import Session
 from ontoloom.query.base import Query
 from ontoloom.query.constraints import InSelection
-from ontoloom.selections.types import SelectionNotFoundError, SelectionRef
+from ontoloom.selections.types import SelectionNotFoundError
 
 
-def _collect_selection_refs[T](q: Query[T]) -> list[SelectionRef]:
-    refs: list[SelectionRef] = []
-
-    constraints = getattr(q, "constraints", None)
-    if constraints is not None:
-        refs.extend(c.ref for c in constraints if isinstance(c, InSelection))
-
-    selection = getattr(q, "selection", None)
-    if selection is not None:
-        refs.append(selection)
-
-    within = getattr(q, "within", None)
-    if within is not None:
-        refs.append(within)
-
-    return refs
-
-
-def _verify_selection_refs[T](s: Session, q: Query[T]):
-    """Fail loud on a typoed/nonexistent selection ref before dispatch.
+def _verify_in_selection_refs[T](s: Session, q: Query[T]) -> None:
+    """Fail loud on a typoed/nonexistent `InSelection` constraint ref.
 
     Without this, an `InSelection(ref=...)` over a nonexistent name silently
-    yields an empty result — a silent debugging trap.
+    yields an empty result via the pure-SQL EXISTS filter — a debugging trap.
     """
-    for ref in _collect_selection_refs(q):
+    constraints = getattr(q, "constraints", None)
+    if constraints is None:
+        return
+
+    for c in constraints:
+        if not isinstance(c, InSelection):
+            continue
+
         row = s.conn.execute(
             "SELECT 1 FROM selections WHERE name = ? AND kind = ?",
-            (ref.bare, ref.kind),
+            (c.ref.bare, c.ref.kind),
         ).fetchone()
 
         if row is None:
-            raise SelectionNotFoundError(ref.bare)
+            raise SelectionNotFoundError(c.ref.bare)
 
 
 def run[T](s: Session, q: Query[T]) -> T:
-    _verify_selection_refs(s, q)
+    _verify_in_selection_refs(s, q)
     return q._run(s)

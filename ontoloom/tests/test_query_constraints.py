@@ -149,7 +149,7 @@ def test_in_selection_rejects_bare_string():
 
 def test_of_types_rejects_unknown_tag():
     with pytest.raises(ValidationError):
-        WithTypes(tags=("NotAnAxiomType",))  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
+        WithTypes(tags=("NotAnAxiomType",))  # type: ignore[arg-type]
 
 
 # -- MentionsAll: IRI count cap --

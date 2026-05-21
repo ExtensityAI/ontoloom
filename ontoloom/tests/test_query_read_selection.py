@@ -6,10 +6,11 @@ assertions diverge meaningfully (labels, punning) stay standalone below.
 """
 
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from ontoloom.axioms.store import add_axioms
+from ontoloom.axioms.mutations import add_axioms
 from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI, RDFS_LABEL
@@ -18,15 +19,19 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
 from ontoloom.query.read_axiom_selection import ReadAxiomSelection
 from ontoloom.query.read_entity_selection import ReadEntitySelection
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
     SelectionKind,
+    SelectionKindMismatchError,
+    SelectionName,
     SelectionNotFoundError,
     ShowFilter,
 )
 from pydantic import ValidationError
+
+SEL = SelectionName("sel")
 
 
 def _axiom_ref(name: str) -> AxiomSelectionName:
@@ -37,7 +42,7 @@ def _entity_ref(name: str) -> EntitySelectionName:
     return EntitySelectionName(f"entities:{name}")
 
 
-def _seed_axioms_present_missing(s: Any, name: str) -> None:
+def _seed_axioms_present_missing(s: Any, name: SelectionName) -> None:
     ax = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
     add_axioms(s, [ax])
     real_hash = HashedAxiom.of(ax).hash
@@ -45,12 +50,12 @@ def _seed_axioms_present_missing(s: Any, name: str) -> None:
     upsert_selection(s, name, SelectionKind.AXIOMS, [real_hash, fake_hash], "test")
 
 
-def _seed_entities_present_missing(s: Any, name: str) -> None:
+def _seed_entities_present_missing(s: Any, name: SelectionName) -> None:
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     upsert_selection(s, name, SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
 
 
-def _seed_axioms_for_pagination(s: Any, name: str) -> None:
+def _seed_axioms_for_pagination(s: Any, name: SelectionName) -> None:
     axs = [
         Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Zebra")),
         Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Antelope")),
@@ -61,7 +66,7 @@ def _seed_axioms_for_pagination(s: Any, name: str) -> None:
     upsert_selection(s, name, SelectionKind.AXIOMS, hashes, "test")
 
 
-def _seed_entities_for_pagination(s: Any, name: str) -> None:
+def _seed_entities_for_pagination(s: Any, name: SelectionName) -> None:
     add_axioms(
         s,
         [
@@ -79,91 +84,65 @@ def _seed_entities_for_pagination(s: Any, name: str) -> None:
     )
 
 
-# (query_class, ref_factory, kind, wrong_kind_str, seed_pm, seed_pag)
-_AXIOM_PARAMS: tuple[Any, ...] = (
-    ReadAxiomSelection,
-    _axiom_ref,
-    SelectionKind.AXIOMS,
-    "entities:foo",
-    _seed_axioms_present_missing,
-    _seed_axioms_for_pagination,
-)
-_ENTITY_PARAMS: tuple[Any, ...] = (
-    ReadEntitySelection,
-    _entity_ref,
-    SelectionKind.ENTITIES,
-    "axioms:foo",
-    _seed_entities_present_missing,
-    _seed_entities_for_pagination,
-)
+@dataclass(frozen=True, slots=True)
+class _ReadParams:
+    query_class: type
+    ref_factory: Callable[[str], Any]
+    kind: SelectionKind
+    wrong_kind_str: str
+    seed_pm: Callable[..., None]
+    seed_pag: Callable[..., None]
 
 
-PARAMS = pytest.mark.parametrize(
-    ("query_class", "ref_factory", "kind", "wrong_kind_str", "seed_pm", "seed_pag"),
-    [_AXIOM_PARAMS, _ENTITY_PARAMS],
-    ids=["axiom", "entity"],
+_AXIOM_PARAMS = _ReadParams(
+    query_class=ReadAxiomSelection,
+    ref_factory=_axiom_ref,
+    kind=SelectionKind.AXIOMS,
+    wrong_kind_str="entities:foo",
+    seed_pm=_seed_axioms_present_missing,
+    seed_pag=_seed_axioms_for_pagination,
 )
+_ENTITY_PARAMS = _ReadParams(
+    query_class=ReadEntitySelection,
+    ref_factory=_entity_ref,
+    kind=SelectionKind.ENTITIES,
+    wrong_kind_str="axioms:foo",
+    seed_pm=_seed_entities_present_missing,
+    seed_pag=_seed_entities_for_pagination,
+)
+
+PARAMS = pytest.mark.parametrize("p", [_AXIOM_PARAMS, _ENTITY_PARAMS], ids=["axiom", "entity"])
 
 
 # -- field validator --
 
 
 @PARAMS
-def test_field_validator_rejects_wrong_kind(
-    query_class: type,
-    ref_factory: Callable[[str], Any],  # noqa: ARG001
-    kind: SelectionKind,  # noqa: ARG001
-    wrong_kind_str: str,
-    seed_pm: Callable[..., None],  # noqa: ARG001
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
+def test_field_validator_rejects_wrong_kind(p: _ReadParams):
     with pytest.raises(ValidationError):
-        query_class(selection=wrong_kind_str)
+        p.query_class(selection=p.wrong_kind_str)
 
 
 @PARAMS
-def test_field_validator_accepts_correct_kind(
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],  # noqa: ARG001
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
-    q = query_class(selection=ref_factory("foo"))
-    assert q.selection.kind == kind
+def test_field_validator_accepts_correct_kind(p: _ReadParams):
+    q = p.query_class(selection=p.ref_factory("foo"))
+    assert q.selection.kind == p.kind
 
 
 # -- _run integration: shared behavior --
 
 
 @PARAMS
-def test_run_missing_selection_raises(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,  # noqa: ARG001
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],  # noqa: ARG001
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
+def test_run_missing_selection_raises(s, p: _ReadParams):
     with pytest.raises(SelectionNotFoundError):
-        run(s, query_class(selection=ref_factory("nope")))
+        run(s, p.query_class(selection=p.ref_factory("nope")))
 
 
 @PARAMS
-def test_run_basic_present_and_missing(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
-    seed_pm(s, "sel")
-    page = run(s, query_class(selection=ref_factory("sel")))
-    assert page.meta.kind == kind
+def test_run_basic_present_and_missing(s, p: _ReadParams):
+    p.seed_pm(s, "sel")
+    page = run(s, p.query_class(selection=p.ref_factory("sel")))
+    assert page.meta.kind == p.kind
     assert page.meta.size == 2
     assert page.total_filtered == 2
     assert page.present == 1
@@ -173,33 +152,17 @@ def test_run_basic_present_and_missing(
 
 
 @PARAMS
-def test_run_show_present_only(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,  # noqa: ARG001
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
-    seed_pm(s, "sel")
-    page = run(s, query_class(selection=ref_factory("sel"), show=ShowFilter.PRESENT))
+def test_run_show_present_only(s, p: _ReadParams):
+    p.seed_pm(s, "sel")
+    page = run(s, p.query_class(selection=p.ref_factory("sel"), show=ShowFilter.PRESENT))
     assert page.total_filtered == 1
     assert len(page.items) == 1
 
 
 @PARAMS
-def test_run_show_missing_only(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,  # noqa: ARG001
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
-    seed_pm(s, "sel")
-    page = run(s, query_class(selection=ref_factory("sel"), show=ShowFilter.MISSING))
+def test_run_show_missing_only(s, p: _ReadParams):
+    p.seed_pm(s, "sel")
+    page = run(s, p.query_class(selection=p.ref_factory("sel"), show=ShowFilter.MISSING))
     assert page.total_filtered == 1
     assert len(page.items) == 1
 
@@ -210,38 +173,74 @@ def _item_key(item: Any) -> str:
 
 
 @PARAMS
-def test_run_pagination_walks_in_lexicographic_order(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,  # noqa: ARG001
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],  # noqa: ARG001
-    seed_pag: Callable[..., None],
-):
-    seed_pag(s, "sel")
-    full = run(s, query_class(selection=ref_factory("sel")))
-    full_keys: Sequence[str] = [_item_key(i) for i in full.items]
-    assert list(full_keys) == sorted(full_keys)
+def test_run_pagination_is_consistent(s, p: _ReadParams):
+    """Concatenated paginated reads equal the unpaginated read.
 
-    page1 = run(s, query_class(selection=ref_factory("sel"), limit=2))
-    page2 = run(s, query_class(selection=ref_factory("sel"), limit=2, offset=2))
+    Specific order is per-query contract (`ReadAxiomSelection` = insertion
+    order, `ReadEntitySelection` = lex on IRI); covered by the dedicated
+    order tests below.
+    """
+    p.seed_pag(s, "sel")
+    full = run(s, p.query_class(selection=p.ref_factory("sel")))
+    full_keys: Sequence[str] = [_item_key(i) for i in full.items]
+
+    page1 = run(s, p.query_class(selection=p.ref_factory("sel"), limit=2))
+    page2 = run(s, p.query_class(selection=p.ref_factory("sel"), limit=2, offset=2))
     paged = [_item_key(i) for i in page1.items] + [_item_key(i) for i in page2.items]
     assert paged == list(full_keys)
 
 
+def test_axiom_run_returns_items_in_insertion_order(s):
+    axs = [
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Zebra")),
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Antelope")),
+        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Mongoose")),
+    ]
+    add_axioms(s, axs)
+    hashes = [HashedAxiom.of(a).hash for a in axs]
+    upsert_selection(s, SEL, SelectionKind.AXIOMS, hashes, "test")
+
+    page = run(s, ReadAxiomSelection(selection=_axiom_ref("sel")))
+    assert [item.hash for item in page.items] == hashes
+
+
+def test_axiom_run_raises_on_kind_mismatch(s):
+    upsert_selection(s, SelectionName("foo"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    with pytest.raises(SelectionKindMismatchError):
+        run(s, ReadAxiomSelection(selection=_axiom_ref("foo")))
+
+
+def test_entity_run_raises_on_kind_mismatch(s):
+    upsert_selection(s, SelectionName("foo"), SelectionKind.AXIOMS, ["a" * 64], "test")
+    with pytest.raises(SelectionKindMismatchError):
+        run(s, ReadEntitySelection(selection=_entity_ref("foo")))
+
+
+def test_entity_run_returns_items_in_lex_order(s):
+    add_axioms(
+        s,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Zebra")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Antelope")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Mongoose")),
+        ],
+    )
+    upsert_selection(
+        s,
+        SEL,
+        SelectionKind.ENTITIES,
+        ["ex:Zebra", "ex:Antelope", "ex:Mongoose"],
+        "test",
+    )
+
+    page = run(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    assert [str(item.iri) for item in page.items] == ["ex:Antelope", "ex:Mongoose", "ex:Zebra"]
+
+
 @PARAMS
-def test_run_empty_selection(
-    s,
-    query_class: type,
-    ref_factory: Callable[[str], Any],
-    kind: SelectionKind,
-    wrong_kind_str: str,  # noqa: ARG001
-    seed_pm: Callable[..., None],  # noqa: ARG001
-    seed_pag: Callable[..., None],  # noqa: ARG001
-):
-    upsert_selection(s, "empty", kind, [], "test")
-    page = run(s, query_class(selection=ref_factory("empty")))
+def test_run_empty_selection(s, p: _ReadParams):
+    upsert_selection(s, SelectionName("empty"), p.kind, [], "test")
+    page = run(s, p.query_class(selection=p.ref_factory("empty")))
     assert page.items == ()
     assert page.total_filtered == 0
     assert page.present == 0
@@ -252,7 +251,7 @@ def test_run_empty_selection(
 
 
 def test_entity_run_present_and_missing_classified(s):
-    _seed_entities_present_missing(s, "sel")
+    _seed_entities_present_missing(s, SEL)
     page = run(s, ReadEntitySelection(selection=_entity_ref("sel")))
     by_iri = {item.iri: item for item in page.items}
     assert by_iri[IRI("ex:Dog")].present is True
@@ -262,14 +261,14 @@ def test_entity_run_present_and_missing_classified(s):
 
 
 def test_entity_run_show_present_returns_only_dog(s):
-    _seed_entities_present_missing(s, "sel")
+    _seed_entities_present_missing(s, SEL)
     page = run(s, ReadEntitySelection(selection=_entity_ref("sel"), show=ShowFilter.PRESENT))
     assert page.items[0].iri == IRI("ex:Dog")
     assert page.items[0].present is True
 
 
 def test_entity_run_show_missing_returns_only_ghost(s):
-    _seed_entities_present_missing(s, "sel")
+    _seed_entities_present_missing(s, SEL)
     page = run(s, ReadEntitySelection(selection=_entity_ref("sel"), show=ShowFilter.MISSING))
     assert page.items[0].iri == IRI("ex:Ghost")
     assert page.items[0].present is False
@@ -287,7 +286,7 @@ def test_entity_run_labels_populated_for_present_entities(s):
             ),
         ],
     )
-    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:Dog"], "test")
     page = run(s, ReadEntitySelection(selection=_entity_ref("sel")))
     assert page.items[0].label == "Dog"
 
@@ -300,7 +299,7 @@ def test_entity_run_punned_entity_present_missing_invariant(s):
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:X")),
         ],
     )
-    upsert_selection(s, "sel", SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
+    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:X", "ex:Ghost"], "test")
     page = run(s, ReadEntitySelection(selection=_entity_ref("sel")))
     assert page.present + page.missing == page.meta.size
     assert page.present == 1
@@ -311,18 +310,18 @@ def test_entity_run_punned_entity_present_missing_invariant(s):
 
 
 def test_axiom_run_show_present_items_not_missing(s):
-    _seed_axioms_present_missing(s, "sel")
+    _seed_axioms_present_missing(s, SEL)
     page = run(s, ReadAxiomSelection(selection=_axiom_ref("sel"), show=ShowFilter.PRESENT))
     assert all(not item.missing for item in page.items)
 
 
 def test_axiom_run_show_missing_items_all_missing(s):
-    _seed_axioms_present_missing(s, "sel")
+    _seed_axioms_present_missing(s, SEL)
     page = run(s, ReadAxiomSelection(selection=_axiom_ref("sel"), show=ShowFilter.MISSING))
     assert all(item.missing for item in page.items)
 
 
 def test_axiom_run_basic_meta_name(s):
-    _seed_axioms_present_missing(s, "sel")
+    _seed_axioms_present_missing(s, SEL)
     page = run(s, ReadAxiomSelection(selection=_axiom_ref("sel")))
     assert page.meta.name == "sel"

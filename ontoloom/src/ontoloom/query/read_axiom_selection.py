@@ -7,11 +7,13 @@ from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.load import load_axiom
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.metadata import get_selection_meta
+from ontoloom.selections.persistence import get_selection
 from ontoloom.selections.types import (
     AxiomItem,
     AxiomSelectionName,
     AxiomSelectionPage,
+    SelectionKind,
+    SelectionKindMismatchError,
     ShowFilter,
 )
 
@@ -29,9 +31,9 @@ def _show_filter_clause(show: ShowFilter) -> str:
 class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
     """Paginated read of an axiom-kind selection.
 
-    Page order is stable and lexicographic on the item hash. The
-    `(selection_name, item)` autoindex provides the ordering for free, so
-    paginated reads avoid a temp-sort over the full selection.
+    Page order is insertion order (`id`, which aliases rowid), so any ranking
+    baked into the insertion sequence (e.g. exact-match-first in
+    `search_axioms`) survives pagination.
     """
 
     selection: AxiomSelectionName
@@ -55,14 +57,17 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
         if filter_clause:
             sql_parts.append(filter_clause.lstrip())
 
-        sql_parts.append("ORDER BY si.item")
+        sql_parts.append("ORDER BY si.id")
         append_pagination(sql_parts, params, self.limit, self.offset)
         return RenderedSql(sql=" ".join(sql_parts), params=tuple(params))
 
     @override
     def _run(self, s: Session) -> AxiomSelectionPage:
         name = self.selection.bare
-        meta = get_selection_meta(s, name)
+        meta = get_selection(s, name)
+        if meta.kind != SelectionKind.AXIOMS:
+            raise SelectionKindMismatchError(name, SelectionKind.AXIOMS, meta.kind)
+
         filter_clause = _show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(

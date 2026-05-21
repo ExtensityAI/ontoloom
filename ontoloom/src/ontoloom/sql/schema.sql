@@ -87,11 +87,14 @@ CREATE TABLE IF NOT EXISTS selections (
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+-- `id` is an INTEGER PRIMARY KEY (rowid alias) so we can index `(selection_name, id)`
+-- and serve paginated `ORDER BY id` reads without a temp B-tree sort.
 CREATE TABLE IF NOT EXISTS selection_items (
+    id INTEGER PRIMARY KEY,
     selection_name TEXT NOT NULL REFERENCES selections(name) ON DELETE CASCADE,
     item TEXT NOT NULL,
     UNIQUE(selection_name, item)
 );
 
--- UNIQUE(selection_name, item) already provides a covering index for name-based lookups.
-CREATE INDEX IF NOT EXISTS idx_selection_items_item ON selection_items(item);
+CREATE INDEX IF NOT EXISTS idx_selection_items_name_id
+    ON selection_items(selection_name, id);
