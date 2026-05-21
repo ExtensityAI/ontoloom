@@ -18,7 +18,6 @@ from ontoloom_mcp.components.locking import (
     LockedAxiomSelectionName,
     LockedEntitySelectionName,
     StaleSelectionError,
-    format_locked,
     format_locked_quoted,
     verify_lock,
 )
@@ -151,19 +150,7 @@ def test_verify_lock_kind_mismatch_treated_as_missing(s):
         verify_lock(s, locked)
 
 
-# -- format_locked --
-
-
-def test_format_locked_axiom(s):
-    result = upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, ["a" * 64], "test")
-    assert format_locked(result.selection) == f"axioms:ax_sel@{result.selection.hash}"
-
-
-def test_format_locked_entity(s):
-    result = upsert_selection(
-        s, SelectionName("ent_sel"), SelectionKind.ENTITIES, ["ex:Cat"], "test"
-    )
-    assert format_locked(result.selection) == f"entities:ent_sel@{result.selection.hash}"
+# -- format_locked_quoted --
 
 
 def test_format_locked_quoted_wraps_in_double_quotes(s):

@@ -176,11 +176,6 @@ def verify_lock(s: Session, locked: LockedSelectionRef):
     return bare
 
 
-def format_locked(meta: SelectionMeta) -> str:
-    """Render `meta` as the wire-form locked ref the LLM can use for a follow-up call."""
-    return f"{meta.kind}:{meta.name}@{meta.hash}"
-
-
 def format_locked_quoted(meta: SelectionMeta) -> str:
     """Render `meta` as a double-quoted wire-form locked ref for embedding in MCP messages."""
-    return dquoted(format_locked(meta))
+    return dquoted(f"{meta.kind}:{meta.name}@{meta.hash}")
