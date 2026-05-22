@@ -128,8 +128,8 @@ class SubObjectPropertyOfChainPattern(BasePattern):
 
 
 class EquivalentObjectPropertiesPattern(BasePattern):
-    object_properties: tuple[Slot, ...]
-    object_properties_match: TupleMatch = TupleMatch.EXACT
+    equivalent_object_properties: tuple[Slot, ...]
+    equivalent_object_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class TransitiveObjectPropertyPattern(BasePattern):
@@ -156,8 +156,8 @@ class SubDataPropertyOfPattern(BasePattern):
 
 
 class EquivalentDataPropertiesPattern(BasePattern):
-    data_properties: tuple[Slot, ...]
-    data_properties_match: TupleMatch = TupleMatch.EXACT
+    equivalent_data_properties: tuple[Slot, ...]
+    equivalent_data_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class DataPropertyDomainPattern(BasePattern):
@@ -191,10 +191,10 @@ class AnnotationPropertyRangePattern(BasePattern):
 
 class HasKeyPattern(BasePattern):
     class_expression: ExprSlot
-    object_properties: tuple[Slot, ...]
-    object_properties_match: TupleMatch = TupleMatch.EXACT
-    data_properties: tuple[Slot, ...]
-    data_properties_match: TupleMatch = TupleMatch.EXACT
+    has_key_object_properties: tuple[Slot, ...]
+    has_key_object_properties_match: TupleMatch = TupleMatch.EXACT
+    has_key_data_properties: tuple[Slot, ...]
+    has_key_data_properties_match: TupleMatch = TupleMatch.EXACT
 
 
 class DatatypeDefinitionPattern(BasePattern):

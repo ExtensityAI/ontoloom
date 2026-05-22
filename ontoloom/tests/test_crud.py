@@ -820,8 +820,8 @@ def test_has_key_neither_properties_rejected():
     with pytest.raises(ValueError, match="at least one"):
         HasKey(
             class_expression=IRI("ex:Person"),
-            object_properties=(),
-            data_properties=(),
+            has_key_object_properties=(),
+            has_key_data_properties=(),
         )
 
 

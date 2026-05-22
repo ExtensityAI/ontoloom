@@ -200,7 +200,7 @@ AXIOMS = [
         chain=(IRI(":hasParent"), IRI(":hasBrother")),
         super_property=IRI(":hasUncle"),
     ),
-    EquivalentObjectProperties(object_properties=(IRI(":owns"), IRI(":hasPet"))),
+    EquivalentObjectProperties(equivalent_object_properties=(IRI(":owns"), IRI(":hasPet"))),
     TransitiveObjectProperty(transitive_property=IRI(":hasPart")),
     ReflexiveObjectProperty(reflexive_property=IRI(":hasPart")),
     ObjectPropertyDomain(object_property=IRI(":owns"), domain=nc(":Person")),
@@ -209,7 +209,7 @@ AXIOMS = [
     SubDataPropertyOf(
         sub_data_property=IRI(":hasWeight"), super_data_property=IRI(":hasMeasurement")
     ),
-    EquivalentDataProperties(data_properties=(IRI(":hasName"), IRI(":fullName"))),
+    EquivalentDataProperties(equivalent_data_properties=(IRI(":hasName"), IRI(":fullName"))),
     DataPropertyDomain(data_property=IRI(":hasAge"), domain=nc(":Person")),
     DataPropertyRange(
         data_property=IRI(":hasAge"), range=DataTypeRef(datatype=DataType.NON_NEGATIVE_INTEGER)
@@ -218,8 +218,8 @@ AXIOMS = [
     # --- HasKey ---
     HasKey(
         class_expression=nc(":Person"),
-        object_properties=(),
-        data_properties=(IRI(":hasSSN"),),
+        has_key_object_properties=(),
+        has_key_data_properties=(IRI(":hasSSN"),),
     ),
     # --- Annotation property axioms ---
     SubAnnotationPropertyOf(

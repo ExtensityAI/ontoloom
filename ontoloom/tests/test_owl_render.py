@@ -103,8 +103,8 @@ def test_nested_owl_struct_renders_recursively():
 def test_has_key_multi_field_tuples_use_brackets():
     obj = HasKey(
         class_expression=IRI("ex:Person"),
-        object_properties=(IRI("ex:hasSSN"),),
-        data_properties=(IRI("ex:fingerprint"),),
+        has_key_object_properties=(IRI("ex:hasSSN"),),
+        has_key_data_properties=(IRI("ex:fingerprint"),),
     )
     assert format_owl_struct(obj) == "HasKey(ex:Person, [ex:hasSSN], [ex:fingerprint])"
 

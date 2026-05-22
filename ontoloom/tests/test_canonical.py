@@ -92,14 +92,18 @@ def test_disjoint_classes_order_irrelevant():
 
 
 def test_equivalent_object_properties_order_irrelevant():
-    ax1 = EquivalentObjectProperties(object_properties=(IRI("ex:p"), IRI("ex:q"), IRI("ex:r")))
-    ax2 = EquivalentObjectProperties(object_properties=(IRI("ex:r"), IRI("ex:p"), IRI("ex:q")))
+    ax1 = EquivalentObjectProperties(
+        equivalent_object_properties=(IRI("ex:p"), IRI("ex:q"), IRI("ex:r"))
+    )
+    ax2 = EquivalentObjectProperties(
+        equivalent_object_properties=(IRI("ex:r"), IRI("ex:p"), IRI("ex:q"))
+    )
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
 def test_equivalent_data_properties_order_irrelevant():
-    ax1 = EquivalentDataProperties(data_properties=(IRI("ex:dp1"), IRI("ex:dp2")))
-    ax2 = EquivalentDataProperties(data_properties=(IRI("ex:dp2"), IRI("ex:dp1")))
+    ax1 = EquivalentDataProperties(equivalent_data_properties=(IRI("ex:dp1"), IRI("ex:dp2")))
+    ax2 = EquivalentDataProperties(equivalent_data_properties=(IRI("ex:dp2"), IRI("ex:dp1")))
     assert canonical_json(ax1) == canonical_json(ax2)
 
 
@@ -118,13 +122,13 @@ def test_different_individuals_order_irrelevant():
 def test_has_key_properties_order_irrelevant():
     ax1 = HasKey(
         class_expression=IRI("ex:Person"),
-        object_properties=(IRI("ex:p1"), IRI("ex:p2")),
-        data_properties=(IRI("ex:d1"), IRI("ex:d2")),
+        has_key_object_properties=(IRI("ex:p1"), IRI("ex:p2")),
+        has_key_data_properties=(IRI("ex:d1"), IRI("ex:d2")),
     )
     ax2 = HasKey(
         class_expression=IRI("ex:Person"),
-        object_properties=(IRI("ex:p2"), IRI("ex:p1")),
-        data_properties=(IRI("ex:d2"), IRI("ex:d1")),
+        has_key_object_properties=(IRI("ex:p2"), IRI("ex:p1")),
+        has_key_data_properties=(IRI("ex:d2"), IRI("ex:d1")),
     )
     assert canonical_json(ax1) == canonical_json(ax2)
 

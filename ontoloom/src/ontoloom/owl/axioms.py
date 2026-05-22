@@ -140,7 +140,7 @@ class SubObjectPropertyOfChain(BaseAxiom):
 class EquivalentObjectProperties(BaseAxiom):
     """r₁ ≡ r₂ -> properties relate the same pairs of individuals."""
 
-    object_properties: Annotated[
+    equivalent_object_properties: Annotated[
         tuple[IRI, ...],
         Unordered(),
         EntityType.OBJECT_PROPERTY,
@@ -225,7 +225,7 @@ class SubDataPropertyOf(BaseAxiom):
 class EquivalentDataProperties(BaseAxiom):
     """dp₁ ≡ dp₂ -> data properties have the same values for all individuals."""
 
-    data_properties: Annotated[
+    equivalent_data_properties: Annotated[
         tuple[IRI, ...],
         Unordered(),
         EntityType.DATA_PROPERTY,
@@ -317,13 +317,13 @@ class HasKey(BaseAxiom):
     """
 
     class_expression: Annotated[ClassExpression, Position.CLASS]
-    object_properties: Annotated[
+    has_key_object_properties: Annotated[
         tuple[IRI, ...],
         Unordered(),
         EntityType.OBJECT_PROPERTY,
         Position.PROPERTY,
     ] = ()
-    data_properties: Annotated[
+    has_key_data_properties: Annotated[
         tuple[IRI, ...],
         Unordered(),
         EntityType.DATA_PROPERTY,
@@ -332,7 +332,7 @@ class HasKey(BaseAxiom):
 
     @model_validator(mode="after")
     def _check_has_properties(self):
-        if not self.object_properties and not self.data_properties:
+        if not self.has_key_object_properties and not self.has_key_data_properties:
             msg = "HasKey must have at least one object or data property"
             raise ValueError(msg)
         return self

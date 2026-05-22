@@ -30,8 +30,8 @@ def test_gen_patterns_unordered_tuple_gets_sibling_match_enum():
     # Unordered tuple field -> bare tuple + sibling `<field>_match: TupleMatch`
     assert "equivalent_classes: tuple[ExprSlot, ...]" in source
     assert "equivalent_classes_match: TupleMatch = TupleMatch.EXACT" in source
-    assert "object_properties: tuple[Slot, ...]" in source
-    assert "object_properties_match: TupleMatch = TupleMatch.EXACT" in source
+    assert "equivalent_object_properties: tuple[Slot, ...]" in source
+    assert "equivalent_object_properties_match: TupleMatch = TupleMatch.EXACT" in source
 
 
 def test_gen_patterns_ordered_tuple_has_no_sibling_match():
@@ -201,7 +201,13 @@ def test_gen_patterns_field_type_transformations():
     assert "chain_match" not in gen.SubObjectPropertyOfChainPattern.model_fields
 
     # Unordered tuple of IRI → tuple[Slot, ...] + sibling `<field>_match`
-    ann = gen.EquivalentObjectPropertiesPattern.model_fields["object_properties"].annotation
+    ann = gen.EquivalentObjectPropertiesPattern.model_fields[
+        "equivalent_object_properties"
+    ].annotation
     inner = _strip_annotated(get_args(ann)[0])
-    assert inner == slot_inner, f"expected tuple[Slot, ...] for object_properties, got {ann}"
-    assert "object_properties_match" in gen.EquivalentObjectPropertiesPattern.model_fields
+    assert inner == slot_inner, (
+        f"expected tuple[Slot, ...] for equivalent_object_properties, got {ann}"
+    )
+    assert (
+        "equivalent_object_properties_match" in gen.EquivalentObjectPropertiesPattern.model_fields
+    )

@@ -113,7 +113,7 @@ def test_sub_object_property_of_chain():
 
 
 def test_equivalent_object_properties():
-    ax = EquivalentObjectProperties(object_properties=(IRI(":r"), IRI(":s")))
+    ax = EquivalentObjectProperties(equivalent_object_properties=(IRI(":r"), IRI(":s")))
     entities = _entities(ax)
     assert (":r", EntityType.OBJECT_PROPERTY, P.MEMBER) in entities
     assert (":s", EntityType.OBJECT_PROPERTY, P.MEMBER) in entities
@@ -169,8 +169,8 @@ def test_functional_data_property():
 def test_has_key():
     ax = HasKey(
         class_expression=NC(":C"),
-        object_properties=(IRI(":op"),),
-        data_properties=(IRI(":dp"),),
+        has_key_object_properties=(IRI(":op"),),
+        has_key_data_properties=(IRI(":dp"),),
     )
     entities = _entities(ax)
     assert (":C", EntityType.CLASS, P.CLASS) in entities
