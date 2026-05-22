@@ -10,7 +10,7 @@ from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
-from ontoloom.prefixes.types import PrefixName
+from ontoloom.owl.prefix_name import PrefixName
 from ontoloom.selections.types import SelectionRef
 
 # Each IRI in a MentionsAll becomes its own EXISTS subquery in the SQL plan.

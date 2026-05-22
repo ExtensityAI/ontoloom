@@ -3,29 +3,10 @@ from typing import override
 
 from ontoloom.errors import OntoloomError
 from ontoloom.models import TypedStr
+from ontoloom.owl.prefix_name import PrefixName
 from ontoloom.utils import dquoted
 
-_PREFIX_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.-]*$")
 _NAMESPACE_IRI_PATTERN = re.compile(r"^\S+:\S+$")
-
-
-class PrefixName(TypedStr):
-    """A namespace prefix label (e.g. `ex`, `rdfs`, `owl`)."""
-
-    description = "Prefix name (e.g. 'ex', 'rdfs', 'owl')"
-    pattern = r"^[a-zA-Z_][a-zA-Z0-9_.-]*$"
-    examples = ("ex", "rdfs", "owl")
-
-    @override
-    @classmethod
-    def parse(cls, value: str):
-        if not _PREFIX_NAME_PATTERN.match(value):
-            msg = (
-                "PrefixName must start with a letter or underscore and contain only "
-                f"letters, digits, '_', '.', '-', got {dquoted(value)}"
-            )
-            raise ValueError(msg)
-        return value
 
 
 class NamespaceIRI(TypedStr):
