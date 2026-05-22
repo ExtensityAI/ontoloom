@@ -561,7 +561,7 @@ def test_remove_axioms_stale_selection_translates(populated_db):
 
     wrapped = translate_errors(remove_axioms)
     with pytest.raises(ToolError) as exc_info:
-        wrapped(path=populated_db, target=BySelection(selection=stale))
+        wrapped(path=populated_db, target=BySelection(name=stale))
     msg = str(exc_info.value)
     assert "changed" in msg
     assert "Current: dogs_ax@" in msg

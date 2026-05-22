@@ -26,7 +26,7 @@ class ByHashes(FrozenModel):
 class BySelection(FrozenModel):
     """Target every axiom in a locked axiom-selection."""
 
-    selection: LockedAxiomSelectionName
+    name: LockedAxiomSelectionName
 
 
 _get_remove_axioms_target_tag = make_tag_resolver(
@@ -45,14 +45,14 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget):
     `target` is one of:
     - `{"hashes": [...]}`: Each hash (full or unambiguous prefix) must match
       exactly one axiom. Atomic: if any hash fails to resolve, nothing is removed.
-    - `{"selection": "axioms:NAME@hash_prefix"}`: Removes every axiom in the locked
+    - `{"name": "axioms:NAME@hash_prefix"}`: Removes every axiom in the locked
       axiom-selection. The hash prefix verifies the selection hasn't changed
       since you last read it. Best-effort: skips hashes no longer in the DB.
     """
     ont = Ontology(path)
     with session(ont) as s:
         match target:
-            case BySelection(selection=locked):
+            case BySelection(name=locked):
                 verified = verify_lock(s, locked)
                 sel_result = remove_by_selection(s, verified)
                 s.commit()
