@@ -9,7 +9,7 @@ from ontoloom.entities.reader import (
     undeclared_entity_count,
 )
 from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import SelectionRef
 
 from ontoloom_mcp.components.formatting import (

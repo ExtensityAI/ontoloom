@@ -26,7 +26,7 @@ from ontoloom.prefixes.store import check_iri_prefixes
 from ontoloom.query.constraints import AxiomConstraint, InSelection, MentionsAll
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dedupe
 

@@ -8,7 +8,7 @@ selection surfaces as `SelectionNotFoundError` instead of an empty result.
 from ontoloom.connection import Session
 from ontoloom.query.base import Query
 from ontoloom.query.constraints import InSelection
-from ontoloom.selections.persistence import selection_exists
+from ontoloom.selections.store import selection_exists
 from ontoloom.selections.types import SelectionNotFoundError
 
 

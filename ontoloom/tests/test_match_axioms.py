@@ -22,7 +22,7 @@ from ontoloom.patterns.types import (
     SubObjectPropertyOfChainPattern,
     TupleMatch,
 )
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,

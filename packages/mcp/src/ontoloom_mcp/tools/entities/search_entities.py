@@ -8,7 +8,7 @@ from ontoloom.entities.reader import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.selections.persistence import get_selection, upsert_selection
+from ontoloom.selections.store import get_selection, upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionRef
 from ontoloom.utils import dquoted
 

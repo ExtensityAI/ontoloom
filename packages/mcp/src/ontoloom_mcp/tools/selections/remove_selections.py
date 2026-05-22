@@ -3,7 +3,7 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.selections.persistence import remove_selections as core_remove_selections
+from ontoloom.selections.store import remove_selections as core_remove_selections
 from ontoloom.selections.types import SelectionRef
 from ontoloom.utils import dquoted
 

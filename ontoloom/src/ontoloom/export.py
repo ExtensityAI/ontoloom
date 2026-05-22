@@ -15,7 +15,7 @@ from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.query.constraints import AxiomConstraint, InSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 

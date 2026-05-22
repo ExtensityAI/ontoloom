@@ -13,7 +13,7 @@ from ontoloom.selections.expr import (
     IntersectExpr,
     UnionExpr,
 )
-from ontoloom.selections.persistence import (
+from ontoloom.selections.store import (
     get_selection,
     remove_selections,
     selection_exists,

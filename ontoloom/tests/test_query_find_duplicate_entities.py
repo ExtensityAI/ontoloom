@@ -8,7 +8,7 @@ from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
 from pydantic import ValidationError
 

@@ -11,7 +11,7 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import InSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.search_axioms import SearchAxioms, SearchAxiomsHit, SearchAxiomsResult
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import AxiomSelectionName, SelectionKind, SelectionName
 
 

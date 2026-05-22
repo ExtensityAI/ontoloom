@@ -9,7 +9,7 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import (
     EntityItem,
     EntitySelectionName,

@@ -1,6 +1,6 @@
 """Selection vocabulary: kinds, ops, validated identifiers, and read-shape DTOs.
 
-Pure types -> no I/O. Persistence lives in `selections/persistence.py`; set-expression
+Pure types -> no I/O. Persistence lives in `selections/store.py`; set-expression
 evaluation lives in `selections/compose.py`; paginated reads live in
 `selections/read_axiom_selection.py` and `selections/read_entity_selection.py`.
 """

@@ -205,7 +205,7 @@ def test_search_axioms_by_property_only(empty_db):
 
 def test_search_axioms_with_within_scope(empty_db):
     from ontoloom.axioms.types import HashedAxiom
-    from ontoloom.selections.persistence import upsert_selection
+    from ontoloom.selections.store import upsert_selection
     from ontoloom.selections.types import SelectionKind, SelectionName
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 

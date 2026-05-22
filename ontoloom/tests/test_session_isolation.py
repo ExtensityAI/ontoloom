@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.errors import ConcurrentWriteError
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 
 _PRAGMAS = (Path(__file__).parent.parent / "src" / "ontoloom" / "sql" / "pragmas.sql").read_text()

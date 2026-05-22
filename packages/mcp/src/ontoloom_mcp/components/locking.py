@@ -12,7 +12,7 @@ from typing import Literal, overload, override
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
 from ontoloom.models import TypedStr
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import (
     NAME_FRAGMENT,
     AxiomSelectionName,

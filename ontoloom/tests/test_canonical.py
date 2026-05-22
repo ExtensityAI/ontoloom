@@ -29,7 +29,7 @@ from ontoloom.owl.literals import (
     LangLiteral,
     TypedLiteral,
 )
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import SelectionKind, SelectionName
 
 # -- Annotation exclusion --
@@ -306,7 +306,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
         from ontoloom.query.dispatch import run
         from ontoloom.selections.compose import create_selection
         from ontoloom.selections.expr import IntersectExpr
-        from ontoloom.selections.persistence import upsert_selection
+        from ontoloom.selections.store import upsert_selection
         from ontoloom.selections.read_entity_selection import ReadEntitySelection
         from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
         from ontoloom.connection import Ontology

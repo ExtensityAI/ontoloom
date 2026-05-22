@@ -13,7 +13,7 @@ from ontoloom.query.constraints import (
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.search_axioms import SearchAxioms
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.types import (
     AxiomSelectionName,

@@ -24,7 +24,7 @@ from ontoloom.selections.expr import (
     SetOperand,
     UnionExpr,
 )
-from ontoloom.selections.persistence import UpsertResult, get_selection, upsert_selection
+from ontoloom.selections.store import UpsertResult, get_selection, upsert_selection
 from ontoloom.selections.types import (
     SelectionExprError,
     SelectionKind,

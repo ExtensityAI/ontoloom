@@ -4,7 +4,7 @@ import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.prefixes.store import set_prefix
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.selections.persistence import upsert_selection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,

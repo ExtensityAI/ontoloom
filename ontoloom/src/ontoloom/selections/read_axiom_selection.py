@@ -7,7 +7,7 @@ from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.connection import Session
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.persistence import get_selection
+from ontoloom.selections.store import get_selection
 from ontoloom.selections.types import (
     AxiomItem,
     AxiomSelectionName,

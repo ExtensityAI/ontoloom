@@ -61,7 +61,7 @@ from ontoloom.prefixes.types import (
 from ontoloom.query.dispatch import run
 from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import EntitiesInExpr
-from ontoloom.selections.persistence import (
+from ontoloom.selections.store import (
     list_selections,
     upsert_selection,
 )
