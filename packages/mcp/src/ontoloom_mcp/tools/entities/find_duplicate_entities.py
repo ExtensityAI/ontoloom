@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.reader import find_duplicate_entities
+from ontoloom.entities.reader import find_duplicate_entities as _find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import EntitySelectionName, SelectionKind
@@ -13,7 +13,7 @@ from ontoloom_mcp.components.types import OntologyPath
 _PREVIEW_GROUPS = 20
 
 
-def find_duplicates(
+def find_duplicate_entities(
     path: OntologyPath,
     into: EntitySelectionName,
     annotation_property: IRI,
@@ -34,12 +34,12 @@ def find_duplicates(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        result = find_duplicate_entities(s, annotation_property, within=within)
+        result = _find_duplicate_entities(s, annotation_property, within=within)
 
         if not result.affected_iris:
             return f"No duplicate {annotation_property} values found."
 
-        source = f"find_duplicates(annotation_property={dquoted(annotation_property)})"
+        source = f"find_duplicate_entities(annotation_property={dquoted(annotation_property)})"
         if within is not None:
             source += f", within={dquoted(str(within))}"
         upserted = upsert_selection(
@@ -71,8 +71,8 @@ def find_duplicates(
     return "\n".join(lines)
 
 
-tool_find_duplicates = create_tool(
-    find_duplicates,
-    name="find_duplicates",
+tool_find_duplicate_entities = create_tool(
+    find_duplicate_entities,
+    name="find_duplicate_entities",
     annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True),
 )

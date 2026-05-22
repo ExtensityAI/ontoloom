@@ -61,11 +61,11 @@ from ontoloom.prefixes.types import (
 from ontoloom.query.dispatch import run
 from ontoloom.selections.compose import create_selection
 from ontoloom.selections.expr import EntitiesInExpr
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import (
     list_selections,
     upsert_selection,
 )
-from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
@@ -825,10 +825,10 @@ def test_has_key_neither_properties_rejected():
         )
 
 
-# -- find_duplicates --
+# -- find_duplicate_entities --
 
 
-def test_find_duplicates_tie_break_order(s):
+def test_find_duplicate_entities_tie_break_order(s):
     add_axioms(
         s,
         [

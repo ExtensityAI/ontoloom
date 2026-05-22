@@ -418,10 +418,10 @@ def test_add_axioms_accepts_builtin_prefixes(empty_db):
     assert "Added 1" in result
 
 
-def test_find_duplicates_within_missing_selection_translates(populated_db):
-    from ontoloom_mcp.tools.entities.find_duplicates import find_duplicates
+def test_find_duplicate_entities_within_missing_selection_translates(populated_db):
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
 
-    wrapped = translate_errors(find_duplicates)
+    wrapped = translate_errors(find_duplicate_entities)
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,

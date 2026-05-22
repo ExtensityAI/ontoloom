@@ -19,9 +19,9 @@ from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
+from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     AxiomSelectionPage,
@@ -141,7 +141,7 @@ def test_run_raises_on_nonexistent_selection_in_read_axiom_selection(s):
         run(s, ReadAxiomSelection(selection=ref))
 
 
-def test_run_raises_on_nonexistent_within_in_find_duplicates(s):
+def test_run_raises_on_nonexistent_within_in_find_duplicate_entities(s):
     ref = EntitySelectionName("entities:does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
