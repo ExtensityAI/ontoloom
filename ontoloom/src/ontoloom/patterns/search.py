@@ -11,6 +11,7 @@ from typing import Annotated, get_args, get_origin
 from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.connection import Session
+from ontoloom.errors import StoreCorruptionError
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import AXIOM_CLASSES, AxiomTag
 from ontoloom.owl.expressions import ClassExpression
@@ -59,7 +60,11 @@ def match_axioms(
 
     with _iter_candidates(s, pattern, within) as rows:
         for h, json_data in rows:
-            axiom = load_axiom(json_data, f"match {short_hash(h)}")
+            try:
+                axiom = load_axiom(json_data)
+            except StoreCorruptionError as e:
+                msg = f"match {short_hash(h)}"
+                raise StoreCorruptionError(msg, e.original) from e
             if match_pattern(pattern, axiom):
                 matched_hashes.append(AxiomHash(h))
                 if limit is not None and len(matched_hashes) >= limit:

@@ -15,7 +15,7 @@ from ontoloom.axioms.types import (
 )
 from ontoloom.connection import Session
 from ontoloom.entities.text import record_annotation_value, record_local_name
-from ontoloom.errors import InternalError
+from ontoloom.errors import InternalError, StoreCorruptionError
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import BaseAxiom
@@ -73,13 +73,14 @@ def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
         if h not in found:
             raise AxiomNotFoundError(h)
 
-    to_remove = [
-        HashedAxiom(
-            axiom=load_axiom(found[h], f"axiom {short_hash(h)} in remove_by_hash"),
-            hash=h,
-        )
-        for h in hashes
-    ]
+    to_remove: list[HashedAxiom] = []
+    for h in hashes:
+        try:
+            axiom = load_axiom(found[h])
+        except StoreCorruptionError as e:
+            msg = f"axiom {short_hash(h)} in remove_by_hash"
+            raise StoreCorruptionError(msg, e.original) from e
+        to_remove.append(HashedAxiom(axiom=axiom, hash=h))
 
     _delete_axioms(s, to_remove)
     return RemoveResult(removed=tuple(to_remove))
@@ -105,7 +106,11 @@ def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelec
         if full_hash is None:
             absent += 1
             continue
-        axiom = load_axiom(json_data, f"axiom {short_hash(full_hash)} in remove_by_selection")
+        try:
+            axiom = load_axiom(json_data)
+        except StoreCorruptionError as e:
+            msg = f"axiom {short_hash(full_hash)} in remove_by_selection"
+            raise StoreCorruptionError(msg, e.original) from e
         to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
     _delete_axioms(s, to_remove)
@@ -131,7 +136,11 @@ def annotate_axiom(
     remove_annotations = remove_annotations or []
 
     resolved = load_axiom_row(s, axiom_hash)
-    axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in annotate")
+    try:
+        axiom = load_axiom(resolved.json_data)
+    except StoreCorruptionError as e:
+        msg = f"axiom {short_hash(resolved.hash)} in annotate"
+        raise StoreCorruptionError(msg, e.original) from e
 
     current = list(axiom.annotations)
     for ann in remove_annotations:
@@ -179,7 +188,11 @@ def replace_axiom(s: Session, old_hash: AxiomHash, new_axiom: BaseAxiom) -> Repl
     new_h = HashedAxiom.of(new_axiom).hash
 
     resolved = load_axiom_row(s, old_hash)
-    old_axiom = load_axiom(resolved.json_data, f"axiom {short_hash(resolved.hash)} in replace")
+    try:
+        old_axiom = load_axiom(resolved.json_data)
+    except StoreCorruptionError as e:
+        msg = f"axiom {short_hash(resolved.hash)} in replace"
+        raise StoreCorruptionError(msg, e.original) from e
     old_hashed = HashedAxiom(axiom=old_axiom, hash=resolved.hash)
 
     if new_h == resolved.hash:
@@ -263,7 +276,11 @@ def rename_iri(
     rows = list(run(s, ListAxioms(constraints=tuple(constraints))))
 
     for old_full_hash, old_json_data in rows:
-        old_axiom = load_axiom(old_json_data, f"rename {old_iri} -> {new_iri}")
+        try:
+            old_axiom = load_axiom(old_json_data)
+        except StoreCorruptionError as e:
+            msg = f"rename {old_iri} -> {new_iri}"
+            raise StoreCorruptionError(msg, e.original) from e
         new_axiom = _substitute_iri(old_axiom, old_iri, new_iri)
         new_h = HashedAxiom.of(new_axiom).hash
         old_hashed = HashedAxiom(axiom=old_axiom, hash=old_full_hash)

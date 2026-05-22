@@ -5,6 +5,7 @@ from typing import override
 from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.connection import Session
+from ontoloom.errors import StoreCorruptionError
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
 from ontoloom.selections.store import get_selection
@@ -87,17 +88,19 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
         compiled = self.render()
         rows = s.conn.execute(compiled.sql, compiled.params).fetchall()
 
-        items = tuple(
-            AxiomItem(
-                hash=AxiomHash(item_hash),
-                axiom=(
-                    load_axiom(data, f"axiom {short_hash(item_hash)} in ReadAxiomSelection")
-                    if data is not None
-                    else None
-                ),
-            )
-            for item_hash, data in rows
-        )
+        items_list: list[AxiomItem] = []
+        for item_hash, data in rows:
+            if data is None:
+                items_list.append(AxiomItem(hash=AxiomHash(item_hash), axiom=None))
+                continue
+
+            try:
+                axiom = load_axiom(data)
+            except StoreCorruptionError as e:
+                msg = f"axiom {short_hash(item_hash)} in ReadAxiomSelection"
+                raise StoreCorruptionError(msg, e.original) from e
+            items_list.append(AxiomItem(hash=AxiomHash(item_hash), axiom=axiom))
+        items = tuple(items_list)
 
         return AxiomSelectionPage(
             meta=meta,

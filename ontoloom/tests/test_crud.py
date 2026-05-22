@@ -810,7 +810,7 @@ def test_store_corruption_error(s):
     row = s.conn.execute("SELECT json(data) FROM axioms WHERE hash = ?", (h,)).fetchone()
     assert row is not None
     with pytest.raises(StoreCorruptionError):
-        load_axiom(row[0], "test context")
+        load_axiom(row[0])
 
 
 # -- HasKey validation --
