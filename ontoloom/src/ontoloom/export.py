@@ -32,14 +32,14 @@ class HeaderRecord(BaseModel, frozen=True):
 
 @dataclass(frozen=True, slots=True)
 class ExportResult:
-    """Outcome of `export_to_jsonl`. `skipped` is non-zero only when scoping by
+    """Outcome of `export_jsonl`. `skipped` is non-zero only when scoping by
     a selection that contains hashes no longer in the store."""
 
     exported: int
     skipped: int
 
 
-def export_to_jsonl(
+def export_jsonl(
     s: Session, output_path: Path, *, within: AxiomSelectionName | None = None
 ) -> ExportResult:
     """Export axioms as JSONL with a header line."""

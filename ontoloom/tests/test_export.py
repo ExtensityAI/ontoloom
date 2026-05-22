@@ -5,7 +5,7 @@ import json
 import pytest
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.axioms.types import HashedAxiom
-from ontoloom.export import export_to_jsonl
+from ontoloom.export import export_jsonl
 from ontoloom.owl.axioms import (
     AnnotationAssertion,
     Axiom,
@@ -49,7 +49,7 @@ def populated(s):
 
 def test_export_jsonl(populated, tmp_path):
     export_path = tmp_path / "export.jsonl"
-    result = export_to_jsonl(populated, export_path)
+    result = export_jsonl(populated, export_path)
     assert result.exported == 8
     assert result.skipped == 0
 
@@ -70,7 +70,7 @@ def test_export_jsonl_hash_roundtrip(populated, tmp_path):
     original_hashes = {r[0] for r in populated.conn.execute("SELECT hash FROM axioms")}
 
     export_path = tmp_path / "export.jsonl"
-    export_to_jsonl(populated, export_path)
+    export_jsonl(populated, export_path)
 
     lines = export_path.read_text().strip().split("\n")
     adapter = TypeAdapter(Axiom)
@@ -82,8 +82,8 @@ def test_export_jsonl_hash_roundtrip(populated, tmp_path):
 def test_export_jsonl_byte_identical(populated, tmp_path):
     p1 = tmp_path / "a.jsonl"
     p2 = tmp_path / "b.jsonl"
-    export_to_jsonl(populated, p1)
-    export_to_jsonl(populated, p2)
+    export_jsonl(populated, p1)
+    export_jsonl(populated, p2)
     # Header lines differ (exported_at timestamp); axiom lines must be deterministic.
     axiom_lines_1 = p1.read_text().splitlines()[1:]
     axiom_lines_2 = p2.read_text().splitlines()[1:]
@@ -96,7 +96,7 @@ def test_unicode_iri_roundtrip(s, tmp_path):
     h = HashedAxiom.of(ax).hash
 
     export_path = tmp_path / "uni.jsonl"
-    export_to_jsonl(s, export_path)
+    export_jsonl(s, export_path)
 
     adapter = TypeAdapter(Axiom)
     lines = export_path.read_text().strip().split("\n")

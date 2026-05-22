@@ -20,7 +20,7 @@ CURRENT_SCHEMA_VERSION = 6
 
 
 # Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`
-# to confine `Ontology(...)` and `export_to_jsonl`. Unset (default)
+# to confine `Ontology(...)` and `export_jsonl`. Unset (default)
 # means unrestricted, preserving single-user behavior.
 _env = os.environ.get("ONTOLOOM_WORKSPACE_ROOT")
 WORKSPACE_ROOT = Path(_env).resolve() if _env else None

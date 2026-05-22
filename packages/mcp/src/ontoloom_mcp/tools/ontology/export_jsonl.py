@@ -2,7 +2,7 @@ from pathlib import Path
 
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.export import export_to_jsonl
+from ontoloom.export import export_jsonl as _export_jsonl
 from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 
@@ -21,7 +21,7 @@ def export_jsonl(path: OntologyPath, output_path: Path, within: AxiomSelectionNa
     """
     ont = Ontology(path)
     with session(ont) as s:
-        result = export_to_jsonl(s, output_path, within=within)
+        result = _export_jsonl(s, output_path, within=within)
         s.commit()
 
     if within is not None:
