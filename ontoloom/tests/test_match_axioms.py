@@ -11,9 +11,9 @@ from ontoloom.owl.axioms import (
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import BCP47Tag, LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.patterns.match import _match_slot_vs_expression
+from ontoloom.patterns.matcher import _match_slot_vs_expression
+from ontoloom.patterns.search import match_axioms
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
-from ontoloom.patterns.store import match_axioms
 from ontoloom.patterns.types import (
     AnnotationAssertionPattern,
     EquivalentClassesPattern,

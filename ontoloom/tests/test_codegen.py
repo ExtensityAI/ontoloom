@@ -148,7 +148,7 @@ def test_exprslot_and_axiomslot_exact_membership():
 def test_expression_container_types_reflective_derivation():
     """_EXPRESSION_CONTAINER_TYPES must match the axiom types that actually carry ClassExpression fields."""
     from ontoloom.owl.axioms import AxiomTag
-    from ontoloom.patterns.store import _EXPRESSION_CONTAINER_TYPES
+    from ontoloom.patterns.search import _EXPRESSION_CONTAINER_TYPES
 
     expected = {
         AxiomTag.CLASS_ASSERTION,

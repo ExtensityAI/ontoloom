@@ -16,7 +16,7 @@ from ontoloom.owl.axioms import AXIOM_CLASSES, AxiomTag
 from ontoloom.owl.expressions import ClassExpression
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import SKIP
-from ontoloom.patterns.match import match_pattern
+from ontoloom.patterns.matcher import match_pattern
 from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.query.constraints import (

@@ -1,6 +1,6 @@
 from ontoloom.owl.axioms import EquivalentClasses
 from ontoloom.owl.iri import IRI
-from ontoloom.patterns.match import match_pattern
+from ontoloom.patterns.matcher import match_pattern
 from ontoloom.patterns.slot import IRISlot
 from ontoloom.patterns.types import EquivalentClassesPattern
 
