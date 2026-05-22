@@ -14,8 +14,9 @@ from typing import Any
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Session
-from ontoloom.hashing import AxiomHash, HashedAxiom
+from ontoloom.hashing import AxiomHash
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AxiomTag, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI

@@ -5,14 +5,10 @@ with the same logical content (modulo annotation differences and unordered-set
 permutations) hash to the same value.
 """
 
-import hashlib
 from collections.abc import Sequence
-from dataclasses import dataclass
 from typing import override
 
-from ontoloom.canonical import canonical_json
 from ontoloom.models import TypedStr
-from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.utils import dquoted
 
 # Standard width for hash prefixes shown to users. 12 hex chars = 48 bits;
@@ -61,23 +57,6 @@ class AxiomHash(TypedStr):
             msg = f"AxiomHash must be 64 lowercase hex chars, got {dquoted(value)}"
             raise ValueError(msg)
         return normalized
-
-
-@dataclass(frozen=True, slots=True)
-class HashedAxiom:
-    """An axiom paired with its computed content hash."""
-
-    axiom: BaseAxiom
-    hash: AxiomHash
-
-    @classmethod
-    def of(cls, axiom: BaseAxiom):
-        digest = hashlib.sha256(canonical_json(axiom).encode()).hexdigest()
-        return cls(axiom=axiom, hash=AxiomHash(digest))
-
-    @property
-    def short(self):
-        return short_hash(self.hash)
 
 
 def disambiguating_prefixes(hashes: Sequence[str]) -> list[str]:

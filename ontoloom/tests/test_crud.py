@@ -9,6 +9,7 @@ in test_export.py.
 import json
 
 import pytest
+from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.axioms.hashes import AxiomNotFoundError
 from ontoloom.axioms.mutations import (
     add_axioms,
@@ -17,6 +18,7 @@ from ontoloom.axioms.mutations import (
     rename_iri,
     replace_axiom,
 )
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import (
     Ontology,
     OntologyExistsError,
@@ -31,8 +33,7 @@ from ontoloom.entities.reader import (
 )
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import StoreCorruptionError
-from ontoloom.hashing import AxiomHash, HashedAxiom
-from ontoloom.load import load_axiom
+from ontoloom.hashing import AxiomHash
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
     AnnotationAssertion,

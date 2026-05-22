@@ -1,6 +1,7 @@
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.canonical import canonical_json
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import HASH_DISPLAY_LEN, HashedAxiom, disambiguating_prefixes
+from ontoloom.hashing import HASH_DISPLAY_LEN, disambiguating_prefixes
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
     DataPropertyRange,

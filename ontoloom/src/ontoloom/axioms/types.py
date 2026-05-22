@@ -1,13 +1,32 @@
 """Output types of the axiom storage API."""
 
+import hashlib
 from collections import Counter
 from dataclasses import dataclass
 
-from ontoloom.hashing import AxiomHash, HashedAxiom
+from ontoloom.canonical import canonical_json
+from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.owl.annotations import Annotation
-from ontoloom.owl.axioms import AxiomTag
+from ontoloom.owl.axioms import AxiomTag, BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.types import SelectionMeta
+
+
+@dataclass(frozen=True, slots=True)
+class HashedAxiom:
+    """An axiom paired with its computed content hash."""
+
+    axiom: BaseAxiom
+    hash: AxiomHash
+
+    @classmethod
+    def of(cls, axiom: BaseAxiom):
+        digest = hashlib.sha256(canonical_json(axiom).encode()).hexdigest()
+        return cls(axiom=axiom, hash=AxiomHash(digest))
+
+    @property
+    def short(self):
+        return short_hash(self.hash)
 
 
 @dataclass(frozen=True, slots=True)

@@ -9,7 +9,7 @@ from collections import Counter
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
-from ontoloom.hashing import HashedAxiom
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AxiomTag, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI

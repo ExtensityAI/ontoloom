@@ -1,6 +1,6 @@
 import pytest
 from ontoloom.axioms.mutations import add_axioms
-from ontoloom.hashing import HashedAxiom
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType

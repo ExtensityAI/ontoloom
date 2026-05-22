@@ -2,8 +2,8 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import HashedAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
     AxiomConstraint,

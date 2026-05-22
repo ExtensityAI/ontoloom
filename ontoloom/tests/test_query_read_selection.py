@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
-from ontoloom.hashing import HashedAxiom
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import LangLiteral

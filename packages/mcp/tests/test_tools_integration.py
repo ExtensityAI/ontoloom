@@ -187,7 +187,7 @@ def test_search_axioms_by_property_only(empty_db):
         properties=[IRI("rdfs:isDefinedBy")],
     )
 
-    from ontoloom.hashing import HashedAxiom
+    from ontoloom.axioms.types import HashedAxiom
 
     defined_hash = HashedAxiom.of(defined_axiom).hash
     commented_hash = HashedAxiom.of(commented_axiom).hash
@@ -204,7 +204,7 @@ def test_search_axioms_by_property_only(empty_db):
 
 
 def test_search_axioms_with_within_scope(empty_db):
-    from ontoloom.hashing import HashedAxiom
+    from ontoloom.axioms.types import HashedAxiom
     from ontoloom.selections.persistence import upsert_selection
     from ontoloom.selections.types import SelectionKind, SelectionName
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
@@ -273,7 +273,7 @@ def test_search_axioms_with_within_scope(empty_db):
 
 
 def test_search_axioms_exact_ranked_before_substring(empty_db):
-    from ontoloom.hashing import HashedAxiom
+    from ontoloom.axioms.types import HashedAxiom
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
     exact = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
@@ -449,7 +449,7 @@ def test_annotate_axiom_reports_applied_counts(populated_db):
     from ontoloom.owl.axioms import SubClassOf as _SubClassOf
 
     sub_axiom = _SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
-    from ontoloom.hashing import HashedAxiom
+    from ontoloom.axioms.types import HashedAxiom
 
     target_hash = HashedAxiom.of(sub_axiom).hash
 

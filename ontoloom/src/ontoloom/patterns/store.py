@@ -8,9 +8,9 @@ from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from typing import Annotated, get_args, get_origin
 
+from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.connection import Session
 from ontoloom.hashing import AxiomHash, short_hash
-from ontoloom.load import load_axiom
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import AXIOM_CLASSES, AxiomTag
 from ontoloom.owl.expressions import ClassExpression

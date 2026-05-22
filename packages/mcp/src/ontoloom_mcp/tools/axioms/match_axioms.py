@@ -1,6 +1,6 @@
 from mcp.types import ToolAnnotations
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import HashedAxiom
 from ontoloom.patterns.store import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.query.dispatch import run
