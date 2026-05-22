@@ -117,7 +117,7 @@ def _iter_candidates(
     if isinstance(pattern, _EXPRESSION_PATTERN_CLASSES):
         constraints.append(WithTypes(tags=tuple(sorted(_EXPRESSION_CONTAINER_TYPES))))
     else:
-        constraints.append(WithTypes(tags=(AxiomTag(pattern.axiom_tag()),)))
+        constraints.append(WithTypes(tags=(AxiomTag(pattern.owl_tag()),)))
 
     concrete_iris = _extract_concrete_iris(pattern)
     if concrete_iris[:3]:

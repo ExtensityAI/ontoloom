@@ -22,12 +22,13 @@ from ontoloom.patterns.slot import Slot
 class BasePattern(FrozenModel):
     """Common base for axiom and expression pattern classes.
 
-    `cls.axiom_tag()` returns the matched OWL type (the class name minus the
-    "Pattern" suffix), e.g. `SubClassOfPattern.axiom_tag() == "SubClassOf"`.
+    `cls.owl_tag()` returns the matched OWL type (axiom or expression) — the
+    class name minus the "Pattern" suffix, e.g.
+    `SubClassOfPattern.owl_tag() == "SubClassOf"`.
     """
 
     @classmethod
-    def axiom_tag(cls):
+    def owl_tag(cls):
         return cls.__name__.removesuffix("Pattern")
 
 

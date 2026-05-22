@@ -39,7 +39,7 @@ def match_pattern(pattern: BasePattern, axiom: BaseAxiom) -> list[Bindings]:
         return results
 
     # Axiom-level pattern: type must match the axiom's type
-    if pattern.axiom_tag() == axiom.tag():
+    if pattern.owl_tag() == axiom.tag():
         result = _match_model(pattern, axiom, {})
         return [result] if result is not None else []
 
@@ -56,7 +56,7 @@ def _match_model(
             return _match_slot_vs_str(pattern.iri, actual, bindings)  # pyright: ignore[reportAttributeAccessIssue]
         return None
 
-    if pattern.axiom_tag() != actual.tag():
+    if pattern.owl_tag() != actual.tag():
         return None
 
     actual_fields = type(actual).model_fields
