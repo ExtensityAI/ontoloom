@@ -1,8 +1,7 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.hashes import resolve_hash_prefix
+from ontoloom.axioms.hashing import AxiomHashPrefix, resolve_hash_prefix, short_hash
 from ontoloom.axioms.mutations import replace_axiom as core_replace_axiom
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import AxiomHashPrefix, short_hash
 from ontoloom.owl.axioms import Axiom
 
 from ontoloom_mcp.components.formatting import format_diff

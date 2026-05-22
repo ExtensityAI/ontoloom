@@ -2,8 +2,8 @@
 
 from collections.abc import Sequence
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
-from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import Position
 from ontoloom.query.constraints import (

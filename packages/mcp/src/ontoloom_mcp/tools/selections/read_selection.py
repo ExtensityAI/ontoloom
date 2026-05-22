@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
+from ontoloom.axioms.hashing import short_hash
 from ontoloom.connection import Ontology, session
 from ontoloom.errors import InternalError
-from ontoloom.hashing import short_hash
 from ontoloom.query.dispatch import run
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection

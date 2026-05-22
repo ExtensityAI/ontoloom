@@ -10,8 +10,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal, override
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.errors import OntoloomError
-from ontoloom.hashing import AxiomHash
 from ontoloom.models import TypedStr
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI

@@ -3,7 +3,7 @@ from typing import cast
 
 from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.axioms.entity_walker import iter_axiom_entities
-from ontoloom.axioms.hashes import AxiomNotFoundError, load_axiom_row
+from ontoloom.axioms.hashing import AxiomHash, AxiomNotFoundError, load_axiom_row, short_hash
 from ontoloom.axioms.types import (
     AddResult,
     AnnotateResult,
@@ -16,7 +16,6 @@ from ontoloom.axioms.types import (
 from ontoloom.connection import Session
 from ontoloom.entities.text import record_annotation_value, record_local_name
 from ontoloom.errors import InternalError
-from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.models import FrozenModel
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import BaseAxiom

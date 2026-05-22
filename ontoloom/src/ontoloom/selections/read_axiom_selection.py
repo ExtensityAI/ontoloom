@@ -3,8 +3,8 @@
 from typing import override
 
 from ontoloom.axioms.deserialize import load_axiom
+from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.connection import Session
-from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
 from ontoloom.selections.persistence import get_selection

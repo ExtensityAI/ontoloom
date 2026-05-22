@@ -6,8 +6,8 @@ Each test calls a tool function directly (the same callable wrapped by
 
 import pytest
 from fastmcp.exceptions import ToolError
+from ontoloom.axioms.hashing import AxiomHashPrefix
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI

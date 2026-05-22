@@ -4,8 +4,8 @@ import hashlib
 from collections import Counter
 from dataclasses import dataclass
 
+from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.canonical import canonical_json
-from ontoloom.hashing import AxiomHash, short_hash
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AxiomTag, BaseAxiom
 from ontoloom.owl.iri import IRI

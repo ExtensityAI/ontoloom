@@ -1,12 +1,13 @@
 """Hash-prefix resolution and AxiomHashPrefix validation."""
 
 import pytest
-from ontoloom.axioms.hashes import (
+from ontoloom.axioms.hashing import (
     AmbiguousHashError,
+    AxiomHash,
+    AxiomHashPrefix,
     AxiomNotFoundError,
     resolve_hash_prefix,
 )
-from ontoloom.hashing import AxiomHash, AxiomHashPrefix
 
 
 def test_axiom_hash_prefix_rejects_empty():

@@ -10,7 +10,7 @@ import json
 
 import pytest
 from ontoloom.axioms.deserialize import load_axiom
-from ontoloom.axioms.hashes import AxiomNotFoundError
+from ontoloom.axioms.hashing import AxiomHash, AxiomNotFoundError
 from ontoloom.axioms.mutations import (
     add_axioms,
     annotate_axiom,
@@ -33,7 +33,6 @@ from ontoloom.entities.reader import (
 )
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.errors import StoreCorruptionError
-from ontoloom.hashing import AxiomHash
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
     AnnotationAssertion,

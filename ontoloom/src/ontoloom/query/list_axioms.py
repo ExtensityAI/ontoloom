@@ -2,8 +2,8 @@
 
 from typing import override
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
-from ontoloom.hashing import AxiomHash
 from ontoloom.query._predicates import _axiom_predicates
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasAxiomConstraints, HasPagination

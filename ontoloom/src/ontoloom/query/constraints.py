@@ -4,8 +4,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, Field, model_validator
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.errors import OntoloomError
-from ontoloom.hashing import AxiomHash
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI

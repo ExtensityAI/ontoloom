@@ -2,10 +2,9 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.hashes import resolve_hash_prefix
+from ontoloom.axioms.hashing import AxiomHashPrefix, resolve_hash_prefix
 from ontoloom.axioms.mutations import remove_by_hash, remove_by_selection
 from ontoloom.connection import Ontology, session
-from ontoloom.hashing import AxiomHashPrefix
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 
 from ontoloom_mcp.components.formatting import format_diff

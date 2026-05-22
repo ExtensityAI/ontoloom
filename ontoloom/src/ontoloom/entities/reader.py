@@ -1,5 +1,6 @@
 from collections.abc import Iterable, Sequence
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
 from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.entities.projections import (
@@ -18,7 +19,6 @@ from ontoloom.entities.types import (
     MatchSource,
 )
 from ontoloom.errors import OntoloomError
-from ontoloom.hashing import AxiomHash
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName

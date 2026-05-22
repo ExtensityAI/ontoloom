@@ -3,7 +3,7 @@
 import functools
 
 from fastmcp.exceptions import ToolError
-from ontoloom.axioms.hashes import AmbiguousHashError, AxiomNotFoundError
+from ontoloom.axioms.hashing import AmbiguousHashError, AxiomNotFoundError
 from ontoloom.connection import OntologyNotFoundError
 from ontoloom.entities.reader import EntityNotFoundError
 from ontoloom.errors import (
