@@ -24,7 +24,6 @@ from ontoloom.query.constraints import (
     MentionsAll,
     MentionsAllOverflowError,
     MentionsAny,
-    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -340,20 +339,8 @@ def test_axiom_non_mergeable_dedupe(equal: Any, distinct: Any):
 # == Axiom: annotation-constraint dedupe ==
 
 
-@pytest.mark.parametrize(
-    "c",
-    [
-        pytest.param(
-            WithAnnotationText(text="x", properties=(IRI("ex:p"),)),
-            id="with_annotation_text",
-        ),
-        pytest.param(
-            HasAnyAnnotation(properties=(IRI("ex:p"),)),
-            id="has_any_annotation",
-        ),
-    ],
-)
-def test_normalize_axiom_annotation_dedupe(c: Any):
+def test_normalize_axiom_annotation_dedupe():
+    c = HasAnyAnnotation(properties=(IRI("ex:p"),))
     assert normalize_axiom([c, c]) == (c,)
 
 

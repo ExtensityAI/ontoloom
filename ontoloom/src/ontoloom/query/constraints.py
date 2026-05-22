@@ -1,6 +1,5 @@
 """Constraint variants, query-class mixins, and field validators — pure outputs, no DB access."""
 
-from enum import StrEnum
 from typing import Annotated
 
 from pydantic import AfterValidator, Field, model_validator
@@ -117,29 +116,12 @@ class MentionsAny(FrozenModel):
     iris: Annotated[tuple[IRI, ...], Field(min_length=1), SortedUnique]
 
 
-class TextMatchKind(StrEnum):
-    EXACT = "exact"
-    SUBSTRING = "substring"
-
-
-class WithAnnotationText(FrozenModel):
-    text: Annotated[str, Field(min_length=1)]
-    properties: Annotated[tuple[IRI, ...], SortedUnique] = ()
-    match_kind: TextMatchKind = TextMatchKind.SUBSTRING
-
-
 class HasAnyAnnotation(FrozenModel):
     properties: Annotated[tuple[IRI, ...], Field(min_length=1), SortedUnique]
 
 
 type AxiomConstraint = (
-    WithTypes
-    | MentionsAll
-    | MentionsAny
-    | WithAnnotationText
-    | HasAnyAnnotation
-    | InSelection
-    | AlwaysFalse
+    WithTypes | MentionsAll | MentionsAny | HasAnyAnnotation | InSelection | AlwaysFalse
 )
 
 

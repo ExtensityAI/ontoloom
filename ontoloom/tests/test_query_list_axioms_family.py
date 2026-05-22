@@ -25,8 +25,6 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import (
     AlwaysFalse,
     HasAnyAnnotation,
-    TextMatchKind,
-    WithAnnotationText,
     WithTypes,
 )
 from ontoloom.query.dispatch import run
@@ -241,95 +239,11 @@ def test_stream_run_iteration_lazy_within_with_block(s):
     assert len(rest) == 2
 
 
-# ---- ListAxiomHashes-specific: WithAnnotationText predicate ------------------
-#
-# Annotation predicates are query-agnostic (they live in `_axiom_predicates`),
-# but the existing coverage exercises them through ListAxiomHashes. Kept here
-# unparametrized — the predicate is what's under test, not the projection.
+# ---- ListAxiomHashes-specific: HasAnyAnnotation predicate --------------------
 
 
 def _comment(text: str) -> Annotation:
     return Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value=text))
-
-
-def _label(text: str) -> Annotation:
-    return Annotation(property=IRI("rdfs:label"), value=LangLiteral(value=text))
-
-
-def test_run_with_annotation_text_substring_matches_partial(s):
-    matching = SubClassOf(
-        sub_class=IRI("ex:Dog"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_comment("this is a TODO note"),),
-    )
-    other = SubClassOf(
-        sub_class=IRI("ex:Cat"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_comment("unrelated content"),),
-    )
-    add_axioms(s, [matching, other])
-    result = run(s, ListAxiomHashes(constraints=(WithAnnotationText(text="TODO"),)))
-    assert result == [HashedAxiom.of(matching).hash]
-
-
-def test_run_with_annotation_text_exact_no_substring(s):
-    exact = SubClassOf(
-        sub_class=IRI("ex:Dog"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_comment("TODO"),),
-    )
-    superstring = SubClassOf(
-        sub_class=IRI("ex:Cat"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_comment("TODO and more"),),
-    )
-    add_axioms(s, [exact, superstring])
-    result = run(
-        s,
-        ListAxiomHashes(
-            constraints=(WithAnnotationText(text="TODO", match_kind=TextMatchKind.EXACT),),
-        ),
-    )
-    assert result == [HashedAxiom.of(exact).hash]
-
-
-def test_run_with_annotation_text_restricts_to_properties(s):
-    commented = SubClassOf(
-        sub_class=IRI("ex:Dog"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_comment("X"),),
-    )
-    labelled = SubClassOf(
-        sub_class=IRI("ex:Cat"),
-        super_class=IRI("ex:Animal"),
-        annotations=(_label("X"),),
-    )
-    add_axioms(s, [commented, labelled])
-    result = run(
-        s,
-        ListAxiomHashes(
-            constraints=(WithAnnotationText(text="X", properties=(IRI("rdfs:comment"),)),),
-        ),
-    )
-    assert result == [HashedAxiom.of(commented).hash]
-
-
-def test_run_with_annotation_text_empty_result(s):
-    add_axioms(
-        s,
-        [
-            SubClassOf(
-                sub_class=IRI("ex:Dog"),
-                super_class=IRI("ex:Animal"),
-                annotations=(_comment("hello"),),
-            ),
-        ],
-    )
-    result = run(s, ListAxiomHashes(constraints=(WithAnnotationText(text="nonexistent"),)))
-    assert result == []
-
-
-# ---- ListAxiomHashes-specific: HasAnyAnnotation predicate --------------------
 
 
 def test_run_has_any_annotation_existence(s):

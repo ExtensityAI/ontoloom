@@ -20,7 +20,6 @@ from ontoloom.query.constraints import (
     MentionsAll,
     MentionsAllOverflowError,
     MentionsAny,
-    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -157,7 +156,6 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
     with_types: list[WithTypes] = []
     mentions_all: list[MentionsAll] = []
     mentions_any: list[MentionsAny] = []
-    with_annotation_text: list[WithAnnotationText] = []
     has_any_annotation: list[HasAnyAnnotation] = []
     in_selection: list[InSelection] = []
 
@@ -171,8 +169,6 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
                 mentions_all.append(c)
             case MentionsAny():
                 mentions_any.append(c)
-            case WithAnnotationText():
-                with_annotation_text.append(c)
             case HasAnyAnnotation():
                 has_any_annotation.append(c)
             case InSelection():
@@ -207,7 +203,6 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
 
     # Non-mergeable: dedupe exact-value-equal duplicates only.
     result.extend(dedupe(mentions_any))
-    result.extend(dedupe(with_annotation_text))
     result.extend(dedupe(has_any_annotation))
 
     return tuple(sorted(result, key=repr))

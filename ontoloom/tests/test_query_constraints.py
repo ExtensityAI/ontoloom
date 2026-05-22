@@ -18,8 +18,6 @@ from ontoloom.query.constraints import (
     MentionedIn,
     MentionsAll,
     MentionsAny,
-    TextMatchKind,
-    WithAnnotationText,
     WithRoles,
     WithTypes,
 )
@@ -161,30 +159,6 @@ def test_mentions_all_nine_iris_raises():
 
     with pytest.raises(ValidationError):
         MentionsAll(iris=nine_iris)
-
-
-# -- WithAnnotationText --
-
-
-def test_with_annotation_text_empty_text_raises():
-    with pytest.raises(ValidationError):
-        WithAnnotationText(text="")
-
-
-def test_with_annotation_text_default_properties_empty():
-    assert WithAnnotationText(text="x").properties == ()
-
-
-def test_with_annotation_text_properties_sorted():
-    assert WithAnnotationText(text="x", properties=(B, A)).properties == (A, B)
-
-
-def test_with_annotation_text_properties_deduped():
-    assert WithAnnotationText(text="x", properties=(A, A)).properties == (A,)
-
-
-def test_with_annotation_text_default_match_kind_substring():
-    assert WithAnnotationText(text="x").match_kind == TextMatchKind.SUBSTRING
 
 
 # -- HasAnyAnnotation --

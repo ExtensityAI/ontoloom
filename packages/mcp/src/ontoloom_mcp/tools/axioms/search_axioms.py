@@ -9,11 +9,10 @@ from ontoloom.query.constraints import (
     AxiomConstraint,
     HasAnyAnnotation,
     InSelection,
-    TextMatchKind,
-    WithAnnotationText,
 )
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.persistence import upsert_selection
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.types import (
@@ -76,34 +75,15 @@ def search_axioms(
                 ),
             )
         else:
-            exact_hashes = run(
+            result = run(
                 s,
-                ListAxiomHashes(
-                    constraints=(
-                        WithAnnotationText(
-                            text=query,
-                            properties=props_tuple,
-                            match_kind=TextMatchKind.EXACT,
-                        ),
-                        *scope,
-                    ),
+                SearchAxioms(
+                    query=query,
+                    properties=props_tuple,
+                    constraints=scope,
                 ),
             )
-            substr_hashes = run(
-                s,
-                ListAxiomHashes(
-                    constraints=(
-                        WithAnnotationText(
-                            text=query,
-                            properties=props_tuple,
-                            match_kind=TextMatchKind.SUBSTRING,
-                        ),
-                        *scope,
-                    ),
-                ),
-            )
-            exact_set = set(exact_hashes)
-            hashes = list(exact_hashes) + [h for h in substr_hashes if h not in exact_set]
+            hashes = [hit.hash for hit in result.hits]
 
         source = _build_source(query, properties, within)
         upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
