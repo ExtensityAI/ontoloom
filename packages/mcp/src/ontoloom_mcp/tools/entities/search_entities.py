@@ -5,7 +5,8 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, Session, session
 from ontoloom.entities.reader import collect_entity_iris
 from ontoloom.entities.reader import search_entities as core_search_entities
-from ontoloom.owl.iri import IRI
+from ontoloom.entities.types import EntitySearchPage
+from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.selections.store import (
@@ -22,7 +23,7 @@ from ontoloom.utils import dquoted
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
     SELECT_PREVIEW,
-    format_entity_search_page,
+    format_roles,
     format_selection_result,
 )
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -87,7 +88,7 @@ def search_entities(
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
-        page_text = format_entity_search_page(page)
+        page_text = _format_entity_search_page(page)
 
         result = format_selection_result("entities", upserted, page_text)
 
@@ -134,6 +135,26 @@ def _no_results_msg(query, role, namespace, declared, properties, within):
 def _build_source(query, role, namespace, declared, properties, within):
     parts = _filter_parts(query, role, namespace, declared, properties, within)
     return f"search_entities({', '.join(parts)})"
+
+
+def _format_entity_search_page(page: EntitySearchPage):
+    end = page.offset + len(page.matches)
+    lines = [f"Showing {page.offset + 1}-{end} of {page.total} entities:"]
+    lines.append("")
+    for m in page.matches:
+        role_str = format_roles(m.roles)
+        label = ""
+        for ann in m.annotations:
+            if ann.property == RDFS_LABEL:
+                label = f" {dquoted(ann.value)}"
+                break
+        lines.append(f"  {m.iri} ({role_str}){label}")
+        lines.extend(
+            f"    {ann.property} {dquoted(ann.value)}"
+            for ann in m.annotations
+            if ann.property != RDFS_LABEL
+        )
+    return "\n".join(lines)
 
 
 tool_search_entities = create_tool(

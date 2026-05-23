@@ -1,5 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.reader import axiom_summary as compute_axiom_summary
+from ontoloom.axioms.types import AxiomSummary
 from ontoloom.connection import Ontology, session
 from ontoloom.entities.projections import top_entities_by_axiom_count
 from ontoloom.entities.reader import (
@@ -8,14 +9,13 @@ from ontoloom.entities.reader import (
 from ontoloom.entities.reader import (
     undeclared_entity_count,
 )
+from ontoloom.entities.types import EntitySummary
 from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
 from ontoloom.selections.store import get_axiom_selection, get_entity_selection
 from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
 from ontoloom_mcp.components.formatting import (
     build_refs,
-    format_axiom_summary,
-    format_entity_summary,
     format_ref,
 )
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -53,8 +53,8 @@ def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
                 parts.append(f"Within selection {format_locked_quoted(sel_ent)} (entities):")
             parts.append("")
 
-        parts.append(format_entity_summary(ent_summary))
-        parts.append(format_axiom_summary(ax_summary))
+        parts.append(_format_entity_summary(ent_summary))
+        parts.append(_format_axiom_summary(ax_summary))
 
         # `excl` matches `search_entities(declared=False)` (exclude_deprecated=True);
         # `incl` is the raw count for transparency.
@@ -91,6 +91,28 @@ def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
         s.commit()
 
     return "\n\n".join(parts)
+
+
+def _format_entity_summary(summary: EntitySummary):
+    lines = [f"{summary.total} entities total"]
+    role_total = sum(summary.by_role.values())
+    if role_total != summary.total:
+        # Per-role counts can sum higher (an entity punned across roles is counted
+        # in each) or lower (an entity with no role is omitted). Flag so the LLM
+        # doesn't expect strict arithmetic.
+        lines.append("By role (entities can have multiple roles, e.g. punning):")
+    else:
+        lines.append("By role:")
+    for role, count in summary.by_role.most_common():
+        lines.append(f"  {count} {role}")
+    return "\n".join(lines)
+
+
+def _format_axiom_summary(summary: AxiomSummary):
+    lines = [f"{summary.total} axioms total"]
+    for typ, count in summary.by_type.most_common():
+        lines.append(f"  {count} {typ}")
+    return "\n".join(lines)
 
 
 tool_describe_ontology = create_tool(

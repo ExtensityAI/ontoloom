@@ -4,12 +4,11 @@ from dataclasses import dataclass
 
 from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.axioms.hashing import short_hash
-from ontoloom.axioms.types import AxiomSummary, HashedAxiom
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Session
 from ontoloom.entities.reader import lookup_entity_labels
-from ontoloom.entities.types import EntityInfo, EntitySearchPage, EntitySummary
 from ontoloom.owl.axioms import BaseAxiom
-from ontoloom.owl.iri import IRI, RDFS_LABEL
+from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
 from ontoloom.utils import dquoted
@@ -132,45 +131,6 @@ def format_axiom_listing(
     )
 
 
-def format_entity_inspect(ref: Ref, info: EntityInfo):
-    lines = [f"{format_ref(ref)} ({format_roles(info.roles)})", ""]
-
-    if info.annotations:
-        lines.append("Annotations:")
-        lines.extend(f"  {ann.property} {dquoted(ann.value)}" for ann in info.annotations)
-        lines.append("")
-
-    total = sum(info.axiom_counts.values())
-    if total:
-        lines.append(f"Axioms (asserted): {total}")
-        for typ, count in info.axiom_counts.most_common():
-            lines.append(f"  {count} {typ}")
-
-    return "\n".join(lines).rstrip()
-
-
-def format_entity_summary(summary: EntitySummary):
-    lines = [f"{summary.total} entities total"]
-    role_total = sum(summary.by_role.values())
-    if role_total != summary.total:
-        # Per-role counts can sum higher (an entity punned across roles is counted
-        # in each) or lower (an entity with no role is omitted). Flag so the LLM
-        # doesn't expect strict arithmetic.
-        lines.append("By role (entities can have multiple roles, e.g. punning):")
-    else:
-        lines.append("By role:")
-    for role, count in summary.by_role.most_common():
-        lines.append(f"  {count} {role}")
-    return "\n".join(lines)
-
-
-def format_axiom_summary(summary: AxiomSummary):
-    lines = [f"{summary.total} axioms total"]
-    for typ, count in summary.by_type.most_common():
-        lines.append(f"  {count} {typ}")
-    return "\n".join(lines)
-
-
 def format_selection_result(
     kind_label: str,
     upserted: AxiomUpsertResult | EntityUpsertResult,
@@ -193,23 +153,3 @@ def format_selection_result(
         )
 
     return "\n".join(parts)
-
-
-def format_entity_search_page(page: EntitySearchPage):
-    end = page.offset + len(page.matches)
-    lines = [f"Showing {page.offset + 1}-{end} of {page.total} entities:"]
-    lines.append("")
-    for m in page.matches:
-        role_str = format_roles(m.roles)
-        label = ""
-        for ann in m.annotations:
-            if ann.property == RDFS_LABEL:
-                label = f" {dquoted(ann.value)}"
-                break
-        lines.append(f"  {m.iri} ({role_str}){label}")
-        lines.extend(
-            f"    {ann.property} {dquoted(ann.value)}"
-            for ann in m.annotations
-            if ann.property != RDFS_LABEL
-        )
-    return "\n".join(lines)
