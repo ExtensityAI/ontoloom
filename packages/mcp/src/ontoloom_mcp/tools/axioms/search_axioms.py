@@ -2,7 +2,6 @@ from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
@@ -14,23 +13,13 @@ from ontoloom.query.constraints import (
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.search_axioms import SearchAxioms
-from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
-    ShowFilter,
-)
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.formatting import (
-    SELECT_INLINE_MAX,
-    SELECT_PREVIEW,
-    build_refs_per_axiom,
-    format_axiom_listing,
-    format_selection_result,
-)
+from ontoloom_mcp.components.formatting import format_selection_result
 from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.preview import format_axiom_selection_preview
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -99,23 +88,7 @@ def search_axioms(
             s.commit()
             return f"0 axioms -> {format_locked_quoted(sel)}.\nNo axioms found ({source})."
 
-        page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = run(
-            s,
-            ReadAxiomSelection(
-                selection=AxiomSelectionName(f"axioms:{sel.name}"),
-                limit=min(page_size, limit),
-                offset=0,
-                show=ShowFilter.ALL,
-            ),
-        )
-        page_axioms = [
-            HashedAxiom(axiom=item.axiom, hash=item.hash)
-            for item in page.items
-            if item.axiom is not None
-        ]
-        refs_per_axiom = build_refs_per_axiom(s, page_axioms)
-        page_text = format_axiom_listing(page_axioms, refs_per_axiom=refs_per_axiom)
+        page_text = format_axiom_selection_preview(s, upserted, limit=limit)
         s.commit()
 
     return format_selection_result("axioms", upserted, page_text)

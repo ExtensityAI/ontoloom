@@ -1,25 +1,13 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
 from ontoloom.patterns.search import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
-from ontoloom.query.dispatch import run
-from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
-    ShowFilter,
-)
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
-from ontoloom_mcp.components.formatting import (
-    SELECT_INLINE_MAX,
-    SELECT_PREVIEW,
-    build_refs_per_axiom,
-    format_axiom_listing,
-    format_selection_result,
-)
+from ontoloom_mcp.components.formatting import format_selection_result
 from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.preview import format_axiom_selection_preview
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -72,23 +60,7 @@ def match_axioms(
             s.commit()
             return f"{header} -> {format_locked_quoted(sel)}."
 
-        page_size = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = run(
-            s,
-            ReadAxiomSelection(
-                selection=AxiomSelectionName(f"axioms:{sel.name}"),
-                limit=page_size,
-                offset=0,
-                show=ShowFilter.ALL,
-            ),
-        )
-        page_axioms = [
-            HashedAxiom(axiom=item.axiom, hash=item.hash)
-            for item in page.items
-            if item.axiom is not None
-        ]
-        refs_per_axiom = build_refs_per_axiom(s, page_axioms)
-        page_text = format_axiom_listing(page_axioms, refs_per_axiom=refs_per_axiom)
+        page_text = format_axiom_selection_preview(s, upserted)
         s.commit()
 
     return f"{header}. " + format_selection_result("axioms", upserted, page_text)
