@@ -8,11 +8,11 @@ from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.query.constraints import InSelection
+from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.search_axioms import SearchAxioms, SearchAxiomsHit, SearchAxiomsResult
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import AxiomSelectionName, SelectionKind, SelectionName
+from ontoloom.selections.store import upsert_axiom_selection
+from ontoloom.selections.types import AxiomSelectionName, SelectionName
 
 
 def _comment(text: str) -> Annotation:
@@ -170,10 +170,9 @@ def test_search_axioms_respects_within_selection(s):
     )
     add_axioms(s, [in_scope, out_of_scope])
 
-    upsert_selection(
+    upsert_axiom_selection(
         s,
         SelectionName("scoped"),
-        SelectionKind.AXIOMS,
         [HashedAxiom.of(in_scope).hash],
         "test",
     )
@@ -181,7 +180,7 @@ def test_search_axioms_respects_within_selection(s):
 
     result = run(
         s,
-        SearchAxioms(query="TODO", constraints=(InSelection(ref=ref),), limit=10),
+        SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),), limit=10),
     )
 
     assert result.total == 1
@@ -210,4 +209,4 @@ def test_search_axioms_missing_selection_raises(s):
     ref = AxiomSelectionName("axioms:does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
-        run(s, SearchAxioms(query="TODO", constraints=(InSelection(ref=ref),)))
+        run(s, SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),)))

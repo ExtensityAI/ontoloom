@@ -1,4 +1,8 @@
-"""Direct SQL CRUD on the `selections` and `selection_items` tables.
+"""Direct SQL CRUD on the kind-specific selection tables.
+
+Two parallel families operate on `axiom_selections` / `axiom_selection_items`
+and `entity_selections` / `entity_selection_items` respectively. The two kinds
+never share storage — every callsite knows its kind statically.
 
 Core mutations do not perform optimistic-lock checks: callers needing
 LLM-context staleness mitigation wrap mutations in `verify_lock` at the MCP
@@ -11,21 +15,28 @@ from dataclasses import dataclass
 
 from ontoloom.connection import Session
 from ontoloom.selections.types import (
+    AxiomSelection,
+    AxiomSelectionListing,
+    AxiomSelectionName,
+    EntitySelection,
+    EntitySelectionListing,
+    EntitySelectionName,
     SelectionContentHash,
-    SelectionKind,
-    SelectionKindMismatchError,
-    SelectionListing,
-    SelectionMeta,
     SelectionName,
     SelectionNotFoundError,
-    SelectionRef,
 )
 from ontoloom.utils import dedupe
 
 
 @dataclass(frozen=True, slots=True)
-class UpsertResult:
-    selection: SelectionMeta
+class AxiomUpsertResult:
+    selection: AxiomSelection
+    previous_size: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class EntityUpsertResult:
+    selection: EntitySelection
     previous_size: int | None
 
 
@@ -51,77 +62,72 @@ def _hash_selection_items(items: list[str]) -> SelectionContentHash:
     return SelectionContentHash(hashlib.sha256(content.encode()).hexdigest()[:16])
 
 
-def get_selection(s: Session, name: SelectionName) -> SelectionMeta:
-    """Fetch selection metadata. Raises SelectionNotFoundError if absent."""
+# -- Axiom-side --
+
+
+def get_axiom_selection(s: Session, name: SelectionName) -> AxiomSelection:
+    """Fetch axiom-selection metadata. Raises SelectionNotFoundError if absent."""
     row = s.conn.execute(
-        "SELECT kind, hash, size, source FROM selections WHERE name = ?", (name,)
+        "SELECT hash, size, source FROM axiom_selections WHERE name = ?", (name,)
     ).fetchone()
 
     if row is None:
         raise SelectionNotFoundError(name)
 
-    return SelectionMeta(
+    return AxiomSelection(
         name=name,
-        kind=SelectionKind(row[0]),
-        hash=SelectionContentHash(row[1]),
-        size=row[2],
-        source=row[3],
+        hash=SelectionContentHash(row[0]),
+        size=row[1],
+        source=row[2],
     )
 
 
-def selection_exists(s: Session, name: SelectionName, kind: SelectionKind) -> bool:
-    """True iff a selection row with the given name and kind exists."""
-    row = s.conn.execute(
-        "SELECT 1 FROM selections WHERE name = ? AND kind = ?",
-        (name, kind),
-    ).fetchone()
+def axiom_selection_exists(s: Session, name: SelectionName) -> bool:
+    """True iff an axiom-selection row with the given name exists."""
+    row = s.conn.execute("SELECT 1 FROM axiom_selections WHERE name = ?", (name,)).fetchone()
     return row is not None
 
 
-def upsert_selection(
+def upsert_axiom_selection(
     s: Session,
     name: SelectionName,
-    kind: SelectionKind,
     items: Sequence[str],
     source: str,
-) -> UpsertResult:
-    """Write a selection, overwriting if it exists.
+) -> AxiomUpsertResult:
+    """Write an axiom selection, overwriting if it exists.
 
-    Caller's insertion order is preserved on disk (`id`, rowid alias); each
-    Read* query chooses its own ordering — `ReadAxiomSelection` paginates in
-    insertion order so any baked-in ranking survives, `ReadEntitySelection`
-    paginates lexicographically. The content hash is order-independent (items
-    sorted internally).
+    Caller's insertion order is preserved on disk (`id`, rowid alias);
+    `ReadAxiomSelection` paginates in insertion order so any baked-in ranking
+    survives. The content hash is order-independent (items sorted internally).
 
     Unconditional overwrite -> last writer wins, even if another agent has
     written since you last read. Optimistic locking (hash-prefix check) is a
     MCP-layer concern; callers needing it wrap this with `verify_lock`.
     """
-    items = dedupe(items)
-    content_hash = _hash_selection_items(items)
-    size = len(items)
+    deduped = dedupe(items)
+    content_hash = _hash_selection_items(deduped)
+    size = len(deduped)
 
     existing = s.conn.execute(
-        "SELECT size, hash FROM selections WHERE name = ?", (name,)
+        "SELECT size FROM axiom_selections WHERE name = ?", (name,)
     ).fetchone()
 
-    s.conn.execute("DELETE FROM selection_items WHERE selection_name = ?", (name,))
-    s.conn.execute("DELETE FROM selections WHERE name = ?", (name,))
+    s.conn.execute("DELETE FROM axiom_selection_items WHERE selection_name = ?", (name,))
+    s.conn.execute("DELETE FROM axiom_selections WHERE name = ?", (name,))
     s.conn.execute(
-        "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
-        (name, kind, content_hash, size, source),
+        "INSERT INTO axiom_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
+        (name, content_hash, size, source),
     )
 
-    if items:
+    if deduped:
         s.conn.executemany(
-            "INSERT INTO selection_items (selection_name, item) VALUES (?, ?)",
-            [(name, item) for item in items],
+            "INSERT INTO axiom_selection_items (selection_name, item) VALUES (?, ?)",
+            [(name, item) for item in deduped],
         )
 
-    return UpsertResult(
-        selection=SelectionMeta(
+    return AxiomUpsertResult(
+        selection=AxiomSelection(
             name=name,
-            kind=kind,
             hash=content_hash,
             size=size,
             source=source,
@@ -130,116 +136,218 @@ def upsert_selection(
     )
 
 
-def list_selections(s: Session) -> list[SelectionListing]:
-    """Return all selections paired with their current present-item count.
+def list_axiom_selections(s: Session) -> list[AxiomSelectionListing]:
+    """Return all axiom selections paired with their current present-item count.
 
-    Drift detection: `missing_count = meta.size - present_count`. Item is
-    "present" iff it still resolves — for axiom selections, the hash exists in
-    `axioms`; for entity selections, the IRI is referenced by any axiom
-    (declared or not).
+    An axiom item is "present" iff its hash still exists in the `axioms` table.
     """
     metas = [
-        SelectionMeta(
+        AxiomSelection(
             name=SelectionName(r[0]),
-            kind=SelectionKind(r[1]),
-            hash=r[2],
-            size=r[3],
-            source=r[4],
+            hash=SelectionContentHash(r[1]),
+            size=r[2],
+            source=r[3],
         )
         for r in s.conn.execute(
-            "SELECT name, kind, hash, size, source FROM selections ORDER BY created_at, name"
+            "SELECT name, hash, size, source FROM axiom_selections ORDER BY created_at, name"
         )
     ]
 
     if not metas:
         return []
 
-    # Batched present-count queries — one per kind. Selections with zero items
-    # produce count=0 via the LEFT JOIN's NULL row.
-    axiom_present: dict[str, int] = dict(
+    present: dict[str, int] = dict(
         s.conn.execute(
             "SELECT s.name, COUNT(a.hash) "
-            "FROM selections s "
-            "LEFT JOIN selection_items si ON si.selection_name = s.name "
+            "FROM axiom_selections s "
+            "LEFT JOIN axiom_selection_items si ON si.selection_name = s.name "
             "LEFT JOIN axioms a ON a.hash = si.item "
-            "WHERE s.kind = ? "
-            "GROUP BY s.name",
-            (SelectionKind.AXIOMS.value,),
-        )
-    )
-    entity_present: dict[str, int] = dict(
-        s.conn.execute(
-            "SELECT s.name, SUM(CASE WHEN EXISTS ("
-            "SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item"
-            ") THEN 1 ELSE 0 END) "
-            "FROM selections s "
-            "LEFT JOIN selection_items si ON si.selection_name = s.name "
-            "WHERE s.kind = ? "
-            "GROUP BY s.name",
-            (SelectionKind.ENTITIES.value,),
+            "GROUP BY s.name"
         )
     )
 
     return [
-        SelectionListing(
-            meta=meta,
-            present_count=(
-                axiom_present.get(meta.name, 0)
-                if meta.kind == SelectionKind.AXIOMS
-                else entity_present.get(meta.name, 0)
-            ),
+        AxiomSelectionListing(meta=meta, present_count=present.get(meta.name, 0)) for meta in metas
+    ]
+
+
+def remove_axiom_selections(
+    s: Session, names: Sequence[AxiomSelectionName]
+) -> RemoveSelectionsResult:
+    """Best-effort remove. Duplicate refs in the input are de-duplicated.
+
+    Missing selections surface in `not_found`, not as an exception.
+    """
+    bare_names = dedupe(ref.bare for ref in names)
+    return _remove_named(s, "axiom_selections", bare_names)
+
+
+def get_axiom_selection_items(s: Session, name: SelectionName) -> list[str]:
+    """Read the items of an axiom selection in insertion order."""
+    return [
+        r[0]
+        for r in s.conn.execute(
+            "SELECT item FROM axiom_selection_items WHERE selection_name = ? ORDER BY id",
+            (name,),
         )
+    ]
+
+
+# -- Entity-side (mirror) --
+
+
+def get_entity_selection(s: Session, name: SelectionName) -> EntitySelection:
+    """Fetch entity-selection metadata. Raises SelectionNotFoundError if absent."""
+    row = s.conn.execute(
+        "SELECT hash, size, source FROM entity_selections WHERE name = ?", (name,)
+    ).fetchone()
+
+    if row is None:
+        raise SelectionNotFoundError(name)
+
+    return EntitySelection(
+        name=name,
+        hash=SelectionContentHash(row[0]),
+        size=row[1],
+        source=row[2],
+    )
+
+
+def entity_selection_exists(s: Session, name: SelectionName) -> bool:
+    """True iff an entity-selection row with the given name exists."""
+    row = s.conn.execute("SELECT 1 FROM entity_selections WHERE name = ?", (name,)).fetchone()
+    return row is not None
+
+
+def upsert_entity_selection(
+    s: Session,
+    name: SelectionName,
+    items: Sequence[str],
+    source: str,
+) -> EntityUpsertResult:
+    """Write an entity selection, overwriting if it exists.
+
+    Caller's insertion order is preserved on disk; `ReadEntitySelection`
+    paginates lexicographically on the IRI. The content hash is
+    order-independent (items sorted internally).
+
+    Unconditional overwrite -> last writer wins. Optimistic locking is a
+    MCP-layer concern; callers needing it wrap this with `verify_lock`.
+    """
+    deduped = dedupe(items)
+    content_hash = _hash_selection_items(deduped)
+    size = len(deduped)
+
+    existing = s.conn.execute(
+        "SELECT size FROM entity_selections WHERE name = ?", (name,)
+    ).fetchone()
+
+    s.conn.execute("DELETE FROM entity_selection_items WHERE selection_name = ?", (name,))
+    s.conn.execute("DELETE FROM entity_selections WHERE name = ?", (name,))
+    s.conn.execute(
+        "INSERT INTO entity_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
+        (name, content_hash, size, source),
+    )
+
+    if deduped:
+        s.conn.executemany(
+            "INSERT INTO entity_selection_items (selection_name, item) VALUES (?, ?)",
+            [(name, item) for item in deduped],
+        )
+
+    return EntityUpsertResult(
+        selection=EntitySelection(
+            name=name,
+            hash=content_hash,
+            size=size,
+            source=source,
+        ),
+        previous_size=existing[0] if existing else None,
+    )
+
+
+def list_entity_selections(s: Session) -> list[EntitySelectionListing]:
+    """Return all entity selections paired with their current present-item count.
+
+    An entity item is "present" iff its IRI is referenced by any axiom
+    (declared or not).
+    """
+    metas = [
+        EntitySelection(
+            name=SelectionName(r[0]),
+            hash=SelectionContentHash(r[1]),
+            size=r[2],
+            source=r[3],
+        )
+        for r in s.conn.execute(
+            "SELECT name, hash, size, source FROM entity_selections ORDER BY created_at, name"
+        )
+    ]
+
+    if not metas:
+        return []
+
+    present: dict[str, int] = dict(
+        s.conn.execute(
+            "SELECT s.name, SUM(CASE WHEN EXISTS ("
+            "SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item"
+            ") THEN 1 ELSE 0 END) "
+            "FROM entity_selections s "
+            "LEFT JOIN entity_selection_items si ON si.selection_name = s.name "
+            "GROUP BY s.name"
+        )
+    )
+
+    return [
+        EntitySelectionListing(meta=meta, present_count=present.get(meta.name, 0) or 0)
         for meta in metas
     ]
 
 
-def _remove_by_names(s: Session, names: Sequence[SelectionName]) -> list[DroppedSelection]:
-    """Delete the named selections in one batch; return what was actually dropped."""
-    if not names:
-        return []
-    placeholders = ",".join("?" for _ in names)
-    dropped = [
-        DroppedSelection(name=SelectionName(r[0]), size=r[1])
-        for r in s.conn.execute(
-            f"SELECT name, size FROM selections WHERE name IN ({placeholders}) ORDER BY name",
-            tuple(names),
-        )
-    ]
-    if dropped:
-        s.conn.execute(
-            f"DELETE FROM selections WHERE name IN ({placeholders})",
-            tuple(names),
-        )
-    return dropped
-
-
-def remove_selections(s: Session, refs: Sequence[SelectionRef]) -> RemoveSelectionsResult:
+def remove_entity_selections(
+    s: Session, names: Sequence[EntitySelectionName]
+) -> RemoveSelectionsResult:
     """Best-effort remove. Duplicate refs in the input are de-duplicated.
 
-    Raises `SelectionKindMismatchError` if any ref's prefix disagrees with the
-    stored kind (atomic precheck — nothing is removed on mismatch). Missing
-    selections surface in `not_found`, not as an exception.
+    Missing selections surface in `not_found`, not as an exception.
     """
-    deduped = dedupe(refs)
-    bare_names = [ref.bare for ref in deduped]
+    bare_names = dedupe(ref.bare for ref in names)
+    return _remove_named(s, "entity_selections", bare_names)
 
+
+def get_entity_selection_items(s: Session, name: SelectionName) -> list[str]:
+    """Read the items of an entity selection in insertion order."""
+    return [
+        r[0]
+        for r in s.conn.execute(
+            "SELECT item FROM entity_selection_items WHERE selection_name = ? ORDER BY id",
+            (name,),
+        )
+    ]
+
+
+# -- shared low-level helper --
+
+
+def _remove_named(
+    s: Session, table: str, bare_names: Sequence[SelectionName]
+) -> RemoveSelectionsResult:
     if not bare_names:
         return RemoveSelectionsResult(dropped=(), not_found=())
 
     placeholders = ",".join("?" for _ in bare_names)
-    stored_kinds: dict[str, str] = dict(
-        s.conn.execute(
-            f"SELECT name, kind FROM selections WHERE name IN ({placeholders})",
-            bare_names,
+    dropped = [
+        DroppedSelection(name=SelectionName(r[0]), size=r[1])
+        for r in s.conn.execute(
+            f"SELECT name, size FROM {table} WHERE name IN ({placeholders}) ORDER BY name",
+            tuple(bare_names),
         )
-    )
-
-    for ref in deduped:
-        actual = stored_kinds.get(ref.bare)
-        if actual is not None and actual != ref.kind.value:
-            raise SelectionKindMismatchError(ref.bare, ref.kind, SelectionKind(actual))
-
-    dropped = _remove_by_names(s, bare_names)
+    ]
+    if dropped:
+        s.conn.execute(
+            f"DELETE FROM {table} WHERE name IN ({placeholders})",
+            tuple(bare_names),
+        )
     found = {d.name for d in dropped}
-    not_found = tuple(ref.bare for ref in deduped if ref.bare not in found)
+    not_found = tuple(n for n in bare_names if n not in found)
     return RemoveSelectionsResult(dropped=tuple(dropped), not_found=not_found)

@@ -9,8 +9,8 @@ from ontoloom.entities.reader import (
     undeclared_entity_count,
 )
 from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
-from ontoloom.selections.store import get_selection
-from ontoloom.selections.types import SelectionRef
+from ontoloom.selections.store import get_axiom_selection, get_entity_selection
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
 from ontoloom_mcp.components.formatting import (
     build_refs,
@@ -21,6 +21,8 @@ from ontoloom_mcp.components.formatting import (
 from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
+
+type SelectionRef = AxiomSelectionName | EntitySelectionName
 
 _TOP_ENTITIES = 10
 
@@ -43,8 +45,12 @@ def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
         parts = []
 
         if within is not None:
-            sel = get_selection(s, within.bare)
-            parts.append(f"Within selection {format_locked_quoted(sel)} ({sel.kind}):")
+            if isinstance(within, AxiomSelectionName):
+                sel_ax = get_axiom_selection(s, within.bare)
+                parts.append(f"Within selection {format_locked_quoted(sel_ax)} (axioms):")
+            else:
+                sel_ent = get_entity_selection(s, within.bare)
+                parts.append(f"Within selection {format_locked_quoted(sel_ent)} (entities):")
             parts.append("")
 
         parts.append(format_entity_summary(ent_summary))

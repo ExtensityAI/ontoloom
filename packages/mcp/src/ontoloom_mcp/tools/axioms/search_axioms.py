@@ -8,17 +8,17 @@ from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
     AxiomConstraint,
     HasAnyAnnotation,
-    InSelection,
+    InAxiomSelection,
+    InEntitySelection,
 )
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.search_axioms import SearchAxioms
-from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
-    SelectionKind,
-    SelectionRef,
+    EntitySelectionName,
     ShowFilter,
 )
 from ontoloom.utils import dquoted
@@ -40,7 +40,7 @@ def search_axioms(
     into: AxiomSelectionName,
     query: Annotated[str, MinLen(1)] | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
-    within: SelectionRef | None = None,
+    within: AxiomSelectionName | EntitySelectionName | None = None,
     limit: Limit = 100,
 ):
     """Search axioms by axiom-level annotation text or property; save matches to a selection.
@@ -63,7 +63,13 @@ def search_axioms(
         raise ValueError(msg)
 
     props_tuple = tuple(properties or ())
-    scope: tuple[AxiomConstraint, ...] = (InSelection(ref=within),) if within is not None else ()
+    scope: tuple[AxiomConstraint, ...] = (
+        (InAxiomSelection(name=within),)
+        if isinstance(within, AxiomSelectionName)
+        else (InEntitySelection(name=within),)
+        if isinstance(within, EntitySelectionName)
+        else ()
+    )
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -86,7 +92,7 @@ def search_axioms(
             hashes = [hit.hash for hit in result.hits]
 
         source = _build_source(query, properties, within)
-        upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
+        upserted = upsert_axiom_selection(s, into.bare, hashes, source)
         sel = upserted.selection
 
         if not hashes:
@@ -118,7 +124,7 @@ def search_axioms(
 def _build_source(
     query: str | None,
     properties: list[IRI] | None,
-    within: SelectionRef | None,
+    within: AxiomSelectionName | EntitySelectionName | None,
 ) -> str:
     parts = []
     if query:

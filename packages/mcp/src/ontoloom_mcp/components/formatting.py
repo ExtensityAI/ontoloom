@@ -11,7 +11,7 @@ from ontoloom.entities.types import EntityInfo, EntitySearchPage, EntitySummary
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
-from ontoloom.selections.store import UpsertResult
+from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -173,7 +173,7 @@ def format_axiom_summary(summary: AxiomSummary):
 
 def format_selection_result(
     kind_label: str,
-    upserted: UpsertResult,
+    upserted: AxiomUpsertResult | EntityUpsertResult,
     page_text: str,
 ):
     sel = upserted.selection

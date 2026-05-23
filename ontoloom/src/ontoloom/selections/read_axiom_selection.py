@@ -1,4 +1,4 @@
-"""Paginated read of an axiom-kind selection with present/missing accounting."""
+"""Paginated read of an axiom selection with present/missing accounting."""
 
 from typing import override
 
@@ -8,13 +8,11 @@ from ontoloom.connection import Session
 from ontoloom.errors import StoreCorruptionError
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import (
     AxiomItem,
     AxiomSelectionName,
     AxiomSelectionPage,
-    SelectionKind,
-    SelectionKindMismatchError,
     ShowFilter,
 )
 
@@ -30,7 +28,7 @@ def _show_filter_clause(show: ShowFilter) -> str:
 
 
 class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
-    """Paginated read of an axiom-kind selection.
+    """Paginated read of an axiom selection.
 
     Page order is insertion order (`id`, which aliases rowid), so any ranking
     baked into the insertion sequence (e.g. exact-match-first in
@@ -49,7 +47,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
         """
         sql_parts = [
             "SELECT si.item, json(a.data)",
-            "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item",
+            "FROM axiom_selection_items si LEFT JOIN axioms a ON a.hash = si.item",
             "WHERE si.selection_name = ?",
         ]
         params: list[object] = [self.selection.bare]
@@ -65,21 +63,19 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
     @override
     def _run(self, s: Session) -> AxiomSelectionPage:
         name = self.selection.bare
-        meta = get_selection(s, name)
-        if meta.kind != SelectionKind.AXIOMS:
-            raise SelectionKindMismatchError(name, SelectionKind.AXIOMS, meta.kind)
+        meta = get_axiom_selection(s, name)
 
         filter_clause = _show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(
-            "SELECT COUNT(*) FROM selection_items si "
+            "SELECT COUNT(*) FROM axiom_selection_items si "
             "LEFT JOIN axioms a ON a.hash = si.item "
             f"WHERE si.selection_name = ?{filter_clause}",
             (name,),
         ).fetchone()[0]
 
         present_count = s.conn.execute(
-            "SELECT COUNT(*) FROM selection_items si "
+            "SELECT COUNT(*) FROM axiom_selection_items si "
             "JOIN axioms a ON a.hash = si.item "
             "WHERE si.selection_name = ?",
             (name,),

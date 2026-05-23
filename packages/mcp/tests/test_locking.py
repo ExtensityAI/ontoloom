@@ -4,12 +4,11 @@ import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.prefixes.store import set_prefix
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
     SelectionContentHash,
-    SelectionKind,
     SelectionName,
     SelectionNotFoundError,
 )
@@ -58,7 +57,6 @@ def test_locked_entity_parse_fields():
     assert str(locked) == "entities:my_sel@a1b2c3d4"
     assert locked.bare == EntitySelectionName("entities:my_sel")
     assert locked.hash_prefix == "a1b2c3d4"
-    assert locked.kind == SelectionKind.ENTITIES
 
 
 def test_locked_entity_first_colon_split():
@@ -95,7 +93,6 @@ def test_locked_axiom_parse_fields():
     assert str(locked) == "axioms:my_sel@deadbeef"
     assert locked.bare == AxiomSelectionName("axioms:my_sel")
     assert locked.hash_prefix == "deadbeef"
-    assert locked.kind == SelectionKind.AXIOMS
 
 
 def test_locked_axiom_rejects_entity_prefix():
@@ -117,7 +114,7 @@ def test_locked_entity_selection_name_lowercases_uppercase_hash_prefix():
 
 
 def test_verify_lock_returns_bare_on_match(s):
-    result = upsert_selection(s, SelectionName("cats"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    result = upsert_entity_selection(s, SelectionName("cats"), ["ex:Cat"], "test")
     locked = LockedEntitySelectionName(f"entities:cats@{result.selection.hash[:8]}")
 
     bare = verify_lock(s, locked)
@@ -133,7 +130,7 @@ def test_verify_lock_raises_not_found_on_missing(s):
 
 
 def test_verify_lock_raises_stale_on_hash_mismatch(s):
-    upsert_selection(s, SelectionName("cats"), SelectionKind.ENTITIES, ["ex:Cat"], "test")
+    upsert_entity_selection(s, SelectionName("cats"), ["ex:Cat"], "test")
     locked = LockedEntitySelectionName("entities:cats@00000000")
 
     with pytest.raises(StaleSelectionError):
@@ -141,9 +138,9 @@ def test_verify_lock_raises_stale_on_hash_mismatch(s):
 
 
 def test_verify_lock_kind_mismatch_treated_as_missing(s):
-    # A selection named "dogs" exists as ENTITIES; an AXIOMS lock with the same
-    # name must not match -- separate (name, kind) row, so it's not found.
-    upsert_selection(s, SelectionName("dogs"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    # A selection named "dogs" exists as entities; an AXIOMS lock with the same
+    # name must not match -- separate kind-specific tables, so it's not found.
+    upsert_entity_selection(s, SelectionName("dogs"), ["ex:Dog"], "test")
     locked = LockedAxiomSelectionName("axioms:dogs@deadbeef")
 
     with pytest.raises(SelectionNotFoundError):
@@ -154,7 +151,7 @@ def test_verify_lock_kind_mismatch_treated_as_missing(s):
 
 
 def test_format_locked_quoted_wraps_in_double_quotes(s):
-    result = upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, ["a" * 64], "test")
+    result = upsert_axiom_selection(s, SelectionName("ax_sel"), ["a" * 64], "test")
     assert format_locked_quoted(result.selection) == f'"axioms:ax_sel@{result.selection.hash}"'
 
 

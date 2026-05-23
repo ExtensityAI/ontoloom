@@ -59,17 +59,17 @@ from ontoloom.prefixes.types import (
     PrefixNotFoundError,
 )
 from ontoloom.query.dispatch import run
-from ontoloom.selections.compose import create_selection
+from ontoloom.selections.compose import create_entity_selection
 from ontoloom.selections.expr import EntitiesInExpr
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import (
-    list_selections,
-    upsert_selection,
+    list_entity_selections,
+    upsert_axiom_selection,
+    upsert_entity_selection,
 )
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
-    SelectionKind,
     SelectionName,
 )
 
@@ -417,7 +417,7 @@ def test_rename_iri_scoped_to_selection(s):
     h_in = next(ha.hash for ha in result.added if ha.axiom == ax_in)
     h_out = HashedAxiom.of(ax_out).hash
 
-    upsert_selection(s, SelectionName("scope"), SelectionKind.AXIOMS, [h_in], "test")
+    upsert_axiom_selection(s, SelectionName("scope"), [h_in], "test")
 
     renamed = rename_iri(
         s, IRI("ex:Animal"), IRI("ex:Mammal"), within=AxiomSelectionName("axioms:scope")
@@ -466,7 +466,7 @@ def test_entity_selection_present_count_punned_entity(s):
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:Pun")),
         ],
     )
-    upsert_selection(s, SelectionName("punned"), SelectionKind.ENTITIES, ["ex:Pun"], "test")
+    upsert_entity_selection(s, SelectionName("punned"), ["ex:Pun"], "test")
 
     page = run(s, ReadEntitySelection(selection=_ent("punned")))
     assert page.present >= 0
@@ -728,12 +728,12 @@ def axiom_selection(s):
         ],
     )
     hashes = [ha.hash for ha in result.added]
-    upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, hashes, "test")
+    upsert_axiom_selection(s, SelectionName("ax_sel"), hashes, "test")
     return s
 
 
 def test_entities_in_with_field_sub_class(axiom_selection):
-    create_selection(
+    create_entity_selection(
         axiom_selection,
         _ent("sub_classes"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUB_CLASS),
@@ -741,14 +741,14 @@ def test_entities_in_with_field_sub_class(axiom_selection):
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", ("sub_classes",)
+            "SELECT item FROM entity_selection_items WHERE selection_name = ?", ("sub_classes",)
         )
     ]
     assert set(items) == {"ex:Dog", "ex:Cat"}
 
 
 def test_entities_in_with_field_super_class(axiom_selection):
-    create_selection(
+    create_entity_selection(
         axiom_selection,
         _ent("super_classes"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUPER_CLASS),
@@ -756,7 +756,7 @@ def test_entities_in_with_field_super_class(axiom_selection):
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", ("super_classes",)
+            "SELECT item FROM entity_selection_items WHERE selection_name = ?", ("super_classes",)
         )
     ]
     # Only the first SubClassOf has a named super_class (ex:Animal).
@@ -765,7 +765,7 @@ def test_entities_in_with_field_super_class(axiom_selection):
 
 
 def test_entities_in_with_field_filler(axiom_selection):
-    create_selection(
+    create_entity_selection(
         axiom_selection,
         _ent("fillers"),
         EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.FILLER),
@@ -773,20 +773,20 @@ def test_entities_in_with_field_filler(axiom_selection):
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", ("fillers",)
+            "SELECT item FROM entity_selection_items WHERE selection_name = ?", ("fillers",)
         )
     ]
     assert set(items) == {"ex:Person"}
 
 
 def test_entities_in_without_field(axiom_selection):
-    create_selection(
+    create_entity_selection(
         axiom_selection, _ent("all_ents"), EntitiesInExpr(entities_in=SelectionName("ax_sel"))
     )
     items = [
         r[0]
         for r in axiom_selection.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?", ("all_ents",)
+            "SELECT item FROM entity_selection_items WHERE selection_name = ?", ("all_ents",)
         )
     ]
     # All entities across both axioms, any position
@@ -860,17 +860,17 @@ def test_find_duplicate_entities_tie_break_order(s):
 # -- list_selections --
 
 
-def test_list_all_selections_order(s):
+def test_list_all_entity_selections_order(s):
     # Force identical created_at on two selections; tiebreaker by name must sort a_sel first.
-    upsert_selection(s, SelectionName("z_sel"), SelectionKind.ENTITIES, ["ex:A"], "test")
-    upsert_selection(s, SelectionName("a_sel"), SelectionKind.ENTITIES, ["ex:B"], "test")
-    s.conn.execute("UPDATE selections SET created_at = '2026-04-30T12:00:00.000Z'")
+    upsert_entity_selection(s, SelectionName("z_sel"), ["ex:A"], "test")
+    upsert_entity_selection(s, SelectionName("a_sel"), ["ex:B"], "test")
+    s.conn.execute("UPDATE entity_selections SET created_at = '2026-04-30T12:00:00.000Z'")
 
-    names = [ls.meta.name for ls in list_selections(s)]
+    names = [ls.meta.name for ls in list_entity_selections(s)]
     assert names == ["a_sel", "z_sel"]
 
 
-def test_list_selections_present_count_no_double_count(s):
+def test_list_entity_selections_present_count_no_double_count(s):
     # An entity referenced by multiple axioms must still count once.
     add_axioms(
         s,
@@ -880,18 +880,18 @@ def test_list_selections_present_count_no_double_count(s):
             SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Mammal")),
         ],
     )
-    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:Dog", "ex:Ghost"], "test")
+    upsert_entity_selection(s, SEL, ["ex:Dog", "ex:Ghost"], "test")
 
-    listings = {ls.meta.name: ls for ls in list_selections(s)}
+    listings = {ls.meta.name: ls for ls in list_entity_selections(s)}
     assert listings[SEL].present_count == 1
 
 
-def test_list_selections_entity_selection_unaffected_by_axiom_growth(s):
+def test_list_entity_selections_unaffected_by_axiom_growth(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    upsert_selection(s, SEL, SelectionKind.ENTITIES, ["ex:Dog"], "test")
-    before = {ls.meta.name: ls.present_count for ls in list_selections(s)}
+    upsert_entity_selection(s, SEL, ["ex:Dog"], "test")
+    before = {ls.meta.name: ls.present_count for ls in list_entity_selections(s)}
 
     add_axioms(s, [SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))])
-    after = {ls.meta.name: ls.present_count for ls in list_selections(s)}
+    after = {ls.meta.name: ls.present_count for ls in list_entity_selections(s)}
 
     assert before[SEL] == after[SEL] == 1

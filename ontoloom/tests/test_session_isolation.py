@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from ontoloom.connection import Ontology, session
 from ontoloom.errors import ConcurrentWriteError
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import SelectionKind, SelectionName
+from ontoloom.selections.store import upsert_entity_selection
+from ontoloom.selections.types import SelectionName
 
 _PRAGMAS = (Path(__file__).parent.parent / "src" / "ontoloom" / "sql" / "pragmas.sql").read_text()
 
@@ -32,7 +32,7 @@ def test_wal_snapshot_isolation_prevents_verify_lock_toctou(tmp_path):
     ont = Ontology.create(db)
 
     with session(ont) as s:
-        upsert_selection(s, SelectionName("foo"), SelectionKind.ENTITIES, ["ex:Initial"], "seed")
+        upsert_entity_selection(s, SelectionName("foo"), ["ex:Initial"], "seed")
         s.commit()
 
     raw_a = _raw(db)
@@ -40,23 +40,21 @@ def test_wal_snapshot_isolation_prevents_verify_lock_toctou(tmp_path):
     try:
         # A: BEGIN + verify_lock-style read (snapshot established).
         raw_a.execute("BEGIN")
-        raw_a.execute(
-            "SELECT hash FROM selections WHERE name = 'foo' AND kind = 'entities'"
-        ).fetchone()
+        raw_a.execute("SELECT hash FROM entity_selections WHERE name = 'foo'").fetchone()
 
         # B: concurrent writer commits an overwrite of `foo`.
         raw_b.execute("BEGIN IMMEDIATE")
-        raw_b.execute("DELETE FROM selection_items WHERE selection_name = 'foo'")
-        raw_b.execute("DELETE FROM selections WHERE name = 'foo'")
+        raw_b.execute("DELETE FROM entity_selection_items WHERE selection_name = 'foo'")
+        raw_b.execute("DELETE FROM entity_selections WHERE name = 'foo'")
         raw_b.execute(
-            "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
-            ("foo", "entities", "deadbeefdeadbeef", 1, "B-write"),
+            "INSERT INTO entity_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
+            ("foo", "deadbeefdeadbeef", 1, "B-write"),
         )
         raw_b.execute("COMMIT")
 
         # A: any write now fails — snapshot conflict.
         with pytest.raises(sqlite3.OperationalError, match="database is locked"):
-            raw_a.execute("DELETE FROM selections WHERE name = 'foo'")
+            raw_a.execute("DELETE FROM entity_selections WHERE name = 'foo'")
             raw_a.execute("COMMIT")
     finally:
         raw_a.close()
@@ -64,7 +62,7 @@ def test_wal_snapshot_isolation_prevents_verify_lock_toctou(tmp_path):
 
     # B's write is the persisted state — no corruption.
     final = sqlite3.connect(str(db), autocommit=True)
-    row = final.execute("SELECT source FROM selections WHERE name = 'foo'").fetchone()
+    row = final.execute("SELECT source FROM entity_selections WHERE name = 'foo'").fetchone()
     final.close()
     assert row[0] == "B-write"
 
@@ -76,27 +74,27 @@ def test_session_translates_snapshot_conflict_to_concurrent_write_error(tmp_path
     ont = Ontology.create(db)
 
     with session(ont) as s:
-        upsert_selection(s, SelectionName("foo"), SelectionKind.ENTITIES, ["ex:Initial"], "seed")
+        upsert_entity_selection(s, SelectionName("foo"), ["ex:Initial"], "seed")
         s.commit()
 
     raw_b = _raw(db)
     try:
         with pytest.raises(ConcurrentWriteError, match="locked"), session(ont) as a:
             # A pins its snapshot with an initial read.
-            a.conn.execute("SELECT hash FROM selections WHERE name = 'foo'").fetchone()
+            a.conn.execute("SELECT hash FROM entity_selections WHERE name = 'foo'").fetchone()
 
             # B commits an overwrite under A's snapshot.
             raw_b.execute("BEGIN IMMEDIATE")
-            raw_b.execute("DELETE FROM selection_items WHERE selection_name = 'foo'")
-            raw_b.execute("DELETE FROM selections WHERE name = 'foo'")
+            raw_b.execute("DELETE FROM entity_selection_items WHERE selection_name = 'foo'")
+            raw_b.execute("DELETE FROM entity_selections WHERE name = 'foo'")
             raw_b.execute(
-                "INSERT INTO selections (name, kind, hash, size, source) VALUES (?, ?, ?, ?, ?)",
-                ("foo", "entities", "deadbeefdeadbeef", 1, "B-write"),
+                "INSERT INTO entity_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
+                ("foo", "deadbeefdeadbeef", 1, "B-write"),
             )
             raw_b.execute("COMMIT")
 
             # A's first write hits the snapshot conflict -> translated.
-            a.conn.execute("DELETE FROM selections WHERE name = 'foo'")
+            a.conn.execute("DELETE FROM entity_selections WHERE name = 'foo'")
             a.commit()
     finally:
         raw_b.close()

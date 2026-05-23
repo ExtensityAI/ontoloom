@@ -1,7 +1,6 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.hashing import short_hash
 from ontoloom.connection import Ontology, session
-from ontoloom.errors import InternalError
 from ontoloom.query.dispatch import run
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
@@ -10,7 +9,6 @@ from ontoloom.selections.types import (
     AxiomSelectionPage,
     EntitySelectionName,
     EntitySelectionPage,
-    SelectionRef,
     ShowFilter,
 )
 from ontoloom.utils import dquoted
@@ -23,7 +21,7 @@ from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
 def read_selection(
     path: OntologyPath,
-    name: SelectionRef,
+    name: AxiomSelectionName | EntitySelectionName,
     limit: Limit = 20,
     offset: Offset = 0,
     show: ShowFilter = ShowFilter.ALL,
@@ -31,8 +29,7 @@ def read_selection(
     """Paginated view of a selection's contents with missing-item visibility.
 
     - `name`: Kind-prefixed selection reference (e.g. `"axioms:my_sel"` or
-      `"entities:my_sel"`). The prefix must match the stored selection's kind
-      or the call raises.
+      `"entities:my_sel"`). The prefix selects which kind-table is read.
     - `show`: "all" (default), "present" (only items still in ontology),
       "missing" (only items removed since the selection was created).
       Use "missing" to audit a selection after ontology modifications.
@@ -43,23 +40,25 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        match name:
-            case AxiomSelectionName():
-                page = run(
-                    s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
-                )
-            case EntitySelectionName():
-                page = run(
-                    s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
-                )
-            case _:
-                msg = f"Unexpected selection ref kind: {name!r}"
-                raise InternalError(msg)
-        s.commit()
+        if isinstance(name, AxiomSelectionName):
+            page_ax: AxiomSelectionPage = run(
+                s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
+            )
+            s.commit()
+            return _format_axiom_page(page_ax, limit=limit, offset=offset, show=show)
 
+        page_ent: EntitySelectionPage = run(
+            s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
+        )
+        s.commit()
+        return _format_entity_page(page_ent, offset=offset, show=show)
+
+
+def _format_axiom_page(page: AxiomSelectionPage, *, limit: int, offset: int, show: ShowFilter):
+    del limit
     meta = page.meta
     header = (
-        f"Selection {format_locked_quoted(meta)} ({meta.kind}): "
+        f"Selection {format_locked_quoted(meta)} (axioms): "
         f"{meta.size} total ({page.present} present, {page.missing} missing)"
     )
 
@@ -70,27 +69,40 @@ def read_selection(
         showing = f"Showing {offset + 1}-{end} of {page.total_filtered} (filter: {show}):"
 
     lines = [header, showing, ""]
+    for item in page.items:
+        h = short_hash(item.hash)
 
-    match page:
-        case AxiomSelectionPage():
-            for item in page.items:
-                h = short_hash(item.hash)
-                if item.axiom is None:
-                    lines.append(f"[{h}] *missing*")
-                    continue
+        if item.axiom is None:
+            lines.append(f"[{h}] *missing*")
+            continue
 
-                lines.append(f"[{h}] {item.axiom}")
-                lines.extend(format_axiom_annotations(item.axiom))
-        case EntitySelectionPage():
-            for item in page.items:
-                if not item.present:
-                    lines.append(f"{item.iri} *missing*")
-                    continue
+        lines.append(f"[{h}] {item.axiom}")
+        lines.extend(format_axiom_annotations(item.axiom))
+    return "\n".join(lines)
 
-                role_str = f" ({item.role})" if item.role else ""
-                label_str = f" {dquoted(item.label)}" if item.label else ""
-                lines.append(f"{item.iri}{role_str}{label_str}")
 
+def _format_entity_page(page: EntitySelectionPage, *, offset: int, show: ShowFilter):
+    meta = page.meta
+    header = (
+        f"Selection {format_locked_quoted(meta)} (entities): "
+        f"{meta.size} total ({page.present} present, {page.missing} missing)"
+    )
+
+    end = offset + len(page.items)
+    if not page.items:
+        showing = f"0 results (filter: {show})."
+    else:
+        showing = f"Showing {offset + 1}-{end} of {page.total_filtered} (filter: {show}):"
+
+    lines = [header, showing, ""]
+    for item in page.items:
+        if not item.present:
+            lines.append(f"{item.iri} *missing*")
+            continue
+
+        role_str = f" ({item.role})" if item.role else ""
+        label_str = f" {dquoted(item.label)}" if item.label else ""
+        lines.append(f"{item.iri}{role_str}{label_str}")
     return "\n".join(lines)
 
 

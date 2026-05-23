@@ -1,4 +1,4 @@
-"""Selection vocabulary: kinds, ops, validated identifiers, and read-shape DTOs.
+"""Selection vocabulary: kind-specific identifiers, ops, and read-shape DTOs.
 
 Pure types -> no I/O. Persistence lives in `selections/store.py`; set-expression
 evaluation lives in `selections/compose.py`; paginated reads live in
@@ -8,7 +8,7 @@ evaluation lives in `selections/compose.py`; paginated reads live in
 import re
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Literal, override
+from typing import override
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.errors import OntoloomError
@@ -25,18 +25,6 @@ class SelectionNotFoundError(OntoloomError):
         super().__init__(f"Selection {dquoted(name)} does not exist.")
 
 
-class SelectionKindMismatchError(OntoloomError):
-    """Caller's kind-prefixed ref disagrees with the stored selection's kind."""
-
-    def __init__(self, name: "SelectionName", expected: "SelectionKind", actual: "SelectionKind"):
-        self.name = name
-        self.expected = expected
-        self.actual = actual
-        super().__init__(
-            f"Selection {dquoted(name)} is kind {actual}, but caller referenced it as {expected}."
-        )
-
-
 class SelectionExprError(OntoloomError):
     """Set-expression evaluation precondition violated.
 
@@ -51,17 +39,6 @@ MAX_SELECTION_NAME_LEN = 64
 NAME_FRAGMENT = rf"[a-zA-Z][a-zA-Z0-9._/:-]{{0,{MAX_SELECTION_NAME_LEN - 1}}}"
 
 _NAME_PATTERN = re.compile(rf"^{NAME_FRAGMENT}$")
-
-
-class SelectionKind(StrEnum):
-    """Named sets saved from search results for later operations.
-
-    AXIOMS: set of axiom hashes -> scope axiom searches, set algebra, export subsets, mass deletion.
-    ENTITIES: set of entity IRIs -> scope entity/axiom searches, set algebra, convert to axiom selections.
-    """
-
-    AXIOMS = "axioms"
-    ENTITIES = "entities"
 
 
 class ShowFilter(StrEnum):
@@ -126,15 +103,12 @@ class SelectionName(TypedStr):
         return value
 
 
-def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
+def _parse_kinded_name(value: str, kind: str, type_name: str) -> str:
     """Validate `kind:NAME` wire form; return `value` unchanged."""
     prefix, sep, name = value.partition(":")
 
-    if not sep or prefix != kind.value:
-        msg = (
-            f"{type_name} must be '{kind.value}:NAME' "
-            f"(e.g. '{kind.value}:my_sel'), got {dquoted(value)}"
-        )
+    if not sep or prefix != kind:
+        msg = f"{type_name} must be '{kind}:NAME' (e.g. '{kind}:my_sel'), got {dquoted(value)}"
         raise ValueError(msg)
     validate_selection_name(name)
     return value
@@ -150,15 +124,11 @@ class EntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_name(value, SelectionKind.ENTITIES, "EntitySelectionName")
+        return _parse_kinded_name(value, "entities", "EntitySelectionName")
 
     @property
     def bare(self) -> SelectionName:
         return SelectionName(self.removeprefix("entities:"))
-
-    @property
-    def kind(self) -> Literal[SelectionKind.ENTITIES]:
-        return SelectionKind.ENTITIES
 
 
 class AxiomSelectionName(TypedStr):
@@ -171,34 +141,46 @@ class AxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_name(value, SelectionKind.AXIOMS, "AxiomSelectionName")
+        return _parse_kinded_name(value, "axioms", "AxiomSelectionName")
 
     @property
     def bare(self) -> SelectionName:
         return SelectionName(self.removeprefix("axioms:"))
 
-    @property
-    def kind(self) -> Literal[SelectionKind.AXIOMS]:
-        return SelectionKind.AXIOMS
-
-
-type SelectionRef = EntitySelectionName | AxiomSelectionName
-
 
 @dataclass(frozen=True, slots=True)
-class SelectionMeta:
+class AxiomSelection:
     name: SelectionName
-    kind: SelectionKind
     hash: SelectionContentHash
     size: int
     source: str = ""
 
 
 @dataclass(frozen=True, slots=True)
-class SelectionListing:
-    """SelectionMeta plus drift information (how many items still resolve)."""
+class AxiomSelectionListing:
+    """AxiomSelection plus drift information (how many items still resolve)."""
 
-    meta: SelectionMeta
+    meta: AxiomSelection
+    present_count: int
+
+    @property
+    def missing_count(self) -> int:
+        return self.meta.size - self.present_count
+
+
+@dataclass(frozen=True, slots=True)
+class EntitySelection:
+    name: SelectionName
+    hash: SelectionContentHash
+    size: int
+    source: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class EntitySelectionListing:
+    """EntitySelection plus drift information (how many items still resolve)."""
+
+    meta: EntitySelection
     present_count: int
 
     @property
@@ -238,7 +220,7 @@ class EntityItem:
 
 @dataclass(frozen=True, slots=True)
 class AxiomSelectionPage:
-    meta: SelectionMeta
+    meta: AxiomSelection
     items: tuple[AxiomItem, ...]
     total_filtered: int
     present: int
@@ -248,7 +230,7 @@ class AxiomSelectionPage:
 
 @dataclass(frozen=True, slots=True)
 class EntitySelectionPage:
-    meta: SelectionMeta
+    meta: EntitySelection
     items: tuple[EntityItem, ...]
     total_filtered: int
     present: int

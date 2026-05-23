@@ -77,12 +77,10 @@ CREATE INDEX IF NOT EXISTS idx_axiom_text_lower_text
 CREATE INDEX IF NOT EXISTS idx_axiom_text_prop_lower_text
     ON axiom_text(property, LOWER(text));
 
--- Named selections: persistent sets of axiom hashes or entity IRIs.
--- Kind is inferred from the producing operation. Content hash enables
--- optimistic locking (write ops require name@hash_prefix).
-CREATE TABLE IF NOT EXISTS selections (
+-- Axiom selections: persistent sets of axiom hashes.
+-- Content hash enables optimistic locking (write ops require name@hash_prefix).
+CREATE TABLE IF NOT EXISTS axiom_selections (
     name TEXT PRIMARY KEY,
-    kind TEXT NOT NULL CHECK (kind IN ('axioms', 'entities')),
     hash TEXT NOT NULL,
     size INTEGER NOT NULL,
     source TEXT NOT NULL,
@@ -91,12 +89,31 @@ CREATE TABLE IF NOT EXISTS selections (
 
 -- `id` is an INTEGER PRIMARY KEY (rowid alias) so we can index `(selection_name, id)`
 -- and serve paginated `ORDER BY id` reads without a temp B-tree sort.
-CREATE TABLE IF NOT EXISTS selection_items (
+CREATE TABLE IF NOT EXISTS axiom_selection_items (
     id INTEGER PRIMARY KEY,
-    selection_name TEXT NOT NULL REFERENCES selections(name) ON DELETE CASCADE,
+    selection_name TEXT NOT NULL REFERENCES axiom_selections(name) ON DELETE CASCADE,
     item TEXT NOT NULL,
     UNIQUE(selection_name, item)
 );
 
-CREATE INDEX IF NOT EXISTS idx_selection_items_name_id
-    ON selection_items(selection_name, id);
+CREATE INDEX IF NOT EXISTS idx_axiom_selection_items_name_id
+    ON axiom_selection_items(selection_name, id);
+
+-- Entity selections: persistent sets of entity IRIs.
+CREATE TABLE IF NOT EXISTS entity_selections (
+    name TEXT PRIMARY KEY,
+    hash TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+CREATE TABLE IF NOT EXISTS entity_selection_items (
+    id INTEGER PRIMARY KEY,
+    selection_name TEXT NOT NULL REFERENCES entity_selections(name) ON DELETE CASCADE,
+    item TEXT NOT NULL,
+    UNIQUE(selection_name, item)
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_selection_items_name_id
+    ON entity_selection_items(selection_name, id);

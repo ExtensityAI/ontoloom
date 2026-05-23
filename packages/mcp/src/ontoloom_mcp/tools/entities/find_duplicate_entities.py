@@ -2,8 +2,8 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import find_duplicate_entities as _find_duplicate_entities
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import EntitySelectionName, SelectionKind
+from ontoloom.selections.store import upsert_entity_selection
+from ontoloom.selections.types import EntitySelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -42,10 +42,9 @@ def find_duplicate_entities(
         source = f"find_duplicate_entities(annotation_property={dquoted(annotation_property)})"
         if within is not None:
             source += f", within={dquoted(str(within))}"
-        upserted = upsert_selection(
+        upserted = upsert_entity_selection(
             s,
             into.bare,
-            SelectionKind.ENTITIES,
             result.affected_iris,
             source=source,
         )

@@ -8,8 +8,8 @@ from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionName
+from ontoloom.selections.store import upsert_entity_selection
+from ontoloom.selections.types import EntitySelectionName, SelectionName
 from pydantic import ValidationError
 
 
@@ -51,7 +51,7 @@ def test_field_validator_accepts_entity_within():
         within=_ref("foo"),
     )
     assert q.within is not None
-    assert q.within.kind == SelectionKind.ENTITIES
+    assert isinstance(q.within, EntitySelectionName)
 
 
 # -- integration tests --
@@ -134,7 +134,7 @@ def test_run_scoped_to_entity_selection(s):
             _label("ex:C", "Shared"),
         ],
     )
-    upsert_selection(s, SelectionName("scope"), SelectionKind.ENTITIES, ["ex:A", "ex:B"], "test")
+    upsert_entity_selection(s, SelectionName("scope"), ["ex:A", "ex:B"], "test")
 
     result = run(
         s,

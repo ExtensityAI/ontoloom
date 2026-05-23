@@ -12,10 +12,10 @@ from ontoloom.connection import (
 )
 from ontoloom.prefixes.store import list_prefixes
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.query.constraints import AxiomConstraint, InSelection
+from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 
@@ -53,9 +53,9 @@ def export_jsonl(
     constraints: list[AxiomConstraint] = []
 
     if within is not None:
-        meta = get_selection(s, within.bare)
+        meta = get_axiom_selection(s, within.bare)
         selection_size = meta.size
-        constraints.append(InSelection(ref=within))
+        constraints.append(InAxiomSelection(name=within))
 
     header = HeaderRecord(
         format="ontoloom-jsonl",

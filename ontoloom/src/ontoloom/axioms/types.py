@@ -9,7 +9,7 @@ from ontoloom.canonical import canonical_json
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AxiomTag, BaseAxiom
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.types import SelectionMeta
+from ontoloom.selections.types import AxiomSelection
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +50,7 @@ class RemoveResult:
 class RemoveBySelectionResult:
     removed: tuple[HashedAxiom, ...]
     absent: int
-    meta: SelectionMeta
+    meta: AxiomSelection
 
 
 @dataclass(frozen=True, slots=True)

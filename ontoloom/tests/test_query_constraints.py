@@ -11,10 +11,11 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
     InPositions,
-    InSelection,
     MentionedIn,
     MentionsAll,
     MentionsAny,
@@ -125,22 +126,37 @@ def test_deprecated_state_true_raises():
         Deprecated(state=True)
 
 
-# -- InSelection --
+# -- InAxiomSelection / InEntitySelection --
 
 
-def test_in_selection_holds_axiom_ref():
+def test_in_axiom_selection_holds_axiom_ref():
     ref = AxiomSelectionName("axioms:x")
-    assert InSelection(ref=ref).ref == ref
+    assert InAxiomSelection(name=ref).name == ref
 
 
-def test_in_selection_holds_entity_ref():
+def test_in_entity_selection_holds_entity_ref():
     ref = EntitySelectionName("entities:x")
-    assert InSelection(ref=ref).ref == ref
+    assert InEntitySelection(name=ref).name == ref
 
 
-def test_in_selection_rejects_bare_string():
+def test_in_axiom_selection_rejects_bare_string():
     with pytest.raises(ValidationError):
-        InSelection(ref="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
+        InAxiomSelection(name="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
+
+
+def test_in_entity_selection_rejects_bare_string():
+    with pytest.raises(ValidationError):
+        InEntitySelection(name="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
+
+
+def test_in_axiom_selection_rejects_entity_ref():
+    with pytest.raises(ValidationError):
+        InAxiomSelection(name=EntitySelectionName("entities:x"))  # pyright: ignore[reportArgumentType]
+
+
+def test_in_entity_selection_rejects_axiom_ref():
+    with pytest.raises(ValidationError):
+        InEntitySelection(name=AxiomSelectionName("axioms:x"))  # pyright: ignore[reportArgumentType]
 
 
 # -- WithTypes: unknown tag rejection --

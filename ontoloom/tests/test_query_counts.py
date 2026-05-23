@@ -18,9 +18,10 @@ from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
     AlwaysFalse,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
-    InSelection,
     MentionsAll,
     MentionsAny,
     WithRoles,
@@ -30,11 +31,10 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
-    SelectionKind,
     SelectionName,
 )
 
@@ -71,30 +71,28 @@ def test_ce_run_in_selection_entities(s):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
         ],
     )
-    upsert_selection(
+    upsert_entity_selection(
         s,
         SelectionName("dogs_and_cats"),
-        SelectionKind.ENTITIES,
         ["ex:Dog", "ex:Cat"],
         source="test",
     )
     ref = EntitySelectionName("entities:dogs_and_cats")
-    assert run(s, CountEntities(constraints=(InSelection(ref=ref),))) == 2
+    assert run(s, CountEntities(constraints=(InEntitySelection(name=ref),))) == 2
 
 
 def test_ce_run_in_selection_axioms(s):
     dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     cat_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
     add_axioms(s, [dog_decl, cat_decl])
-    upsert_selection(
+    upsert_axiom_selection(
         s,
         SelectionName("dog_only"),
-        SelectionKind.AXIOMS,
         [HashedAxiom.of(dog_decl).hash],
         source="test",
     )
     ref = AxiomSelectionName("axioms:dog_only")
-    assert run(s, CountEntities(constraints=(InSelection(ref=ref),))) == 1
+    assert run(s, CountEntities(constraints=(InAxiomSelection(name=ref),))) == 1
 
 
 def test_ce_run_namespace_filter(s):
@@ -295,15 +293,14 @@ def test_cabt_run_in_selection_axioms(s):
     cat_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
     sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
     add_axioms(s, [dog_decl, cat_decl, sub])
-    upsert_selection(
+    upsert_axiom_selection(
         s,
         SelectionName("axiom_pair"),
-        SelectionKind.AXIOMS,
         [HashedAxiom.of(dog_decl).hash, HashedAxiom.of(sub).hash],
         source="test",
     )
     ref = AxiomSelectionName("axioms:axiom_pair")
-    result = run(s, CountAxiomsByType(constraints=(InSelection(ref=ref),)))
+    result = run(s, CountAxiomsByType(constraints=(InAxiomSelection(name=ref),)))
     assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
 
 
@@ -316,15 +313,14 @@ def test_cabt_run_in_selection_entities(s):
             SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
         ],
     )
-    upsert_selection(
+    upsert_entity_selection(
         s,
         SelectionName("dog_only"),
-        SelectionKind.ENTITIES,
         ["ex:Dog"],
         source="test",
     )
     ref = EntitySelectionName("entities:dog_only")
-    result = run(s, CountAxiomsByType(constraints=(InSelection(ref=ref),)))
+    result = run(s, CountAxiomsByType(constraints=(InEntitySelection(name=ref),)))
     # Dog declaration mentions ex:Dog; SubClassOf mentions ex:Dog.
     # Cat declaration does not mention ex:Dog.
     assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})

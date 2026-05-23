@@ -2,7 +2,7 @@
 
 Exact matches on `axiom_text.text` outrank substring matches; within each rank
 the order is by axiom hash. Optional `properties` restrict the search to a set
-of annotation property IRIs. Additional axiom constraints (e.g. `InSelection`)
+of annotation property IRIs. Additional axiom constraints (e.g. `InAxiomSelection`)
 narrow the candidate set before ranking.
 
 Pagination (`limit`/`offset`) is applied after ranking; `total` reports the

@@ -12,10 +12,11 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
     InPositions,
-    InSelection,
     MentionedIn,
     MentionsAll,
     MentionsAllOverflowError,
@@ -39,7 +40,7 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
     """Merge and deduplicate entity constraints according to canonical rules.
 
     Raises:
-        ValueError: if more than one InSelection constraint is present.
+        ValueError: if more than one selection-scope constraint is present.
     """
     if not cs:
         return ()
@@ -53,7 +54,7 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
     has_any_property: list[HasAnyProperty] = []
     mentioned_in: list[MentionedIn] = []
     in_positions: list[InPositions] = []
-    in_selection: list[InSelection] = []
+    in_selection: list[InAxiomSelection | InEntitySelection] = []
 
     for c in cs:
         if isinstance(c, AlwaysFalse):
@@ -77,7 +78,7 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
             mentioned_in.append(c)
         elif isinstance(c, InPositions):
             in_positions.append(c)
-        elif isinstance(c, InSelection):
+        elif isinstance(c, (InAxiomSelection, InEntitySelection)):
             in_selection.append(c)
         else:
             msg = f"unknown entity constraint variant: {type(c).__name__}"
@@ -148,7 +149,7 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
     """Merge and deduplicate axiom constraints according to canonical rules.
 
     Raises:
-        ValueError: if more than one InSelection constraint is present.
+        ValueError: if more than one selection-scope constraint is present.
     """
     if not cs:
         return ()
@@ -157,7 +158,7 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
     mentions_all: list[MentionsAll] = []
     mentions_any: list[MentionsAny] = []
     has_any_annotation: list[HasAnyAnnotation] = []
-    in_selection: list[InSelection] = []
+    in_selection: list[InAxiomSelection | InEntitySelection] = []
 
     for c in cs:
         match c:
@@ -171,7 +172,7 @@ def normalize_axiom(cs: Sequence[AxiomConstraint]) -> tuple[AxiomConstraint, ...
                 mentions_any.append(c)
             case HasAnyAnnotation():
                 has_any_annotation.append(c)
-            case InSelection():
+            case InAxiomSelection() | InEntitySelection():
                 in_selection.append(c)
             case _:
                 msg = f"unknown axiom constraint variant: {type(c).__name__}"

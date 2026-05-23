@@ -2,8 +2,8 @@ from mcp.types import ToolAnnotations
 from ontoloom.axioms.mutations import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import AxiomSelectionName, SelectionKind
+from ontoloom.selections.store import upsert_axiom_selection
+from ontoloom.selections.types import AxiomSelectionName
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -66,10 +66,9 @@ def rename_iri(
         upserted = None
         if into is not None:
             new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
-            upserted = upsert_selection(
+            upserted = upsert_axiom_selection(
                 s,
                 into.bare,
-                SelectionKind.AXIOMS,
                 new_hashes,
                 f"rename_iri({old_iri} -> {new_iri})",
             )

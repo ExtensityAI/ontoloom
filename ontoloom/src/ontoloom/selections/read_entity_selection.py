@@ -1,4 +1,4 @@
-"""Paginated read of an entity-kind selection with role/label hydration."""
+"""Paginated read of an entity selection with role/label hydration."""
 
 from typing import override
 
@@ -9,13 +9,11 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.base import Query, RenderedSql, append_pagination
 from ontoloom.query.constraints import HasPagination
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import get_entity_selection
 from ontoloom.selections.types import (
     EntityItem,
     EntitySelectionName,
     EntitySelectionPage,
-    SelectionKind,
-    SelectionKindMismatchError,
     ShowFilter,
 )
 
@@ -33,7 +31,7 @@ def _show_filter_clause(show: ShowFilter) -> str:
 
 
 class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
-    """Paginated read of an entity-kind selection.
+    """Paginated read of an entity selection.
 
     Page order is stable and lexicographic on the item IRI. The
     `(selection_name, item)` autoindex provides the ordering for free, so
@@ -52,7 +50,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
         """
         sql_parts = [
             f"SELECT si.item, {_EXISTS_FRAGMENT} AS is_present",
-            "FROM selection_items si",
+            "FROM entity_selection_items si",
             "WHERE si.selection_name = ?",
         ]
         params: list[object] = [self.selection.bare]
@@ -68,19 +66,18 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
     @override
     def _run(self, s: Session) -> EntitySelectionPage:
         name = self.selection.bare
-        meta = get_selection(s, name)
-        if meta.kind != SelectionKind.ENTITIES:
-            raise SelectionKindMismatchError(name, SelectionKind.ENTITIES, meta.kind)
+        meta = get_entity_selection(s, name)
 
         filter_clause = _show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(
-            f"SELECT COUNT(*) FROM selection_items si WHERE si.selection_name = ?{filter_clause}",
+            f"SELECT COUNT(*) FROM entity_selection_items si "
+            f"WHERE si.selection_name = ?{filter_clause}",
             (name,),
         ).fetchone()[0]
 
         present_count = s.conn.execute(
-            "SELECT COUNT(DISTINCT si.item) FROM selection_items si "
+            "SELECT COUNT(DISTINCT si.item) FROM entity_selection_items si "
             "WHERE si.selection_name = ? "
             f"AND {_EXISTS_FRAGMENT}",
             (name,),

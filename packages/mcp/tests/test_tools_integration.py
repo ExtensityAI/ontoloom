@@ -194,7 +194,7 @@ def test_search_axioms_by_property_only(empty_db):
 
     with session(Ontology(empty_db)) as s:
         rows = s.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?",
+            "SELECT item FROM axiom_selection_items WHERE selection_name = ?",
             ("defined",),
         ).fetchall()
         s.commit()
@@ -205,8 +205,8 @@ def test_search_axioms_by_property_only(empty_db):
 
 def test_search_axioms_with_within_scope(empty_db):
     from ontoloom.axioms.types import HashedAxiom
-    from ontoloom.selections.store import upsert_selection
-    from ontoloom.selections.types import SelectionKind, SelectionName
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom.selections.types import SelectionName
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
     todo = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
@@ -244,10 +244,9 @@ def test_search_axioms_with_within_scope(empty_db):
     # Pre-build a scope selection containing the in-scope TODO and the no-anno axiom,
     # but NOT the out-of-scope TODO.
     with session(Ontology(empty_db)) as s:
-        upsert_selection(
+        upsert_axiom_selection(
             s,
             SelectionName("scope"),
-            SelectionKind.AXIOMS,
             [in_scope_hash, no_anno_hash],
             "test fixture",
         )
@@ -262,7 +261,7 @@ def test_search_axioms_with_within_scope(empty_db):
 
     with session(Ontology(empty_db)) as s:
         rows = s.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ?",
+            "SELECT item FROM axiom_selection_items WHERE selection_name = ?",
             ("hits",),
         ).fetchall()
         s.commit()
@@ -312,11 +311,11 @@ def test_search_axioms_exact_ranked_before_substring(empty_db):
     hash_b = HashedAxiom.of(axiom_b).hash
 
     # `read_selection` re-orders by hash, so verify ranking via raw rowid order
-    # (insertion order, which `upsert_selection` preserves from the search's
+    # (insertion order, which `upsert_axiom_selection` preserves from the search's
     # exact-first ranking).
     with session(Ontology(empty_db)) as s:
         rows = s.conn.execute(
-            "SELECT item FROM selection_items WHERE selection_name = ? ORDER BY rowid",
+            "SELECT item FROM axiom_selection_items WHERE selection_name = ? ORDER BY rowid",
             ("ranked",),
         ).fetchall()
         s.commit()

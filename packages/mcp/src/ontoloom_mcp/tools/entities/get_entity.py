@@ -3,8 +3,8 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import axiom_hashes_for_entity
 from ontoloom.entities.reader import get_entity as core_get_entity
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import upsert_selection
-from ontoloom.selections.types import AxiomSelectionName, SelectionKind
+from ontoloom.selections.store import upsert_axiom_selection
+from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import build_refs, format_entity_inspect
@@ -39,7 +39,7 @@ def get_entity(
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
             source = f"get_entity(iri={dquoted(iri)})"
-            upserted = upsert_selection(s, into.bare, SelectionKind.AXIOMS, hashes, source)
+            upserted = upsert_axiom_selection(s, into.bare, hashes, source)
             sel = upserted.selection
             sel_msg = f"\n\n{sel.size} axiom hashes -> {format_locked_quoted(sel)}."
             if upserted.previous_size is not None:

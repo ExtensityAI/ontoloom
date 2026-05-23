@@ -23,10 +23,10 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.store import check_iri_prefixes
-from ontoloom.query.constraints import AxiomConstraint, InSelection, MentionsAll
+from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection, MentionsAll
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import AxiomSelectionName
 from ontoloom.utils import dedupe
 
@@ -89,8 +89,8 @@ def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
 def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelectionResult:
     """Remove axioms referenced by an axiom selection. Best-effort: skips missing.
 
-    The post-mutation `SelectionMeta` is returned so adapters (MCP) can render a
-    fresh locked ref for follow-up calls.
+    The post-mutation `AxiomSelection` is returned so adapters (MCP) can render
+    a fresh locked ref for follow-up calls.
     """
     bare = within.bare
 
@@ -98,7 +98,7 @@ def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelec
     absent = 0
     rows = s.conn.execute(
         "SELECT si.item, a.hash, json(a.data) "
-        "FROM selection_items si LEFT JOIN axioms a ON a.hash = si.item "
+        "FROM axiom_selection_items si LEFT JOIN axioms a ON a.hash = si.item "
         "WHERE si.selection_name = ?",
         (bare,),
     )
@@ -114,7 +114,7 @@ def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelec
         to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
     _delete_axioms(s, to_remove)
-    meta = get_selection(s, bare)
+    meta = get_axiom_selection(s, bare)
     return RemoveBySelectionResult(removed=tuple(to_remove), absent=absent, meta=meta)
 
 
@@ -271,7 +271,7 @@ def rename_iri(
 
     constraints: list[AxiomConstraint] = [MentionsAll(iris=(old_iri,))]
     if within is not None:
-        constraints.append(InSelection(ref=within))
+        constraints.append(InAxiomSelection(name=within))
 
     rows = list(run(s, ListAxioms(constraints=tuple(constraints))))
 

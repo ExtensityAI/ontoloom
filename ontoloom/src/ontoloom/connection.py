@@ -16,7 +16,7 @@ _SQL = importlib.resources.files("ontoloom").joinpath("sql")
 _SCHEMA = _SQL.joinpath("schema.sql").read_text()
 _PRAGMAS = _SQL.joinpath("pragmas.sql").read_text()
 
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 
 # Optional sandbox root for agent-supplied paths. Set `ONTOLOOM_WORKSPACE_ROOT`

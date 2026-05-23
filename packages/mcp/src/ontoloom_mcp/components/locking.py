@@ -7,19 +7,19 @@ transactions, not hash prefixes, for concurrency control.
 """
 
 import re
-from typing import Literal, overload, override
+from typing import overload, override
 
 from ontoloom.connection import Session
 from ontoloom.errors import OntoloomError
 from ontoloom.models import TypedStr
-from ontoloom.selections.store import get_selection
+from ontoloom.selections.store import get_axiom_selection, get_entity_selection
 from ontoloom.selections.types import (
     NAME_FRAGMENT,
+    AxiomSelection,
     AxiomSelectionName,
+    EntitySelection,
     EntitySelectionName,
     SelectionContentHash,
-    SelectionKind,
-    SelectionMeta,
     SelectionName,
     SelectionNotFoundError,
     validate_selection_name,
@@ -69,12 +69,12 @@ class StaleSelectionError(OntoloomError):
         )
 
 
-def _parse_kinded_locked(value: str, kind: SelectionKind, type_name: str) -> str:
+def _parse_kinded_locked(value: str, kind: str, type_name: str) -> str:
     """Validate `kind:NAME@HASH_PREFIX` wire form; lowercase the hash portion."""
     prefix, sep, rest = value.partition(":")
 
-    if not sep or prefix != kind.value:
-        msg = f"{type_name} must be '{kind.value}:NAME@HASH_PREFIX', got {dquoted(value)}"
+    if not sep or prefix != kind:
+        msg = f"{type_name} must be '{kind}:NAME@HASH_PREFIX', got {dquoted(value)}"
         raise ValueError(msg)
 
     name, at_sep, hash_prefix = rest.partition("@")
@@ -99,7 +99,7 @@ class LockedEntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_locked(value, SelectionKind.ENTITIES, "LockedEntitySelectionName")
+        return _parse_kinded_locked(value, "entities", "LockedEntitySelectionName")
 
     @property
     def bare(self) -> EntitySelectionName:
@@ -110,10 +110,6 @@ class LockedEntitySelectionName(TypedStr):
     def hash_prefix(self) -> HashPrefix:
         _, _, suffix = self.partition("@")
         return HashPrefix(suffix)
-
-    @property
-    def kind(self) -> Literal[SelectionKind.ENTITIES]:
-        return SelectionKind.ENTITIES
 
 
 class LockedAxiomSelectionName(TypedStr):
@@ -126,7 +122,7 @@ class LockedAxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_locked(value, SelectionKind.AXIOMS, "LockedAxiomSelectionName")
+        return _parse_kinded_locked(value, "axioms", "LockedAxiomSelectionName")
 
     @property
     def bare(self) -> AxiomSelectionName:
@@ -138,13 +134,6 @@ class LockedAxiomSelectionName(TypedStr):
         _, _, suffix = self.partition("@")
         return HashPrefix(suffix)
 
-    @property
-    def kind(self) -> Literal[SelectionKind.AXIOMS]:
-        return SelectionKind.AXIOMS
-
-
-type LockedSelectionRef = LockedEntitySelectionName | LockedAxiomSelectionName
-
 
 @overload
 def verify_lock(s: Session, locked: LockedEntitySelectionName) -> EntitySelectionName: ...
@@ -152,27 +141,44 @@ def verify_lock(s: Session, locked: LockedEntitySelectionName) -> EntitySelectio
 def verify_lock(s: Session, locked: LockedAxiomSelectionName) -> AxiomSelectionName: ...
 
 
-def verify_lock(s: Session, locked: LockedSelectionRef):
+def verify_lock(s: Session, locked: LockedEntitySelectionName | LockedAxiomSelectionName):
     """Verify `locked` references a current selection; return its narrow bare form.
 
     Raises:
-        SelectionNotFoundError: no `(name, kind)` row exists.
+        SelectionNotFoundError: no row exists in the matching kind-table.
         StaleSelectionError: row exists but its current hash doesn't start with
             `locked.hash_prefix`.
     """
     bare = locked.bare
     name = bare.bare
-    meta = get_selection(s, name)
 
-    if meta.kind != locked.kind:
-        raise SelectionNotFoundError(name)
+    if isinstance(locked, LockedAxiomSelectionName):
+        try:
+            meta_ax = get_axiom_selection(s, name)
+        except SelectionNotFoundError:
+            raise SelectionNotFoundError(name) from None
 
-    if not meta.hash.startswith(locked.hash_prefix):
-        raise StaleSelectionError(name, locked.hash_prefix, meta.hash, meta.size)
+        if not meta_ax.hash.startswith(locked.hash_prefix):
+            raise StaleSelectionError(name, locked.hash_prefix, meta_ax.hash, meta_ax.size)
+        return bare
 
+    try:
+        meta_ent = get_entity_selection(s, name)
+    except SelectionNotFoundError:
+        raise SelectionNotFoundError(name) from None
+
+    if not meta_ent.hash.startswith(locked.hash_prefix):
+        raise StaleSelectionError(name, locked.hash_prefix, meta_ent.hash, meta_ent.size)
     return bare
 
 
-def format_locked_quoted(meta: SelectionMeta) -> str:
+@overload
+def format_locked_quoted(meta: AxiomSelection) -> str: ...
+@overload
+def format_locked_quoted(meta: EntitySelection) -> str: ...
+
+
+def format_locked_quoted(meta: AxiomSelection | EntitySelection) -> str:
     """Render `meta` as a double-quoted wire-form locked ref for embedding in MCP messages."""
-    return dquoted(f"{meta.kind}:{meta.name}@{meta.hash}")
+    kind = "axioms" if isinstance(meta, AxiomSelection) else "entities"
+    return dquoted(f"{kind}:{meta.name}@{meta.hash}")

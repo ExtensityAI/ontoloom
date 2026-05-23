@@ -1,8 +1,8 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.selections.compose import create_selection as core_create_selection
+from ontoloom.selections.compose import create_axiom_selection, create_entity_selection
 from ontoloom.selections.expr import SetExpr
-from ontoloom.selections.types import SelectionRef
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
 from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
@@ -11,7 +11,7 @@ from ontoloom_mcp.components.types import OntologyPath
 
 def create_selection(
     path: OntologyPath,
-    name: SelectionRef,
+    name: AxiomSelectionName | EntitySelectionName,
     expr: SetExpr,
 ):
     """Create a selection by evaluating a set-expression tree.
@@ -40,14 +40,24 @@ def create_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        upserted = core_create_selection(s, name, expr)
-        s.commit()
+        if isinstance(name, AxiomSelectionName):
+            ax = create_axiom_selection(s, name, expr)
+            s.commit()
+            sel_ax = ax.selection
+            parts = [f"Selection {format_locked_quoted(sel_ax)}: {sel_ax.size} axioms"]
 
-    sel = upserted.selection
-    parts = [f"Selection {format_locked_quoted(sel)}: {sel.size} {sel.kind}"]
-    if upserted.previous_size is not None:
-        parts.append(f"(overwrote previous: {upserted.previous_size} items)")
-    return " ".join(parts)
+            if ax.previous_size is not None:
+                parts.append(f"(overwrote previous: {ax.previous_size} items)")
+            return " ".join(parts)
+
+        ent = create_entity_selection(s, name, expr)
+        s.commit()
+        sel_ent = ent.selection
+        parts = [f"Selection {format_locked_quoted(sel_ent)}: {sel_ent.size} entities"]
+
+        if ent.previous_size is not None:
+            parts.append(f"(overwrote previous: {ent.previous_size} items)")
+        return " ".join(parts)
 
 
 tool_create_selection = create_tool(

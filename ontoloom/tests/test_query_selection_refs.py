@@ -2,10 +2,9 @@ import pytest
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
-    SelectionKind,
 )
 
-# -- EntitySelectionName.parse / kind / bare --
+# -- EntitySelectionName.parse / bare --
 
 
 def test_entity_selection_name_parse_roundtrip():
@@ -15,13 +14,11 @@ def test_entity_selection_name_parse_roundtrip():
 
 def test_entity_selection_name_first_colon_split():
     ref = EntitySelectionName("entities:ns:dogs")
-    assert ref.kind == SelectionKind.ENTITIES
     assert ref.bare == "ns:dogs"
 
 
-def test_entity_selection_name_kind_and_bare():
+def test_entity_selection_name_bare():
     ref = EntitySelectionName("entities:my_sel")
-    assert ref.kind == SelectionKind.ENTITIES
     assert ref.bare == "my_sel"
 
 
@@ -55,7 +52,7 @@ def test_entity_selection_name_rejects_digit_start():
         EntitySelectionName("entities:1invalid")
 
 
-# -- AxiomSelectionName.parse / kind / bare --
+# -- AxiomSelectionName.parse / bare --
 
 
 def test_axiom_selection_name_parse_roundtrip():
@@ -65,7 +62,6 @@ def test_axiom_selection_name_parse_roundtrip():
 
 def test_axiom_selection_name_first_colon_split():
     ref = AxiomSelectionName("axioms:ns:dogs")
-    assert ref.kind == SelectionKind.AXIOMS
     assert ref.bare == "ns:dogs"
 
 

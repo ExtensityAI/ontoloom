@@ -29,9 +29,10 @@ from ontoloom.query.constraints import (
     EntityConstraint,
     HasAnyProperty,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
-    InSelection,
     MentionsAll,
     WithRoles,
 )
@@ -44,9 +45,16 @@ from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
-    SelectionRef,
 )
 from ontoloom.utils import dquoted
+
+type SelectionRef = AxiomSelectionName | EntitySelectionName
+
+
+def _in_selection_entity(within: SelectionRef) -> EntityConstraint:
+    if isinstance(within, AxiomSelectionName):
+        return InAxiomSelection(name=within)
+    return InEntitySelection(name=within)
 
 
 class EntityNotFoundError(OntoloomError):
@@ -109,7 +117,7 @@ def get_entity(s: Session, iri: IRI, *, within: AxiomSelectionName | None = None
 
     axiom_count_constraints: tuple[AxiomConstraint, ...] = (
         MentionsAll(iris=(iri,)),
-        *((InSelection(ref=within),) if within is not None else ()),
+        *((InAxiomSelection(name=within),) if within is not None else ()),
     )
     axiom_counts = run(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
@@ -127,7 +135,7 @@ def axiom_hashes_for_entity(
     """Return all axiom hashes for an entity."""
     constraints: tuple[AxiomConstraint, ...] = (
         MentionsAll(iris=(iri,)),
-        *((InSelection(ref=within),) if within is not None else ()),
+        *((InAxiomSelection(name=within),) if within is not None else ()),
     )
     return run(s, ListAxiomHashes(constraints=constraints))
 
@@ -213,7 +221,7 @@ def collect_entity_iris(
 def entity_summary(s: Session, *, within: SelectionRef | None = None) -> EntitySummary:
     constraints: tuple[EntityConstraint, ...] = (
         HasRole(),
-        *((InSelection(ref=within),) if within is not None else ()),
+        *((_in_selection_entity(within),) if within is not None else ()),
     )
     total = run(s, CountEntities(constraints=constraints))
     by_role = run(s, CountEntitiesByRole(constraints=constraints))
@@ -250,7 +258,7 @@ def _build_entity_constraints(
     if namespace is not None:
         constraints.append(InNamespaces(namespaces=(namespace,)))
     if within is not None:
-        constraints.append(InSelection(ref=within))
+        constraints.append(_in_selection_entity(within))
     if declared is not None:
         constraints.append(Declared(state=declared))
     if properties:
@@ -277,7 +285,7 @@ def _apply_text_filters(
     constraints: list[EntityConstraint] = [InIRIs(iris=tuple(IRI(k) for k in matches))]
 
     if within is not None:
-        constraints.append(InSelection(ref=within))
+        constraints.append(_in_selection_entity(within))
     if role is not None:
         constraints.append(WithRoles(roles=(role,)))
     if namespace is not None:
@@ -399,6 +407,6 @@ def undeclared_entity_count(
         HasRole(),
         Declared(state=False),
         *((Deprecated(state=False),) if exclude_deprecated else ()),
-        *((InSelection(ref=within),) if within is not None else ()),
+        *((_in_selection_entity(within),) if within is not None else ()),
     )
     return run(s, CountEntities(constraints=constraints))

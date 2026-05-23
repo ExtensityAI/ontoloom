@@ -22,13 +22,16 @@ from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.query.constraints import (
     AxiomConstraint,
-    InSelection,
+    InAxiomSelection,
+    InEntitySelection,
     MentionsAll,
     WithTypes,
 )
 from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.types import SelectionRef
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+
+type SelectionRef = AxiomSelectionName | EntitySelectionName
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +132,10 @@ def _iter_candidates(
         constraints.append(MentionsAll(iris=tuple(IRI(iri) for iri in concrete_iris[:3])))
 
     if within is not None:
-        constraints.append(InSelection(ref=within))
+        if isinstance(within, AxiomSelectionName):
+            constraints.append(InAxiomSelection(name=within))
+        else:
+            constraints.append(InEntitySelection(name=within))
 
     return run(s, StreamAxioms(constraints=tuple(constraints)))
 

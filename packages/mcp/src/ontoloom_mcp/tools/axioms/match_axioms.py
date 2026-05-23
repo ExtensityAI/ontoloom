@@ -4,12 +4,11 @@ from ontoloom.connection import Ontology, session
 from ontoloom.patterns.search import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.query.dispatch import run
-from ontoloom.selections.store import upsert_selection
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
-    SelectionKind,
-    SelectionRef,
+    EntitySelectionName,
     ShowFilter,
 )
 
@@ -29,7 +28,7 @@ def match_axioms(
     path: OntologyPath,
     pattern: Pattern,
     into: AxiomSelectionName,
-    within: SelectionRef | None = None,
+    within: AxiomSelectionName | EntitySelectionName | None = None,
     limit: Limit = 100,
 ):
     """Find axioms matching a structural pattern; save matches to an axiom selection.
@@ -56,10 +55,9 @@ def match_axioms(
     ont = Ontology(path)
     with session(ont) as s:
         result = core_match(s, pattern, within=within, limit=limit)
-        upserted = upsert_selection(
+        upserted = upsert_axiom_selection(
             s,
             into.bare,
-            SelectionKind.AXIOMS,
             result.axiom_hashes,
             "match_axioms",
         )

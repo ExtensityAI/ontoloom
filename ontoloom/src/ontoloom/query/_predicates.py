@@ -19,17 +19,17 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
     InPositions,
-    InSelection,
     MentionedIn,
     MentionsAll,
     MentionsAny,
     WithRoles,
     WithTypes,
 )
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 
 # Backslash chosen as the LIKE-ESCAPE character; pair every use with `ESCAPE '\\'`.
 LIKE_ESCAPE = "\\"
@@ -135,21 +135,21 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                 placeholders = ",".join("?" for _ in positions)
                 fragments.append(f"ae.position IN ({placeholders})")
                 params.extend(positions)
-            case InSelection(ref=EntitySelectionName() as ref):
+            case InEntitySelection(name=name):
                 fragments.append(
-                    "EXISTS (SELECT 1 FROM selection_items si_w "
+                    "EXISTS (SELECT 1 FROM entity_selection_items si_w "
                     "WHERE si_w.item = ae.entity_iri "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(ref.bare)
-            case InSelection(ref=AxiomSelectionName() as ref):
+                params.append(name.bare)
+            case InAxiomSelection(name=name):
                 fragments.append(
-                    "EXISTS (SELECT 1 FROM selection_items si_w "
+                    "EXISTS (SELECT 1 FROM axiom_selection_items si_w "
                     "JOIN axioms a_w ON a_w.hash = si_w.item "
                     "WHERE a_w.id = ae.axiom_id "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(ref.bare)
+                params.append(name.bare)
             case _:
                 msg = f"unknown entity constraint variant: {type(c).__name__}"
                 raise ValueError(msg)
@@ -197,21 +197,21 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # n
                     f"WHERE at.axiom_id = a.id AND at.property IN ({placeholders}))"
                 )
                 params.extend(properties)
-            case InSelection(ref=AxiomSelectionName() as ref):
+            case InAxiomSelection(name=name):
                 fragments.append(
-                    "EXISTS (SELECT 1 FROM selection_items si_w "
+                    "EXISTS (SELECT 1 FROM axiom_selection_items si_w "
                     "WHERE si_w.item = a.hash "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(ref.bare)
-            case InSelection(ref=EntitySelectionName() as ref):
+                params.append(name.bare)
+            case InEntitySelection(name=name):
                 fragments.append(
-                    "EXISTS (SELECT 1 FROM selection_items si_w "
+                    "EXISTS (SELECT 1 FROM entity_selection_items si_w "
                     "JOIN axiom_entities ae_w ON ae_w.entity_iri = si_w.item "
                     "WHERE si_w.selection_name = ? "
                     "AND ae_w.axiom_id = a.id)"
                 )
-                params.append(ref.bare)
+                params.append(name.bare)
             case _:
                 msg = f"unknown axiom constraint variant: {type(c).__name__}"
                 raise ValueError(msg)

@@ -8,8 +8,15 @@ from ontoloom.entities.reader import search_entities as core_search_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.selections.store import get_selection, upsert_selection
-from ontoloom.selections.types import EntitySelectionName, SelectionKind, SelectionRef
+from ontoloom.selections.store import (
+    get_axiom_selection,
+    get_entity_selection,
+    upsert_entity_selection,
+)
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+)
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
@@ -21,6 +28,8 @@ from ontoloom_mcp.components.formatting import (
 from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
+
+type SelectionRef = AxiomSelectionName | EntitySelectionName
 
 
 def search_entities(
@@ -68,7 +77,7 @@ def search_entities(
 
         iris = collect_entity_iris(s, **kwargs)
         source = _build_source(query, role, namespace, declared, properties, within)
-        upserted = upsert_selection(s, into.bare, SelectionKind.ENTITIES, iris, source)
+        upserted = upsert_entity_selection(s, into.bare, iris, source)
         sel = upserted.selection
 
         if not iris:
@@ -91,8 +100,12 @@ def search_entities(
 
 
 def _within_metadata(s: Session, within: SelectionRef):
-    sel = get_selection(s, within.bare)
-    return f"\nWithin selection {format_locked_quoted(sel)} ({sel.kind}, {sel.size} items)"
+    if isinstance(within, AxiomSelectionName):
+        sel = get_axiom_selection(s, within.bare)
+        return f"\nWithin selection {format_locked_quoted(sel)} (axioms, {sel.size} items)"
+
+    ent = get_entity_selection(s, within.bare)
+    return f"\nWithin selection {format_locked_quoted(ent)} (entities, {ent.size} items)"
 
 
 def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:

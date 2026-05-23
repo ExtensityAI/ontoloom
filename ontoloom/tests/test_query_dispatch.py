@@ -10,7 +10,7 @@ from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
 from ontoloom.owl.axioms import AxiomTag, Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.query.constraints import InSelection
+from ontoloom.query.constraints import InEntitySelection
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
@@ -21,13 +21,12 @@ from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
-from ontoloom.selections.store import upsert_selection
+from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import (
     AxiomSelectionName,
     AxiomSelectionPage,
     EntitySelectionName,
     EntitySelectionPage,
-    SelectionKind,
     SelectionName,
     SelectionNotFoundError,
 )
@@ -101,7 +100,7 @@ def test_dispatch_stream_axioms_is_context_manager(s):
 def test_dispatch_read_axiom_selection(s):
     dog, _ = _seed(s)
     dog_hash = HashedAxiom.of(dog).hash
-    upsert_selection(s, SelectionName("ax_sel"), SelectionKind.AXIOMS, [dog_hash], "test")
+    upsert_axiom_selection(s, SelectionName("ax_sel"), [dog_hash], "test")
 
     ref = AxiomSelectionName("axioms:ax_sel")
     result = run(s, ReadAxiomSelection(selection=ref))
@@ -111,7 +110,7 @@ def test_dispatch_read_axiom_selection(s):
 
 def test_dispatch_read_entity_selection(s):
     _seed(s)
-    upsert_selection(s, SelectionName("ent_sel"), SelectionKind.ENTITIES, ["ex:Dog"], "test")
+    upsert_entity_selection(s, SelectionName("ent_sel"), ["ex:Dog"], "test")
 
     ref = EntitySelectionName("entities:ent_sel")
     result = run(s, ReadEntitySelection(selection=ref))
@@ -131,7 +130,7 @@ def test_run_raises_on_nonexistent_selection_ref_in_constraints(s):
     ref = EntitySelectionName("entities:does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
-        run(s, ListEntities(constraints=(InSelection(ref=ref),)))
+        run(s, ListEntities(constraints=(InEntitySelection(name=ref),)))
 
 
 def test_run_raises_on_nonexistent_selection_in_read_axiom_selection(s):

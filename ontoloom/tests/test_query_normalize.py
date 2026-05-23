@@ -16,10 +16,11 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
+    InAxiomSelection,
+    InEntitySelection,
     InIRIs,
     InNamespaces,
     InPositions,
-    InSelection,
     MentionedIn,
     MentionsAll,
     MentionsAllOverflowError,
@@ -175,17 +176,17 @@ def test_not_deprecated_dedupe():
     assert result == (Deprecated(state=False),)
 
 
-# == Entity: InSelection ==
+# == Entity: InAxiomSelection / InEntitySelection ==
 
 
 def test_in_selection_single_passes_through():
-    c = InSelection(ref=_ENTITY_REF)
+    c = InEntitySelection(name=_ENTITY_REF)
     result = normalize_entity([c, InIRIs(iris=(A,))])
-    assert InSelection(ref=_ENTITY_REF) in result
+    assert InEntitySelection(name=_ENTITY_REF) in result
 
 
 def test_in_selection_multiple_raises():
-    c = InSelection(ref=_ENTITY_REF)
+    c = InEntitySelection(name=_ENTITY_REF)
 
     with pytest.raises(ValueError, match="a query may have at most one selection scope"):
         normalize_entity([c, c])
@@ -344,17 +345,17 @@ def test_normalize_axiom_annotation_dedupe():
     assert normalize_axiom([c, c]) == (c,)
 
 
-# == Axiom: InSelection ==
+# == Axiom: InAxiomSelection / InEntitySelection ==
 
 
 def test_axiom_in_selection_single_passes_through():
-    c = InSelection(ref=_AXIOM_REF)
+    c = InAxiomSelection(name=_AXIOM_REF)
     result = normalize_axiom([c, WithTypes(tags=(AxiomTag.SUB_CLASS_OF,))])
-    assert InSelection(ref=_AXIOM_REF) in result
+    assert InAxiomSelection(name=_AXIOM_REF) in result
 
 
 def test_axiom_in_selection_multiple_raises():
-    c = InSelection(ref=_AXIOM_REF)
+    c = InAxiomSelection(name=_AXIOM_REF)
 
     with pytest.raises(ValueError, match="a query may have at most one selection scope"):
         normalize_axiom([c, c])
