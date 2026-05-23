@@ -78,6 +78,10 @@ def _ent(name: str) -> EntitySelectionName:
     return EntitySelectionName(f"entities:{name}")
 
 
+def _ax(name: str) -> AxiomSelectionName:
+    return AxiomSelectionName(f"axioms:{name}")
+
+
 EX = PrefixName("ex")
 EX_NS = NamespaceIRI("http://example.org/")
 EX_NS_V1 = NamespaceIRI("http://example.org/v1/")
@@ -736,7 +740,7 @@ def test_entities_in_with_field_sub_class(axiom_selection):
     create_entity_selection(
         axiom_selection,
         _ent("sub_classes"),
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUB_CLASS),
+        EntitiesInExpr(entities_in=_ax("ax_sel"), position=Position.SUB_CLASS),
     )
     items = [
         r[0]
@@ -751,7 +755,7 @@ def test_entities_in_with_field_super_class(axiom_selection):
     create_entity_selection(
         axiom_selection,
         _ent("super_classes"),
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.SUPER_CLASS),
+        EntitiesInExpr(entities_in=_ax("ax_sel"), position=Position.SUPER_CLASS),
     )
     items = [
         r[0]
@@ -768,7 +772,7 @@ def test_entities_in_with_field_filler(axiom_selection):
     create_entity_selection(
         axiom_selection,
         _ent("fillers"),
-        EntitiesInExpr(entities_in=SelectionName("ax_sel"), position=Position.FILLER),
+        EntitiesInExpr(entities_in=_ax("ax_sel"), position=Position.FILLER),
     )
     items = [
         r[0]
@@ -781,7 +785,7 @@ def test_entities_in_with_field_filler(axiom_selection):
 
 def test_entities_in_without_field(axiom_selection):
     create_entity_selection(
-        axiom_selection, _ent("all_ents"), EntitiesInExpr(entities_in=SelectionName("ax_sel"))
+        axiom_selection, _ent("all_ents"), EntitiesInExpr(entities_in=_ax("ax_sel"))
     )
     items = [
         r[0]

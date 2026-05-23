@@ -206,7 +206,6 @@ def test_search_axioms_by_property_only(empty_db):
 def test_search_axioms_with_within_scope(empty_db):
     from ontoloom.axioms.types import HashedAxiom
     from ontoloom.selections.store import upsert_axiom_selection
-    from ontoloom.selections.types import SelectionName
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
     todo = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
@@ -554,7 +553,7 @@ def test_remove_axioms_stale_selection_translates(populated_db):
     create_selection(
         path=populated_db,
         name=AxiomSelectionName("axioms:dogs_ax"),
-        expr=AxiomsForExpr(axioms_for=SelectionName("dogs_ent")),
+        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:dogs_ent")),
     )
     stale = LockedAxiomSelectionName("axioms:dogs_ax@deadbeef")
 

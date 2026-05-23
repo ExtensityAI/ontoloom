@@ -29,8 +29,8 @@ class SelectionExprError(OntoloomError):
     """Set-expression evaluation precondition violated.
 
     Covers operand-cardinality issues (no operands, too few for intersect/diff)
-    and kind mismatches (axioms_for over an axiom expression, mixed-kind operands
-    of a set op).
+    and any boundary-layer kind-routing mismatches when the destination kind
+    of the selection doesn't match the kind of the supplied expression.
     """
 
 

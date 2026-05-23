@@ -309,10 +309,10 @@ def test_selection_pagination_stable_across_processes(tmp_path):
         from pathlib import Path
         from ontoloom.query.dispatch import run
         from ontoloom.selections.compose import create_entity_selection
-        from ontoloom.selections.expr import IntersectExpr
+        from ontoloom.selections.expr import EntityIntersectExpr
         from ontoloom.selections.store import upsert_entity_selection
         from ontoloom.selections.read_entity_selection import ReadEntitySelection
-        from ontoloom.selections.types import EntitySelectionName, SelectionName
+        from ontoloom.selections.types import EntitySelectionName
         from ontoloom.connection import Ontology
         from ontoloom.connection import session
 
@@ -322,7 +322,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
             upsert_entity_selection(s, "b",
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
             r = EntitySelectionName("entities:r")
-            create_entity_selection(s, r, IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))))
+            create_entity_selection(s, r, EntityIntersectExpr(intersect=(EntitySelectionName("entities:a"), EntitySelectionName("entities:b"))))
             page = run(s, ReadEntitySelection(selection=r, limit=5))
             print(",".join(item.iri for item in page.items))
             s.commit()
