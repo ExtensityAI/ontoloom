@@ -73,7 +73,7 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
                     entries = [
                         ("-", HashedAxiom(axiom=load_axiom(data), hash=h)) for h, data in rows
                     ]
-                    summary = f"Removing {meta.size} axioms in selection {dquoted(name)}."
+                    summary = f"Removing {len(entries)} axioms in selection {dquoted(name)}."
                     raise ConfirmationRequiredError(
                         format_diff(entries, summary, max_rows=20), token
                     )
