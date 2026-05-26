@@ -4,9 +4,8 @@ Two parallel families operate on `axiom_selections` / `axiom_selection_items`
 and `entity_selections` / `entity_selection_items` respectively. The two kinds
 never share storage — every callsite knows its kind statically.
 
-Core mutations do not perform optimistic-lock checks: callers needing
-LLM-context staleness mitigation wrap mutations in `verify_lock` at the MCP
-boundary. Multi-process callers need real transactions, not hash prefixes.
+Writes are non-destructive by default: `mode=CREATE` refuses to clobber an
+occupied name. Multi-process callers need real transactions for safety.
 """
 
 import hashlib
@@ -106,9 +105,6 @@ def upsert_axiom_selection(
     Caller's insertion order is preserved on disk (`id`, rowid alias);
     `ReadAxiomSelection` paginates in insertion order so any baked-in ranking
     survives. The content hash is order-independent (items sorted internally).
-
-    Optimistic locking (hash-prefix check) is a MCP-layer concern; callers
-    needing it wrap this with `verify_lock`.
 
     Raises:
         SelectionExistsError: `mode=CREATE` and the name is already in use.
@@ -247,9 +243,6 @@ def upsert_entity_selection(
     Caller's insertion order is preserved on disk; `ReadEntitySelection`
     paginates lexicographically on the IRI. The content hash is
     order-independent (items sorted internally).
-
-    Optimistic locking is a MCP-layer concern; callers needing it wrap this
-    with `verify_lock`.
 
     Raises:
         SelectionExistsError: `mode=CREATE` and the name is already in use.
