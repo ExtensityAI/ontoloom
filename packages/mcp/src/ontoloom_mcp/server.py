@@ -30,9 +30,12 @@ mcp = FastMCP(
         "derived from axioms. Add/remove axioms to change the ontology.\n\n"
         "Selections are named sets of axiom hashes or entity IRIs that persist across calls. "
         "Use them to build up working sets incrementally: search, save, narrow, combine, "
-        "then act (export, delete, inspect). Outputs include 'name@hash' identifiers; pass "
-        "that exact form back as `within=` for write operations to confirm the selection "
-        "hasn't drifted (optimistic locking)."
+        "then act (export, delete, inspect). Reference a selection by its bare kind-prefixed "
+        "name: `axioms:NAME` or `entities:NAME`. Writing to an existing name is refused by "
+        'default; pass `mode="replace"` to overwrite, or combine sets via set-algebra in '
+        "create_selection. Destructive ops (remove_axioms by selection, rename_iri) show a "
+        "preview and return a `confirm` token; call again with `confirm=<token>` to apply. "
+        "If the selection changed meanwhile, the token is rejected and a fresh preview shown."
     ),
 )
 

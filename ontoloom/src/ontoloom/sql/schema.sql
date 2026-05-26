@@ -78,7 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_axiom_text_prop_lower_text
     ON axiom_text(property, LOWER(text));
 
 -- Axiom selections: persistent sets of axiom hashes.
--- Content hash enables optimistic locking (write ops require name@hash_prefix).
+-- Content hash; backs confirm-token staleness detection for destructive ops.
 CREATE TABLE IF NOT EXISTS axiom_selections (
     name TEXT PRIMARY KEY,
     hash TEXT NOT NULL,
