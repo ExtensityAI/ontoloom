@@ -24,8 +24,6 @@ from ontoloom.utils import dquoted
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from ontoloom_mcp.components.locking import StaleSelectionError
-
 
 def _format_one_error(err: ErrorDetails) -> str:
     return err["msg"]
@@ -63,13 +61,6 @@ def format_error(e: Exception) -> str:  # noqa: C901
                 f"Selection {dquoted(e.name)} does not exist. "
                 f"Use `search_entities` or `match_axioms` (with `into=` set) to create one."
             )
-        case StaleSelectionError():
-            current = (
-                f" Current: {e.name}@{e.current_hash} ({e.current_size} items)."
-                if e.current_hash is not None and e.current_size is not None
-                else " It no longer exists."
-            )
-            return f"Selection {dquoted(e.name)} has changed since you last observed it.{current}"
         case SelectionExistsError():
             return (
                 f"Selection {dquoted(e.name)} already exists ({e.existing_size} items). "
