@@ -16,6 +16,7 @@ from ontoloom.errors import (
 from ontoloom.models import UnionDispatchError
 from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError, UndeclaredPrefixError
 from ontoloom.selections.types import (
+    SelectionExistsError,
     SelectionExprError,
     SelectionNotFoundError,
 )
@@ -69,6 +70,11 @@ def format_error(e: Exception) -> str:  # noqa: C901
                 else " It no longer exists."
             )
             return f"Selection {dquoted(e.name)} has changed since you last observed it.{current}"
+        case SelectionExistsError():
+            return (
+                f"Selection {dquoted(e.name)} already exists ({e.existing_size} items). "
+                f'Pass mode="replace" to overwrite it.'
+            )
         case SelectionExprError():
             return f"Invalid set expression: {e}"
         case AxiomNotFoundError():
