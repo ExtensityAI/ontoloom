@@ -19,8 +19,7 @@ from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.formatting import format_diff
-from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.formatting import format_diff, format_selection_ref
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -84,7 +83,7 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
                 summary = (
                     f"Removed {len(sel_result.removed)} axioms "
                     f"({sel_result.absent} already absent). "
-                    f"Selection {format_locked_quoted(sel_result.meta)} retained."
+                    f"Selection {format_selection_ref(sel_result.meta)} retained."
                 )
                 return format_diff(entries, summary, max_rows=20)
 

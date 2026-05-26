@@ -12,12 +12,12 @@ from ontoloom.selections.types import (
     SelectionName,
     SelectionNotFoundError,
 )
+from ontoloom_mcp.components.formatting import format_selection_ref
 from ontoloom_mcp.components.locking import (
     HashPrefix,
     LockedAxiomSelectionName,
     LockedEntitySelectionName,
     StaleSelectionError,
-    format_locked_quoted,
     verify_lock,
 )
 
@@ -147,12 +147,12 @@ def test_verify_lock_kind_mismatch_treated_as_missing(s):
         verify_lock(s, locked)
 
 
-# -- format_locked_quoted --
+# -- format_selection_ref --
 
 
-def test_format_locked_quoted_wraps_in_double_quotes(s):
+def test_format_selection_ref_wraps_bare_ref_in_double_quotes(s):
     result = upsert_axiom_selection(s, SelectionName("ax_sel"), ["a" * 64], "test")
-    assert format_locked_quoted(result.selection) == f'"axioms:ax_sel@{result.selection.hash}"'
+    assert format_selection_ref(result.selection) == '"axioms:ax_sel"'
 
 
 # -- StaleSelectionError message format --

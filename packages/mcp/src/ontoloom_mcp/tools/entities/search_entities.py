@@ -26,9 +26,9 @@ from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
     SELECT_PREVIEW,
     format_roles,
+    format_selection_ref,
     format_selection_result,
 )
-from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -88,7 +88,7 @@ def search_entities(
         if not iris:
             no_results = _no_results_msg(query, role, namespace, declared, properties or (), within)
             s.commit()
-            return f"0 entities -> {format_locked_quoted(sel)}.\n{no_results}"
+            return f"0 entities -> {format_selection_ref(sel)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
@@ -107,10 +107,10 @@ def search_entities(
 def _within_metadata(s: Session, within: SelectionRef):
     if isinstance(within, AxiomSelectionName):
         sel = get_axiom_selection(s, within.bare)
-        return f"\nWithin selection {format_locked_quoted(sel)} (axioms, {sel.size} items)"
+        return f"\nWithin selection {format_selection_ref(sel)} (axioms, {sel.size} items)"
 
     ent = get_entity_selection(s, within.bare)
-    return f"\nWithin selection {format_locked_quoted(ent)} (entities, {ent.size} items)"
+    return f"\nWithin selection {format_selection_ref(ent)} (entities, {ent.size} items)"
 
 
 def _filter_parts(

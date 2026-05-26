@@ -9,7 +9,7 @@ from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.formatting import format_selection_ref
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -85,7 +85,7 @@ def rename_iri(
         parts.append(f"{len(merged)} merged into existing axioms.")
     if upserted is not None:
         sel = upserted.selection
-        parts.append(f"Saved to {format_locked_quoted(sel)} ({sel.size} items).")
+        parts.append(f"Saved to {format_selection_ref(sel)} ({sel.size} items).")
     return " ".join(parts)
 
 

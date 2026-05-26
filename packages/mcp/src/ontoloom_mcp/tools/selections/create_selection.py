@@ -15,7 +15,7 @@ from ontoloom.selections.types import (
 )
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.formatting import format_selection_ref
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -63,7 +63,7 @@ def create_selection(
             ax = create_axiom_selection(s, name, expr, mode=mode)
             s.commit()
             sel_ax = ax.selection
-            parts = [f"Selection {format_locked_quoted(sel_ax)}: {sel_ax.size} axioms"]
+            parts = [f"Selection {format_selection_ref(sel_ax)}: {sel_ax.size} axioms"]
 
             if ax.previous_size is not None:
                 parts.append(f"(overwrote previous: {ax.previous_size} items)")
@@ -75,7 +75,7 @@ def create_selection(
         ent = create_entity_selection(s, name, expr, mode=mode)
         s.commit()
         sel_ent = ent.selection
-        parts = [f"Selection {format_locked_quoted(sel_ent)}: {sel_ent.size} entities"]
+        parts = [f"Selection {format_selection_ref(sel_ent)}: {sel_ent.size} entities"]
 
         if ent.previous_size is not None:
             parts.append(f"(overwrote previous: {ent.previous_size} items)")

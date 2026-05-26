@@ -13,8 +13,7 @@ from ontoloom.selections.types import (
 )
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.formatting import format_axiom_annotations
-from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.formatting import format_axiom_annotations, format_selection_ref
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
@@ -57,7 +56,7 @@ def read_selection(
 def _format_axiom_page(page: AxiomSelectionPage, *, offset: int, show: ShowFilter):
     meta = page.meta
     header = (
-        f"Selection {format_locked_quoted(meta)} (axioms): "
+        f"Selection {format_selection_ref(meta)} (axioms): "
         f"{meta.size} total ({page.present} present, {page.missing} missing)"
     )
 
@@ -83,7 +82,7 @@ def _format_axiom_page(page: AxiomSelectionPage, *, offset: int, show: ShowFilte
 def _format_entity_page(page: EntitySelectionPage, *, offset: int, show: ShowFilter):
     meta = page.meta
     header = (
-        f"Selection {format_locked_quoted(meta)} (entities): "
+        f"Selection {format_selection_ref(meta)} (entities): "
         f"{meta.size} total ({page.present} present, {page.missing} missing)"
     )
 

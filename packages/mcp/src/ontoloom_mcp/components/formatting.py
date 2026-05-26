@@ -11,9 +11,8 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
+from ontoloom.selections.types import AxiomSelection, EntitySelection
 from ontoloom.utils import dquoted
-
-from ontoloom_mcp.components.locking import format_locked_quoted
 
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
@@ -63,6 +62,11 @@ def build_refs_per_axiom(s: Session, axioms: Sequence[HashedAxiom]) -> list[list
     return [
         [Ref(iri=iri, label=labels.get(iri)) for iri in unique_iris_in(ha.axiom)] for ha in axioms
     ]
+
+
+def format_selection_ref(meta: AxiomSelection | EntitySelection) -> str:
+    kind = "axioms" if isinstance(meta, AxiomSelection) else "entities"
+    return dquoted(f"{kind}:{meta.name}")
 
 
 def format_ref(ref: Ref) -> str:
@@ -137,7 +141,7 @@ def format_selection_result(
 ):
     sel = upserted.selection
     kind_label = "axioms" if isinstance(upserted, AxiomUpsertResult) else "entities"
-    parts = [f"{sel.size} {kind_label} -> {format_locked_quoted(sel)}."]
+    parts = [f"{sel.size} {kind_label} -> {format_selection_ref(sel)}."]
     if upserted.previous_size is not None:
         parts.append(f"Overwrote previous ({upserted.previous_size} items).")
 

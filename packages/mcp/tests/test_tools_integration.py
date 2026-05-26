@@ -88,7 +88,8 @@ def test_search_entities_creates_selection(populated_db):
         into=EntitySelectionName("entities:dogs"),
         query="Dog",
     )
-    assert "dogs@" in result
+    assert '"entities:dogs"' in result
+    assert "entities:dogs@" not in result
 
 
 def test_read_selection_after_search(populated_db):
@@ -139,7 +140,8 @@ def test_search_axioms_by_text(empty_db):
         query="TODO",
     )
 
-    assert "axioms:todos@" in result
+    assert '"axioms:todos"' in result
+    assert "axioms:todos@" not in result
     assert "1 axioms" in result
     assert "SubClassOf" in result
 
@@ -923,7 +925,8 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
     )
 
     first = search_axioms(path=empty_db, into=AxiomSelectionName("axioms:t"), query="dog")
-    assert "axioms:t" in first or "t@" in first
+    assert '"axioms:t"' in first
+    assert "axioms:t@" not in first
 
     wrapped = translate_errors(search_axioms)
     with pytest.raises(ToolError) as exc_info:
@@ -938,7 +941,8 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
         query="dog",
         mode=WriteMode.REPLACE,
     )
-    assert "t@" in overwrote
+    assert '"axioms:t"' in overwrote
+    assert "axioms:t@" not in overwrote
 
 
 def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
@@ -959,7 +963,8 @@ def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
         query="Dog",
         mode=WriteMode.REPLACE,
     )
-    assert "t@" in overwrote
+    assert '"entities:t"' in overwrote
+    assert "entities:t@" not in overwrote
 
 
 def test_producer_tools_accept_mode_argument(populated_db):

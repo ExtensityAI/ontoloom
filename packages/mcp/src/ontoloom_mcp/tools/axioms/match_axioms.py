@@ -5,8 +5,7 @@ from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, WriteMode
 
-from ontoloom_mcp.components.formatting import format_selection_result
-from ontoloom_mcp.components.locking import format_locked_quoted
+from ontoloom_mcp.components.formatting import format_selection_ref, format_selection_result
 from ontoloom_mcp.components.preview import format_axiom_selection_preview
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
@@ -61,7 +60,7 @@ def match_axioms(
 
         if not result.axiom_hashes:
             s.commit()
-            return f"{header} -> {format_locked_quoted(sel)}."
+            return f"{header} -> {format_selection_ref(sel)}."
 
         page_text = format_axiom_selection_preview(s, upserted)
         s.commit()

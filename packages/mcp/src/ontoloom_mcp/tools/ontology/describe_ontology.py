@@ -17,8 +17,8 @@ from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
 from ontoloom_mcp.components.formatting import (
     build_refs,
     format_ref,
+    format_selection_ref,
 )
-from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -47,10 +47,10 @@ def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
         if within is not None:
             if isinstance(within, AxiomSelectionName):
                 sel_ax = get_axiom_selection(s, within.bare)
-                parts.append(f"Within selection {format_locked_quoted(sel_ax)} (axioms):")
+                parts.append(f"Within selection {format_selection_ref(sel_ax)} (axioms):")
             else:
                 sel_ent = get_entity_selection(s, within.bare)
-                parts.append(f"Within selection {format_locked_quoted(sel_ent)} (entities):")
+                parts.append(f"Within selection {format_selection_ref(sel_ent)} (entities):")
             parts.append("")
 
         parts.append(_format_entity_summary(ent_summary))
