@@ -795,6 +795,113 @@ def test_rename_iri_collision_with_wrong_token_raises(populated_db):
         )
 
 
+def test_rename_iri_within_bare_scope_limits_rename(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_decl_hash = HashedAxiom.of(dog_decl).hash
+
+    # Scope holds only the ex:Dog declaration, not the SubClassOf(ex:Dog, ...).
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope"), [dog_decl_hash], "test fixture")
+        s.commit()
+
+    result = rename_iri(
+        path=populated_db,
+        old_iri=IRI("ex:Dog"),
+        new_iri=IRI("ex:Puppy"),
+        within=AxiomSelectionName("axioms:scope"),
+    )
+    assert "1 axioms replaced" in result
+
+    # The SubClassOf is out of scope, so it still mentions ex:Dog.
+    with session(Ontology(populated_db)) as s:
+        subclass_rows = s.conn.execute(
+            "SELECT COUNT(*) FROM axiom_entities WHERE entity_iri = ?", ("ex:Dog",)
+        ).fetchone()
+        s.commit()
+    assert subclass_rows[0] == 1  # only the SubClassOf still references ex:Dog
+
+
+def test_rename_iri_within_scope_collision_token_round_trips(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_decl_hash = HashedAxiom.of(dog_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope"), [dog_decl_hash], "test fixture")
+        s.commit()
+
+    # Renaming ex:Dog -> ex:Animal collides on the Declaration axiom.
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        rename_iri(
+            path=populated_db,
+            old_iri=IRI("ex:Dog"),
+            new_iri=IRI("ex:Animal"),
+            within=AxiomSelectionName("axioms:scope"),
+        )
+    token = exc_info.value.token
+
+    result = rename_iri(
+        path=populated_db,
+        old_iri=IRI("ex:Dog"),
+        new_iri=IRI("ex:Animal"),
+        within=AxiomSelectionName("axioms:scope"),
+        confirm=token,
+    )
+    assert "merged" in result
+
+
+def test_rename_iri_within_scope_change_invalidates_token(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom.selections.types import WriteMode
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_decl_hash = HashedAxiom.of(dog_decl).hash
+    animal_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    animal_decl_hash = HashedAxiom.of(animal_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope"), [dog_decl_hash], "test fixture")
+        s.commit()
+
+    with pytest.raises(ConfirmationRequiredError) as first:
+        rename_iri(
+            path=populated_db,
+            old_iri=IRI("ex:Dog"),
+            new_iri=IRI("ex:Animal"),
+            within=AxiomSelectionName("axioms:scope"),
+        )
+    token_before = first.value.token
+
+    # Change the scope's contents (add an extra hash). The rename still collides
+    # on the in-scope ex:Dog declaration, but the scope identity has changed.
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("scope"),
+            [dog_decl_hash, animal_decl_hash],
+            "test fixture",
+            mode=WriteMode.REPLACE,
+        )
+        s.commit()
+
+    with pytest.raises(ConfirmationRequiredError) as second:
+        rename_iri(
+            path=populated_db,
+            old_iri=IRI("ex:Dog"),
+            new_iri=IRI("ex:Animal"),
+            within=AxiomSelectionName("axioms:scope"),
+        )
+    token_after = second.value.token
+
+    assert token_before != token_after
+
+
 # -- WriteMode: non-destructive selection writes --
 
 

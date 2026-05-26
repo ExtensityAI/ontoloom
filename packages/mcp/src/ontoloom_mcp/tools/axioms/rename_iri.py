@@ -2,18 +2,14 @@ from mcp.types import ToolAnnotations
 from ontoloom.axioms.mutations import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
-from ontoloom.selections.store import upsert_axiom_selection
+from ontoloom.selections.store import get_axiom_selection, upsert_axiom_selection
 from ontoloom.selections.types import AxiomSelectionName, WriteMode
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.locking import (
-    LockedAxiomSelectionName,
-    format_locked_quoted,
-    verify_lock,
-)
+from ontoloom_mcp.components.locking import format_locked_quoted
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -22,7 +18,7 @@ def rename_iri(
     path: OntologyPath,
     old_iri: IRI,
     new_iri: IRI,
-    within: LockedAxiomSelectionName | None = None,
+    within: AxiomSelectionName | None = None,
     into: AxiomSelectionName | None = None,
     mode: WriteMode = WriteMode.CREATE,
     confirm: str | None = None,
@@ -35,9 +31,9 @@ def rename_iri(
     Args:
     - `old_iri`: IRI to replace.
     - `new_iri`: New IRI to use in its place.
-    - `within`: Optional locked axiom selection reference
-      `"axioms:NAME@hash_prefix"` (e.g. `"axioms:my_sel@a3f1b2c4"`). The hash
-      prefix verifies the selection hasn't changed since you last observed it.
+    - `within`: Optional axiom selection (e.g. `"axioms:my_sel"`) restricting
+      the rename to axioms in that scope. Scope staleness is only re-checked
+      when the rename hits a collision (it is folded into the confirm token).
     - `into`: Optional axiom selection (e.g. `"axioms:renamed"`) to populate
       with the post-rename hashes of every replaced axiom. Use to inspect or
       further operate on the affected axioms without re-querying.
@@ -49,13 +45,14 @@ def rename_iri(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        verified = verify_lock(s, within) if within is not None else None
-        result = core_rename_iri(s, old_iri, new_iri, within=verified)
+        result = core_rename_iri(s, old_iri, new_iri, within=within)
 
         if result.colliding_hashes:
-            token = confirmation_token(
-                "rename_iri", str(old_iri), str(new_iri), *sorted(result.colliding_hashes)
-            )
+            parts = ["rename_iri", str(old_iri), str(new_iri), *sorted(result.colliding_hashes)]
+            if within is not None:
+                parts += [str(within), get_axiom_selection(s, within.bare).hash]
+
+            token = confirmation_token(*parts)
             if confirm != token:
                 msg = (
                     f"Renaming {old_iri} -> {new_iri} would merge "
