@@ -1,10 +1,9 @@
-"""Regression: SQLite WAL + the project's explicit-BEGIN session pattern actually
-closes the TOCTOU window between `verify_lock`'s SELECT and the subsequent write.
+"""Regression: SQLite WAL + the project's explicit-BEGIN session pattern closes
+the lost-update window between a session's first read and its subsequent write.
 
-This is the empirical basis for the locking-module guarantee: if a competing
-connection commits a write *anywhere* between session A's first read and A's
-commit, A's commit fails with `database is locked` (snapshot conflict). A's
-write does not overwrite the competitor's change.
+If a competing connection commits a write *anywhere* between session A's first
+read and A's commit, A's commit fails with `database is locked` (snapshot
+conflict). A's write does not silently overwrite the competitor's change.
 """
 
 import sqlite3
@@ -25,9 +24,9 @@ def _raw(path: Path) -> sqlite3.Connection:
     return conn
 
 
-def test_wal_snapshot_isolation_prevents_verify_lock_toctou(tmp_path):
-    """A's `verify_lock`-style SELECT pins A's snapshot; if B commits anything
-    before A commits, A's write fails — even when A writes a different row."""
+def test_wal_snapshot_isolation_prevents_lost_update_toctou(tmp_path):
+    """A's initial SELECT pins A's snapshot; if B commits anything before A
+    commits, A's write fails — even when A writes a different row."""
     db = tmp_path / "iso.db"
     ont = Ontology.create(db)
 
@@ -38,7 +37,7 @@ def test_wal_snapshot_isolation_prevents_verify_lock_toctou(tmp_path):
     raw_a = _raw(db)
     raw_b = _raw(db)
     try:
-        # A: BEGIN + verify_lock-style read (snapshot established).
+        # A: BEGIN + initial read (snapshot established).
         raw_a.execute("BEGIN")
         raw_a.execute("SELECT hash FROM entity_selections WHERE name = 'foo'").fetchone()
 
