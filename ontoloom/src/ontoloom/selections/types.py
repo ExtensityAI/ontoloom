@@ -110,6 +110,19 @@ class SelectionNotFoundError(OntoloomError):
         super().__init__(f"Selection {dquoted(name)} does not exist.")
 
 
+class WriteMode(StrEnum):
+    CREATE = "create"  # refuse if the name is already in use
+    REPLACE = "replace"  # overwrite unconditionally
+
+
+class SelectionExistsError(OntoloomError):
+    def __init__(self, name: SelectionName, existing_size: int):
+        self.name = name
+        self.existing_size = existing_size
+        msg = f"Selection {dquoted(name)} already exists ({existing_size} items)."
+        super().__init__(msg)
+
+
 def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
     """Validate `kind:NAME` wire form; return `value` unchanged."""
     prefix, sep, name = value.partition(":")

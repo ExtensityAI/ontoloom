@@ -29,10 +29,12 @@ from ontoloom.selections.store import (
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
+    SelectionExistsError,
     SelectionExprError,
     SelectionName,
     SelectionNotFoundError,
     ShowFilter,
+    WriteMode,
 )
 
 
@@ -464,3 +466,25 @@ def test_axiom_selection_exists_false_when_only_entity_side(s):
     upsert_entity_selection(s, SelectionName("bar"), [], source="test")
 
     assert axiom_selection_exists(s, SelectionName("bar")) is False
+
+
+# -- WriteMode / SelectionExistsError --
+
+
+def test_write_mode_from_value():
+    assert WriteMode("create") is WriteMode.CREATE
+    assert WriteMode("replace") is WriteMode.REPLACE
+
+
+def test_write_mode_rejects_unknown_value():
+    with pytest.raises(ValueError):
+        WriteMode("union")
+
+
+def test_selection_exists_error_stringifies_name_and_size():
+    err = SelectionExistsError(SelectionName("x"), 3)
+    text = str(err)
+    assert "x" in text
+    assert "3" in text
+    assert err.name == "x"
+    assert err.existing_size == 3
