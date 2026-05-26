@@ -20,6 +20,7 @@ from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import (
     axiom_selection_exists,
     entity_selection_exists,
+    get_axiom_selection,
     get_entity_selection,
     remove_axiom_selections,
     remove_entity_selections,
@@ -171,7 +172,7 @@ def test_nested_expression(s):
 
 def test_overwrite_produces_new_hash(s):
     hash1 = upsert_entity_selection(s, SelectionName("s"), ["ex:Dog"], "test").selection.hash
-    _r = upsert_entity_selection(s, SelectionName("s"), ["ex:Cat"], "test")
+    _r = upsert_entity_selection(s, SelectionName("s"), ["ex:Cat"], "test", mode=WriteMode.REPLACE)
     hash2, card2 = _r.selection.hash, _r.selection.size
 
     assert hash2 != hash1
@@ -488,3 +489,57 @@ def test_selection_exists_error_stringifies_name_and_size():
     assert "3" in text
     assert err.name == "x"
     assert err.existing_size == 3
+
+
+# -- WriteMode gating on the core write path --
+
+
+def test_upsert_axiom_create_refuses_existing(s):
+    upsert_axiom_selection(s, SelectionName("dup"), ["a" * 64, "b" * 64], "test")
+
+    with pytest.raises(SelectionExistsError) as exc_info:
+        upsert_axiom_selection(s, SelectionName("dup"), ["c" * 64], "test", mode=WriteMode.CREATE)
+
+    assert exc_info.value.existing_size == 2
+    # Original is untouched.
+    assert get_axiom_selection(s, SelectionName("dup")).size == 2
+
+
+def test_upsert_axiom_replace_overwrites(s):
+    upsert_axiom_selection(s, SelectionName("dup"), ["a" * 64, "b" * 64], "test")
+
+    result = upsert_axiom_selection(
+        s, SelectionName("dup"), ["c" * 64], "test", mode=WriteMode.REPLACE
+    )
+
+    assert result.selection.size == 1
+    assert result.previous_size == 2
+    assert get_axiom_selection(s, SelectionName("dup")).size == 1
+
+
+def test_upsert_axiom_create_on_fresh_name_succeeds(s):
+    result = upsert_axiom_selection(
+        s, SelectionName("fresh"), ["a" * 64], "test", mode=WriteMode.CREATE
+    )
+
+    assert result.selection.size == 1
+    assert result.previous_size is None
+
+
+def test_upsert_entity_create_refuses_existing(s):
+    upsert_entity_selection(s, SelectionName("dup"), ["ex:Dog"], "test")
+
+    with pytest.raises(SelectionExistsError) as exc_info:
+        upsert_entity_selection(s, SelectionName("dup"), ["ex:Cat"], "test", mode=WriteMode.CREATE)
+
+    assert exc_info.value.existing_size == 1
+    assert get_entity_selection(s, SelectionName("dup")).size == 1
+
+
+def test_create_axiom_selection_create_refuses_existing(s):
+    upsert_axiom_selection(s, SelectionName("occupied"), ["a" * 64], "test")
+
+    with pytest.raises(SelectionExistsError):
+        create_axiom_selection(
+            s, _ax("occupied"), AxiomUnionExpr(union=(_ax("occupied"),)), mode=WriteMode.CREATE
+        )

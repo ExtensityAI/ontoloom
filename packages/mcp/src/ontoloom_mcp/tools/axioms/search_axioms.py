@@ -15,7 +15,7 @@ from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_selection_result
@@ -28,6 +28,7 @@ from ontoloom_mcp.components.types import Limit, OntologyPath
 def search_axioms(
     path: OntologyPath,
     into: AxiomSelectionName,
+    mode: WriteMode = WriteMode.CREATE,
     query: Annotated[str, MinLen(1)] | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
     within: AxiomSelectionName | EntitySelectionName | None = None,
@@ -40,6 +41,7 @@ def search_axioms(
 
     Args:
     - `into`: Kind-prefixed name for the output selection (e.g. `"axioms:todos"`).
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `query`: Case-insensitive match on axiom-level annotation values. Exact matches
       rank before substring matches.
     - `properties`: Annotation property IRIs. With query, restricts text search to
@@ -82,7 +84,7 @@ def search_axioms(
             hashes = [hit.hash for hit in result.hits]
 
         source = _build_source(query, props_tuple, within)
-        upserted = upsert_axiom_selection(s, into.bare, hashes, source)
+        upserted = upsert_axiom_selection(s, into.bare, hashes, source, mode=mode)
         sel = upserted.selection
 
         if not hashes:

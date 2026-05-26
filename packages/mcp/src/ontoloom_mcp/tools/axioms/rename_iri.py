@@ -3,7 +3,7 @@ from ontoloom.axioms.mutations import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import AxiomSelectionName, WriteMode
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -24,6 +24,7 @@ def rename_iri(
     new_iri: IRI,
     within: LockedAxiomSelectionName | None = None,
     into: AxiomSelectionName | None = None,
+    mode: WriteMode = WriteMode.CREATE,
     confirm: str | None = None,
 ):
     """Rename an IRI across all (or restricted) axioms.
@@ -40,6 +41,7 @@ def rename_iri(
     - `into`: Optional axiom selection (e.g. `"axioms:renamed"`) to populate
       with the post-rename hashes of every replaced axiom. Use to inspect or
       further operate on the affected axioms without re-querying.
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `confirm`: When the rename would merge axioms into existing ones (hash
       collision => annotations on the merged axioms may be lost), the first
       call raises `ConfirmationRequiredError` with a token. Pass that token
@@ -71,6 +73,7 @@ def rename_iri(
                 into.bare,
                 new_hashes,
                 f"rename_iri({old_iri} -> {new_iri})",
+                mode=mode,
             )
 
         s.commit()

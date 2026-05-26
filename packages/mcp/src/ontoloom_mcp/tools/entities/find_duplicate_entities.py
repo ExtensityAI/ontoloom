@@ -3,7 +3,7 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import find_duplicate_entities as _find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_entity_selection
-from ontoloom.selections.types import EntitySelectionName
+from ontoloom.selections.types import EntitySelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -17,6 +17,7 @@ def find_duplicate_entities(
     path: OntologyPath,
     into: EntitySelectionName,
     annotation_property: IRI,
+    mode: WriteMode = WriteMode.CREATE,
     within: EntitySelectionName | None = None,
 ):
     """Find annotation values shared by multiple entities.
@@ -29,6 +30,7 @@ def find_duplicate_entities(
       (e.g. `"entities:dup_labels"`).
     - `annotation_property`: The property whose values are checked for duplicates
       (e.g. "rdfs:label").
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `within`: Optional entity selection (e.g. `"entities:my_classes"`) to
       restrict the check to.
     """
@@ -47,6 +49,7 @@ def find_duplicate_entities(
             into.bare,
             result.affected_iris,
             source=source,
+            mode=mode,
         )
         sel = upserted.selection
         s.commit()

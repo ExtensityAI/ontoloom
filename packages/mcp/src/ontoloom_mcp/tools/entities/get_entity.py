@@ -5,7 +5,7 @@ from ontoloom.entities.reader import get_entity as core_get_entity
 from ontoloom.entities.types import EntityInfo
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import AxiomSelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import Ref, build_refs, format_ref, format_roles
@@ -18,6 +18,7 @@ def get_entity(
     path: OntologyPath,
     iri: IRI,
     into: AxiomSelectionName | None = None,
+    mode: WriteMode = WriteMode.CREATE,
     within: AxiomSelectionName | None = None,
 ):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
@@ -30,6 +31,7 @@ def get_entity(
       (e.g. `"axioms:dog_axioms"`). Entry point for "I want to work on this
       entity's axioms" -> then use `match_axioms(within=...)` or
       `remove_axioms(within=...)` on the result.
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     """
     ont = Ontology(path)
     with session(ont) as s:
@@ -40,7 +42,7 @@ def get_entity(
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
             source = f"get_entity(iri={dquoted(iri)})"
-            upserted = upsert_axiom_selection(s, into.bare, hashes, source)
+            upserted = upsert_axiom_selection(s, into.bare, hashes, source, mode=mode)
             sel = upserted.selection
             sel_msg = f"\n\n{sel.size} axiom hashes -> {format_locked_quoted(sel)}."
             if upserted.previous_size is not None:

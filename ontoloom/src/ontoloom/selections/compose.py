@@ -43,26 +43,37 @@ from ontoloom.selections.types import (
     SelectionExprError,
     SelectionNotFoundError,
     SetOp,
+    WriteMode,
 )
 from ontoloom.utils import dquoted
 
 
 def create_axiom_selection(
-    s: Session, name: AxiomSelectionName, expr: AxiomSetExpr, *, source: str = ""
+    s: Session,
+    name: AxiomSelectionName,
+    expr: AxiomSetExpr,
+    *,
+    source: str = "",
+    mode: WriteMode = WriteMode.CREATE,
 ) -> AxiomUpsertResult:
     """Create an axiom selection by evaluating an `AxiomSetExpr` tree."""
     items = _eval_axiom_expr(s, expr)
     auto_source = source or str(expr)
-    return upsert_axiom_selection(s, name.bare, items, auto_source)
+    return upsert_axiom_selection(s, name.bare, items, auto_source, mode=mode)
 
 
 def create_entity_selection(
-    s: Session, name: EntitySelectionName, expr: EntitySetExpr, *, source: str = ""
+    s: Session,
+    name: EntitySelectionName,
+    expr: EntitySetExpr,
+    *,
+    source: str = "",
+    mode: WriteMode = WriteMode.CREATE,
 ) -> EntityUpsertResult:
     """Create an entity selection by evaluating an `EntitySetExpr` tree."""
     items = _eval_entity_expr(s, expr)
     auto_source = source or str(expr)
-    return upsert_entity_selection(s, name.bare, items, auto_source)
+    return upsert_entity_selection(s, name.bare, items, auto_source, mode=mode)
 
 
 def _eval_axiom_expr(s: Session, expr: AxiomSetExpr) -> list[str]:

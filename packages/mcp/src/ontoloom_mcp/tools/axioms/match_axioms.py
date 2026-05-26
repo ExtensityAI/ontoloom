@@ -3,7 +3,7 @@ from ontoloom.connection import Ontology, session
 from ontoloom.patterns.search import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import format_selection_result
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -16,6 +16,7 @@ def match_axioms(
     path: OntologyPath,
     pattern: Pattern,
     into: AxiomSelectionName,
+    mode: WriteMode = WriteMode.CREATE,
     within: AxiomSelectionName | EntitySelectionName | None = None,
     limit: Limit = 100,
 ):
@@ -36,6 +37,7 @@ def match_axioms(
     - `pattern`: The pattern object to match.
     - `into`: Kind-prefixed name for the axiom selection to save results
       (e.g. `"axioms:my_matches"`).
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `within`: Optional selection reference (e.g. `"axioms:my_sel"` or
       `"entities:my_ents"`) to restrict the search to.
     - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
@@ -48,6 +50,7 @@ def match_axioms(
             into.bare,
             result.axiom_hashes,
             "match_axioms",
+            mode=mode,
         )
         sel = upserted.selection
 

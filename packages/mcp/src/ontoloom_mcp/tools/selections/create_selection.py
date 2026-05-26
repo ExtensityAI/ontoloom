@@ -7,7 +7,12 @@ from ontoloom.selections.expr import (
     is_axiom_set_expr,
     is_entity_set_expr,
 )
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionExprError
+from ontoloom.selections.types import (
+    AxiomSelectionName,
+    EntitySelectionName,
+    SelectionExprError,
+    WriteMode,
+)
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.locking import format_locked_quoted
@@ -19,6 +24,7 @@ def create_selection(
     path: OntologyPath,
     name: AxiomSelectionName | EntitySelectionName,
     expr: AxiomSetExpr | EntitySetExpr,
+    mode: WriteMode = WriteMode.CREATE,
 ):
     """Create a selection by evaluating a set-expression tree.
 
@@ -46,7 +52,7 @@ def create_selection(
     operands to be the same kind as the enclosing tree; the cross-kind
     operators (`axioms_for`, `entities_in`) flip the kind.
 
-    Overwrites if name exists.
+    `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     """
     ont = Ontology(path)
     with session(ont) as s:
@@ -54,7 +60,7 @@ def create_selection(
             if not is_axiom_set_expr(expr):
                 msg = f"`name` {dquoted(name)} expects an AxiomSetExpr; got {type(expr).__name__}."
                 raise SelectionExprError(msg)
-            ax = create_axiom_selection(s, name, expr)
+            ax = create_axiom_selection(s, name, expr, mode=mode)
             s.commit()
             sel_ax = ax.selection
             parts = [f"Selection {format_locked_quoted(sel_ax)}: {sel_ax.size} axioms"]
@@ -66,7 +72,7 @@ def create_selection(
         if not is_entity_set_expr(expr):
             msg = f"`name` {dquoted(name)} expects an EntitySetExpr; got {type(expr).__name__}."
             raise SelectionExprError(msg)
-        ent = create_entity_selection(s, name, expr)
+        ent = create_entity_selection(s, name, expr, mode=mode)
         s.commit()
         sel_ent = ent.selection
         parts = [f"Selection {format_locked_quoted(sel_ent)}: {sel_ent.size} entities"]
@@ -77,5 +83,5 @@ def create_selection(
 
 
 tool_create_selection = create_tool(
-    create_selection, name="create_selection", annotations=ToolAnnotations(idempotentHint=True)
+    create_selection, name="create_selection", annotations=ToolAnnotations()
 )

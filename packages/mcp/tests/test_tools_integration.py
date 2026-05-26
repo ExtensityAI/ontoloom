@@ -712,3 +712,116 @@ def test_rename_iri_collision_with_wrong_token_raises(populated_db):
             new_iri=IRI("ex:Animal"),
             confirm="00000000",
         )
+
+
+# -- WriteMode: non-destructive selection writes --
+
+
+def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
+    from ontoloom.selections.types import WriteMode
+    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(
+                entity_type=EntityType.CLASS,
+                iri=IRI("ex:Dog"),
+                annotations=[
+                    Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="a dog"))
+                ],
+            )
+        ],
+    )
+
+    first = search_axioms(path=empty_db, into=AxiomSelectionName("axioms:t"), query="dog")
+    assert "axioms:t" in first or "t@" in first
+
+    wrapped = translate_errors(search_axioms)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=empty_db, into=AxiomSelectionName("axioms:t"), query="dog")
+    msg = str(exc_info.value)
+    assert "already exists" in msg
+    assert 'mode="replace"' in msg
+
+    overwrote = search_axioms(
+        path=empty_db,
+        into=AxiomSelectionName("axioms:t"),
+        query="dog",
+        mode=WriteMode.REPLACE,
+    )
+    assert "t@" in overwrote
+
+
+def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
+    from ontoloom.selections.types import WriteMode
+
+    search_entities(path=populated_db, into=EntitySelectionName("entities:t"), query="Dog")
+
+    wrapped = translate_errors(search_entities)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=populated_db, into=EntitySelectionName("entities:t"), query="Dog")
+    msg = str(exc_info.value)
+    assert "already exists" in msg
+    assert 'mode="replace"' in msg
+
+    overwrote = search_entities(
+        path=populated_db,
+        into=EntitySelectionName("entities:t"),
+        query="Dog",
+        mode=WriteMode.REPLACE,
+    )
+    assert "t@" in overwrote
+
+
+def test_producer_tools_accept_mode_argument(populated_db):
+    """Light smoke test: each producer accepts a `mode` kwarg without error."""
+    # Give two entities a shared label so find_duplicate_entities produces a selection.
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom.selections.expr import AxiomUnionExpr
+    from ontoloom.selections.types import WriteMode
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+    from ontoloom_mcp.tools.selections.create_selection import create_selection
+
+    add_axioms(
+        path=populated_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Pup")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Hound")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"), subject=IRI("ex:Pup"), value=LangLiteral(value="shared")
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Hound"),
+                value=LangLiteral(value="shared"),
+            ),
+        ],
+    )
+
+    match_axioms(
+        path=populated_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=AxiomSelectionName("axioms:m"),
+        mode=WriteMode.CREATE,
+    )
+    get_entity(
+        path=populated_db,
+        iri=IRI("ex:Dog"),
+        into=AxiomSelectionName("axioms:ge"),
+        mode=WriteMode.CREATE,
+    )
+    find_duplicate_entities(
+        path=populated_db,
+        into=EntitySelectionName("entities:dup"),
+        annotation_property=IRI("rdfs:label"),
+        mode=WriteMode.CREATE,
+    )
+    create_selection(
+        path=populated_db,
+        name=AxiomSelectionName("axioms:composed"),
+        expr=AxiomUnionExpr(union=(AxiomSelectionName("axioms:m"),)),
+        mode=WriteMode.CREATE,
+    )

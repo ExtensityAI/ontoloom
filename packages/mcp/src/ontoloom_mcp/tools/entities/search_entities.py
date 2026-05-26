@@ -18,6 +18,7 @@ from ontoloom.selections.store import (
 from ontoloom.selections.types import (
     AxiomSelectionName,
     EntitySelectionName,
+    WriteMode,
 )
 from ontoloom.utils import dquoted
 
@@ -37,6 +38,7 @@ type SelectionRef = AxiomSelectionName | EntitySelectionName
 def search_entities(
     path: OntologyPath,
     into: EntitySelectionName,
+    mode: WriteMode = WriteMode.CREATE,
     query: Annotated[str, MinLen(1)] | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
@@ -53,6 +55,7 @@ def search_entities(
     Args:
     - `into`: Kind-prefixed name for the output selection
       (e.g. `"entities:dogs"`).
+    - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `query`: Substring match on IRI local names and annotation values (labels, comments).
     - `role`: Filter by entity type: "Class", "ObjectProperty", "DataProperty",
       "AnnotationProperty", "NamedIndividual", "Datatype".
@@ -79,7 +82,7 @@ def search_entities(
 
         iris = collect_entity_iris(s, **kwargs)
         source = _build_source(query, role, namespace, declared, properties or (), within)
-        upserted = upsert_entity_selection(s, into.bare, iris, source)
+        upserted = upsert_entity_selection(s, into.bare, iris, source, mode=mode)
         sel = upserted.selection
 
         if not iris:

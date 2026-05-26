@@ -22,8 +22,10 @@ from ontoloom.selections.types import (
     EntitySelectionListing,
     EntitySelectionName,
     SelectionContentHash,
+    SelectionExistsError,
     SelectionName,
     SelectionNotFoundError,
+    WriteMode,
 )
 from ontoloom.utils import dedupe
 
@@ -93,16 +95,23 @@ def upsert_axiom_selection(
     name: SelectionName,
     items: Sequence[str],
     source: str,
+    mode: WriteMode = WriteMode.CREATE,
 ) -> AxiomUpsertResult:
-    """Write an axiom selection, overwriting if it exists.
+    """Write an axiom selection.
+
+    `mode=CREATE` (default) refuses to clobber an occupied name, raising
+    `SelectionExistsError`. `mode=REPLACE` overwrites unconditionally ->
+    last writer wins, even if another agent has written since you last read.
 
     Caller's insertion order is preserved on disk (`id`, rowid alias);
     `ReadAxiomSelection` paginates in insertion order so any baked-in ranking
     survives. The content hash is order-independent (items sorted internally).
 
-    Unconditional overwrite -> last writer wins, even if another agent has
-    written since you last read. Optimistic locking (hash-prefix check) is a
-    MCP-layer concern; callers needing it wrap this with `verify_lock`.
+    Optimistic locking (hash-prefix check) is a MCP-layer concern; callers
+    needing it wrap this with `verify_lock`.
+
+    Raises:
+        SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
     deduped = dedupe(items)
     content_hash = _hash_selection_items(deduped)
@@ -111,6 +120,9 @@ def upsert_axiom_selection(
     existing = s.conn.execute(
         "SELECT size FROM axiom_selections WHERE name = ?", (name,)
     ).fetchone()
+
+    if existing is not None and mode is WriteMode.CREATE:
+        raise SelectionExistsError(name, existing[0])
 
     s.conn.execute("DELETE FROM axiom_selection_items WHERE selection_name = ?", (name,))
     s.conn.execute("DELETE FROM axiom_selections WHERE name = ?", (name,))
@@ -224,15 +236,23 @@ def upsert_entity_selection(
     name: SelectionName,
     items: Sequence[str],
     source: str,
+    mode: WriteMode = WriteMode.CREATE,
 ) -> EntityUpsertResult:
-    """Write an entity selection, overwriting if it exists.
+    """Write an entity selection.
+
+    `mode=CREATE` (default) refuses to clobber an occupied name, raising
+    `SelectionExistsError`. `mode=REPLACE` overwrites unconditionally ->
+    last writer wins.
 
     Caller's insertion order is preserved on disk; `ReadEntitySelection`
     paginates lexicographically on the IRI. The content hash is
     order-independent (items sorted internally).
 
-    Unconditional overwrite -> last writer wins. Optimistic locking is a
-    MCP-layer concern; callers needing it wrap this with `verify_lock`.
+    Optimistic locking is a MCP-layer concern; callers needing it wrap this
+    with `verify_lock`.
+
+    Raises:
+        SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
     deduped = dedupe(items)
     content_hash = _hash_selection_items(deduped)
@@ -241,6 +261,9 @@ def upsert_entity_selection(
     existing = s.conn.execute(
         "SELECT size FROM entity_selections WHERE name = ?", (name,)
     ).fetchone()
+
+    if existing is not None and mode is WriteMode.CREATE:
+        raise SelectionExistsError(name, existing[0])
 
     s.conn.execute("DELETE FROM entity_selection_items WHERE selection_name = ?", (name,))
     s.conn.execute("DELETE FROM entity_selections WHERE name = ?", (name,))

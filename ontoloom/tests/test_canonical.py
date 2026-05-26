@@ -312,17 +312,17 @@ def test_selection_pagination_stable_across_processes(tmp_path):
         from ontoloom.selections.expr import EntityIntersectExpr
         from ontoloom.selections.store import upsert_entity_selection
         from ontoloom.selections.read_entity_selection import ReadEntitySelection
-        from ontoloom.selections.types import EntitySelectionName
+        from ontoloom.selections.types import EntitySelectionName, WriteMode
         from ontoloom.connection import Ontology
         from ontoloom.connection import session
 
         with session(Ontology(Path({str(db_path)!r}))) as s:
             upsert_entity_selection(s, "a",
-                ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src")
+                ["ex:Z", "ex:A", "ex:M", "ex:Q", "ex:B"], "src", mode=WriteMode.REPLACE)
             upsert_entity_selection(s, "b",
-                ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src")
+                ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src", mode=WriteMode.REPLACE)
             r = EntitySelectionName("entities:r")
-            create_entity_selection(s, r, EntityIntersectExpr(intersect=(EntitySelectionName("entities:a"), EntitySelectionName("entities:b"))))
+            create_entity_selection(s, r, EntityIntersectExpr(intersect=(EntitySelectionName("entities:a"), EntitySelectionName("entities:b"))), mode=WriteMode.REPLACE)
             page = run(s, ReadEntitySelection(selection=r, limit=5))
             print(",".join(item.iri for item in page.items))
             s.commit()
