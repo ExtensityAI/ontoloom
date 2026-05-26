@@ -537,33 +537,114 @@ def test_read_selection_not_found_translates(populated_db):
     assert "search_entities" in msg or "match_axioms" in msg
 
 
-def test_remove_axioms_stale_selection_translates(populated_db):
-    # Create an axiom selection, then try to use a wrong hash prefix on it.
+def _make_dogs_selection(path):
+    """Create axiom-selection 'axioms:dogs_ax' over the ex:Dog axioms."""
     from ontoloom.selections.expr import AxiomsForExpr
-    from ontoloom.selections.types import AxiomSelectionName
-    from ontoloom_mcp.components.locking import LockedAxiomSelectionName
+    from ontoloom_mcp.tools.selections.create_selection import create_selection
+
+    search_entities(path=path, into=EntitySelectionName("entities:dogs_ent"), query="Dog")
+    create_selection(
+        path=path,
+        name=AxiomSelectionName("axioms:dogs_ax"),
+        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:dogs_ent")),
+    )
+
+
+def _count_axioms(path):
+    from ontoloom.query.dispatch import run
+    from ontoloom.query.list_axioms import ListAxioms
+
+    ont = Ontology(path)
+    with session(ont) as s:
+        count = len(run(s, ListAxioms(constraints=())))
+        s.commit()
+    return count
+
+
+def test_remove_axioms_by_selection_first_call_previews_and_requires_confirm(populated_db):
+    from ontoloom_mcp.tools.axioms.remove_axioms import BySelection
+
+    _make_dogs_selection(populated_db)
+    before = _count_axioms(populated_db)
+
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        remove_axioms(
+            path=populated_db, target=BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
+        )
+
+    msg = str(exc_info.value)
+    assert "Removing" in msg
+    # The ex:Dog declaration and the SubClassOf axiom mention Dog -> count of 2.
+    assert "Removing 2 axioms" in msg
+    assert "ex:Dog" in msg
+    assert "confirm=" in msg
+    assert exc_info.value.token
+    # Nothing removed on the preview call.
+    assert _count_axioms(populated_db) == before
+
+
+def test_remove_axioms_by_selection_confirm_token_removes(populated_db):
+    from ontoloom_mcp.tools.axioms.remove_axioms import BySelection
+
+    _make_dogs_selection(populated_db)
+    before = _count_axioms(populated_db)
+
+    target = BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        remove_axioms(path=populated_db, target=target)
+    token = exc_info.value.token
+
+    result = remove_axioms(path=populated_db, target=target, confirm=token)
+    assert "Removed 2 axioms" in result
+    assert _count_axioms(populated_db) == before - 2
+
+
+def test_remove_axioms_by_selection_stale_token_re_previews(populated_db):
+    from ontoloom.selections.expr import AxiomsForExpr
+    from ontoloom.selections.types import WriteMode
     from ontoloom_mcp.tools.axioms.remove_axioms import BySelection
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
+    _make_dogs_selection(populated_db)
+    target = BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
+
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        remove_axioms(path=populated_db, target=target)
+    old_token = exc_info.value.token
+
+    # Overwrite the selection's contents (now the ex:Animal axioms instead).
     search_entities(
-        path=populated_db,
-        into=EntitySelectionName("entities:dogs_ent"),
-        query="Dog",
+        path=populated_db, into=EntitySelectionName("entities:animals_ent"), query="Animal"
     )
     create_selection(
         path=populated_db,
         name=AxiomSelectionName("axioms:dogs_ax"),
-        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:dogs_ent")),
+        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:animals_ent")),
+        mode=WriteMode.REPLACE,
     )
-    stale = LockedAxiomSelectionName("axioms:dogs_ax@deadbeef")
 
-    wrapped = translate_errors(remove_axioms)
-    with pytest.raises(ToolError) as exc_info:
-        wrapped(path=populated_db, target=BySelection(name=stale))
-    msg = str(exc_info.value)
-    assert "changed" in msg
-    assert "Current: dogs_ax@" in msg
-    assert "items)" in msg
+    # The old token no longer matches the recomputed one -> fresh preview.
+    with pytest.raises(ConfirmationRequiredError) as exc_info2:
+        remove_axioms(path=populated_db, target=target, confirm=old_token)
+    assert exc_info2.value.token != old_token
+
+
+def test_remove_axioms_by_hashes_removes_without_confirmation(populated_db):
+    from ontoloom.query.dispatch import run
+    from ontoloom.query.list_axioms import ListAxioms
+    from ontoloom_mcp.tools.axioms.remove_axioms import ByHashes
+
+    ont = Ontology(populated_db)
+    with session(ont) as s:
+        first_hash = run(s, ListAxioms(constraints=()))[0][0]
+        s.commit()
+    before = _count_axioms(populated_db)
+
+    result = remove_axioms(
+        path=populated_db, target=ByHashes(hashes=(AxiomHashPrefix(first_hash),))
+    )
+    assert "Removed 1 axioms" in result
+    assert _count_axioms(populated_db) == before - 1
 
 
 def test_axiom_dispatch_failure_renders_focused_mcp_message():
