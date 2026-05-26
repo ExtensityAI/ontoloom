@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated
 
 from annotated_types import MinLen
@@ -77,12 +78,12 @@ def search_entities(
         }
 
         iris = collect_entity_iris(s, **kwargs)
-        source = _build_source(query, role, namespace, declared, properties, within)
+        source = _build_source(query, role, namespace, declared, properties or (), within)
         upserted = upsert_entity_selection(s, into.bare, iris, source)
         sel = upserted.selection
 
         if not iris:
-            no_results = _no_results_msg(query, role, namespace, declared, properties, within)
+            no_results = _no_results_msg(query, role, namespace, declared, properties or (), within)
             s.commit()
             return f"0 entities -> {format_locked_quoted(sel)}.\n{no_results}"
 
@@ -90,7 +91,7 @@ def search_entities(
         page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
         page_text = _format_entity_search_page(page)
 
-        result = format_selection_result("entities", upserted, page_text)
+        result = format_selection_result(upserted, page_text)
 
         if within is not None:
             result += "\n" + _within_metadata(s, within)
@@ -109,7 +110,14 @@ def _within_metadata(s: Session, within: SelectionRef):
     return f"\nWithin selection {format_locked_quoted(ent)} (entities, {ent.size} items)"
 
 
-def _filter_parts(query, role, namespace, declared, properties, within) -> list[str]:
+def _filter_parts(
+    query: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
+    declared: bool | None,
+    properties: Sequence[IRI],
+    within: SelectionRef | None,
+) -> list[str]:
     parts = []
     if query:
         parts.append(f"query={dquoted(query)}")
@@ -126,13 +134,27 @@ def _filter_parts(query, role, namespace, declared, properties, within) -> list[
     return parts
 
 
-def _no_results_msg(query, role, namespace, declared, properties, within):
+def _no_results_msg(
+    query: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
+    declared: bool | None,
+    properties: Sequence[IRI],
+    within: SelectionRef | None,
+):
     parts = _filter_parts(query, role, namespace, declared, properties, within)
     desc = ", ".join(parts) if parts else "no filters"
     return f"No entities found ({desc})."
 
 
-def _build_source(query, role, namespace, declared, properties, within):
+def _build_source(
+    query: str | None,
+    role: EntityType | None,
+    namespace: PrefixName | None,
+    declared: bool | None,
+    properties: Sequence[IRI],
+    within: SelectionRef | None,
+):
     parts = _filter_parts(query, role, namespace, declared, properties, within)
     return f"search_entities({', '.join(parts)})"
 

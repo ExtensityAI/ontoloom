@@ -69,7 +69,9 @@ def _peel_entity_type(annotation: object) -> EntityType | None:
     return None
 
 
-def _walk_value(value, kind: EntityType | None, position: Position | None) -> Iterator[EntityRef]:
+def _walk_value(
+    value: object, kind: EntityType | None, position: Position | None
+) -> Iterator[EntityRef]:
     match value:
         case IRI():
             yield value, kind, position

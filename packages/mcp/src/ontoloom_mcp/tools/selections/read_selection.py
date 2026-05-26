@@ -45,7 +45,7 @@ def read_selection(
                 s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
             )
             s.commit()
-            return _format_axiom_page(page_ax, limit=limit, offset=offset, show=show)
+            return _format_axiom_page(page_ax, offset=offset, show=show)
 
         page_ent: EntitySelectionPage = run(
             s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
@@ -54,8 +54,7 @@ def read_selection(
         return _format_entity_page(page_ent, offset=offset, show=show)
 
 
-def _format_axiom_page(page: AxiomSelectionPage, *, limit: int, offset: int, show: ShowFilter):
-    del limit
+def _format_axiom_page(page: AxiomSelectionPage, *, offset: int, show: ShowFilter):
     meta = page.meta
     header = (
         f"Selection {format_locked_quoted(meta)} (axioms): "

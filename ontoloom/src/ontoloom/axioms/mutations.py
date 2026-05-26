@@ -122,8 +122,8 @@ def annotate_axiom(
     s: Session,
     axiom_hash: AxiomHash,
     *,
-    add_annotations: list[Annotation] | None = None,
-    remove_annotations: list[Annotation] | None = None,
+    add_annotations: Sequence[Annotation] = (),
+    remove_annotations: Sequence[Annotation] = (),
 ) -> AnnotateResult:
     """Modify axiom-level metadata annotations.
 
@@ -132,9 +132,6 @@ def annotate_axiom(
     removals targeting absent annotations are dropped from `removed` (so the
     counts reflect storage changes, not request size).
     """
-    add_annotations = add_annotations or []
-    remove_annotations = remove_annotations or []
-
     resolved = load_axiom_row(s, axiom_hash)
     try:
         axiom = load_axiom(resolved.json_data)

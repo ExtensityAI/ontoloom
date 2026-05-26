@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Annotated
 
 from annotated_types import MinLen
@@ -80,7 +81,7 @@ def search_axioms(
             )
             hashes = [hit.hash for hit in result.hits]
 
-        source = _build_source(query, properties, within)
+        source = _build_source(query, props_tuple, within)
         upserted = upsert_axiom_selection(s, into.bare, hashes, source)
         sel = upserted.selection
 
@@ -91,12 +92,12 @@ def search_axioms(
         page_text = format_axiom_selection_preview(s, upserted, limit=limit)
         s.commit()
 
-    return format_selection_result("axioms", upserted, page_text)
+    return format_selection_result(upserted, page_text)
 
 
 def _build_source(
     query: str | None,
-    properties: list[IRI] | None,
+    properties: Sequence[IRI],
     within: AxiomSelectionName | EntitySelectionName | None,
 ) -> str:
     parts = []

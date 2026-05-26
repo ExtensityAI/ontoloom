@@ -1,6 +1,7 @@
 """Domain error -> ToolError translation decorator for MCP tools."""
 
 import functools
+from collections.abc import Callable
 
 from fastmcp.exceptions import ToolError
 from ontoloom.axioms.hashing import AmbiguousHashError, AxiomNotFoundError
@@ -123,7 +124,7 @@ def format_error(e: Exception) -> str:  # noqa: C901
             return str(e)
 
 
-def translate_errors(fn):
+def translate_errors[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
     """Catch translatable exceptions -> ToolError with hints. Let ToolError pass through.
 
     Bare ValueError is intentionally not caught: it represents a programming
@@ -131,7 +132,7 @@ def translate_errors(fn):
     """
 
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         try:
             return fn(*args, **kwargs)
         except ToolError:

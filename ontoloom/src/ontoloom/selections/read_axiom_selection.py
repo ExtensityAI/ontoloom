@@ -25,6 +25,9 @@ def _show_filter_clause(show: ShowFilter) -> str:
             return " AND a.id IS NOT NULL"
         case ShowFilter.MISSING:
             return " AND a.id IS NULL"
+        case _:
+            msg = f"unhandled ShowFilter: {show}"
+            raise ValueError(msg)
 
 
 class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):

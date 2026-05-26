@@ -71,6 +71,10 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget):
                 s.commit()
                 return format_diff(entries, f"Removed {len(result.removed)} axioms.")
 
+            case _:
+                msg = f"unhandled RemoveAxiomsTarget variant: {type(target).__name__}"
+                raise ValueError(msg)
+
 
 tool_remove_axioms = create_tool(
     remove_axioms, name="remove_axioms", annotations=ToolAnnotations(destructiveHint=True)

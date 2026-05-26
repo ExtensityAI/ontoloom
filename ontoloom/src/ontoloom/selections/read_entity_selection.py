@@ -28,6 +28,9 @@ def _show_filter_clause(show: ShowFilter) -> str:
             return f" AND {_EXISTS_FRAGMENT}"
         case ShowFilter.MISSING:
             return f" AND NOT {_EXISTS_FRAGMENT}"
+        case _:
+            msg = f"unhandled ShowFilter: {show}"
+            raise ValueError(msg)
 
 
 class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):

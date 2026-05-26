@@ -1,7 +1,5 @@
 """Search axioms using pattern matching, integrated with DB and selections."""
 
-from __future__ import annotations
-
 import typing
 from collections.abc import Iterator
 from contextlib import AbstractContextManager

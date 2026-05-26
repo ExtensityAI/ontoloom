@@ -1,7 +1,5 @@
 """Pattern matcher: matches patterns against axioms, returns variable bindings."""
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from itertools import permutations
 from typing import get_args

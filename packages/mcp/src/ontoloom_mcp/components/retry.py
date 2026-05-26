@@ -3,6 +3,7 @@
 import functools
 import sqlite3
 import time
+from collections.abc import Callable
 
 from fastmcp.exceptions import ToolError
 
@@ -11,11 +12,11 @@ _BASE_DELAY = 0.05
 _MAX_DELAY = 1.0
 
 
-def retry_on_busy(fn):
+def retry_on_busy[**P, R](fn: Callable[P, R]) -> Callable[P, R]:
     """Retry on sqlite3 'database is locked'. Raises ToolError on exhaustion."""
 
     @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         last: sqlite3.OperationalError | None = None
         for attempt in range(_MAX_ATTEMPTS):
             try:

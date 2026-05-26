@@ -20,8 +20,8 @@ from ontoloom.selections.types import (
     EntitySelection,
     EntitySelectionName,
     SelectionContentHash,
+    SelectionKind,
     SelectionName,
-    SelectionNotFoundError,
     validate_selection_name,
 )
 from ontoloom.utils import dquoted
@@ -69,7 +69,7 @@ class StaleSelectionError(OntoloomError):
         )
 
 
-def _parse_kinded_locked(value: str, kind: str, type_name: str) -> str:
+def _parse_kinded_locked(value: str, kind: SelectionKind, type_name: str) -> str:
     """Validate `kind:NAME@HASH_PREFIX` wire form; lowercase the hash portion."""
     prefix, sep, rest = value.partition(":")
 
@@ -99,7 +99,7 @@ class LockedEntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_locked(value, "entities", "LockedEntitySelectionName")
+        return _parse_kinded_locked(value, SelectionKind.ENTITIES, "LockedEntitySelectionName")
 
     @property
     def bare(self) -> EntitySelectionName:
@@ -122,7 +122,7 @@ class LockedAxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_locked(value, "axioms", "LockedAxiomSelectionName")
+        return _parse_kinded_locked(value, SelectionKind.AXIOMS, "LockedAxiomSelectionName")
 
     @property
     def bare(self) -> AxiomSelectionName:
@@ -153,19 +153,13 @@ def verify_lock(s: Session, locked: LockedEntitySelectionName | LockedAxiomSelec
     name = bare.bare
 
     if isinstance(locked, LockedAxiomSelectionName):
-        try:
-            meta_ax = get_axiom_selection(s, name)
-        except SelectionNotFoundError:
-            raise SelectionNotFoundError(name) from None
+        meta_ax = get_axiom_selection(s, name)
 
         if not meta_ax.hash.startswith(locked.hash_prefix):
             raise StaleSelectionError(name, locked.hash_prefix, meta_ax.hash, meta_ax.size)
         return bare
 
-    try:
-        meta_ent = get_entity_selection(s, name)
-    except SelectionNotFoundError:
-        raise SelectionNotFoundError(name) from None
+    meta_ent = get_entity_selection(s, name)
 
     if not meta_ent.hash.startswith(locked.hash_prefix):
         raise StaleSelectionError(name, locked.hash_prefix, meta_ent.hash, meta_ent.size)

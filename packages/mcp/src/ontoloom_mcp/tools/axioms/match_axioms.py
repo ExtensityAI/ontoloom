@@ -63,7 +63,7 @@ def match_axioms(
         page_text = format_axiom_selection_preview(s, upserted)
         s.commit()
 
-    return f"{header}. " + format_selection_result("axioms", upserted, page_text)
+    return f"{header}. " + format_selection_result(upserted, page_text)
 
 
 tool_match_axioms = create_tool(

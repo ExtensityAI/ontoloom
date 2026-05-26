@@ -11,12 +11,14 @@ from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entities.types import (
     AnnotationRow,
     DuplicateResult,
+    EntityDisplay,
     EntityInfo,
     EntityMatch,
     EntitySearchPage,
     EntitySummary,
     MatchQuality,
     MatchSource,
+    TextMatch,
 )
 from ontoloom.errors import OntoloomError
 from ontoloom.owl.iri import IRI, RDFS_LABEL
@@ -64,9 +66,9 @@ class EntityNotFoundError(OntoloomError):
     surfacing "did you mean…?" hints without a follow-up query.
     """
 
-    def __init__(self, iri: str, near_matches: list[str] | None = None):
+    def __init__(self, iri: str, near_matches: Sequence[str] = ()):
         self.iri = iri
-        self.near_matches = near_matches or []
+        self.near_matches = near_matches
         super().__init__(f"Entity {dquoted(iri)} not found.")
 
 
@@ -74,6 +76,8 @@ _NEAR_MATCH_LIMIT = 3
 
 
 _LABEL_BATCH_SIZE = 500
+
+_EMPTY_DISPLAY = EntityDisplay(roles=frozenset(), annotations=())
 
 
 def lookup_entity_labels(s: Session, iris: Iterable[str]) -> dict[str, str | None]:
@@ -271,13 +275,13 @@ def _build_entity_constraints(
 
 def _apply_text_filters(
     s: Session,
-    matches: dict[str, tuple[MatchSource, MatchQuality]],
+    matches: dict[str, TextMatch],
     role: EntityType | None,
     namespace: PrefixName | None,
     within: SelectionRef | None,
     declared: bool | None,
     exclude_deprecated: bool,
-) -> dict[str, tuple[MatchSource, MatchQuality]]:
+) -> dict[str, TextMatch]:
     """Apply post-text-search filters to candidate matches via a single ListEntities call."""
     if not matches:
         return matches
@@ -331,8 +335,8 @@ def _list_entities(
         matches=tuple(
             EntityMatch(
                 iri=iri,
-                roles=display.get(str(iri), (frozenset(), ()))[0],
-                annotations=display.get(str(iri), (frozenset(), ()))[1],
+                roles=display.get(str(iri), _EMPTY_DISPLAY).roles,
+                annotations=display.get(str(iri), _EMPTY_DISPLAY).annotations,
                 match_source=MatchSource.LIST,
                 match_quality=MatchQuality.EXACT,
             )
@@ -364,8 +368,8 @@ def _text_search_entities(
     sorted_iris = sorted(
         matches.keys(),
         key=lambda k: (
-            quality_order.get(matches[k][1], 9),
-            source_order.get(matches[k][0], 9),
+            quality_order.get(matches[k].quality, 9),
+            source_order.get(matches[k].source, 9),
             k,
         ),
     )
@@ -380,10 +384,10 @@ def _text_search_entities(
         matches=tuple(
             EntityMatch(
                 iri=IRI(iri_str),
-                roles=display.get(iri_str, (frozenset(), ()))[0],
-                annotations=display.get(iri_str, (frozenset(), ()))[1],
-                match_source=matches[iri_str][0],
-                match_quality=matches[iri_str][1],
+                roles=display.get(iri_str, _EMPTY_DISPLAY).roles,
+                annotations=display.get(iri_str, _EMPTY_DISPLAY).annotations,
+                match_source=matches[iri_str].source,
+                match_quality=matches[iri_str].quality,
             )
             for iri_str in page_iris
         ),

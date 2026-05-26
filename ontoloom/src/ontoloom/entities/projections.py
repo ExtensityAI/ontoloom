@@ -12,7 +12,13 @@ from collections.abc import Sequence
 
 from ontoloom.connection import Session
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
-from ontoloom.entities.types import AnnotationRow, MatchQuality, MatchSource
+from ontoloom.entities.types import (
+    AnnotationRow,
+    EntityDisplay,
+    MatchQuality,
+    MatchSource,
+    TextMatch,
+)
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 
@@ -26,8 +32,8 @@ def find_text_matches(
     source_label: MatchSource,
     *,
     properties: Sequence[IRI] = (),
-) -> dict[str, tuple[MatchSource, MatchQuality]]:
-    """Returns {iri: (source_label, quality)}.
+) -> dict[str, TextMatch]:
+    """Returns {iri: TextMatch}.
 
     properties: when non-empty, restrict annotation search to these property IRIs.
     Only applies when property_filter is None (annotation search path).
@@ -48,7 +54,7 @@ def find_text_matches(
     # pagination output. Without it, page-1 contents drift across runs.
     # LIMIT _TEXT_SCAN_CAP: bound memory for runaway substring queries; user
     # sees first-N alphabetical IRIs rather than all matches.
-    matches: dict[str, tuple[MatchSource, MatchQuality]] = {}
+    matches: dict[str, TextMatch] = {}
     query_lower = query.lower()
 
     for (iri_str,) in s.conn.execute(
@@ -56,21 +62,19 @@ def find_text_matches(
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
         if iri_str not in matches:
-            matches[iri_str] = (source_label, MatchQuality.EXACT)
+            matches[iri_str] = TextMatch(source_label, MatchQuality.EXACT)
 
     for (iri_str,) in s.conn.execute(
         f"SELECT DISTINCT entity_iri FROM entity_text WHERE {prop_cond} AND INSTR(LOWER(text), ?) > 0 ORDER BY entity_iri LIMIT ?",
         [*params, query_lower, _TEXT_SCAN_CAP],
     ):
         if iri_str not in matches:
-            matches[iri_str] = (source_label, MatchQuality.SUBSTRING)
+            matches[iri_str] = TextMatch(source_label, MatchQuality.SUBSTRING)
 
     return matches
 
 
-def batch_fetch_entity_display(
-    s: Session, iris: list[str]
-) -> dict[str, tuple[frozenset[EntityType], tuple[AnnotationRow, ...]]]:
+def batch_fetch_entity_display(s: Session, iris: list[str]) -> dict[str, EntityDisplay]:
     placeholders = ",".join("?" for _ in iris)
 
     roles_by_iri: dict[str, set[EntityType]] = {}
@@ -90,9 +94,9 @@ def batch_fetch_entity_display(
         anns_by_iri.setdefault(iri_str, []).append(AnnotationRow(property=IRI(prop), value=text))
 
     return {
-        iri_str: (
-            frozenset(roles_by_iri.get(iri_str, ())),
-            tuple(anns_by_iri.get(iri_str, ())),
+        iri_str: EntityDisplay(
+            roles=frozenset(roles_by_iri.get(iri_str, ())),
+            annotations=tuple(anns_by_iri.get(iri_str, ())),
         )
         for iri_str in iris
     }

@@ -4,8 +4,10 @@ import logging
 import time
 from typing import override
 
+import mcp.types as mt
 from fastmcp.exceptions import ToolError
-from fastmcp.server.middleware import Middleware
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools.base import ToolResult
 
 from ontoloom_mcp.components.errors import TRANSLATABLE, format_error
 
@@ -16,7 +18,11 @@ class TimingMiddleware(Middleware):
     """Log wall-clock time per tool call."""
 
     @override
-    async def on_call_tool(self, context, call_next):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
         start = time.perf_counter()
         try:
             return await call_next(context)
@@ -36,7 +42,11 @@ class LastResortMiddleware(Middleware):
     """
 
     @override
-    async def on_call_tool(self, context, call_next):
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
         try:
             return await call_next(context)
         except ToolError:

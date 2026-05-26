@@ -57,32 +57,32 @@ def normalize_entity(cs: Sequence[EntityConstraint]) -> tuple[EntityConstraint, 
     in_selection: list[InAxiomSelection | InEntitySelection] = []
 
     for c in cs:
-        if isinstance(c, AlwaysFalse):
-            return (AlwaysFalse(),)
-
-        if isinstance(c, InIRIs):
-            in_iris.append(c)
-        elif isinstance(c, WithRoles):
-            with_roles.append(c)
-        elif isinstance(c, HasRole):
-            has_role.append(c)
-        elif isinstance(c, InNamespaces):
-            in_namespaces.append(c)
-        elif isinstance(c, Declared):
-            declared.append(c)
-        elif isinstance(c, Deprecated):
-            deprecated.append(c)
-        elif isinstance(c, HasAnyProperty):
-            has_any_property.append(c)
-        elif isinstance(c, MentionedIn):
-            mentioned_in.append(c)
-        elif isinstance(c, InPositions):
-            in_positions.append(c)
-        elif isinstance(c, (InAxiomSelection, InEntitySelection)):
-            in_selection.append(c)
-        else:
-            msg = f"unknown entity constraint variant: {type(c).__name__}"
-            raise ValueError(msg)
+        match c:
+            case AlwaysFalse():
+                return (AlwaysFalse(),)
+            case InIRIs():
+                in_iris.append(c)
+            case WithRoles():
+                with_roles.append(c)
+            case HasRole():
+                has_role.append(c)
+            case InNamespaces():
+                in_namespaces.append(c)
+            case Declared():
+                declared.append(c)
+            case Deprecated():
+                deprecated.append(c)
+            case HasAnyProperty():
+                has_any_property.append(c)
+            case MentionedIn():
+                mentioned_in.append(c)
+            case InPositions():
+                in_positions.append(c)
+            case InAxiomSelection() | InEntitySelection():
+                in_selection.append(c)
+            case _:
+                msg = f"unknown entity constraint variant: {type(c).__name__}"
+                raise ValueError(msg)
 
     if len(in_selection) > 1:
         msg = "a query may have at most one selection scope"

@@ -8,8 +8,6 @@ is a single string with one of three disjoint shapes.
 "is this any slot type."
 """
 
-from __future__ import annotations
-
 import re
 from typing import Annotated, Any, override
 

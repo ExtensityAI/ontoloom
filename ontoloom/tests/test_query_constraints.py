@@ -164,7 +164,7 @@ def test_in_entity_selection_rejects_axiom_ref():
 
 def test_of_types_rejects_unknown_tag():
     with pytest.raises(ValidationError):
-        WithTypes(tags=("NotAnAxiomType",))  # type: ignore[arg-type]
+        WithTypes(tags=("NotAnAxiomType",))  # pyright: ignore[reportArgumentType]
 
 
 # -- MentionsAll: IRI count cap --

@@ -503,12 +503,12 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
 
 def test_bcp47_lang_validation_error_message():
     from ontoloom.owl.literals import LangLiteral
-    from ontoloom_mcp.components.errors import _format_validation_error
+    from ontoloom_mcp.components.errors import format_error
     from pydantic import ValidationError
 
     with pytest.raises(ValidationError) as exc_info:
         LangLiteral(value="x", lang="invalid lang!")  # pyright: ignore[reportArgumentType]
-    msg = _format_validation_error(exc_info.value)
+    msg = format_error(exc_info.value)
     assert "BCP 47" in msg
     assert '"invalid lang!"' in msg
 

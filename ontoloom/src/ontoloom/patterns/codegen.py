@@ -11,8 +11,6 @@ hand-written header (imports + BasePattern) is preserved.
 Run: uv run ontoloom-gen-patterns
 """
 
-from __future__ import annotations
-
 import subprocess
 import sys
 import types

@@ -31,6 +31,22 @@ class AnnotationRow:
 
 
 @dataclass(frozen=True, slots=True)
+class TextMatch:
+    """How and where a text-search query matched an entity."""
+
+    source: MatchSource
+    quality: MatchQuality
+
+
+@dataclass(frozen=True, slots=True)
+class EntityDisplay:
+    """An entity's roles and annotations, batch-fetched for display."""
+
+    roles: frozenset[EntityType]
+    annotations: tuple[AnnotationRow, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class EntitySummary:
     total: int
     by_role: Counter[EntityType]

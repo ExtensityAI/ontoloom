@@ -74,7 +74,7 @@ def format_roles(roles: AbstractSet[EntityType]):
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
 
-def format_axiom_annotations(axiom):
+def format_axiom_annotations(axiom: BaseAxiom):
     """Indented Turtle-style `# prop value` lines for an axiom's metadata annotations.
 
     Returns an empty list when the axiom carries no annotations. Callers
@@ -100,7 +100,7 @@ def _format_axiom_line(ha: HashedAxiom, refs: Sequence[Ref] = ()):
 
 
 def format_diff(
-    entries: list[tuple[str, HashedAxiom]],
+    entries: Sequence[tuple[str, HashedAxiom]],
     summary: str,
     refs_per_entry: Sequence[Sequence[Ref]] = (),
     max_rows: int | None = None,
@@ -120,7 +120,7 @@ def format_diff(
 
 
 def format_axiom_listing(
-    axioms: list[HashedAxiom],
+    axioms: Sequence[HashedAxiom],
     refs_per_axiom: Sequence[Sequence[Ref]] = (),
 ):
     if not axioms:
@@ -132,11 +132,11 @@ def format_axiom_listing(
 
 
 def format_selection_result(
-    kind_label: str,
     upserted: AxiomUpsertResult | EntityUpsertResult,
     page_text: str,
 ):
     sel = upserted.selection
+    kind_label = "axioms" if isinstance(upserted, AxiomUpsertResult) else "entities"
     parts = [f"{sel.size} {kind_label} -> {format_locked_quoted(sel)}."]
     if upserted.previous_size is not None:
         parts.append(f"Overwrote previous ({upserted.previous_size} items).")

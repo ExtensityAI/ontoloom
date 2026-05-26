@@ -60,6 +60,9 @@ def annotate_axiom(
                 add_annotations.append(ann)
             case RemoveAnnotation(remove=ann):
                 remove_annotations.append(ann)
+            case _:
+                msg = f"unhandled AnnotationChange variant: {type(change).__name__}"
+                raise ValueError(msg)
 
     ont = Ontology(path)
     with session(ont) as s:

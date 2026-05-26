@@ -19,12 +19,6 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.utils import dquoted
 
 
-class SelectionNotFoundError(OntoloomError):
-    def __init__(self, name: "SelectionName"):
-        self.name = name
-        super().__init__(f"Selection {dquoted(name)} does not exist.")
-
-
 class SelectionExprError(OntoloomError):
     """Set-expression evaluation precondition violated.
 
@@ -58,6 +52,13 @@ class SetOp(StrEnum):
     UNION = "union"
     INTERSECTION = "intersection"
     DIFFERENCE = "difference"
+
+
+class SelectionKind(StrEnum):
+    """Wire-form prefix distinguishing the two selection kinds."""
+
+    AXIOMS = "axioms"
+    ENTITIES = "entities"
 
 
 class SelectionContentHash(TypedStr):
@@ -103,7 +104,13 @@ class SelectionName(TypedStr):
         return value
 
 
-def _parse_kinded_name(value: str, kind: str, type_name: str) -> str:
+class SelectionNotFoundError(OntoloomError):
+    def __init__(self, name: SelectionName):
+        self.name = name
+        super().__init__(f"Selection {dquoted(name)} does not exist.")
+
+
+def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
     """Validate `kind:NAME` wire form; return `value` unchanged."""
     prefix, sep, name = value.partition(":")
 
@@ -124,7 +131,7 @@ class EntitySelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_name(value, "entities", "EntitySelectionName")
+        return _parse_kinded_name(value, SelectionKind.ENTITIES, "EntitySelectionName")
 
     @property
     def bare(self) -> SelectionName:
@@ -141,7 +148,7 @@ class AxiomSelectionName(TypedStr):
     @override
     @classmethod
     def parse(cls, value: str):
-        return _parse_kinded_name(value, "axioms", "AxiomSelectionName")
+        return _parse_kinded_name(value, SelectionKind.AXIOMS, "AxiomSelectionName")
 
     @property
     def bare(self) -> SelectionName:
