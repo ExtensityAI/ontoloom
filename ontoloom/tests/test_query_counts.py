@@ -20,7 +20,6 @@ from ontoloom.query.constraints import (
     HasRole,
     InAxiomSelection,
     InEntitySelection,
-    InIRIs,
     InNamespaces,
     MentionsAll,
     MentionsAny,
@@ -109,19 +108,6 @@ def test_ce_run_namespace_filter(s):
         )
         == 2
     )
-
-
-def test_ce_run_normalize_runs_before_render(s):
-    # normalize_entity intersects two InIRIs into one; the result is a
-    # single-element set, and the SQL run should still match.
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    q = CountEntities(
-        constraints=(
-            InIRIs(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),
-            InIRIs(iris=(IRI("ex:Dog"), IRI("ex:Fish"))),
-        )
-    )
-    assert run(s, q) == 1
 
 
 # =============================================================================

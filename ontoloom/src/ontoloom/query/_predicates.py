@@ -9,7 +9,6 @@ from dataclasses import dataclass
 
 from ontoloom.entities.text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
-from ontoloom.query._normalize import normalize_axiom, normalize_entity
 from ontoloom.query.constraints import (
     AlwaysFalse,
     AxiomConstraint,
@@ -79,8 +78,6 @@ class Predicate:
 
 
 def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  # noqa: C901
-    constraints = normalize_entity(constraints)
-
     if not constraints:
         return Predicate(sql="1", params=())
 
@@ -158,8 +155,6 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
 
 
 def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
-    constraints = normalize_axiom(constraints)
-
     if not constraints:
         return Predicate(sql="1", params=())
 
