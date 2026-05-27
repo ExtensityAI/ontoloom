@@ -49,12 +49,11 @@ def create_selection_from_expr(
     name: SelectionName,
     expr: SetExpr,
     *,
-    source: str = "",
     mode: WriteMode = WriteMode.CREATE,
 ) -> AxiomUpsertResult | EntityUpsertResult:
     """Evaluate a set-expr and persist the result under `name`, kind inferred from the expr."""
     kind, items = eval_set_expr(s, expr)
-    auto_source = source or str(expr)
+    auto_source = str(expr)
 
     if kind is SelectionKind.AXIOMS:
         return upsert_axiom_selection(
