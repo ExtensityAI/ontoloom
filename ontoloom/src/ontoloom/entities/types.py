@@ -14,7 +14,6 @@ class MatchSource(StrEnum):
 
     IRI = "iri"
     ANNOTATION = "annotation"
-    LIST = "list"
 
 
 class MatchQuality(StrEnum):
@@ -64,8 +63,6 @@ class EntityMatch:
     iri: IRI
     roles: frozenset[EntityType]
     annotations: tuple[AnnotationRow, ...]
-    match_source: MatchSource
-    match_quality: MatchQuality
 
 
 @dataclass(frozen=True, slots=True)

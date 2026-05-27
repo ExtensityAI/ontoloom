@@ -4,7 +4,7 @@ import hashlib
 from collections import Counter
 from dataclasses import dataclass
 
-from ontoloom.axioms.hashing import AxiomHash, short_hash
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.canonical import canonical_json
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AxiomTag, BaseAxiom
@@ -23,10 +23,6 @@ class HashedAxiom:
     def of(cls, axiom: BaseAxiom):
         digest = hashlib.sha256(canonical_json(axiom).encode()).hexdigest()
         return cls(axiom=axiom, hash=AxiomHash(digest))
-
-    @property
-    def short(self):
-        return short_hash(self.hash)
 
 
 @dataclass(frozen=True, slots=True)

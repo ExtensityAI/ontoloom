@@ -328,8 +328,6 @@ def _list_entities(
                 iri=iri,
                 roles=display.get(str(iri), _EMPTY_DISPLAY).roles,
                 annotations=display.get(str(iri), _EMPTY_DISPLAY).annotations,
-                match_source=MatchSource.LIST,
-                match_quality=MatchQuality.EXACT,
             )
             for iri in page_iris
         ),
@@ -377,8 +375,6 @@ def _text_search_entities(
                 iri=IRI(iri_str),
                 roles=display.get(iri_str, _EMPTY_DISPLAY).roles,
                 annotations=display.get(iri_str, _EMPTY_DISPLAY).annotations,
-                match_source=matches[iri_str].source,
-                match_quality=matches[iri_str].quality,
             )
             for iri_str in page_iris
         ),

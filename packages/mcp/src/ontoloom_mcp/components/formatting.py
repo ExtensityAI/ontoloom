@@ -106,13 +106,10 @@ def _format_axiom_line(ha: HashedAxiom, refs: Sequence[Ref] = ()):
 def format_diff(
     entries: Sequence[tuple[str, HashedAxiom]],
     summary: str,
-    refs_per_entry: Sequence[Sequence[Ref]] = (),
     max_rows: int | None = None,
 ):
     capped = entries if max_rows is None else entries[:max_rows]
-    refs_list: Sequence[Sequence[Ref]] = (
-        refs_per_entry[: len(capped)] if refs_per_entry else [()] * len(capped)
-    )
+    refs_list: Sequence[Sequence[Ref]] = [()] * len(capped)
     lines = [
         f"{tag} {_format_axiom_line(ha, refs)}"
         for (tag, ha), refs in zip(capped, refs_list, strict=True)

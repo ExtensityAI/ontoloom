@@ -462,9 +462,10 @@ class TestSearchEntitiesComprehensive:
         # "Dog" should match :Dog as exact (local_name) before substring matches
         page = search_entities(s, query="Dog", limit=1000)
         if page.matches:
+            # :Dog is an exact local-name match, so it sorts ahead of every
+            # substring match and lands first in the ordered page.
             first = page.matches[0]
             assert str(first.iri) == ":Dog"
-            assert first.match_quality == "exact"
 
     def test_search_returns_annotations(self, s):
         add_axioms(s, AXIOMS)
@@ -822,14 +823,3 @@ class TestTextSearchTiebreakers:
         assert idx_sub_iri < idx_sub_ann
         # Combined: exact-iri < exact-ann < sub-iri < sub-ann
         assert idx_exact_iri < idx_exact_ann < idx_sub_iri < idx_sub_ann
-
-        # Verify match metadata is set correctly
-        match_map = {str(m.iri): m for m in page.matches}
-        assert match_map[":target"].match_quality == "exact"
-        assert match_map[":target"].match_source == "iri"
-        assert match_map[":aaa"].match_quality == "exact"
-        assert match_map[":aaa"].match_source == "annotation"
-        assert match_map[":target_extra"].match_quality == "substring"
-        assert match_map[":target_extra"].match_source == "iri"
-        assert match_map[":zzz"].match_quality == "substring"
-        assert match_map[":zzz"].match_source == "annotation"
