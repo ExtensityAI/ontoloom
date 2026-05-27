@@ -41,7 +41,7 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import resolve_within, run
-from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
@@ -129,7 +129,7 @@ def axiom_hashes_for_entity(
         MentionsAll(iris=(iri,)),
         *((InAxiomSelection(name=within),) if within is not None else ()),
     )
-    return run(s, ListAxiomHashes(constraints=constraints))
+    return run(s, FindAxioms(constraints=constraints))
 
 
 def search_entities(

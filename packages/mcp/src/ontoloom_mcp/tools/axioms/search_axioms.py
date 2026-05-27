@@ -10,7 +10,7 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
 )
 from ontoloom.query.dispatch import resolve_within, run
-from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
@@ -62,7 +62,7 @@ def search_axioms(
         if query is None:
             hashes = run(
                 s,
-                ListAxiomHashes(
+                FindAxioms(
                     constraints=(HasAnyAnnotation(properties=props_tuple), *scope),
                 ),
             )

@@ -15,7 +15,7 @@ from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
-from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.stream_axioms import StreamAxioms
@@ -59,9 +59,9 @@ def test_dispatch_count_entities_by_role(s):
     assert result[EntityType.CLASS] == 2
 
 
-def test_dispatch_list_axiom_hashes(s):
+def test_dispatch_find_axioms(s):
     _seed(s)
-    result = run(s, ListAxiomHashes(constraints=()))
+    result = run(s, FindAxioms(constraints=()))
     assert isinstance(result, list)
     assert len(result) == 2
     assert all(isinstance(h, AxiomHash) for h in result)

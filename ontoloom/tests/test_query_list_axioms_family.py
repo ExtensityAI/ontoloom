@@ -1,11 +1,11 @@
-"""Tests for the ListAxioms / ListAxiomHashes / StreamAxioms query trio.
+"""Tests for the ListAxioms / FindAxioms / StreamAxioms query trio.
 
 The three queries share constraint handling and ordering; they differ in
 projection (`a.hash` vs `a.hash, json(a.data)`), pagination support
-(StreamAxioms has none), and return shape (list vs streaming context manager).
-Common cases are parametrized over the trio; the per-query specifics
-(JSON payload shape, streaming lifecycle, pagination semantics) and the
-ListAxiomHashes-only annotation predicates live in dedicated sections.
+(FindAxioms and StreamAxioms have none), and return shape (list vs streaming
+context manager). Common cases are parametrized over the trio; the per-query
+specifics (JSON payload shape, streaming lifecycle, pagination semantics) and
+the FindAxioms-only annotation predicates live in dedicated sections.
 """
 
 import json
@@ -27,7 +27,7 @@ from ontoloom.query.constraints import (
     WithTypes,
 )
 from ontoloom.query.dispatch import run
-from ontoloom.query.list_axiom_hashes import ListAxiomHashes
+from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.stream_axioms import StreamAxioms
 
@@ -39,7 +39,7 @@ from ontoloom.query.stream_axioms import StreamAxioms
 ResultHashes = Callable[[Any, Session], list[AxiomHash]]
 
 
-def _list_hashes_hashes(q: ListAxiomHashes, s: Session) -> list[AxiomHash]:
+def _find_axioms_hashes(q: FindAxioms, s: Session) -> list[AxiomHash]:
     return run(s, q)
 
 
@@ -54,7 +54,7 @@ def _stream_axioms_hashes(q: StreamAxioms, s: Session) -> list[AxiomHash]:
 
 # (id, query_class, projection_sql, supports_pagination, run_adapter)
 TRIO: list[tuple[str, type, str, bool, ResultHashes]] = [
-    ("hashes", ListAxiomHashes, "SELECT a.hash", True, _list_hashes_hashes),
+    ("hashes", FindAxioms, "SELECT a.hash", False, _find_axioms_hashes),
     ("axioms", ListAxioms, "SELECT a.hash, json(a.data)", True, _list_axioms_hashes),
     ("stream", StreamAxioms, "SELECT a.hash, json(a.data)", False, _stream_axioms_hashes),
 ]
@@ -62,7 +62,7 @@ TRIO: list[tuple[str, type, str, bool, ResultHashes]] = [
 
 def _make(query_cls: type, *, constraints: tuple = (), limit: int | None = None, offset: int = 0):
     """Construct a query, omitting pagination args for queries that don't support them."""
-    if query_cls is StreamAxioms:
+    if query_cls in (FindAxioms, StreamAxioms):
         return query_cls(constraints=constraints)
 
     return query_cls(constraints=constraints, limit=limit, offset=offset)
@@ -228,7 +228,7 @@ def test_stream_run_iteration_lazy_within_with_block(s):
     assert len(rest) == 2
 
 
-# ---- ListAxiomHashes-specific: HasAnyAnnotation predicate --------------------
+# ---- FindAxioms-specific: HasAnyAnnotation predicate -------------------------
 
 
 def _comment(text: str) -> Annotation:
@@ -255,7 +255,7 @@ def test_run_has_any_annotation_existence(s):
     add_axioms(s, [sourced, commented, unannotated])
     result = run(
         s,
-        ListAxiomHashes(
+        FindAxioms(
             constraints=(HasAnyAnnotation(properties=(IRI("rdfs:isDefinedBy"),)),),
         ),
     )

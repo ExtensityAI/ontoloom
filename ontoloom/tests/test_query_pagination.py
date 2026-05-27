@@ -4,7 +4,6 @@ from collections.abc import Callable
 
 import pytest
 from ontoloom.query.base import Query
-from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
@@ -20,10 +19,6 @@ def _list_axioms(**kw: object) -> Query[object]:
     return ListAxioms(constraints=(), **kw)  # pyright: ignore[reportArgumentType]
 
 
-def _list_axiom_hashes(**kw: object) -> Query[object]:
-    return ListAxiomHashes(constraints=(), **kw)  # pyright: ignore[reportArgumentType]
-
-
 def _read_axiom_selection(**kw: object) -> Query[object]:
     return ReadAxiomSelection(selection=SelectionName("foo"), **kw)  # pyright: ignore[reportArgumentType]
 
@@ -35,7 +30,6 @@ def _read_entity_selection(**kw: object) -> Query[object]:
 _FACTORIES: tuple[Callable[..., Query[object]], ...] = (
     _list_entities,
     _list_axioms,
-    _list_axiom_hashes,
     _read_axiom_selection,
     _read_entity_selection,
 )
