@@ -11,7 +11,7 @@ from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
 from ontoloom.owl.prefix_name import PrefixName
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 # Each IRI in a MentionsAll becomes its own EXISTS subquery in the SQL plan.
 _MENTIONS_ALL_CAP = 8
@@ -80,11 +80,11 @@ class InPositions(FrozenModel):
 
 
 class InAxiomSelection(FrozenModel):
-    name: AxiomSelectionName
+    name: SelectionName
 
 
 class InEntitySelection(FrozenModel):
-    name: EntitySelectionName
+    name: SelectionName
 
 
 class AlwaysFalse(FrozenModel):

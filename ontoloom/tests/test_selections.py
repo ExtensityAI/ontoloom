@@ -1,4 +1,5 @@
 import pytest
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.axioms import Declaration, SubClassOf
@@ -16,18 +17,16 @@ from ontoloom.selections.expr import (
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import (
+    DroppedSelection,
     axiom_selection_exists,
     entity_selection_exists,
     get_axiom_selection,
     get_entity_selection,
-    remove_axiom_selections,
-    remove_entity_selections,
+    remove_selections_any,
     upsert_axiom_selection,
     upsert_entity_selection,
 )
 from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
     SelectionExistsError,
     SelectionExprError,
     SelectionKindConflictError,
@@ -38,12 +37,12 @@ from ontoloom.selections.types import (
 )
 
 
-def _ax(name: str) -> AxiomSelectionName:
-    return AxiomSelectionName(f"axioms:{name}")
+def _ax(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
-def _ent(name: str) -> EntitySelectionName:
-    return EntitySelectionName(f"entities:{name}")
+def _ent(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
 # -- P-03-3: Selection set algebra --
@@ -443,21 +442,30 @@ def test_create_selection_mixed_kind_union_rejected(s):
         )
 
 
-# -- remove_*_selections kind-strictness --
+# -- remove_selections_any kind-agnostic sweep --
 
 
-def test_remove_axiom_selections_ignores_entity_side(s):
-    """`remove_axiom_selections` over a name only stored entity-side should not drop it."""
+def test_remove_selections_any_drops_entity_side(s):
+    """`remove_selections_any` resolves kind by lookup and drops an entity-side name."""
     upsert_entity_selection(s, SelectionName("foo"), ["ex:Dog"], "test")
-    result = remove_axiom_selections(s, [_ax("foo")])
-    assert result.dropped == ()
-    assert result.not_found == (SelectionName("foo"),)
-    assert get_entity_selection(s, SelectionName("foo")).size == 1  # still there
+    result = remove_selections_any(s, [_ent("foo")])
+    assert result.dropped == (DroppedSelection(name=SelectionName("foo"), size=1),)
+    assert result.not_found == ()
+    assert not entity_selection_exists(s, SelectionName("foo"))
 
 
-def test_remove_entity_selections_tolerates_missing(s):
+def test_remove_selections_any_drops_axiom_side(s):
+    """`remove_selections_any` drops an axiom-side name."""
+    upsert_axiom_selection(s, SelectionName("foo"), [AxiomHash("a" * 64)], "test")
+    result = remove_selections_any(s, [_ax("foo")])
+    assert result.dropped == (DroppedSelection(name=SelectionName("foo"), size=1),)
+    assert result.not_found == ()
+    assert not axiom_selection_exists(s, SelectionName("foo"))
+
+
+def test_remove_selections_any_tolerates_missing(s):
     """Missing names still surface in not_found, not as an exception."""
-    result = remove_entity_selections(s, [_ent("ghost")])
+    result = remove_selections_any(s, [_ent("ghost")])
     assert result.dropped == ()
     assert result.not_found == (SelectionName("ghost"),)
 
@@ -572,7 +580,6 @@ def test_create_selection_create_refuses_existing(s):
 
 
 def test_create_refuses_name_taken_by_other_kind(s):
-    from ontoloom.axioms.hashing import AxiomHash
     from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
     from ontoloom.selections.types import SelectionKindConflictError, SelectionName
 

@@ -3,7 +3,7 @@ from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import find_duplicate_entities as _find_duplicate_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_entity_selection
-from ontoloom.selections.types import EntitySelectionName, WriteMode
+from ontoloom.selections.types import SelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_selection_ref
@@ -15,10 +15,10 @@ _PREVIEW_GROUPS = 20
 
 def find_duplicate_entities(
     path: OntologyPath,
-    into: EntitySelectionName,
+    into: SelectionName,
     annotation_property: IRI,
     mode: WriteMode = WriteMode.CREATE,
-    within: EntitySelectionName | None = None,
+    within: SelectionName | None = None,
 ):
     """Find annotation values shared by multiple entities.
 
@@ -26,12 +26,11 @@ def find_duplicate_entities(
     (e.g., "rdfs:label"). Saves all affected entities as an entity selection.
 
     Args:
-    - `into`: Kind-prefixed name for the output selection
-      (e.g. `"entities:dup_labels"`).
+    - `into`: Name for the output selection (e.g. `"dup_labels"`).
     - `annotation_property`: The property whose values are checked for duplicates
       (e.g. "rdfs:label").
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
-    - `within`: Optional entity selection (e.g. `"entities:my_classes"`) to
+    - `within`: Optional entity selection (e.g. `"my_classes"`) to
       restrict the check to.
     """
     ont = Ontology(path)
@@ -46,7 +45,7 @@ def find_duplicate_entities(
             source += f", within={dquoted(str(within))}"
         upserted = upsert_entity_selection(
             s,
-            into.bare,
+            into,
             result.affected_iris,
             source=source,
             mode=mode,

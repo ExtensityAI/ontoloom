@@ -14,7 +14,7 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, SelectionName
+from ontoloom.selections.types import SelectionName
 from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
 from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
@@ -86,7 +86,7 @@ def test_get_entity_returns_info(populated_db):
 def test_search_entities_creates_selection(populated_db):
     result = search_entities(
         path=populated_db,
-        into=EntitySelectionName("entities:dogs"),
+        into=SelectionName("dogs"),
         query="Dog",
     )
     assert '"entities:dogs"' in result
@@ -135,10 +135,10 @@ def test_create_selection_replace_notes_overwrite(empty_db):
 def test_read_selection_after_search(populated_db):
     search_entities(
         path=populated_db,
-        into=EntitySelectionName("entities:dogs"),
+        into=SelectionName("dogs"),
         query="Dog",
     )
-    result = read_selection(path=populated_db, name=EntitySelectionName("entities:dogs"))
+    result = read_selection(path=populated_db, name=SelectionName("dogs"))
     assert "ex:Dog" in result
 
 
@@ -176,7 +176,7 @@ def test_search_axioms_by_text(empty_db):
 
     result = search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:todos"),
+        into=SelectionName("todos"),
         query="TODO",
     )
 
@@ -185,7 +185,7 @@ def test_search_axioms_by_text(empty_db):
     assert "1 axioms" in result
     assert "SubClassOf" in result
 
-    page = read_selection(path=empty_db, name=AxiomSelectionName("axioms:todos"))
+    page = read_selection(path=empty_db, name=SelectionName("todos"))
     assert "ex:Dog" in page
     assert "ex:Cat" not in page
     assert "TODO" in page
@@ -225,7 +225,7 @@ def test_search_axioms_by_property_only(empty_db):
 
     search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:defined"),
+        into=SelectionName("defined"),
         properties=[IRI("rdfs:isDefinedBy")],
     )
 
@@ -295,9 +295,9 @@ def test_search_axioms_with_within_scope(empty_db):
 
     search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:hits"),
+        into=SelectionName("hits"),
         query="TODO",
-        within=AxiomSelectionName("axioms:scope"),
+        within=SelectionName("scope"),
     )
 
     with session(Ontology(empty_db)) as s:
@@ -344,7 +344,7 @@ def test_search_axioms_exact_ranked_before_substring(empty_db):
 
     search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:ranked"),
+        into=SelectionName("ranked"),
         query="TODO",
     )
 
@@ -374,7 +374,7 @@ def test_search_axioms_no_results_message(empty_db):
 
     result = search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:empty"),
+        into=SelectionName("empty"),
         query="nonexistent",
     )
 
@@ -387,7 +387,7 @@ def test_search_axioms_requires_query_or_properties(empty_db):
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
     with pytest.raises(ValueError, match="search_axioms requires at least one of"):
-        search_axioms(path=empty_db, into=AxiomSelectionName("axioms:x"))
+        search_axioms(path=empty_db, into=SelectionName("x"))
 
 
 # -- Error translation --
@@ -465,9 +465,9 @@ def test_find_duplicate_entities_within_missing_selection_translates(populated_d
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
-            into=EntitySelectionName("entities:dups"),
+            into=SelectionName("dups"),
             annotation_property=IRI("rdfs:label"),
-            within=EntitySelectionName("entities:nonexistent"),
+            within=SelectionName("nonexistent"),
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
@@ -534,10 +534,10 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
     )
     search_entities(
         path=empty_db,
-        into=EntitySelectionName("entities:undeclared"),
+        into=SelectionName("undeclared"),
         declared=False,
     )
-    page = read_selection(path=empty_db, name=EntitySelectionName("entities:undeclared"))
+    page = read_selection(path=empty_db, name=SelectionName("undeclared"))
     assert "0 missing" in page
     assert "ex:Wolf" in page
     assert "*missing*" not in page
@@ -572,7 +572,7 @@ def test_read_selection_not_found_translates(populated_db):
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
-            name=EntitySelectionName("entities:nonexistent"),
+            name=SelectionName("nonexistent"),
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
@@ -584,7 +584,7 @@ def _make_dogs_selection(path):
     from ontoloom.selections.expr import AxiomsForExpr
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
-    search_entities(path=path, into=EntitySelectionName("entities:dogs_ent"), query="Dog")
+    search_entities(path=path, into=SelectionName("dogs_ent"), query="Dog")
     create_selection(
         path=path,
         name=SelectionName("dogs_ax"),
@@ -610,9 +610,7 @@ def test_remove_axioms_by_selection_first_call_previews_and_requires_confirm(pop
     before = _count_axioms(populated_db)
 
     with pytest.raises(ConfirmationRequiredError) as exc_info:
-        remove_axioms(
-            path=populated_db, target=BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
-        )
+        remove_axioms(path=populated_db, target=BySelection(name=SelectionName("dogs_ax")))
 
     msg = str(exc_info.value)
     assert "Removing" in msg
@@ -631,7 +629,7 @@ def test_remove_axioms_by_selection_confirm_token_removes(populated_db):
     _make_dogs_selection(populated_db)
     before = _count_axioms(populated_db)
 
-    target = BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
+    target = BySelection(name=SelectionName("dogs_ax"))
     with pytest.raises(ConfirmationRequiredError) as exc_info:
         remove_axioms(path=populated_db, target=target)
     token = exc_info.value.token
@@ -648,16 +646,14 @@ def test_remove_axioms_by_selection_stale_token_re_previews(populated_db):
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
     _make_dogs_selection(populated_db)
-    target = BySelection(name=AxiomSelectionName("axioms:dogs_ax"))
+    target = BySelection(name=SelectionName("dogs_ax"))
 
     with pytest.raises(ConfirmationRequiredError) as exc_info:
         remove_axioms(path=populated_db, target=target)
     old_token = exc_info.value.token
 
     # Overwrite the selection's contents (now the ex:Animal axioms instead).
-    search_entities(
-        path=populated_db, into=EntitySelectionName("entities:animals_ent"), query="Animal"
-    )
+    search_entities(path=populated_db, into=SelectionName("animals_ent"), query="Animal")
     create_selection(
         path=populated_db,
         name=SelectionName("dogs_ax"),
@@ -853,7 +849,7 @@ def test_rename_iri_within_bare_scope_limits_rename(populated_db):
         path=populated_db,
         old_iri=IRI("ex:Dog"),
         new_iri=IRI("ex:Puppy"),
-        within=AxiomSelectionName("axioms:scope"),
+        within=SelectionName("scope"),
     )
     assert "1 axioms replaced" in result
 
@@ -883,7 +879,7 @@ def test_rename_iri_within_scope_collision_token_round_trips(populated_db):
             path=populated_db,
             old_iri=IRI("ex:Dog"),
             new_iri=IRI("ex:Animal"),
-            within=AxiomSelectionName("axioms:scope"),
+            within=SelectionName("scope"),
         )
     token = exc_info.value.token
 
@@ -891,7 +887,7 @@ def test_rename_iri_within_scope_collision_token_round_trips(populated_db):
         path=populated_db,
         old_iri=IRI("ex:Dog"),
         new_iri=IRI("ex:Animal"),
-        within=AxiomSelectionName("axioms:scope"),
+        within=SelectionName("scope"),
         confirm=token,
     )
     assert "merged" in result
@@ -916,7 +912,7 @@ def test_rename_iri_within_scope_change_invalidates_token(populated_db):
             path=populated_db,
             old_iri=IRI("ex:Dog"),
             new_iri=IRI("ex:Animal"),
-            within=AxiomSelectionName("axioms:scope"),
+            within=SelectionName("scope"),
         )
     token_before = first.value.token
 
@@ -937,7 +933,7 @@ def test_rename_iri_within_scope_change_invalidates_token(populated_db):
             path=populated_db,
             old_iri=IRI("ex:Dog"),
             new_iri=IRI("ex:Animal"),
-            within=AxiomSelectionName("axioms:scope"),
+            within=SelectionName("scope"),
         )
     token_after = second.value.token
 
@@ -964,20 +960,20 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
         ],
     )
 
-    first = search_axioms(path=empty_db, into=AxiomSelectionName("axioms:t"), query="dog")
+    first = search_axioms(path=empty_db, into=SelectionName("t"), query="dog")
     assert '"axioms:t"' in first
     assert "axioms:t@" not in first
 
     wrapped = translate_errors(search_axioms)
     with pytest.raises(ToolError) as exc_info:
-        wrapped(path=empty_db, into=AxiomSelectionName("axioms:t"), query="dog")
+        wrapped(path=empty_db, into=SelectionName("t"), query="dog")
     msg = str(exc_info.value)
     assert "already exists" in msg
     assert 'mode="replace"' in msg
 
     overwrote = search_axioms(
         path=empty_db,
-        into=AxiomSelectionName("axioms:t"),
+        into=SelectionName("t"),
         query="dog",
         mode=WriteMode.REPLACE,
     )
@@ -988,18 +984,18 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
 def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
     from ontoloom.selections.types import WriteMode
 
-    search_entities(path=populated_db, into=EntitySelectionName("entities:t"), query="Dog")
+    search_entities(path=populated_db, into=SelectionName("t"), query="Dog")
 
     wrapped = translate_errors(search_entities)
     with pytest.raises(ToolError) as exc_info:
-        wrapped(path=populated_db, into=EntitySelectionName("entities:t"), query="Dog")
+        wrapped(path=populated_db, into=SelectionName("t"), query="Dog")
     msg = str(exc_info.value)
     assert "already exists" in msg
     assert 'mode="replace"' in msg
 
     overwrote = search_entities(
         path=populated_db,
-        into=EntitySelectionName("entities:t"),
+        into=SelectionName("t"),
         query="Dog",
         mode=WriteMode.REPLACE,
     )
@@ -1037,18 +1033,18 @@ def test_producer_tools_accept_mode_argument(populated_db):
     match_axioms(
         path=populated_db,
         pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
-        into=AxiomSelectionName("axioms:m"),
+        into=SelectionName("m"),
         mode=WriteMode.CREATE,
     )
     get_entity(
         path=populated_db,
         iri=IRI("ex:Dog"),
-        into=AxiomSelectionName("axioms:ge"),
+        into=SelectionName("ge"),
         mode=WriteMode.CREATE,
     )
     find_duplicate_entities(
         path=populated_db,
-        into=EntitySelectionName("entities:dup"),
+        into=SelectionName("dup"),
         annotation_property=IRI("rdfs:label"),
         mode=WriteMode.CREATE,
     )

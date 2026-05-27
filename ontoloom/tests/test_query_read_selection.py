@@ -22,9 +22,7 @@ from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import (
     AxiomSelection,
-    AxiomSelectionName,
     EntitySelection,
-    EntitySelectionName,
     SelectionName,
     SelectionNotFoundError,
     ShowFilter,
@@ -34,12 +32,12 @@ from pydantic import ValidationError
 SEL = SelectionName("sel")
 
 
-def _axiom_ref(name: str) -> AxiomSelectionName:
-    return AxiomSelectionName(f"axioms:{name}")
+def _axiom_ref(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
-def _entity_ref(name: str) -> EntitySelectionName:
-    return EntitySelectionName(f"entities:{name}")
+def _entity_ref(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
 def _seed_axioms_present_missing(s: Any, name: SelectionName) -> None:
@@ -96,7 +94,6 @@ class _ReadParams:
     query_class: type
     ref_factory: Callable[[str], Any]
     meta_class: type
-    wrong_kind_str: str
     seed_pm: Callable[..., None]
     seed_pag: Callable[..., None]
     seed_empty: Callable[..., None]
@@ -106,7 +103,6 @@ _AXIOM_PARAMS = _ReadParams(
     query_class=ReadAxiomSelection,
     ref_factory=_axiom_ref,
     meta_class=AxiomSelection,
-    wrong_kind_str="entities:foo",
     seed_pm=_seed_axioms_present_missing,
     seed_pag=_seed_axioms_for_pagination,
     seed_empty=_seed_empty_axioms,
@@ -115,7 +111,6 @@ _ENTITY_PARAMS = _ReadParams(
     query_class=ReadEntitySelection,
     ref_factory=_entity_ref,
     meta_class=EntitySelection,
-    wrong_kind_str="axioms:foo",
     seed_pm=_seed_entities_present_missing,
     seed_pag=_seed_entities_for_pagination,
     seed_empty=_seed_empty_entities,
@@ -128,13 +123,13 @@ PARAMS = pytest.mark.parametrize("p", [_AXIOM_PARAMS, _ENTITY_PARAMS], ids=["axi
 
 
 @PARAMS
-def test_field_validator_rejects_wrong_kind(p: _ReadParams):
+def test_field_validator_rejects_invalid_name(p: _ReadParams):
     with pytest.raises(ValidationError):
-        p.query_class(selection=p.wrong_kind_str)
+        p.query_class(selection="not a valid name")
 
 
 @PARAMS
-def test_field_validator_accepts_correct_kind(p: _ReadParams):
+def test_field_validator_accepts_valid_name(p: _ReadParams):
     q = p.query_class(selection=p.ref_factory("foo"))
     assert q.selection == p.ref_factory("foo")
 

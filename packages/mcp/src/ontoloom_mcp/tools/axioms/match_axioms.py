@@ -3,7 +3,7 @@ from ontoloom.connection import Ontology, session
 from ontoloom.patterns.search import match_axioms as core_match
 from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, WriteMode
+from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import format_selection_ref, format_selection_result
 from ontoloom_mcp.components.preview import format_axiom_selection_preview
@@ -14,9 +14,9 @@ from ontoloom_mcp.components.types import Limit, OntologyPath
 def match_axioms(
     path: OntologyPath,
     pattern: Pattern,
-    into: AxiomSelectionName,
+    into: SelectionName,
     mode: WriteMode = WriteMode.CREATE,
-    within: AxiomSelectionName | EntitySelectionName | None = None,
+    within: SelectionName | None = None,
     limit: Limit = 100,
 ):
     """Find axioms matching a structural pattern; save matches to an axiom selection.
@@ -34,11 +34,9 @@ def match_axioms(
 
     Args:
     - `pattern`: The pattern object to match.
-    - `into`: Kind-prefixed name for the axiom selection to save results
-      (e.g. `"axioms:my_matches"`).
+    - `into`: Name for the axiom selection to save results (e.g. `"my_matches"`).
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
-    - `within`: Optional selection reference (e.g. `"axioms:my_sel"` or
-      `"entities:my_ents"`) to restrict the search to.
+    - `within`: Optional selection name (axiom or entity) to restrict the search to.
     - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
     """
     ont = Ontology(path)
@@ -46,7 +44,7 @@ def match_axioms(
         result = core_match(s, pattern, within=within, limit=limit)
         upserted = upsert_axiom_selection(
             s,
-            into.bare,
+            into,
             result.axiom_hashes,
             "match_axioms",
             mode=mode,

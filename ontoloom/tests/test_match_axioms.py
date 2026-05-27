@@ -23,11 +23,7 @@ from ontoloom.patterns.types import (
     TupleMatch,
 )
 from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
-from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
-    SelectionName,
-)
+from ontoloom.selections.types import SelectionName
 
 
 @pytest.fixture()
@@ -96,7 +92,7 @@ def test_within_axiom_selection(populated):
     result = match_axioms(
         populated,
         pattern,
-        within=AxiomSelectionName("axioms:dog_only"),
+        within=SelectionName("dog_only"),
     )
     assert len(result.axiom_hashes) == 1
     assert result.axiom_hashes[0] == dog_hash
@@ -114,7 +110,7 @@ def test_within_entity_selection(populated):
     result = match_axioms(
         populated,
         pattern,
-        within=EntitySelectionName("entities:cat_entities"),
+        within=SelectionName("cat_entities"),
     )
     assert len(result.axiom_hashes) == 1
 

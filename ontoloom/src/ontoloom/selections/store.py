@@ -18,10 +18,8 @@ from ontoloom.owl.iri import IRI
 from ontoloom.selections.types import (
     AxiomSelection,
     AxiomSelectionListing,
-    AxiomSelectionName,
     EntitySelection,
     EntitySelectionListing,
-    EntitySelectionName,
     SelectionContentHash,
     SelectionExistsError,
     SelectionKindConflictError,
@@ -226,17 +224,6 @@ def list_axiom_selections(s: Session) -> list[AxiomSelectionListing]:
     ]
 
 
-def remove_axiom_selections(
-    s: Session, names: Sequence[AxiomSelectionName]
-) -> RemoveSelectionsResult:
-    """Best-effort remove. Duplicate refs in the input are de-duplicated.
-
-    Missing selections surface in `not_found`, not as an exception.
-    """
-    bare_names = dedupe(ref.bare for ref in names)
-    return _remove_named(s, "axiom_selections", bare_names)
-
-
 def get_axiom_selection_items(s: Session, name: SelectionName) -> list[AxiomHash]:
     """Read the items of an axiom selection in insertion order, parsed to AxiomHash."""
     return [AxiomHash(item) for item in _get_items(s, "axiom_selection_items", name)]
@@ -334,23 +321,30 @@ def list_entity_selections(s: Session) -> list[EntitySelectionListing]:
     ]
 
 
-def remove_entity_selections(
-    s: Session, names: Sequence[EntitySelectionName]
-) -> RemoveSelectionsResult:
-    """Best-effort remove. Duplicate refs in the input are de-duplicated.
-
-    Missing selections surface in `not_found`, not as an exception.
-    """
-    bare_names = dedupe(ref.bare for ref in names)
-    return _remove_named(s, "entity_selections", bare_names)
-
-
 def get_entity_selection_items(s: Session, name: SelectionName) -> list[IRI]:
     """Read the items of an entity selection in insertion order, parsed to IRI."""
     return [IRI(item) for item in _get_items(s, "entity_selection_items", name)]
 
 
 # -- shared low-level helper --
+
+
+def remove_selections_any(s: Session, names: Sequence[SelectionName]) -> RemoveSelectionsResult:
+    """Remove bare names from whichever kind-table holds each (best-effort).
+
+    Under the cross-kind uniqueness guard a name lives in at most one table,
+    so sweeping both tables is unambiguous. Missing names surface in
+    `not_found`, not as an exception.
+    """
+    deduped = dedupe(names)
+    ax = _remove_named(s, "axiom_selections", deduped)
+    remaining = [n for n in deduped if n not in {d.name for d in ax.dropped}]
+    ent = _remove_named(s, "entity_selections", remaining)
+
+    dropped = ax.dropped + ent.dropped
+    found = {d.name for d in dropped}
+    not_found = tuple(n for n in deduped if n not in found)
+    return RemoveSelectionsResult(dropped=dropped, not_found=not_found)
 
 
 def _remove_named(

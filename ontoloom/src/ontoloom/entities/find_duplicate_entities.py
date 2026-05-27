@@ -8,14 +8,14 @@ from ontoloom.entities.types import DuplicateGroup, DuplicateResult
 from ontoloom.owl.iri import IRI
 from ontoloom.query.base import Query, RenderedSql
 from ontoloom.selections.store import get_entity_selection
-from ontoloom.selections.types import EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 
 class FindDuplicateEntities(Query[DuplicateResult]):
     """Caller-side use of `affected_iris` covers the full result set; no pagination."""
 
     annotation_property: IRI
-    within: EntitySelectionName | None = None
+    within: SelectionName | None = None
 
     @override
     def render(self) -> RenderedSql:
@@ -34,9 +34,9 @@ class FindDuplicateEntities(Query[DuplicateResult]):
             )
             params = (
                 self.annotation_property,
-                self.within.bare,
+                self.within,
                 self.annotation_property,
-                self.within.bare,
+                self.within,
             )
 
         sql = (
@@ -56,7 +56,7 @@ class FindDuplicateEntities(Query[DuplicateResult]):
     @override
     def _run(self, s: Session) -> DuplicateResult:
         if self.within is not None:
-            get_entity_selection(s, self.within.bare)  # raises SelectionNotFoundError if absent
+            get_entity_selection(s, self.within)  # raises SelectionNotFoundError if absent
 
         compiled = self.render()
         rows = s.conn.execute(compiled.sql, compiled.params).fetchall()

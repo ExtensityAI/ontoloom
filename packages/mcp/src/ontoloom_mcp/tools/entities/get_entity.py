@@ -5,7 +5,7 @@ from ontoloom.entities.reader import get_entity as core_get_entity
 from ontoloom.entities.types import EntityInfo
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, WriteMode
+from ontoloom.selections.types import SelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
@@ -22,18 +22,18 @@ from ontoloom_mcp.components.types import OntologyPath
 def get_entity(
     path: OntologyPath,
     iri: IRI,
-    into: AxiomSelectionName | None = None,
+    into: SelectionName | None = None,
     mode: WriteMode = WriteMode.CREATE,
-    within: AxiomSelectionName | None = None,
+    within: SelectionName | None = None,
 ):
     """Get details for a single entity: roles, annotations, and asserted axiom counts by type.
 
     Does NOT include inherited or inferred information.
     Use `match_axioms` to see the full axiom details.
 
-    - `within`: Scope to a named axiom selection (e.g. `"axioms:my_sel"`).
+    - `within`: Scope to a named axiom selection (e.g. `"my_sel"`).
     - `into`: Save this entity's axiom hashes under the given axiom selection
-      (e.g. `"axioms:dog_axioms"`). Entry point for "I want to work on this
+      (e.g. `"dog_axioms"`). Entry point for "I want to work on this
       entity's axioms" -> then use `match_axioms(within=...)` or
       `remove_axioms(within=...)` on the result.
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
@@ -47,7 +47,7 @@ def get_entity(
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
             source = f"get_entity(iri={dquoted(iri)})"
-            upserted = upsert_axiom_selection(s, into.bare, hashes, source, mode=mode)
+            upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
             sel = upserted.selection
             sel_msg = f"\n\n{sel.size} axiom hashes -> {format_selection_ref(sel)}."
             if upserted.previous_size is not None:

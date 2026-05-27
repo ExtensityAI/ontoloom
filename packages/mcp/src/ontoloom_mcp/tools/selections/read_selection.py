@@ -4,11 +4,12 @@ from ontoloom.connection import Ontology, session
 from ontoloom.query.dispatch import run
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
+from ontoloom.selections.store import axiom_selection_exists, entity_selection_exists
 from ontoloom.selections.types import (
-    AxiomSelectionName,
     AxiomSelectionPage,
-    EntitySelectionName,
     EntitySelectionPage,
+    SelectionName,
+    SelectionNotFoundError,
     ShowFilter,
 )
 from ontoloom.utils import dquoted
@@ -20,15 +21,15 @@ from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
 def read_selection(
     path: OntologyPath,
-    name: AxiomSelectionName | EntitySelectionName,
+    name: SelectionName,
     limit: Limit = 20,
     offset: Offset = 0,
     show: ShowFilter = ShowFilter.ALL,
 ):
     """Paginated view of a selection's contents with missing-item visibility.
 
-    - `name`: Kind-prefixed selection reference (e.g. `"axioms:my_sel"` or
-      `"entities:my_sel"`). The prefix selects which kind-table is read.
+    - `name`: Selection name (e.g. `"my_sel"`). The kind (axioms or entities)
+      is resolved by lookup.
     - `show`: "all" (default), "present" (only items still in ontology),
       "missing" (only items removed since the selection was created).
       Use "missing" to audit a selection after ontology modifications.
@@ -39,18 +40,21 @@ def read_selection(
     """
     ont = Ontology(path)
     with session(ont) as s:
-        if isinstance(name, AxiomSelectionName):
+        if axiom_selection_exists(s, name):
             page_ax: AxiomSelectionPage = run(
                 s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
             )
             s.commit()
             return _format_axiom_page(page_ax, offset=offset, show=show)
 
-        page_ent: EntitySelectionPage = run(
-            s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
-        )
-        s.commit()
-        return _format_entity_page(page_ent, offset=offset, show=show)
+        if entity_selection_exists(s, name):
+            page_ent: EntitySelectionPage = run(
+                s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
+            )
+            s.commit()
+            return _format_entity_page(page_ent, offset=offset, show=show)
+
+        raise SelectionNotFoundError(name)
 
 
 def _format_axiom_page(page: AxiomSelectionPage, *, offset: int, show: ShowFilter):

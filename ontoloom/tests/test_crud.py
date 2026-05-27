@@ -67,15 +67,11 @@ from ontoloom.selections.store import (
     upsert_axiom_selection,
     upsert_entity_selection,
 )
-from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
-    SelectionName,
-)
+from ontoloom.selections.types import SelectionName
 
 
-def _ent(name: str) -> EntitySelectionName:
-    return EntitySelectionName(f"entities:{name}")
+def _ent(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
 EX = PrefixName("ex")
@@ -419,9 +415,7 @@ def test_rename_iri_scoped_to_selection(s):
 
     upsert_axiom_selection(s, SelectionName("scope"), [h_in], "test")
 
-    renamed = rename_iri(
-        s, IRI("ex:Animal"), IRI("ex:Mammal"), within=AxiomSelectionName("axioms:scope")
-    )
+    renamed = rename_iri(s, IRI("ex:Animal"), IRI("ex:Mammal"), within=SelectionName("scope"))
     assert len(renamed.replaced) == 1
 
     # ax_out is outside the scope -> its hash should be unchanged

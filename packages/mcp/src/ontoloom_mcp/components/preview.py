@@ -5,7 +5,7 @@ from ontoloom.connection import Session
 from ontoloom.query.dispatch import run
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.store import AxiomUpsertResult
-from ontoloom.selections.types import AxiomSelectionName, ShowFilter
+from ontoloom.selections.types import ShowFilter
 
 from ontoloom_mcp.components.formatting import (
     SELECT_INLINE_MAX,
@@ -33,7 +33,7 @@ def format_axiom_selection_preview(
     page = run(
         s,
         ReadAxiomSelection(
-            selection=AxiomSelectionName(f"axioms:{sel.name}"),
+            selection=sel.name,
             limit=page_size,
             offset=0,
             show=ShowFilter.ALL,

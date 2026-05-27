@@ -12,8 +12,8 @@ from ontoloom.query.constraints import HasPagination
 from ontoloom.selections.store import get_entity_selection
 from ontoloom.selections.types import (
     EntityItem,
-    EntitySelectionName,
     EntitySelectionPage,
+    SelectionName,
     ShowFilter,
 )
 
@@ -41,7 +41,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
     paginated reads avoid a temp-sort over the full selection.
     """
 
-    selection: EntitySelectionName
+    selection: SelectionName
     show: ShowFilter = ShowFilter.ALL
 
     @override
@@ -56,7 +56,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
             "FROM entity_selection_items si",
             "WHERE si.selection_name = ?",
         ]
-        params: list[object] = [self.selection.bare]
+        params: list[object] = [self.selection]
 
         filter_clause = _show_filter_clause(self.show)
         if filter_clause:
@@ -68,7 +68,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
 
     @override
     def _run(self, s: Session) -> EntitySelectionPage:
-        name = self.selection.bare
+        name = self.selection
         meta = get_entity_selection(s, name)
 
         filter_clause = _show_filter_clause(self.show)

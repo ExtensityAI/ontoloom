@@ -23,9 +23,7 @@ from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import (
-    AxiomSelectionName,
     AxiomSelectionPage,
-    EntitySelectionName,
     EntitySelectionPage,
     SelectionName,
     SelectionNotFoundError,
@@ -102,7 +100,7 @@ def test_dispatch_read_axiom_selection(s):
     dog_hash = HashedAxiom.of(dog).hash
     upsert_axiom_selection(s, SelectionName("ax_sel"), [dog_hash], "test")
 
-    ref = AxiomSelectionName("axioms:ax_sel")
+    ref = SelectionName("ax_sel")
     result = run(s, ReadAxiomSelection(selection=ref))
     assert isinstance(result, AxiomSelectionPage)
     assert result.meta.size == 1
@@ -112,7 +110,7 @@ def test_dispatch_read_entity_selection(s):
     _seed(s)
     upsert_entity_selection(s, SelectionName("ent_sel"), ["ex:Dog"], "test")
 
-    ref = EntitySelectionName("entities:ent_sel")
+    ref = SelectionName("ent_sel")
     result = run(s, ReadEntitySelection(selection=ref))
     assert isinstance(result, EntitySelectionPage)
     assert result.meta.size == 1
@@ -127,39 +125,21 @@ def test_dispatch_find_duplicate_entities(s):
 
 
 def test_run_raises_on_nonexistent_selection_ref_in_constraints(s):
-    ref = EntitySelectionName("entities:does_not_exist")
+    ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
         run(s, ListEntities(constraints=(InEntitySelection(name=ref),)))
 
 
 def test_run_raises_on_nonexistent_selection_in_read_axiom_selection(s):
-    ref = AxiomSelectionName("axioms:does_not_exist")
+    ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
         run(s, ReadAxiomSelection(selection=ref))
 
 
 def test_run_raises_on_nonexistent_within_in_find_duplicate_entities(s):
-    ref = EntitySelectionName("entities:does_not_exist")
+    ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
         run(s, FindDuplicateEntities(annotation_property=IRI("rdfs:label"), within=ref))
-
-
-def test_read_axiom_selection_rejects_entity_ref():
-    # Pyright catches `selection: AxiomSelectionName` at the callsite;
-    # Pydantic enforces it at runtime.
-    from pydantic import ValidationError
-
-    entity_ref = EntitySelectionName("entities:foo")
-    with pytest.raises(ValidationError):
-        ReadAxiomSelection(selection=entity_ref)  # pyright: ignore[reportArgumentType]
-
-
-def test_read_entity_selection_rejects_axiom_ref():
-    from pydantic import ValidationError
-
-    axiom_ref = AxiomSelectionName("axioms:foo")
-    with pytest.raises(ValidationError):
-        ReadEntitySelection(selection=axiom_ref)  # pyright: ignore[reportArgumentType]

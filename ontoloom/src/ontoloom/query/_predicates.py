@@ -141,7 +141,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                     "WHERE si_w.item = ae.entity_iri "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(name.bare)
+                params.append(name)
             case InAxiomSelection(name=name):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM axiom_selection_items si_w "
@@ -149,7 +149,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                     "WHERE a_w.id = ae.axiom_id "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(name.bare)
+                params.append(name)
             case _:
                 msg = f"unknown entity constraint variant: {type(c).__name__}"
                 raise ValueError(msg)
@@ -203,7 +203,7 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # n
                     "WHERE si_w.item = a.hash "
                     "AND si_w.selection_name = ?)"
                 )
-                params.append(name.bare)
+                params.append(name)
             case InEntitySelection(name=name):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM entity_selection_items si_w "
@@ -211,7 +211,7 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # n
                     "WHERE si_w.selection_name = ? "
                     "AND ae_w.axiom_id = a.id)"
                 )
-                params.append(name.bare)
+                params.append(name)
             case _:
                 msg = f"unknown axiom constraint variant: {type(c).__name__}"
                 raise ValueError(msg)

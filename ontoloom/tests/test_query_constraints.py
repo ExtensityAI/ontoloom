@@ -22,7 +22,7 @@ from ontoloom.query.constraints import (
     WithRoles,
     WithTypes,
 )
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import SelectionName
 from pydantic import ValidationError
 
 # -- Helpers --
@@ -129,34 +129,24 @@ def test_deprecated_state_true_raises():
 # -- InAxiomSelection / InEntitySelection --
 
 
-def test_in_axiom_selection_holds_axiom_ref():
-    ref = AxiomSelectionName("axioms:x")
+def test_in_axiom_selection_holds_bare_name():
+    ref = SelectionName("x")
     assert InAxiomSelection(name=ref).name == ref
 
 
-def test_in_entity_selection_holds_entity_ref():
-    ref = EntitySelectionName("entities:x")
+def test_in_entity_selection_holds_bare_name():
+    ref = SelectionName("x")
     assert InEntitySelection(name=ref).name == ref
 
 
-def test_in_axiom_selection_rejects_bare_string():
+def test_in_axiom_selection_rejects_invalid_name():
     with pytest.raises(ValidationError):
-        InAxiomSelection(name="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
+        InAxiomSelection(name="not a valid name")  # pyright: ignore[reportArgumentType]
 
 
-def test_in_entity_selection_rejects_bare_string():
+def test_in_entity_selection_rejects_invalid_name():
     with pytest.raises(ValidationError):
-        InEntitySelection(name="not-a-typed-ref")  # pyright: ignore[reportArgumentType]
-
-
-def test_in_axiom_selection_rejects_entity_ref():
-    with pytest.raises(ValidationError):
-        InAxiomSelection(name=EntitySelectionName("entities:x"))  # pyright: ignore[reportArgumentType]
-
-
-def test_in_entity_selection_rejects_axiom_ref():
-    with pytest.raises(ValidationError):
-        InEntitySelection(name=AxiomSelectionName("axioms:x"))  # pyright: ignore[reportArgumentType]
+        InEntitySelection(name="not a valid name")  # pyright: ignore[reportArgumentType]
 
 
 # -- WithTypes: unknown tag rejection --

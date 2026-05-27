@@ -11,8 +11,8 @@ from ontoloom.query.constraints import HasPagination
 from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import (
     AxiomItem,
-    AxiomSelectionName,
     AxiomSelectionPage,
+    SelectionName,
     ShowFilter,
 )
 
@@ -38,7 +38,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
     `search_axioms`) survives pagination.
     """
 
-    selection: AxiomSelectionName
+    selection: SelectionName
     show: ShowFilter = ShowFilter.ALL
 
     @override
@@ -53,7 +53,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
             "FROM axiom_selection_items si LEFT JOIN axioms a ON a.hash = si.item",
             "WHERE si.selection_name = ?",
         ]
-        params: list[object] = [self.selection.bare]
+        params: list[object] = [self.selection]
 
         filter_clause = _show_filter_clause(self.show)
         if filter_clause:
@@ -65,7 +65,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
 
     @override
     def _run(self, s: Session) -> AxiomSelectionPage:
-        name = self.selection.bare
+        name = self.selection
         meta = get_axiom_selection(s, name)
 
         filter_clause = _show_filter_clause(self.show)

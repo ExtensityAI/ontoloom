@@ -20,16 +20,12 @@ from ontoloom.patterns.slot import IRISlot, VariableSlot, WildcardSlot
 from ontoloom.patterns.types import BasePattern, ExpressionPattern
 from ontoloom.query.constraints import (
     AxiomConstraint,
-    InAxiomSelection,
-    InEntitySelection,
     MentionsAll,
     WithTypes,
 )
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import resolve_within, run
 from ontoloom.query.stream_axioms import StreamAxioms
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
-
-type SelectionRef = AxiomSelectionName | EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +43,7 @@ def match_axioms(
     s: Session,
     pattern: BasePattern,
     *,
-    within: SelectionRef | None = None,
+    within: SelectionName | None = None,
     limit: int | None = None,
 ) -> MatchResult:
     """Find axioms matching a pattern. Returns matched hashes.
@@ -111,7 +107,7 @@ _EXPRESSION_CONTAINER_TYPES: tuple[AxiomTag, ...] = tuple(
 def _iter_candidates(
     s: Session,
     pattern: BasePattern,
-    within: SelectionRef | None,
+    within: SelectionName | None,
 ) -> AbstractContextManager[Iterator[tuple[AxiomHash, str]]]:
     """Stream candidate axioms from DB, narrowed by type and scope.
 
@@ -130,10 +126,7 @@ def _iter_candidates(
         constraints.append(MentionsAll(iris=tuple(IRI(iri) for iri in concrete_iris[:3])))
 
     if within is not None:
-        if isinstance(within, AxiomSelectionName):
-            constraints.append(InAxiomSelection(name=within))
-        else:
-            constraints.append(InEntitySelection(name=within))
+        constraints.append(resolve_within(s, within))
 
     return run(s, StreamAxioms(constraints=tuple(constraints)))
 

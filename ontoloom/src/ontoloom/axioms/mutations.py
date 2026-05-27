@@ -27,7 +27,7 @@ from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection, Mentio
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dedupe
 
 
@@ -86,21 +86,19 @@ def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
     return RemoveResult(removed=tuple(to_remove))
 
 
-def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelectionResult:
+def remove_by_selection(s: Session, within: SelectionName) -> RemoveBySelectionResult:
     """Remove axioms referenced by an axiom selection. Best-effort: skips missing.
 
     The post-mutation `AxiomSelection` is returned so adapters (MCP) can render
-    a fresh locked ref for follow-up calls.
+    a fresh ref for follow-up calls.
     """
-    bare = within.bare
-
     to_remove: list[HashedAxiom] = []
     absent = 0
     rows = s.conn.execute(
         "SELECT si.item, a.hash, json(a.data) "
         "FROM axiom_selection_items si LEFT JOIN axioms a ON a.hash = si.item "
         "WHERE si.selection_name = ?",
-        (bare,),
+        (within,),
     )
     for _item, full_hash, json_data in rows:
         if full_hash is None:
@@ -114,7 +112,7 @@ def remove_by_selection(s: Session, within: AxiomSelectionName) -> RemoveBySelec
         to_remove.append(HashedAxiom(axiom=axiom, hash=AxiomHash(full_hash)))
 
     _delete_axioms(s, to_remove)
-    meta = get_axiom_selection(s, bare)
+    meta = get_axiom_selection(s, within)
     return RemoveBySelectionResult(removed=tuple(to_remove), absent=absent, meta=meta)
 
 
@@ -256,7 +254,7 @@ def rename_iri(
     old_iri: IRI,
     new_iri: IRI,
     *,
-    within: AxiomSelectionName | None = None,
+    within: SelectionName | None = None,
 ) -> RenameResult:
     """Replace old_iri with new_iri across all (or scoped) axioms.
 

@@ -16,7 +16,7 @@ from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.store import get_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
 
 FORMAT_VERSION = 4
@@ -40,7 +40,7 @@ class ExportResult:
 
 
 def export_jsonl(
-    s: Session, output_path: Path, *, within: AxiomSelectionName | None = None
+    s: Session, output_path: Path, *, within: SelectionName | None = None
 ) -> ExportResult:
     """Export axioms as JSONL with a header line."""
     assert_within_workspace(output_path)
@@ -53,7 +53,7 @@ def export_jsonl(
     constraints: list[AxiomConstraint] = []
 
     if within is not None:
-        meta = get_axiom_selection(s, within.bare)
+        meta = get_axiom_selection(s, within)
         selection_size = meta.size
         constraints.append(InAxiomSelection(name=within))
 

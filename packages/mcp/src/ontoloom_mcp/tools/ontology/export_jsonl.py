@@ -3,18 +3,18 @@ from pathlib import Path
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.export import export_jsonl as _export_jsonl
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def export_jsonl(path: OntologyPath, output_path: Path, within: AxiomSelectionName | None = None):
+def export_jsonl(path: OntologyPath, output_path: Path, within: SelectionName | None = None):
     """Export axioms to a JSONL file (one axiom per line, sorted by hash).
 
     - `within`: Export only axioms in this axiom selection (e.g.
-      `"axioms:my_sel"`). Export is a read operation, so no hash is required.
+      `"my_sel"`). Export is a read operation, so no hash is required.
       Missing hashes are skipped.
 
     Use for archival, sharing, or version control snapshots.

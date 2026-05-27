@@ -12,7 +12,7 @@ from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName
+from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
@@ -33,7 +33,7 @@ class ByHashes(FrozenModel):
 class BySelection(FrozenModel):
     """Target every axiom in an axiom-selection."""
 
-    name: AxiomSelectionName
+    name: SelectionName
 
 
 _get_remove_axioms_target_tag = make_tag_resolver(
@@ -53,7 +53,7 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
     - `{"hashes": [...]}`: Each hash (full or unambiguous prefix) must match
       exactly one axiom. Atomic: if any hash fails to resolve, nothing is removed.
       No confirmation required (hashes are content-addressed -> never stale).
-    - `{"name": "axioms:NAME"}`: Removes every axiom in the axiom-selection.
+    - `{"name": "NAME"}`: Removes every axiom in the axiom-selection.
       The first call previews the axioms that would be removed and raises
       `ConfirmationRequiredError` with a `confirm` token bound to the
       selection's current contents. Call again with that token to perform the
@@ -64,8 +64,8 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
     with session(ont) as s:
         match target:
             case BySelection(name=name):
-                meta = get_axiom_selection(s, name.bare)
-                token = confirmation_token("remove_axioms", name.bare, meta.hash, str(meta.size))
+                meta = get_axiom_selection(s, name)
+                token = confirmation_token("remove_axioms", name, meta.hash, str(meta.size))
 
                 if confirm != token:
                     rows = run(s, ListAxioms(constraints=(InAxiomSelection(name=name),)))

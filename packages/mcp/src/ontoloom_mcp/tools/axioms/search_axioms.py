@@ -8,14 +8,12 @@ from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
     AxiomConstraint,
     HasAnyAnnotation,
-    InAxiomSelection,
-    InEntitySelection,
 )
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import resolve_within, run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName, WriteMode
+from ontoloom.selections.types import SelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import format_selection_ref, format_selection_result
@@ -26,11 +24,11 @@ from ontoloom_mcp.components.types import Limit, OntologyPath
 
 def search_axioms(
     path: OntologyPath,
-    into: AxiomSelectionName,
+    into: SelectionName,
     mode: WriteMode = WriteMode.CREATE,
     query: Annotated[str, MinLen(1)] | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
-    within: AxiomSelectionName | EntitySelectionName | None = None,
+    within: SelectionName | None = None,
     limit: Limit = 100,
 ):
     """Search axioms by axiom-level annotation text or property; save matches to a selection.
@@ -39,7 +37,7 @@ def search_axioms(
     via `within=` to narrow by structural shape.
 
     Args:
-    - `into`: Kind-prefixed name for the output selection (e.g. `"axioms:todos"`).
+    - `into`: Name for the output selection (e.g. `"todos"`).
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `query`: Case-insensitive match on axiom-level annotation values. Exact matches
       rank before substring matches.
@@ -54,16 +52,13 @@ def search_axioms(
         raise ValueError(msg)
 
     props_tuple = tuple(properties or ())
-    scope: tuple[AxiomConstraint, ...] = (
-        (InAxiomSelection(name=within),)
-        if isinstance(within, AxiomSelectionName)
-        else (InEntitySelection(name=within),)
-        if isinstance(within, EntitySelectionName)
-        else ()
-    )
 
     ont = Ontology(path)
     with session(ont) as s:
+        scope: tuple[AxiomConstraint, ...] = (
+            (resolve_within(s, within),) if within is not None else ()
+        )
+
         if query is None:
             hashes = run(
                 s,
@@ -83,7 +78,7 @@ def search_axioms(
             hashes = [hit.hash for hit in result.hits]
 
         source = _build_source(query, props_tuple, within)
-        upserted = upsert_axiom_selection(s, into.bare, hashes, source, mode=mode)
+        upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
         sel = upserted.selection
 
         if not hashes:
@@ -99,7 +94,7 @@ def search_axioms(
 def _build_source(
     query: str | None,
     properties: Sequence[IRI],
-    within: AxiomSelectionName | EntitySelectionName | None,
+    within: SelectionName | None,
 ) -> str:
     parts = []
     if query:

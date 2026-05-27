@@ -9,7 +9,25 @@ from ontoloom.connection import Session
 from ontoloom.query.base import Query
 from ontoloom.query.constraints import InAxiomSelection, InEntitySelection
 from ontoloom.selections.store import axiom_selection_exists, entity_selection_exists
-from ontoloom.selections.types import SelectionNotFoundError
+from ontoloom.selections.types import SelectionName, SelectionNotFoundError
+
+
+def resolve_within(s: Session, name: SelectionName) -> InAxiomSelection | InEntitySelection:
+    """Resolve a bare selection name to its kind-scoped constraint by table lookup.
+
+    Unambiguous under the cross-kind uniqueness guard: a name lives in at most
+    one table.
+
+    Raises:
+        SelectionNotFoundError: name is absent from both tables.
+    """
+    if axiom_selection_exists(s, name):
+        return InAxiomSelection(name=name)
+
+    if entity_selection_exists(s, name):
+        return InEntitySelection(name=name)
+
+    raise SelectionNotFoundError(name)
 
 
 def _verify_in_selection_refs[T](s: Session, q: Query[T]) -> None:
@@ -26,11 +44,11 @@ def _verify_in_selection_refs[T](s: Session, q: Query[T]) -> None:
     for c in constraints:
         match c:
             case InAxiomSelection(name=name):
-                if not axiom_selection_exists(s, name.bare):
-                    raise SelectionNotFoundError(name.bare)
+                if not axiom_selection_exists(s, name):
+                    raise SelectionNotFoundError(name)
             case InEntitySelection(name=name):
-                if not entity_selection_exists(s, name.bare):
-                    raise SelectionNotFoundError(name.bare)
+                if not entity_selection_exists(s, name):
+                    raise SelectionNotFoundError(name)
             case _:
                 continue
 

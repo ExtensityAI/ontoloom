@@ -9,12 +9,12 @@ from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.dispatch import run
 from ontoloom.selections.store import upsert_entity_selection
-from ontoloom.selections.types import EntitySelectionName, SelectionName
+from ontoloom.selections.types import SelectionName
 from pydantic import ValidationError
 
 
-def _ref(name: str) -> EntitySelectionName:
-    return EntitySelectionName(f"entities:{name}")
+def _ref(name: str) -> SelectionName:
+    return SelectionName(name)
 
 
 def _decl(iri: str) -> Declaration:
@@ -29,14 +29,14 @@ def _label(iri: str, text: str) -> AnnotationAssertion:
     )
 
 
-# -- field validator: wrong kind --
+# -- field validator: name shape --
 
 
-def test_field_validator_rejects_axiom_kind():
+def test_field_validator_rejects_invalid_name():
     with pytest.raises(ValidationError):
         FindDuplicateEntities(
             annotation_property=IRI(RDFS_LABEL),
-            within="axioms:foo",  # pyright: ignore[reportArgumentType]
+            within="not a valid name",  # pyright: ignore[reportArgumentType]
         )
 
 
@@ -45,13 +45,12 @@ def test_field_validator_accepts_none_within():
     assert q.within is None
 
 
-def test_field_validator_accepts_entity_within():
+def test_field_validator_accepts_within():
     q = FindDuplicateEntities(
         annotation_property=IRI(RDFS_LABEL),
         within=_ref("foo"),
     )
-    assert q.within is not None
-    assert isinstance(q.within, EntitySelectionName)
+    assert q.within == SelectionName("foo")
 
 
 # -- integration tests --

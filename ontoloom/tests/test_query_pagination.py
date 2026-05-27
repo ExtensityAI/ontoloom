@@ -9,7 +9,7 @@ from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 
 def _list_entities(**kw: object) -> Query[object]:
@@ -25,11 +25,11 @@ def _list_axiom_hashes(**kw: object) -> Query[object]:
 
 
 def _read_axiom_selection(**kw: object) -> Query[object]:
-    return ReadAxiomSelection(selection=AxiomSelectionName("axioms:foo"), **kw)  # pyright: ignore[reportArgumentType]
+    return ReadAxiomSelection(selection=SelectionName("foo"), **kw)  # pyright: ignore[reportArgumentType]
 
 
 def _read_entity_selection(**kw: object) -> Query[object]:
-    return ReadEntitySelection(selection=EntitySelectionName("entities:foo"), **kw)  # pyright: ignore[reportArgumentType]
+    return ReadEntitySelection(selection=SelectionName("foo"), **kw)  # pyright: ignore[reportArgumentType]
 
 
 _FACTORIES: tuple[Callable[..., Query[object]], ...] = (

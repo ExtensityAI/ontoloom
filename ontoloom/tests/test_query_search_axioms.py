@@ -12,7 +12,7 @@ from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import run
 from ontoloom.query.search_axioms import SearchAxioms, SearchAxiomsHit, SearchAxiomsResult
 from ontoloom.selections.store import upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, SelectionName
+from ontoloom.selections.types import SelectionName
 
 
 def _comment(text: str) -> Annotation:
@@ -176,7 +176,7 @@ def test_search_axioms_respects_within_selection(s):
         [HashedAxiom.of(in_scope).hash],
         "test",
     )
-    ref = AxiomSelectionName("axioms:scoped")
+    ref = SelectionName("scoped")
 
     result = run(
         s,
@@ -206,7 +206,7 @@ def test_search_axioms_total_independent_of_pagination(s):
 def test_search_axioms_missing_selection_raises(s):
     from ontoloom.selections.types import SelectionNotFoundError
 
-    ref = AxiomSelectionName("axioms:does_not_exist")
+    ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
         run(s, SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),)))

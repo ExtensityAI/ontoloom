@@ -32,11 +32,7 @@ from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
 from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
-from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
-    SelectionName,
-)
+from ontoloom.selections.types import SelectionName
 
 # =============================================================================
 # CountEntities
@@ -77,7 +73,7 @@ def test_ce_run_in_selection_entities(s):
         ["ex:Dog", "ex:Cat"],
         source="test",
     )
-    ref = EntitySelectionName("entities:dogs_and_cats")
+    ref = SelectionName("dogs_and_cats")
     assert run(s, CountEntities(constraints=(InEntitySelection(name=ref),))) == 2
 
 
@@ -91,7 +87,7 @@ def test_ce_run_in_selection_axioms(s):
         [HashedAxiom.of(dog_decl).hash],
         source="test",
     )
-    ref = AxiomSelectionName("axioms:dog_only")
+    ref = SelectionName("dog_only")
     assert run(s, CountEntities(constraints=(InAxiomSelection(name=ref),))) == 1
 
 
@@ -299,7 +295,7 @@ def test_cabt_run_in_selection_axioms(s):
         [HashedAxiom.of(dog_decl).hash, HashedAxiom.of(sub).hash],
         source="test",
     )
-    ref = AxiomSelectionName("axioms:axiom_pair")
+    ref = SelectionName("axiom_pair")
     result = run(s, CountAxiomsByType(constraints=(InAxiomSelection(name=ref),)))
     assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
 
@@ -319,7 +315,7 @@ def test_cabt_run_in_selection_entities(s):
         ["ex:Dog"],
         source="test",
     )
-    ref = EntitySelectionName("entities:dog_only")
+    ref = SelectionName("dog_only")
     result = run(s, CountAxiomsByType(constraints=(InEntitySelection(name=ref),)))
     # Dog declaration mentions ex:Dog; SubClassOf mentions ex:Dog.
     # Cat declaration does not mention ex:Dog.

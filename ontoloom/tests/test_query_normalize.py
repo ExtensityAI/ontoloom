@@ -28,7 +28,7 @@ from ontoloom.query.constraints import (
     WithRoles,
     WithTypes,
 )
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 # -- Test fixtures --
 
@@ -40,8 +40,8 @@ D = IRI(":D")
 HASH_A = AxiomHash("a" * 64)
 HASH_B = AxiomHash("b" * 64)
 
-_AXIOM_REF = AxiomSelectionName("axioms:sel")
-_ENTITY_REF = EntitySelectionName("entities:sel")
+_AXIOM_REF = SelectionName("sel")
+_ENTITY_REF = SelectionName("sel")
 
 
 # == Entity: empty input ==

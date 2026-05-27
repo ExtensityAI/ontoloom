@@ -3,7 +3,7 @@ from ontoloom.axioms.mutations import rename_iri as core_rename_iri
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import get_axiom_selection, upsert_axiom_selection
-from ontoloom.selections.types import AxiomSelectionName, WriteMode
+from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
@@ -18,8 +18,8 @@ def rename_iri(
     path: OntologyPath,
     old_iri: IRI,
     new_iri: IRI,
-    within: AxiomSelectionName | None = None,
-    into: AxiomSelectionName | None = None,
+    within: SelectionName | None = None,
+    into: SelectionName | None = None,
     mode: WriteMode = WriteMode.CREATE,
     confirm: str | None = None,
 ):
@@ -31,10 +31,10 @@ def rename_iri(
     Args:
     - `old_iri`: IRI to replace.
     - `new_iri`: New IRI to use in its place.
-    - `within`: Optional axiom selection (e.g. `"axioms:my_sel"`) restricting
+    - `within`: Optional axiom selection (e.g. `"my_sel"`) restricting
       the rename to axioms in that scope. Scope staleness is only re-checked
       when the rename hits a collision (it is folded into the confirm token).
-    - `into`: Optional axiom selection (e.g. `"axioms:renamed"`) to populate
+    - `into`: Optional axiom selection (e.g. `"renamed"`) to populate
       with the post-rename hashes of every replaced axiom. Use to inspect or
       further operate on the affected axioms without re-querying.
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
@@ -50,7 +50,7 @@ def rename_iri(
         if result.colliding_hashes:
             parts = ["rename_iri", str(old_iri), str(new_iri), *sorted(result.colliding_hashes)]
             if within is not None:
-                parts += [str(within), get_axiom_selection(s, within.bare).hash]
+                parts += [str(within), get_axiom_selection(s, within).hash]
 
             token = confirmation_token(*parts)
             if confirm != token:
@@ -67,7 +67,7 @@ def rename_iri(
             new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
             upserted = upsert_axiom_selection(
                 s,
-                into.bare,
+                into,
                 new_hashes,
                 f"rename_iri({old_iri} -> {new_iri})",
                 mode=mode,

@@ -11,8 +11,10 @@ from ontoloom.entities.reader import (
 )
 from ontoloom.entities.types import EntitySummary
 from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
+from ontoloom.query.constraints import InAxiomSelection
+from ontoloom.query.dispatch import resolve_within
 from ontoloom.selections.store import get_axiom_selection, get_entity_selection
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
+from ontoloom.selections.types import SelectionName
 
 from ontoloom_mcp.components.formatting import (
     build_refs,
@@ -22,19 +24,17 @@ from ontoloom_mcp.components.formatting import (
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
-type SelectionRef = AxiomSelectionName | EntitySelectionName
-
 _TOP_ENTITIES = 10
 
 
-def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
+def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
     """Get entity counts, axiom counts, prefix mappings, and structural hubs.
 
     Start here. Shows ontology structure, prefix mappings with usage counts,
     top entities by axiom count, and undeclared reference count.
 
-    Use `within` (e.g. `"axioms:my_sel"` or `"entities:my_ents"`) to restrict
-    to a named selection.
+    Use `within` (e.g. `"my_sel"` or `"my_ents"`) to restrict to a named
+    selection.
     """
     ont = Ontology(path)
     with session(ont) as s:
@@ -45,11 +45,11 @@ def describe_ontology(path: OntologyPath, within: SelectionRef | None = None):
         parts = []
 
         if within is not None:
-            if isinstance(within, AxiomSelectionName):
-                sel_ax = get_axiom_selection(s, within.bare)
+            if isinstance(resolve_within(s, within), InAxiomSelection):
+                sel_ax = get_axiom_selection(s, within)
                 parts.append(f"Within selection {format_selection_ref(sel_ax)} (axioms):")
             else:
-                sel_ent = get_entity_selection(s, within.bare)
+                sel_ent = get_entity_selection(s, within)
                 parts.append(f"Within selection {format_selection_ref(sel_ent)} (entities):")
             parts.append("")
 

@@ -10,14 +10,15 @@ from ontoloom.entities.types import EntitySearchPage
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
+from ontoloom.query.constraints import InAxiomSelection
+from ontoloom.query.dispatch import resolve_within
 from ontoloom.selections.store import (
     get_axiom_selection,
     get_entity_selection,
     upsert_entity_selection,
 )
 from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
+    SelectionName,
     WriteMode,
 )
 from ontoloom.utils import dquoted
@@ -32,19 +33,17 @@ from ontoloom_mcp.components.formatting import (
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
-type SelectionRef = AxiomSelectionName | EntitySelectionName
-
 
 def search_entities(
     path: OntologyPath,
-    into: EntitySelectionName,
+    into: SelectionName,
     mode: WriteMode = WriteMode.CREATE,
     query: Annotated[str, MinLen(1)] | None = None,
     role: EntityType | None = None,
     namespace: PrefixName | None = None,
     declared: bool | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
-    within: SelectionRef | None = None,
+    within: SelectionName | None = None,
     exclude_deprecated: bool = True,
 ):
     """Search for entities by name, type, or namespace; save the result as a selection.
@@ -53,8 +52,7 @@ def search_entities(
     compose it with other selections.
 
     Args:
-    - `into`: Kind-prefixed name for the output selection
-      (e.g. `"entities:dogs"`).
+    - `into`: Name for the output selection (e.g. `"dogs"`).
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `query`: Substring match on IRI local names and annotation values (labels, comments).
     - `role`: Filter by entity type: "Class", "ObjectProperty", "DataProperty",
@@ -63,9 +61,9 @@ def search_entities(
     - `declared`: True = only declared entities, False = only undeclared, None = all.
     - `properties`: Restrict text search to these annotation properties; when query is
       None, find entities that have any annotation with these properties.
-    - `within`: Restrict search to a named selection (e.g. `"entities:my_ents"`
-      or `"axioms:my_axioms"`). An entity selection restricts to those entities;
-      an axiom selection restricts to entities mentioned in those axioms.
+    - `within`: Restrict search to a named selection (e.g. `"my_ents"` or
+      `"my_axioms"`). An entity selection restricts to those entities; an
+      axiom selection restricts to entities mentioned in those axioms.
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
     ont = Ontology(path)
@@ -82,7 +80,7 @@ def search_entities(
 
         iris = collect_entity_iris(s, **kwargs)
         source = _build_source(query, role, namespace, declared, properties or (), within)
-        upserted = upsert_entity_selection(s, into.bare, iris, source, mode=mode)
+        upserted = upsert_entity_selection(s, into, iris, source, mode=mode)
         sel = upserted.selection
 
         if not iris:
@@ -104,12 +102,14 @@ def search_entities(
     return result
 
 
-def _within_metadata(s: Session, within: SelectionRef):
-    if isinstance(within, AxiomSelectionName):
-        sel = get_axiom_selection(s, within.bare)
+def _within_metadata(s: Session, within: SelectionName):
+    constraint = resolve_within(s, within)
+
+    if isinstance(constraint, InAxiomSelection):
+        sel = get_axiom_selection(s, within)
         return f"\nWithin selection {format_selection_ref(sel)} (axioms, {sel.size} items)"
 
-    ent = get_entity_selection(s, within.bare)
+    ent = get_entity_selection(s, within)
     return f"\nWithin selection {format_selection_ref(ent)} (entities, {ent.size} items)"
 
 
@@ -119,7 +119,7 @@ def _filter_parts(
     namespace: PrefixName | None,
     declared: bool | None,
     properties: Sequence[IRI],
-    within: SelectionRef | None,
+    within: SelectionName | None,
 ) -> list[str]:
     parts = []
     if query:
@@ -143,7 +143,7 @@ def _no_results_msg(
     namespace: PrefixName | None,
     declared: bool | None,
     properties: Sequence[IRI],
-    within: SelectionRef | None,
+    within: SelectionName | None,
 ):
     parts = _filter_parts(query, role, namespace, declared, properties, within)
     desc = ", ".join(parts) if parts else "no filters"
@@ -156,7 +156,7 @@ def _build_source(
     namespace: PrefixName | None,
     declared: bool | None,
     properties: Sequence[IRI],
-    within: SelectionRef | None,
+    within: SelectionName | None,
 ):
     parts = _filter_parts(query, role, namespace, declared, properties, within)
     return f"search_entities({', '.join(parts)})"
