@@ -1,6 +1,6 @@
-"""Evaluate `AxiomSetExpr` / `EntitySetExpr` trees and persist the result."""
+"""Evaluate `SetExpr` trees to `(kind, items)` and persist the result."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
@@ -16,16 +16,12 @@ from ontoloom.query.dispatch import run
 from ontoloom.query.list_axiom_hashes import ListAxiomHashes
 from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.expr import (
-    AxiomDiffExpr,
-    AxiomIntersectExpr,
-    AxiomSetExpr,
     AxiomsForExpr,
-    AxiomUnionExpr,
+    DiffExpr,
     EntitiesInExpr,
-    EntityDiffExpr,
-    EntityIntersectExpr,
-    EntitySetExpr,
-    EntityUnionExpr,
+    IntersectExpr,
+    SetExpr,
+    UnionExpr,
 )
 from ontoloom.selections.store import (
     AxiomUpsertResult,
@@ -38,9 +34,9 @@ from ontoloom.selections.store import (
     upsert_entity_selection,
 )
 from ontoloom.selections.types import (
-    AxiomSelectionName,
-    EntitySelectionName,
     SelectionExprError,
+    SelectionKind,
+    SelectionName,
     SelectionNotFoundError,
     SetOp,
     WriteMode,
@@ -48,85 +44,76 @@ from ontoloom.selections.types import (
 from ontoloom.utils import difference_ordered, dquoted, intersect_ordered, union_ordered
 
 
-def create_axiom_selection(
+def create_selection_from_expr(
     s: Session,
-    name: AxiomSelectionName,
-    expr: AxiomSetExpr,
+    name: SelectionName,
+    expr: SetExpr,
     *,
     source: str = "",
     mode: WriteMode = WriteMode.CREATE,
-) -> AxiomUpsertResult:
-    """Create an axiom selection by evaluating an `AxiomSetExpr` tree."""
-    items = _eval_axiom_expr(s, expr)
+) -> AxiomUpsertResult | EntityUpsertResult:
+    """Evaluate a set-expr and persist the result under `name`, kind inferred from the expr."""
+    kind, items = eval_set_expr(s, expr)
     auto_source = source or str(expr)
-    return upsert_axiom_selection(s, name.bare, items, auto_source, mode=mode)
+
+    if kind is SelectionKind.AXIOMS:
+        return upsert_axiom_selection(
+            s, name, [AxiomHash(i) for i in items], auto_source, mode=mode
+        )
+
+    return upsert_entity_selection(s, name, [IRI(i) for i in items], auto_source, mode=mode)
 
 
-def create_entity_selection(
-    s: Session,
-    name: EntitySelectionName,
-    expr: EntitySetExpr,
-    *,
-    source: str = "",
-    mode: WriteMode = WriteMode.CREATE,
-) -> EntityUpsertResult:
-    """Create an entity selection by evaluating an `EntitySetExpr` tree."""
-    items = _eval_entity_expr(s, expr)
-    auto_source = source or str(expr)
-    return upsert_entity_selection(s, name.bare, items, auto_source, mode=mode)
-
-
-def _eval_axiom_expr(s: Session, expr: AxiomSetExpr) -> list[AxiomHash]:
+def eval_set_expr(s: Session, expr: SetExpr) -> tuple[SelectionKind, list[str]]:  # noqa: C901
     match expr:
-        case AxiomSelectionName():
-            if not axiom_selection_exists(s, expr.bare):
-                raise SelectionNotFoundError(expr.bare)
+        case SelectionName():
+            if axiom_selection_exists(s, expr):
+                return SelectionKind.AXIOMS, list(get_axiom_selection_items(s, expr))
 
-            return get_axiom_selection_items(s, expr.bare)
-        case AxiomUnionExpr():
-            return _combine(s, expr.union, SetOp.UNION, _eval_axiom_expr)
-        case AxiomIntersectExpr():
-            return _combine(s, expr.intersect, SetOp.INTERSECTION, _eval_axiom_expr)
-        case AxiomDiffExpr():
-            return _combine(s, expr.diff, SetOp.DIFFERENCE, _eval_axiom_expr)
+            if entity_selection_exists(s, expr):
+                return SelectionKind.ENTITIES, list(get_entity_selection_items(s, expr))
+
+            raise SelectionNotFoundError(expr)
+        case UnionExpr():
+            return _combine(s, expr.union, SetOp.UNION)
+        case IntersectExpr():
+            return _combine(s, expr.intersect, SetOp.INTERSECTION)
+        case DiffExpr():
+            return _combine(s, expr.diff, SetOp.DIFFERENCE)
         case AxiomsForExpr():
-            entity_items = _eval_entity_expr(s, expr.axioms_for)
-            return _axioms_for(s, entity_items)
-        case _:
-            msg = f"Unknown AxiomSetExpr variant: {type(expr).__name__}"
-            raise ValueError(msg)
+            kind, items = eval_set_expr(s, expr.axioms_for)
 
+            if kind is not SelectionKind.ENTITIES:
+                msg = "axioms_for requires an entity-producing operand."
+                raise SelectionExprError(msg)
 
-def _eval_entity_expr(s: Session, expr: EntitySetExpr) -> list[IRI]:
-    match expr:
-        case EntitySelectionName():
-            if not entity_selection_exists(s, expr.bare):
-                raise SelectionNotFoundError(expr.bare)
-
-            return get_entity_selection_items(s, expr.bare)
-        case EntityUnionExpr():
-            return _combine(s, expr.union, SetOp.UNION, _eval_entity_expr)
-        case EntityIntersectExpr():
-            return _combine(s, expr.intersect, SetOp.INTERSECTION, _eval_entity_expr)
-        case EntityDiffExpr():
-            return _combine(s, expr.diff, SetOp.DIFFERENCE, _eval_entity_expr)
+            return SelectionKind.AXIOMS, list(_axioms_for(s, [IRI(i) for i in items]))
         case EntitiesInExpr():
-            axiom_items = _eval_axiom_expr(s, expr.entities_in)
-            return _entities_in(s, axiom_items, expr.position)
+            kind, items = eval_set_expr(s, expr.entities_in)
+
+            if kind is not SelectionKind.AXIOMS:
+                msg = "entities_in requires an axiom-producing operand."
+                raise SelectionExprError(msg)
+
+            return SelectionKind.ENTITIES, list(
+                _entities_in(s, [AxiomHash(i) for i in items], expr.position)
+            )
         case _:
-            msg = f"Unknown EntitySetExpr variant: {type(expr).__name__}"
+            msg = f"Unknown SetExpr variant: {type(expr).__name__}"
             raise ValueError(msg)
 
 
-def _combine[X, E: str](
-    s: Session,
-    operands: Sequence[X],
-    op: SetOp,
-    eval_fn: Callable[[Session, X], list[E]],
-) -> list[E]:
+def _combine(s: Session, operands: Sequence[SetExpr], op: SetOp) -> tuple[SelectionKind, list[str]]:
     _check_arity(op, len(operands))
-    results = [eval_fn(s, sub) for sub in operands]
-    return _apply_set_op(results, op)
+    evaluated = [eval_set_expr(s, sub) for sub in operands]
+    kinds = {kind for kind, _ in evaluated}
+
+    if len(kinds) > 1:
+        msg = "set operations require all operands to be the same kind (axioms or entities)."
+        raise SelectionExprError(msg)
+
+    results = [items for _, items in evaluated]
+    return next(iter(kinds)), _apply_set_op(results, op)
 
 
 def _check_arity(op: SetOp, count: int):

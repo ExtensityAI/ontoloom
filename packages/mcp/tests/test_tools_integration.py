@@ -24,6 +24,7 @@ from ontoloom_mcp.tools.entities.get_entity import get_entity
 from ontoloom_mcp.tools.entities.search_entities import search_entities
 from ontoloom_mcp.tools.ontology.create_ontology import create_ontology
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
+from ontoloom_mcp.tools.selections.create_selection import create_selection
 from ontoloom_mcp.tools.selections.read_selection import read_selection
 
 EX = PrefixName("ex")
@@ -90,6 +91,45 @@ def test_search_entities_creates_selection(populated_db):
     )
     assert '"entities:dogs"' in result
     assert "entities:dogs@" not in result
+
+
+def test_create_selection_returns_clean_one_liner_no_preview(empty_db):
+    from ontoloom.selections.store import upsert_entity_selection
+
+    items = [IRI(f"ex:E{i}") for i in range(25)]
+
+    with session(Ontology(empty_db)) as s:
+        upsert_entity_selection(s, SelectionName("source"), items, "test fixture")
+        s.commit()
+
+    result = create_selection(
+        path=empty_db,
+        name=SelectionName("derived"),
+        expr=SelectionName("source"),
+    )
+    assert result == 'Selection "entities:derived": 25 entities'
+    assert "Preview" not in result
+    assert "\n" not in result
+
+
+def test_create_selection_replace_notes_overwrite(empty_db):
+    from ontoloom.selections.store import upsert_entity_selection
+
+    with session(Ontology(empty_db)) as s:
+        upsert_entity_selection(s, SelectionName("source"), [IRI("ex:A")], "test fixture")
+        upsert_entity_selection(s, SelectionName("derived"), [IRI("ex:Old")], "test fixture")
+        s.commit()
+
+    from ontoloom.selections.types import WriteMode
+
+    result = create_selection(
+        path=empty_db,
+        name=SelectionName("derived"),
+        expr=SelectionName("source"),
+        mode=WriteMode.REPLACE,
+    )
+    assert result == 'Selection "entities:derived": 1 entities (overwrote previous: 1 items)'
+    assert "Preview" not in result
 
 
 def test_read_selection_after_search(populated_db):
@@ -547,8 +587,8 @@ def _make_dogs_selection(path):
     search_entities(path=path, into=EntitySelectionName("entities:dogs_ent"), query="Dog")
     create_selection(
         path=path,
-        name=AxiomSelectionName("axioms:dogs_ax"),
-        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:dogs_ent")),
+        name=SelectionName("dogs_ax"),
+        expr=AxiomsForExpr(axioms_for=SelectionName("dogs_ent")),
     )
 
 
@@ -620,8 +660,8 @@ def test_remove_axioms_by_selection_stale_token_re_previews(populated_db):
     )
     create_selection(
         path=populated_db,
-        name=AxiomSelectionName("axioms:dogs_ax"),
-        expr=AxiomsForExpr(axioms_for=EntitySelectionName("entities:animals_ent")),
+        name=SelectionName("dogs_ax"),
+        expr=AxiomsForExpr(axioms_for=SelectionName("animals_ent")),
         mode=WriteMode.REPLACE,
     )
 
@@ -972,7 +1012,7 @@ def test_producer_tools_accept_mode_argument(populated_db):
     # Give two entities a shared label so find_duplicate_entities produces a selection.
     from ontoloom.owl.axioms import AnnotationAssertion
     from ontoloom.patterns.types import SubClassOfPattern
-    from ontoloom.selections.expr import AxiomUnionExpr
+    from ontoloom.selections.expr import UnionExpr
     from ontoloom.selections.types import WriteMode
     from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
     from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
@@ -1014,7 +1054,7 @@ def test_producer_tools_accept_mode_argument(populated_db):
     )
     create_selection(
         path=populated_db,
-        name=AxiomSelectionName("axioms:composed"),
-        expr=AxiomUnionExpr(union=(AxiomSelectionName("axioms:m"),)),
+        name=SelectionName("composed"),
+        expr=UnionExpr(union=(SelectionName("m"),)),
         mode=WriteMode.CREATE,
     )

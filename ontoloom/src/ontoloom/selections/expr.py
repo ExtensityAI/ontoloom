@@ -1,55 +1,45 @@
-"""Set expressions over selections, split by result kind.
+"""Set expressions over selections — a single kind-agnostic grammar.
 
-Two parallel typed hierarchies replace the previous single `SetExpr` whose
-leaves were bare names: `AxiomSetExpr` produces axiom hashes, `EntitySetExpr`
-produces entity IRIs. Leaves carry kind via `AxiomSelectionName` /
-`EntitySelectionName` (kind-prefixed on the wire, e.g. `"axioms:foo"` /
-`"entities:bar"`). Cross-kind conversion lives on `AxiomsForExpr` (entities ->
-axioms) and `EntitiesInExpr` (axioms -> entities).
+Leaves are bare selection names (`SelectionName`); kind is resolved during
+evaluation (`compose.eval_set_expr`), not encoded in the wire form. Set ops
+(`union`/`intersect`/`diff`) require all operands to resolve to the same kind;
+the cross-kind operators `axioms_for` (entities -> axioms) and `entities_in`
+(axioms -> entities) flip kind.
 
 Examples:
-    AxiomSetExpr
-        "axioms:foo"
-        {"union": ["axioms:a", "axioms:b"]}
-        {"axioms_for": "entities:ents"}
-        {"axioms_for": {"union": ["entities:a", "entities:b"]}}
-    EntitySetExpr
-        "entities:bar"
-        {"intersect": ["entities:a", "entities:b"]}
-        {"entities_in": "axioms:axs", "position": "sub_class"}
+    "foo"
+    {"union": ["a", "b"]}
+    {"axioms_for": "ents"}
+    {"entities_in": "axs", "position": "sub_class"}
 """
 
 from typing import Annotated, Any, override
 
-from typing_extensions import TypeIs
-
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl.markers import Position
-from ontoloom.selections.types import AxiomSelectionName, EntitySelectionName
-
-# -- Axiom-producing expressions --
+from ontoloom.selections.types import SelectionName
 
 
-class AxiomUnionExpr(FrozenModel):
-    union: tuple["AxiomSetExpr", ...]
+class UnionExpr(FrozenModel):
+    union: tuple["SetExpr", ...]
 
     @override
     def __str__(self):
         return "union(" + ", ".join(str(o) for o in self.union) + ")"
 
 
-class AxiomIntersectExpr(FrozenModel):
-    intersect: tuple["AxiomSetExpr", ...]
+class IntersectExpr(FrozenModel):
+    intersect: tuple["SetExpr", ...]
 
     @override
     def __str__(self):
         return "intersect(" + ", ".join(str(o) for o in self.intersect) + ")"
 
 
-class AxiomDiffExpr(FrozenModel):
+class DiffExpr(FrozenModel):
     """First operand minus all subsequent operands, evaluated left-to-right."""
 
-    diff: tuple["AxiomSetExpr", ...]
+    diff: tuple["SetExpr", ...]
 
     @override
     def __str__(self):
@@ -57,136 +47,55 @@ class AxiomDiffExpr(FrozenModel):
 
 
 class AxiomsForExpr(FrozenModel):
-    """Cross-kind: axioms mentioning any entity in the operand expression."""
+    """Cross-kind: axioms mentioning any entity in the operand (operand must eval to entities)."""
 
-    axioms_for: "EntitySetExpr"
+    axioms_for: "SetExpr"
 
     @override
     def __str__(self):
         return f"axioms_for({self.axioms_for})"
 
 
-# -- Entity-producing expressions --
-
-
-class EntityUnionExpr(FrozenModel):
-    union: tuple["EntitySetExpr", ...]
-
-    @override
-    def __str__(self):
-        return "union(" + ", ".join(str(o) for o in self.union) + ")"
-
-
-class EntityIntersectExpr(FrozenModel):
-    intersect: tuple["EntitySetExpr", ...]
-
-    @override
-    def __str__(self):
-        return "intersect(" + ", ".join(str(o) for o in self.intersect) + ")"
-
-
-class EntityDiffExpr(FrozenModel):
-    """First operand minus all subsequent operands, evaluated left-to-right."""
-
-    diff: tuple["EntitySetExpr", ...]
-
-    @override
-    def __str__(self):
-        return "diff(" + ", ".join(str(o) for o in self.diff) + ")"
-
-
 class EntitiesInExpr(FrozenModel):
-    """Cross-kind: entities mentioned by axioms in the operand expression,
+    """Cross-kind: entities mentioned by axioms in the operand (operand must eval to axioms),
     optionally restricted to a structural slot."""
 
-    entities_in: "AxiomSetExpr"
+    entities_in: "SetExpr"
     position: Position | None = None
 
     @override
     def __str__(self):
         if self.position is not None:
             return f"entities_in({self.entities_in}, position={self.position})"
+
         return f"entities_in({self.entities_in})"
 
 
-# -- Discriminated unions --
-
-_resolve_axiom_expr = make_tag_resolver(
-    (AxiomUnionExpr, AxiomIntersectExpr, AxiomDiffExpr, AxiomsForExpr),
-    union_name="AxiomSetExpr",
-)
-
-_resolve_entity_expr = make_tag_resolver(
-    (EntityUnionExpr, EntityIntersectExpr, EntityDiffExpr, EntitiesInExpr),
-    union_name="EntitySetExpr",
+_resolve_set_expr = make_tag_resolver(
+    (UnionExpr, IntersectExpr, DiffExpr, AxiomsForExpr, EntitiesInExpr),
+    union_name="SetExpr",
 )
 
 
-def _get_axiom_set_expr_tag(v: Any):
-    return AxiomSelectionName.tag() if isinstance(v, str) else _resolve_axiom_expr(v)
+def _get_set_expr_tag(v: Any):
+    return SelectionName.tag() if isinstance(v, str) else _resolve_set_expr(v)
 
 
-def _get_entity_set_expr_tag(v: Any):
-    return EntitySelectionName.tag() if isinstance(v, str) else _resolve_entity_expr(v)
-
-
-AxiomSetExpr = Annotated[
+SetExpr = Annotated[
     (
-        tagged(AxiomSelectionName)
-        | tagged(AxiomUnionExpr)
-        | tagged(AxiomIntersectExpr)
-        | tagged(AxiomDiffExpr)
+        tagged(SelectionName)
+        | tagged(UnionExpr)
+        | tagged(IntersectExpr)
+        | tagged(DiffExpr)
         | tagged(AxiomsForExpr)
-    ),
-    *tagged_union_meta(_get_axiom_set_expr_tag, schema_type=("string", "object")),
-]
-
-EntitySetExpr = Annotated[
-    (
-        tagged(EntitySelectionName)
-        | tagged(EntityUnionExpr)
-        | tagged(EntityIntersectExpr)
-        | tagged(EntityDiffExpr)
         | tagged(EntitiesInExpr)
     ),
-    *tagged_union_meta(_get_entity_set_expr_tag, schema_type=("string", "object")),
+    *tagged_union_meta(_get_set_expr_tag, schema_type=("string", "object")),
 ]
 
 
-# Runtime-checkable tuples of concrete classes for each side. Use the typed
-# `is_axiom_set_expr` / `is_entity_set_expr` predicates at boundary layers
-# (MCP tool dispatch) to route a parsed expression to the right typed walker —
-# they narrow `AxiomSetExpr | EntitySetExpr` to the matching arm.
-_AXIOM_SET_EXPR_TYPES: tuple[type, ...] = (
-    AxiomSelectionName,
-    AxiomUnionExpr,
-    AxiomIntersectExpr,
-    AxiomDiffExpr,
-    AxiomsForExpr,
-)
-
-_ENTITY_SET_EXPR_TYPES: tuple[type, ...] = (
-    EntitySelectionName,
-    EntityUnionExpr,
-    EntityIntersectExpr,
-    EntityDiffExpr,
-    EntitiesInExpr,
-)
-
-
-def is_axiom_set_expr(value: "AxiomSetExpr | EntitySetExpr") -> TypeIs["AxiomSetExpr"]:
-    return isinstance(value, _AXIOM_SET_EXPR_TYPES)
-
-
-def is_entity_set_expr(value: "AxiomSetExpr | EntitySetExpr") -> TypeIs["EntitySetExpr"]:
-    return isinstance(value, _ENTITY_SET_EXPR_TYPES)
-
-
-AxiomUnionExpr.model_rebuild()
-AxiomIntersectExpr.model_rebuild()
-AxiomDiffExpr.model_rebuild()
+UnionExpr.model_rebuild()
+IntersectExpr.model_rebuild()
+DiffExpr.model_rebuild()
 AxiomsForExpr.model_rebuild()
-EntityUnionExpr.model_rebuild()
-EntityIntersectExpr.model_rebuild()
-EntityDiffExpr.model_rebuild()
 EntitiesInExpr.model_rebuild()

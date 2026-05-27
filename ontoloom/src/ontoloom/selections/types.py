@@ -55,7 +55,11 @@ class SetOp(StrEnum):
 
 
 class SelectionKind(StrEnum):
-    """Wire-form prefix distinguishing the two selection kinds."""
+    """One of the two selection kinds (axioms or entities).
+
+    Serves as the wire-form prefix in kind-tagged refs and as the eval-time
+    kind result returned by `eval_set_expr`.
+    """
 
     AXIOMS = "axioms"
     ENTITIES = "entities"
