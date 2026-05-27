@@ -3,22 +3,12 @@ from collections.abc import Iterable, Sequence
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
 from ontoloom.entities.find_duplicate_entities import FindDuplicateEntities
-from ontoloom.entities.projections import (
-    batch_fetch_entity_display,
-    find_text_matches,
-)
 from ontoloom.entities.text import LOCAL_NAME_PROPERTY
 from ontoloom.entities.types import (
     AnnotationRow,
     DuplicateResult,
-    EntityDisplay,
     EntityInfo,
-    EntityMatch,
-    EntitySearchPage,
     EntitySummary,
-    MatchQuality,
-    MatchSource,
-    TextMatch,
 )
 from ontoloom.errors import OntoloomError
 from ontoloom.owl.iri import IRI, RDFS_LABEL
@@ -29,10 +19,10 @@ from ontoloom.query.constraints import (
     Declared,
     Deprecated,
     EntityConstraint,
+    EntityTextMatches,
     HasAnyProperty,
     HasRole,
     InAxiomSelection,
-    InIRIs,
     InNamespaces,
     MentionsAll,
     WithRoles,
@@ -42,7 +32,7 @@ from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import resolve_within, run
 from ontoloom.query.find_axioms import FindAxioms
-from ontoloom.query.list_entities import ListEntities
+from ontoloom.query.find_entities import FindEntities
 from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
 
@@ -64,8 +54,6 @@ _NEAR_MATCH_LIMIT = 3
 
 
 _LABEL_BATCH_SIZE = 500
-
-_EMPTY_DISPLAY = EntityDisplay(roles=frozenset(), annotations=())
 
 
 def lookup_entity_labels(s: Session, iris: Iterable[str]) -> dict[str, str | None]:
@@ -114,8 +102,8 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
     axiom_counts = run(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
     if not roles and not annotations and not axiom_counts:
-        near = search_entities(s, query=iri.local_name, limit=_NEAR_MATCH_LIMIT)
-        raise EntityNotFoundError(iri_str, [str(m.iri) for m in near.matches])
+        near = search_entities(s, query=iri.local_name)[:_NEAR_MATCH_LIMIT]
+        raise EntityNotFoundError(iri_str, [str(m) for m in near])
     return EntityInfo(
         roles=frozenset(roles), annotations=tuple(annotations), axiom_counts=axiom_counts
     )
@@ -142,11 +130,11 @@ def search_entities(
     declared: bool | None = None,
     properties: Sequence[IRI] = (),
     exclude_deprecated: bool = True,
-    limit: int = 50,
-    offset: int = 0,
-) -> EntitySearchPage:
-    """Paginated entity search with optional filters.
+) -> list[IRI]:
+    """Return all matching entity IRIs, ranked when `query` is given else IRI-ordered.
 
+    query: substring match on IRI local names and annotation values; ranks
+    local-name-exact, annotation-exact, local-name-substring, annotation-substring.
     within: scope to a named selection. Entity selection restricts to those
     specific entities; axiom selection restricts to entities mentioned in those axioms.
     declared: True = only declared entities, False = only undeclared, None = all.
@@ -154,19 +142,7 @@ def search_entities(
     find entities that have any annotation with these properties.
     exclude_deprecated: exclude entities with owl:deprecated "true" annotation.
     """
-    if query is None:
-        return _list_entities(
-            s,
-            role=role,
-            namespace=namespace,
-            within=within,
-            declared=declared,
-            properties=properties,
-            exclude_deprecated=exclude_deprecated,
-            limit=limit,
-            offset=offset,
-        )
-    return _text_search_entities(
+    constraints = _build_entity_constraints(
         s,
         query=query,
         role=role,
@@ -175,40 +151,8 @@ def search_entities(
         declared=declared,
         properties=properties,
         exclude_deprecated=exclude_deprecated,
-        limit=limit,
-        offset=offset,
     )
-
-
-def collect_entity_iris(
-    s: Session,
-    *,
-    query: str | None = None,
-    role: EntityType | None = None,
-    namespace: PrefixName | None = None,
-    within: SelectionName | None = None,
-    declared: bool | None = None,
-    properties: Sequence[IRI] = (),
-    exclude_deprecated: bool = True,
-) -> list[IRI]:
-    """Return all matching entity IRIs (no display data). For select workflows."""
-    if query is None:
-        constraints = _build_entity_constraints(
-            s,
-            role=role,
-            namespace=namespace,
-            within=within,
-            declared=declared,
-            properties=properties,
-            exclude_deprecated=exclude_deprecated,
-        )
-        return run(s, ListEntities(constraints=constraints))
-
-    # Text search path
-    matches = find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
-    matches.update(find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties))
-    matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
-    return [IRI(k) for k in matches]
+    return run(s, FindEntities(constraints=constraints))
 
 
 def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
@@ -237,6 +181,7 @@ def find_duplicate_entities(
 def _build_entity_constraints(
     s: Session,
     *,
+    query: str | None,
     role: EntityType | None,
     namespace: PrefixName | None,
     within: SelectionName | None,
@@ -244,8 +189,21 @@ def _build_entity_constraints(
     properties: Sequence[IRI],
     exclude_deprecated: bool,
 ) -> tuple[EntityConstraint, ...]:
-    """Build the constraint tuple for the non-text entity search path."""
-    constraints: list[EntityConstraint] = [HasRole()]
+    """Build the constraint tuple for entity search.
+
+    With a text query, `EntityTextMatches` anchors the set (and scopes annotation
+    search to `properties`). Without one, `HasRole()` anchors the full-entity feed
+    and `properties` become a `HasAnyProperty` existence filter.
+    """
+    constraints: list[EntityConstraint] = []
+
+    if query is not None:
+        constraints.append(EntityTextMatches(query=query, properties=tuple(properties)))
+    else:
+        constraints.append(HasRole())
+
+        if properties:
+            constraints.append(HasAnyProperty(properties=tuple(properties)))
 
     if role is not None:
         constraints.append(WithRoles(roles=(role,)))
@@ -253,134 +211,12 @@ def _build_entity_constraints(
         constraints.append(InNamespaces(namespaces=(namespace,)))
     if within is not None:
         constraints.append(resolve_within(s, within))
-    if declared is not None:
-        constraints.append(Declared(state=declared))
-    if properties:
-        constraints.append(HasAnyProperty(properties=tuple(properties)))
-    if exclude_deprecated:
-        constraints.append(Deprecated(state=False))
-
-    return tuple(constraints)
-
-
-def _apply_text_filters(
-    s: Session,
-    matches: dict[str, TextMatch],
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    within: SelectionName | None,
-    declared: bool | None,
-    exclude_deprecated: bool,
-) -> dict[str, TextMatch]:
-    """Apply post-text-search filters to candidate matches via a single ListEntities call."""
-    if not matches:
-        return matches
-
-    constraints: list[EntityConstraint] = [InIRIs(iris=tuple(IRI(k) for k in matches))]
-
-    if within is not None:
-        constraints.append(resolve_within(s, within))
-    if role is not None:
-        constraints.append(WithRoles(roles=(role,)))
-    if namespace is not None:
-        constraints.append(InNamespaces(namespaces=(namespace,)))
     if declared is not None:
         constraints.append(Declared(state=declared))
     if exclude_deprecated:
         constraints.append(Deprecated(state=False))
 
-    surviving = set(run(s, ListEntities(constraints=tuple(constraints))))
-
-    return {k: v for k, v in matches.items() if k in surviving}
-
-
-def _list_entities(
-    s: Session,
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    within: SelectionName | None,
-    declared: bool | None,
-    properties: Sequence[IRI],
-    exclude_deprecated: bool,
-    limit: int,
-    offset: int,
-) -> EntitySearchPage:
-    constraints = _build_entity_constraints(
-        s,
-        role=role,
-        namespace=namespace,
-        within=within,
-        declared=declared,
-        properties=properties,
-        exclude_deprecated=exclude_deprecated,
-    )
-    total = run(s, CountEntities(constraints=constraints))
-    page_iris = run(s, ListEntities(constraints=constraints, limit=limit, offset=offset))
-
-    if not page_iris:
-        return EntitySearchPage(matches=(), total=total, offset=offset)
-
-    display = batch_fetch_entity_display(s, [str(i) for i in page_iris])
-
-    return EntitySearchPage(
-        matches=tuple(
-            EntityMatch(
-                iri=iri,
-                roles=display.get(str(iri), _EMPTY_DISPLAY).roles,
-                annotations=display.get(str(iri), _EMPTY_DISPLAY).annotations,
-            )
-            for iri in page_iris
-        ),
-        total=total,
-        offset=offset,
-    )
-
-
-def _text_search_entities(
-    s: Session,
-    query: str,
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    within: SelectionName | None,
-    declared: bool | None,
-    properties: Sequence[IRI],
-    exclude_deprecated: bool,
-    limit: int,
-    offset: int,
-) -> EntitySearchPage:
-    matches = find_text_matches(s, query, LOCAL_NAME_PROPERTY, MatchSource.IRI)
-    matches.update(find_text_matches(s, query, None, MatchSource.ANNOTATION, properties=properties))
-    matches = _apply_text_filters(s, matches, role, namespace, within, declared, exclude_deprecated)
-
-    quality_order = {MatchQuality.EXACT: 0, MatchQuality.SUBSTRING: 1}
-    source_order = {MatchSource.IRI: 0, MatchSource.ANNOTATION: 1}
-    sorted_iris = sorted(
-        matches.keys(),
-        key=lambda k: (
-            quality_order.get(matches[k].quality, 9),
-            source_order.get(matches[k].source, 9),
-            k,
-        ),
-    )
-
-    total = len(sorted_iris)
-    page_iris = sorted_iris[offset : offset + limit]
-    if not page_iris:
-        return EntitySearchPage(matches=(), total=total, offset=offset)
-
-    display = batch_fetch_entity_display(s, page_iris)
-    return EntitySearchPage(
-        matches=tuple(
-            EntityMatch(
-                iri=IRI(iri_str),
-                roles=display.get(iri_str, _EMPTY_DISPLAY).roles,
-                annotations=display.get(iri_str, _EMPTY_DISPLAY).annotations,
-            )
-            for iri_str in page_iris
-        ),
-        total=total,
-        offset=offset,
-    )
+    return tuple(constraints)
 
 
 def undeclared_entity_count(

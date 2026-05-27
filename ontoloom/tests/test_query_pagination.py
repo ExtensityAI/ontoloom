@@ -4,19 +4,9 @@ from collections.abc import Callable
 
 import pytest
 from ontoloom.query.base import Query
-from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.query.list_entities import ListEntities
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.types import SelectionName
-
-
-def _list_entities(**kw: object) -> Query[object]:
-    return ListEntities(constraints=(), **kw)  # pyright: ignore[reportArgumentType]
-
-
-def _list_axioms(**kw: object) -> Query[object]:
-    return ListAxioms(constraints=(), **kw)  # pyright: ignore[reportArgumentType]
 
 
 def _read_axiom_selection(**kw: object) -> Query[object]:
@@ -28,8 +18,6 @@ def _read_entity_selection(**kw: object) -> Query[object]:
 
 
 _FACTORIES: tuple[Callable[..., Query[object]], ...] = (
-    _list_entities,
-    _list_axioms,
     _read_axiom_selection,
     _read_entity_selection,
 )

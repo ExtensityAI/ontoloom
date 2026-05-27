@@ -2,39 +2,16 @@
 
 from collections import Counter
 from dataclasses import dataclass
-from enum import StrEnum
 
 from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 
 
-class MatchSource(StrEnum):
-    """Where in the entity record a text-search query matched."""
-
-    IRI = "iri"
-    ANNOTATION = "annotation"
-
-
-class MatchQuality(StrEnum):
-    """How the text-search query matched."""
-
-    EXACT = "exact"
-    SUBSTRING = "substring"
-
-
 @dataclass(frozen=True, slots=True)
 class AnnotationRow:
     property: IRI
     value: str
-
-
-@dataclass(frozen=True, slots=True)
-class TextMatch:
-    """How and where a text-search query matched an entity."""
-
-    source: MatchSource
-    quality: MatchQuality
 
 
 @dataclass(frozen=True, slots=True)

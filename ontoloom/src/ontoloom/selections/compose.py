@@ -14,7 +14,7 @@ from ontoloom.query.constraints import (
 )
 from ontoloom.query.dispatch import run
 from ontoloom.query.find_axioms import FindAxioms
-from ontoloom.query.list_entities import ListEntities
+from ontoloom.query.find_entities import FindEntities
 from ontoloom.selections.expr import (
     AxiomsForExpr,
     DiffExpr,
@@ -156,4 +156,4 @@ def _entities_in(
     if field is not None:
         constraints.append(InPositions(positions=(field,)))
 
-    return run(s, ListEntities(constraints=tuple(constraints)))
+    return run(s, FindEntities(constraints=tuple(constraints)))

@@ -16,8 +16,8 @@ from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
 from ontoloom.query.dispatch import run
 from ontoloom.query.find_axioms import FindAxioms
+from ontoloom.query.find_entities import FindEntities
 from ontoloom.query.list_axioms import ListAxioms
-from ontoloom.query.list_entities import ListEntities
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
@@ -44,9 +44,9 @@ def test_dispatch_count_entities(s):
     assert result == 2
 
 
-def test_dispatch_list_entities(s):
+def test_dispatch_find_entities(s):
     _seed(s)
-    result = run(s, ListEntities(constraints=()))
+    result = run(s, FindEntities(constraints=()))
     assert isinstance(result, list)
     assert all(isinstance(x, IRI) for x in result)
     assert result == [IRI("ex:Cat"), IRI("ex:Dog")]
@@ -128,7 +128,7 @@ def test_run_raises_on_nonexistent_selection_ref_in_constraints(s):
     ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
-        run(s, ListEntities(constraints=(InEntitySelection(name=ref),)))
+        run(s, FindEntities(constraints=(InEntitySelection(name=ref),)))
 
 
 def test_run_raises_on_nonexistent_selection_in_read_axiom_selection(s):

@@ -1,25 +1,20 @@
-"""List axioms (hash + JSON data) matching a constraint set, with stable pagination."""
+"""List axioms (hash + JSON data) matching a constraint set, in stable hash order."""
 
 from typing import override
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
 from ontoloom.query._predicates import _axiom_predicates
-from ontoloom.query.base import Query, RenderedSql, append_pagination
-from ontoloom.query.constraints import HasAxiomConstraints, HasPagination
+from ontoloom.query.base import Query, RenderedSql
+from ontoloom.query.constraints import HasAxiomConstraints
 
 
-class ListAxioms(HasAxiomConstraints, HasPagination, Query[list[tuple[AxiomHash, str]]]):
+class ListAxioms(HasAxiomConstraints, Query[list[tuple[AxiomHash, str]]]):
     @override
     def render(self) -> RenderedSql:
         pred = _axiom_predicates(self.constraints)
-        sql_parts = [
-            f"SELECT a.hash, json(a.data) FROM axioms a WHERE {pred.sql}",
-            "ORDER BY a.hash",
-        ]
-        params: list[object] = list(pred.params)
-        append_pagination(sql_parts, params, self.limit, self.offset)
-        return RenderedSql(sql=" ".join(sql_parts), params=tuple(params))
+        sql = f"SELECT a.hash, json(a.data) FROM axioms a WHERE {pred.sql} ORDER BY a.hash"
+        return RenderedSql(sql=sql, params=pred.params)
 
     @override
     def _run(self, s: Session) -> list[tuple[AxiomHash, str]]:

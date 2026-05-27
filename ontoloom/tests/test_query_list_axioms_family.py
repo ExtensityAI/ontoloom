@@ -1,11 +1,11 @@
 """Tests for the ListAxioms / FindAxioms / StreamAxioms query trio.
 
 The three queries share constraint handling and ordering; they differ in
-projection (`a.hash` vs `a.hash, json(a.data)`), pagination support
-(FindAxioms and StreamAxioms have none), and return shape (list vs streaming
-context manager). Common cases are parametrized over the trio; the per-query
-specifics (JSON payload shape, streaming lifecycle, pagination semantics) and
-the FindAxioms-only annotation predicates live in dedicated sections.
+projection (`a.hash` vs `a.hash, json(a.data)`) and return shape (list vs
+streaming context manager). None paginate — feed queries return the full
+ordered result. Common cases are parametrized over the trio; the per-query
+specifics (JSON payload shape, streaming lifecycle) and the FindAxioms-only
+annotation predicates live in dedicated sections.
 """
 
 import json
@@ -52,20 +52,16 @@ def _stream_axioms_hashes(q: StreamAxioms, s: Session) -> list[AxiomHash]:
         return [h for h, _ in it]
 
 
-# (id, query_class, projection_sql, supports_pagination, run_adapter)
-TRIO: list[tuple[str, type, str, bool, ResultHashes]] = [
-    ("hashes", FindAxioms, "SELECT a.hash", False, _find_axioms_hashes),
-    ("axioms", ListAxioms, "SELECT a.hash, json(a.data)", True, _list_axioms_hashes),
-    ("stream", StreamAxioms, "SELECT a.hash, json(a.data)", False, _stream_axioms_hashes),
+# (id, query_class, projection_sql, run_adapter)
+TRIO: list[tuple[str, type, str, ResultHashes]] = [
+    ("hashes", FindAxioms, "SELECT a.hash", _find_axioms_hashes),
+    ("axioms", ListAxioms, "SELECT a.hash, json(a.data)", _list_axioms_hashes),
+    ("stream", StreamAxioms, "SELECT a.hash, json(a.data)", _stream_axioms_hashes),
 ]
 
 
-def _make(query_cls: type, *, constraints: tuple = (), limit: int | None = None, offset: int = 0):
-    """Construct a query, omitting pagination args for queries that don't support them."""
-    if query_cls in (FindAxioms, StreamAxioms):
-        return query_cls(constraints=constraints)
-
-    return query_cls(constraints=constraints, limit=limit, offset=offset)
+def _make(query_cls: type, *, constraints: tuple = ()):
+    return query_cls(constraints=constraints)
 
 
 # ---- shared run tests --------------------------------------------------------
@@ -73,7 +69,7 @@ def _make(query_cls: type, *, constraints: tuple = (), limit: int | None = None,
 
 @pytest.mark.parametrize(
     ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, _, runner in TRIO],
+    [(cls, runner) for _, cls, _, runner in TRIO],
     ids=[ident for ident, *_ in TRIO],
 )
 def test_run_empty_ontology(s, query_cls: type, run_hashes: ResultHashes):
@@ -82,7 +78,7 @@ def test_run_empty_ontology(s, query_cls: type, run_hashes: ResultHashes):
 
 @pytest.mark.parametrize(
     ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, _, runner in TRIO],
+    [(cls, runner) for _, cls, _, runner in TRIO],
     ids=[ident for ident, *_ in TRIO],
 )
 def test_run_yields_axiom_hash_typed_values(s, query_cls: type, run_hashes: ResultHashes):
@@ -96,7 +92,7 @@ def test_run_yields_axiom_hash_typed_values(s, query_cls: type, run_hashes: Resu
 
 @pytest.mark.parametrize(
     ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, _, runner in TRIO],
+    [(cls, runner) for _, cls, _, runner in TRIO],
     ids=[ident for ident, *_ in TRIO],
 )
 def test_run_lists_in_hash_order(s, query_cls: type, run_hashes: ResultHashes):
@@ -112,7 +108,7 @@ def test_run_lists_in_hash_order(s, query_cls: type, run_hashes: ResultHashes):
 
 @pytest.mark.parametrize(
     ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, _, runner in TRIO],
+    [(cls, runner) for _, cls, _, runner in TRIO],
     ids=[ident for ident, *_ in TRIO],
 )
 def test_run_filter_by_of_types(s, query_cls: type, run_hashes: ResultHashes):
@@ -123,45 +119,6 @@ def test_run_filter_by_of_types(s, query_cls: type, run_hashes: ResultHashes):
         s,
     )
     assert result == [HashedAxiom.of(sub).hash]
-
-
-# ---- pagination run (paginated queries only) ---------------------------------
-
-
-@pytest.mark.parametrize(
-    ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, pag, runner in TRIO if pag],
-    ids=[ident for ident, _, _, pag, _ in TRIO if pag],
-)
-def test_run_pagination_stable(s, query_cls: type, run_hashes: ResultHashes):
-    decls = [Declaration(entity_type=EntityType.CLASS, iri=IRI(f"ex:C{i}")) for i in range(6)]
-    add_axioms(s, decls)
-    page1 = run_hashes(_make(query_cls, limit=2), s)
-    page2 = run_hashes(_make(query_cls, limit=2, offset=2), s)
-    assert len(page1) == 2
-    assert len(page2) == 2
-    assert set(page1).isdisjoint(page2)
-
-
-@pytest.mark.parametrize(
-    ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, pag, runner in TRIO if pag],
-    ids=[ident for ident, _, _, pag, _ in TRIO if pag],
-)
-def test_run_pagination_full_walk(s, query_cls: type, run_hashes: ResultHashes):
-    decls = [
-        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
-        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B")),
-        Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:C")),
-    ]
-    add_axioms(s, decls)
-    full = run_hashes(_make(query_cls), s)
-    paged = (
-        run_hashes(_make(query_cls, limit=1), s)
-        + run_hashes(_make(query_cls, limit=1, offset=1), s)
-        + run_hashes(_make(query_cls, limit=1, offset=2), s)
-    )
-    assert paged == full
 
 
 # ---- ListAxioms-specific: JSON payload shape ---------------------------------

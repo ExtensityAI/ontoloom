@@ -7,9 +7,9 @@ every entity is discoverable through the applicable search paths.
 import pytest
 from ontoloom.axioms.mutations import add_axioms
 from ontoloom.connection import Session
+from ontoloom.entities.projections import batch_fetch_entity_display
 from ontoloom.entities.reader import (
     EntityNotFoundError,
-    collect_entity_iris,
     get_entity,
     search_entities,
 )
@@ -78,26 +78,19 @@ def nc(iri: str) -> IRI:
 
 def _all_entity_iris(s: Session) -> set[str]:
     """Collect all entity IRIs via list-all search."""
-    iris = set()
-    page = search_entities(s, limit=1000)
-    for m in page.matches:
-        iris.add(str(m.iri))
-    return iris
+    return {str(i) for i in search_entities(s)}
 
 
 def _search_entities_text(s: Session, query: str) -> set[str]:
-    page = search_entities(s, query=query, limit=1000)
-    return {str(m.iri) for m in page.matches}
+    return {str(i) for i in search_entities(s, query=query)}
 
 
 def _search_entities_role(s: Session, role: EntityType) -> set[str]:
-    page = search_entities(s, role=role, limit=1000)
-    return {str(m.iri) for m in page.matches}
+    return {str(i) for i in search_entities(s, role=role)}
 
 
 def _search_entities_ns(s: Session, namespace: PrefixName) -> set[str]:
-    page = search_entities(s, namespace=namespace, limit=1000)
-    return {str(m.iri) for m in page.matches}
+    return {str(i) for i in search_entities(s, namespace=namespace)}
 
 
 # ---------------------------------------------------------------------------
@@ -443,16 +436,14 @@ class TestSearchEntitiesComprehensive:
     def test_search_combined_query_and_role(self, s):
         add_axioms(s, AXIOMS)
         # Search "Dog" but only classes
-        page = search_entities(s, query="Dog", role=EntityType.CLASS, limit=1000)
-        iris = {str(m.iri) for m in page.matches}
+        iris = {str(i) for i in search_entities(s, query="Dog", role=EntityType.CLASS)}
         assert ":Dog" in iris
         # :Fido (individual) should not match even though it's a Dog instance
         assert ":Fido" not in iris
 
     def test_search_combined_query_and_namespace(self, s):
         add_axioms(s, AXIOMS)
-        page = search_entities(s, query="label", namespace=PrefixName("rdfs"), limit=1000)
-        iris = {str(m.iri) for m in page.matches}
+        iris = {str(i) for i in search_entities(s, query="label", namespace=PrefixName("rdfs"))}
         assert "rdfs:label" in iris
         # skos:definition should not match (wrong namespace)
         assert "skos:definition" not in iris
@@ -460,65 +451,43 @@ class TestSearchEntitiesComprehensive:
     def test_search_match_quality_ordering(self, s):
         add_axioms(s, AXIOMS)
         # "Dog" should match :Dog as exact (local_name) before substring matches
-        page = search_entities(s, query="Dog", limit=1000)
-        if page.matches:
+        iris = search_entities(s, query="Dog")
+        if iris:
             # :Dog is an exact local-name match, so it sorts ahead of every
-            # substring match and lands first in the ordered page.
-            first = page.matches[0]
-            assert str(first.iri) == ":Dog"
+            # substring match and lands first in the ordered result.
+            assert str(iris[0]) == ":Dog"
 
     def test_search_returns_annotations(self, s):
         add_axioms(s, AXIOMS)
-        page = search_entities(s, query="Dog", limit=1000)
-        dog_match = next(m for m in page.matches if str(m.iri) == ":Dog")
-        ann_values = {a.value for a in dog_match.annotations}
+        iris = search_entities(s, query="Dog")
+        assert IRI(":Dog") in iris
+        display = batch_fetch_entity_display(s, [":Dog"])
+        ann_values = {a.value for a in display[":Dog"].annotations}
         assert "Dog" in ann_values
         assert "Hund" in ann_values
 
     def test_search_returns_roles(self, s):
         add_axioms(s, AXIOMS)
-        page = search_entities(s, query="Dog", limit=1000)
-        dog_match = next(m for m in page.matches if str(m.iri) == ":Dog")
-        assert EntityType.CLASS in dog_match.roles
+        iris = search_entities(s, query="Dog")
+        assert IRI(":Dog") in iris
+        display = batch_fetch_entity_display(s, [":Dog"])
+        assert EntityType.CLASS in display[":Dog"].roles
 
-    def test_pagination(self, s):
+    def test_full_result_covers_all_entities(self, s):
         add_axioms(s, AXIOMS)
         all_results = _all_entity_iris(s)
-        total = len(all_results)
-        assert total > 5, "Need enough entities to test pagination"
+        assert len(all_results) > 5, "Need enough entities to exercise the full feed"
 
-        # Collect all pages
-        collected = set()
-        offset = 0
-        page_size = 5
-        while True:
-            page = search_entities(s, limit=page_size, offset=offset)
-            if not page.matches:
-                break
-            for m in page.matches:
-                collected.add(str(m.iri))
-            assert page.total == total
-            offset += page_size
+        iris = {str(i) for i in search_entities(s)}
+        assert iris == all_results
 
-        assert collected == all_results
-
-    def test_text_pagination(self, s):
+    def test_text_search_full_result(self, s):
         add_axioms(s, AXIOMS)
         # "has" matches many entities by local_name substring
-        full = search_entities(s, query="has", limit=1000)
-        assert full.total > 3
-
-        collected = set()
-        offset = 0
-        while True:
-            page = search_entities(s, query="has", limit=3, offset=offset)
-            if not page.matches:
-                break
-            for m in page.matches:
-                collected.add(str(m.iri))
-            offset += 3
-
-        assert len(collected) == full.total
+        iris = search_entities(s, query="has")
+        assert len(iris) > 3
+        # No truncation: a repeat call returns the same set.
+        assert {str(i) for i in search_entities(s, query="has")} == {str(i) for i in iris}
 
 
 class TestGetEntityComprehensive:
@@ -665,8 +634,7 @@ class TestEnhancedEntitySearch:
         self, s, extra_axioms, kwargs, expected_includes, expected_excludes
     ):
         add_axioms(s, [*AXIOMS, *extra_axioms])
-        page = search_entities(s, limit=1000, **kwargs)
-        iris = {str(m.iri) for m in page.matches}
+        iris = {str(i) for i in search_entities(s, **kwargs)}
         # Special case: declared=True must cover every Declaration IRI in AXIOMS
         if kwargs.get("declared") is True and "query" not in kwargs:
             for ax in AXIOMS:
@@ -680,10 +648,12 @@ class TestEnhancedEntitySearch:
     def test_properties_filter_with_query(self, s):
         add_axioms(s, AXIOMS)
         # "Dog" appears in rdfs:label and as local_name. Restrict annotation search to rdfs:label.
-        page = search_entities(
-            s, query="Dog", properties=[IRI("rdfs:label")], exclude_deprecated=False, limit=1000
-        )
-        iris = {str(m.iri) for m in page.matches}
+        iris = {
+            str(i)
+            for i in search_entities(
+                s, query="Dog", properties=[IRI("rdfs:label")], exclude_deprecated=False
+            )
+        }
         # :Dog has rdfs:label "Dog", so it should match
         assert ":Dog" in iris
 
@@ -691,36 +661,37 @@ class TestEnhancedEntitySearch:
         add_axioms(s, AXIOMS)
         # "domesticated" appears in skos:definition for :Pet
         # Restrict to rdfs:label only -> should NOT find :Pet via annotation
-        page = search_entities(
-            s,
-            query="domesticated",
-            properties=[IRI("rdfs:label")],
-            exclude_deprecated=False,
-            limit=1000,
-        )
-        iris = {str(m.iri) for m in page.matches}
+        iris = {
+            str(i)
+            for i in search_entities(
+                s, query="domesticated", properties=[IRI("rdfs:label")], exclude_deprecated=False
+            )
+        }
         assert ":Pet" not in iris
 
     def test_properties_filter_skos_definition(self, s):
         add_axioms(s, AXIOMS)
         # "domesticated" in skos:definition -> should find :Pet
-        page = search_entities(
-            s,
-            query="domesticated",
-            properties=[IRI("skos:definition")],
-            exclude_deprecated=False,
-            limit=1000,
-        )
-        iris = {str(m.iri) for m in page.matches}
+        iris = {
+            str(i)
+            for i in search_entities(
+                s,
+                query="domesticated",
+                properties=[IRI("skos:definition")],
+                exclude_deprecated=False,
+            )
+        }
         assert ":Pet" in iris
 
     def test_properties_filter_no_query(self, s):
         add_axioms(s, AXIOMS)
         # Without query: find entities that have skos:definition annotations
-        page = search_entities(
-            s, properties=[IRI("skos:definition")], exclude_deprecated=False, limit=1000
-        )
-        iris = {str(m.iri) for m in page.matches}
+        iris = {
+            str(i)
+            for i in search_entities(
+                s, properties=[IRI("skos:definition")], exclude_deprecated=False
+            )
+        }
         # :Pet has skos:definition
         assert ":Pet" in iris
         # :Dog has rdfs:label but NOT skos:definition
@@ -728,13 +699,13 @@ class TestEnhancedEntitySearch:
 
     def test_collect_iris_declared(self, s):
         add_axioms(s, AXIOMS)
-        declared_iris = collect_entity_iris(s, declared=True, exclude_deprecated=False)
-        assert ":Dog" in declared_iris
-        assert ":Heart" not in declared_iris
+        declared_iris = search_entities(s, declared=True, exclude_deprecated=False)
+        assert IRI(":Dog") in declared_iris
+        assert IRI(":Heart") not in declared_iris
 
-        undeclared_iris = collect_entity_iris(s, declared=False, exclude_deprecated=False)
-        assert ":Heart" in undeclared_iris
-        assert ":Dog" not in undeclared_iris
+        undeclared_iris = search_entities(s, declared=False, exclude_deprecated=False)
+        assert IRI(":Heart") in undeclared_iris
+        assert IRI(":Dog") not in undeclared_iris
 
     def test_collect_iris_exclude_deprecated(self, s):
         extra = [
@@ -748,51 +719,58 @@ class TestEnhancedEntitySearch:
         ]
         add_axioms(s, extra)
 
-        iris_excl = collect_entity_iris(s, exclude_deprecated=True)
-        assert ":Obsolete" not in iris_excl
-        assert ":Dog" in iris_excl
+        iris_excl = search_entities(s, exclude_deprecated=True)
+        assert IRI(":Obsolete") not in iris_excl
+        assert IRI(":Dog") in iris_excl
 
-        iris_incl = collect_entity_iris(s, exclude_deprecated=False)
-        assert ":Obsolete" in iris_incl
+        iris_incl = search_entities(s, exclude_deprecated=False)
+        assert IRI(":Obsolete") in iris_incl
 
     def test_collect_iris_properties_with_query(self, s):
         add_axioms(s, AXIOMS)
         # "domesticated" in skos:definition for :Pet
-        iris = collect_entity_iris(
+        iris = search_entities(
             s, query="domesticated", properties=[IRI("skos:definition")], exclude_deprecated=False
         )
-        assert ":Pet" in iris
+        assert IRI(":Pet") in iris
 
         # Same query restricted to rdfs:label -> should not find :Pet
-        iris2 = collect_entity_iris(
+        iris2 = search_entities(
             s, query="domesticated", properties=[IRI("rdfs:label")], exclude_deprecated=False
         )
-        assert ":Pet" not in iris2
+        assert IRI(":Pet") not in iris2
 
 
 # -- F-F14: text search tiebreaker ordering --
 
 
 class TestTextSearchTiebreakers:
-    """Pin all three sort keys: quality (exact<substring), source (iri<annotation), IRI."""
+    """Pin the four ranking ordinals the EntityTextMatches CASE collapses to.
 
-    def test_tiebreaker_ordering(self, s):
-        # Build four entities that each match query "target" via a distinct (quality, source) tier.
+    The single ordered CASE reproduces the old `(quality, source, iri)` Python
+    sort: local-name claims the source if it matched there at all, and quality
+    is taken *within* the winning source. The four reachable states, in final
+    order: local-name-exact (0), annotation-exact (1), local-name-substring (2),
+    annotation-substring (3).
+    """
+
+    def test_four_ordinal_states(self, s):
+        # Build four entities, each matching query "target" via a distinct ordinal.
         add_axioms(
             s,
             [
-                # tier (0,0): exact IRI match -> local name IS "target"
+                # ordinal 0: local-name exact -> local name IS "target"
                 Declaration(entity_type=EntityType.CLASS, iri=IRI(":target")),
-                # tier (0,1): exact annotation match -> local name does NOT contain "target"
+                # ordinal 1: annotation exact, no local-name match
                 Declaration(entity_type=EntityType.CLASS, iri=IRI(":aaa")),
                 AnnotationAssertion(
                     property=IRI("rdfs:label"),
                     subject=IRI(":aaa"),
                     value=LangLiteral(value="target"),
                 ),
-                # tier (1,0): substring IRI match -> local name contains but ≠ "target"
+                # ordinal 2: local-name substring (contains but ≠ "target")
                 Declaration(entity_type=EntityType.CLASS, iri=IRI(":target_extra")),
-                # tier (1,1): substring annotation match -> annotation contains "target"
+                # ordinal 3: annotation substring, no local-name match
                 Declaration(entity_type=EntityType.CLASS, iri=IRI(":zzz")),
                 AnnotationAssertion(
                     property=IRI("rdfs:label"),
@@ -802,24 +780,58 @@ class TestTextSearchTiebreakers:
             ],
         )
 
-        page = search_entities(s, query="target", limit=100)
-        iris = [str(m.iri) for m in page.matches]
+        iris = [str(i) for i in search_entities(s, query="target")]
 
         assert ":target" in iris
         assert ":aaa" in iris
         assert ":target_extra" in iris
         assert ":zzz" in iris
 
-        idx_exact_iri = iris.index(":target")
-        idx_exact_ann = iris.index(":aaa")
-        idx_sub_iri = iris.index(":target_extra")
-        idx_sub_ann = iris.index(":zzz")
+        ln_exact = iris.index(":target")
+        ann_exact = iris.index(":aaa")
+        ln_substring = iris.index(":target_extra")
+        ann_substring = iris.index(":zzz")
 
-        # Tiebreaker 1: exact before substring
-        assert idx_exact_iri < idx_sub_iri
-        assert idx_exact_ann < idx_sub_ann
-        # Tiebreaker 2: iri-source before annotation-source within same quality
-        assert idx_exact_iri < idx_exact_ann
-        assert idx_sub_iri < idx_sub_ann
-        # Combined: exact-iri < exact-ann < sub-iri < sub-ann
-        assert idx_exact_iri < idx_exact_ann < idx_sub_iri < idx_sub_ann
+        # Final order: local-name-exact < annotation-exact < local-name-substring < annotation-substring
+        assert ln_exact < ann_exact < ln_substring < ann_substring
+
+    def test_local_name_substring_beats_annotation_exact_cross_case(self, s):
+        # The crossed state: local-name matches as SUBSTRING *and* an annotation
+        # matches EXACTLY. Local-name claims the source, so quality is taken there
+        # (substring) -> ordinal 2, NOT ordinal 1 (annotation-exact). It must rank
+        # AFTER a pure annotation-exact entity and BEFORE a pure annotation-substring.
+        add_axioms(
+            s,
+            [
+                # pure annotation-exact -> ordinal 1
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":aaa")),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"),
+                    subject=IRI(":aaa"),
+                    value=LangLiteral(value="target"),
+                ),
+                # cross case: local-name substring + annotation exact -> ordinal 2
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":target_cross")),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"),
+                    subject=IRI(":target_cross"),
+                    value=LangLiteral(value="target"),
+                ),
+                # pure annotation-substring -> ordinal 3
+                Declaration(entity_type=EntityType.CLASS, iri=IRI(":zzz")),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"),
+                    subject=IRI(":zzz"),
+                    value=LangLiteral(value="has_target_in_label"),
+                ),
+            ],
+        )
+
+        iris = [str(i) for i in search_entities(s, query="target")]
+
+        ann_exact = iris.index(":aaa")
+        cross = iris.index(":target_cross")
+        ann_substring = iris.index(":zzz")
+
+        # cross ranks at ordinal 2 (local-name-substring), so: 1 < 2 < 3
+        assert ann_exact < cross < ann_substring

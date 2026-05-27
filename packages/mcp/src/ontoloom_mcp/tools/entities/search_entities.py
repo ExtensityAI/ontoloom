@@ -4,9 +4,9 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, Session, session
-from ontoloom.entities.reader import collect_entity_iris
+from ontoloom.entities.projections import batch_fetch_entity_display
 from ontoloom.entities.reader import search_entities as core_search_entities
-from ontoloom.entities.types import EntitySearchPage
+from ontoloom.entities.types import EntityDisplay, EntityMatch, EntitySearchPage
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
@@ -78,7 +78,7 @@ def search_entities(
             "exclude_deprecated": exclude_deprecated,
         }
 
-        iris = collect_entity_iris(s, **kwargs)
+        iris = core_search_entities(s, **kwargs)
         source = _build_source(query, role, namespace, declared, properties or (), within)
         upserted = upsert_entity_selection(s, into, iris, source, mode=mode)
         sel = upserted.selection
@@ -89,7 +89,7 @@ def search_entities(
             return f"0 entities -> {format_selection_ref(sel)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = core_search_entities(s, **kwargs, limit=limit_n, offset=0)
+        page = _preview_page(s, iris, limit_n)
         page_text = _format_entity_search_page(page)
 
         result = format_selection_result(upserted, page_text)
@@ -100,6 +100,28 @@ def search_entities(
         s.commit()
 
     return result
+
+
+_EMPTY_DISPLAY = EntityDisplay(roles=frozenset(), annotations=())
+
+
+def _preview_page(s: Session, iris: list[IRI], limit: int) -> EntitySearchPage:
+    """Slice the ranked IRI list in memory and attach display data for the preview."""
+    preview = iris[:limit]
+    display = batch_fetch_entity_display(s, [str(i) for i in preview])
+
+    return EntitySearchPage(
+        matches=tuple(
+            EntityMatch(
+                iri=iri,
+                roles=display.get(str(iri), _EMPTY_DISPLAY).roles,
+                annotations=display.get(str(iri), _EMPTY_DISPLAY).annotations,
+            )
+            for iri in preview
+        ),
+        total=len(iris),
+        offset=0,
+    )
 
 
 def _within_metadata(s: Session, within: SelectionName):
