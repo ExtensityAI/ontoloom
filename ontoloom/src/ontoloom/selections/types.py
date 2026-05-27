@@ -138,51 +138,6 @@ class SelectionKindConflictError(OntoloomError):
         super().__init__(msg)
 
 
-def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
-    """Validate `kind:NAME` wire form; return `value` unchanged."""
-    prefix, sep, name = value.partition(":")
-
-    if not sep or prefix != kind:
-        msg = f"{type_name} must be '{kind}:NAME' (e.g. '{kind}:my_sel'), got {dquoted(value)}"
-        raise ValueError(msg)
-    validate_selection_name(name)
-    return value
-
-
-class EntitySelectionName(TypedStr):
-    """Kind-typed reference to an entity selection. Wire form `entities:NAME`."""
-
-    description = "Entity-kind selection reference (wire form: 'entities:NAME')"
-    pattern = rf"^entities:{NAME_FRAGMENT}$"
-    examples = ("entities:my_selection",)
-
-    @override
-    @classmethod
-    def parse(cls, value: str):
-        return _parse_kinded_name(value, SelectionKind.ENTITIES, "EntitySelectionName")
-
-    @property
-    def bare(self) -> SelectionName:
-        return SelectionName(self.removeprefix("entities:"))
-
-
-class AxiomSelectionName(TypedStr):
-    """Kind-typed reference to an axiom selection. Wire form `axioms:NAME`."""
-
-    description = "Axiom-kind selection reference (wire form: 'axioms:NAME')"
-    pattern = rf"^axioms:{NAME_FRAGMENT}$"
-    examples = ("axioms:my_selection",)
-
-    @override
-    @classmethod
-    def parse(cls, value: str):
-        return _parse_kinded_name(value, SelectionKind.AXIOMS, "AxiomSelectionName")
-
-    @property
-    def bare(self) -> SelectionName:
-        return SelectionName(self.removeprefix("axioms:"))
-
-
 @dataclass(frozen=True, slots=True)
 class AxiomSelection:
     name: SelectionName
