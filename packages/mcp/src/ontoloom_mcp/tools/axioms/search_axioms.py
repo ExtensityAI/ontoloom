@@ -67,7 +67,7 @@ def search_axioms(
                 ),
             )
         else:
-            result = run(
+            hashes = run(
                 s,
                 SearchAxioms(
                     query=query,
@@ -75,7 +75,6 @@ def search_axioms(
                     constraints=scope,
                 ),
             )
-            hashes = [hit.hash for hit in result.hits]
 
         source = _build_source(query, props_tuple, within)
         upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)

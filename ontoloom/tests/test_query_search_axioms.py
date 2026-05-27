@@ -10,7 +10,7 @@ from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import run
-from ontoloom.query.search_axioms import SearchAxioms, SearchAxiomsHit, SearchAxiomsResult
+from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName
 
@@ -36,14 +36,11 @@ def test_search_axioms_returns_exact_then_substring(s):
     )
     add_axioms(s, [exact, substring])
 
-    result = run(s, SearchAxioms(query="TODO", limit=10))
+    result = run(s, SearchAxioms(query="TODO"))
 
-    assert isinstance(result, SearchAxiomsResult)
-    assert result.total == 2
-    assert len(result.hits) == 2
-    assert all(isinstance(h, SearchAxiomsHit) for h in result.hits)
-    assert result.hits[0].hash == HashedAxiom.of(exact).hash
-    assert result.hits[1].hash == HashedAxiom.of(substring).hash
+    assert len(result) == 2
+    assert result[0] == HashedAxiom.of(exact).hash
+    assert result[1] == HashedAxiom.of(substring).hash
 
 
 def test_search_axioms_substring_only(s):
@@ -54,10 +51,10 @@ def test_search_axioms_substring_only(s):
     )
     add_axioms(s, [substring])
 
-    result = run(s, SearchAxioms(query="TODO", limit=10))
+    result = run(s, SearchAxioms(query="TODO"))
 
-    assert result.total == 1
-    assert result.hits[0].hash == HashedAxiom.of(substring).hash
+    assert len(result) == 1
+    assert result[0] == HashedAxiom.of(substring).hash
 
 
 def test_search_axioms_exact_match_not_duplicated_as_substring(s):
@@ -68,10 +65,10 @@ def test_search_axioms_exact_match_not_duplicated_as_substring(s):
     )
     add_axioms(s, [exact])
 
-    result = run(s, SearchAxioms(query="TODO", limit=10))
+    result = run(s, SearchAxioms(query="TODO"))
 
-    assert result.total == 1
-    assert result.hits[0].hash == HashedAxiom.of(exact).hash
+    assert len(result) == 1
+    assert result[0] == HashedAxiom.of(exact).hash
 
 
 def test_search_axioms_case_insensitive(s):
@@ -82,10 +79,10 @@ def test_search_axioms_case_insensitive(s):
     )
     add_axioms(s, [upper])
 
-    result = run(s, SearchAxioms(query="todo", limit=10))
+    result = run(s, SearchAxioms(query="todo"))
 
-    assert result.total == 1
-    assert result.hits[0].hash == HashedAxiom.of(upper).hash
+    assert len(result) == 1
+    assert result[0] == HashedAxiom.of(upper).hash
 
 
 def test_search_axioms_filters_by_properties(s):
@@ -103,15 +100,15 @@ def test_search_axioms_filters_by_properties(s):
 
     result = run(
         s,
-        SearchAxioms(query="x", properties=(IRI("rdfs:comment"),), limit=10),
+        SearchAxioms(query="x", properties=(IRI("rdfs:comment"),)),
     )
 
-    assert result.total == 1
-    assert result.hits[0].hash == HashedAxiom.of(commented).hash
+    assert len(result) == 1
+    assert result[0] == HashedAxiom.of(commented).hash
 
 
-def test_search_axioms_paginates_after_rank(s):
-    axioms = [
+def test_search_axioms_ranks_exact_before_substring_over_full_result(s):
+    substrings = [
         SubClassOf(
             sub_class=IRI(f"ex:C{i}"),
             super_class=IRI("ex:Animal"),
@@ -124,32 +121,24 @@ def test_search_axioms_paginates_after_rank(s):
         super_class=IRI("ex:Animal"),
         annotations=(_comment("TODO"),),
     )
-    add_axioms(s, [exact, *axioms])
+    add_axioms(s, [exact, *substrings])
 
-    page1 = run(s, SearchAxioms(query="TODO", limit=2, offset=0))
-    page2 = run(s, SearchAxioms(query="TODO", limit=2, offset=2))
-    page3 = run(s, SearchAxioms(query="TODO", limit=2, offset=4))
-
-    assert page1.total == 6
-    assert page2.total == 6
-    assert page3.total == 6
-
-    assert len(page1.hits) == 2
-    assert len(page2.hits) == 2
-    assert len(page3.hits) == 2
+    result = run(s, SearchAxioms(query="TODO"))
 
     # Exact match ranks first (before all substring matches).
-    assert page1.hits[0].hash == HashedAxiom.of(exact).hash
+    assert result[0] == HashedAxiom.of(exact).hash
 
-    all_hashes = [h.hash for h in (*page1.hits, *page2.hits, *page3.hits)]
-    assert len(set(all_hashes)) == 6
+    # The full, unpaginated result holds every match exactly once.
+    assert len(result) == 6
+    assert len(set(result)) == 6
+    expected = {HashedAxiom.of(a).hash for a in (exact, *substrings)}
+    assert set(result) == expected
 
 
 def test_search_axioms_empty_result(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = run(s, SearchAxioms(query="nonexistent", limit=10))
-    assert result.total == 0
-    assert result.hits == ()
+    result = run(s, SearchAxioms(query="nonexistent"))
+    assert result == []
 
 
 def test_search_axioms_respects_within_selection(s):
@@ -175,27 +164,11 @@ def test_search_axioms_respects_within_selection(s):
 
     result = run(
         s,
-        SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),), limit=10),
+        SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),)),
     )
 
-    assert result.total == 1
-    assert result.hits[0].hash == HashedAxiom.of(in_scope).hash
-
-
-def test_search_axioms_total_independent_of_pagination(s):
-    axioms = [
-        SubClassOf(
-            sub_class=IRI(f"ex:C{i}"),
-            super_class=IRI("ex:Animal"),
-            annotations=(_comment("contains TODO mark"),),
-        )
-        for i in range(4)
-    ]
-    add_axioms(s, axioms)
-
-    page = run(s, SearchAxioms(query="TODO", limit=2))
-    assert page.total == 4
-    assert len(page.hits) == 2
+    assert len(result) == 1
+    assert result[0] == HashedAxiom.of(in_scope).hash
 
 
 def test_search_axioms_missing_selection_raises(s):

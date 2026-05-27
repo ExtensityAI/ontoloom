@@ -4,37 +4,22 @@ Exact matches on `axiom_text.text` outrank substring matches; within each rank
 the order is by axiom hash. Optional `properties` restrict the search to a set
 of annotation property IRIs. Additional axiom constraints (e.g. `InAxiomSelection`)
 narrow the candidate set before ranking.
-
-Pagination (`limit`/`offset`) is applied after ranking; `total` reports the
-full match count independent of pagination.
 """
 
-from dataclasses import dataclass
 from typing import override
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
 from ontoloom.owl.iri import IRI
 from ontoloom.query._predicates import _axiom_predicates
-from ontoloom.query.base import Query, RenderedSql, append_pagination
-from ontoloom.query.constraints import AxiomConstraint, HasAxiomConstraints, HasPagination
+from ontoloom.query.base import Query, RenderedSql
+from ontoloom.query.constraints import AxiomConstraint, HasAxiomConstraints
 
 RANK_EXACT = 0
 RANK_SUBSTRING = 1
 
 
-@dataclass(frozen=True, slots=True)
-class SearchAxiomsHit:
-    hash: AxiomHash
-
-
-@dataclass(frozen=True, slots=True)
-class SearchAxiomsResult:
-    hits: tuple[SearchAxiomsHit, ...]
-    total: int
-
-
-class SearchAxioms(HasAxiomConstraints, HasPagination, Query[SearchAxiomsResult]):
+class SearchAxioms(HasAxiomConstraints, Query[list[AxiomHash]]):
     query: str
     properties: tuple[IRI, ...] = ()
     constraints: tuple[AxiomConstraint, ...] = ()
@@ -42,27 +27,22 @@ class SearchAxioms(HasAxiomConstraints, HasPagination, Query[SearchAxiomsResult]
     @override
     def render(self) -> RenderedSql:
         cte_sql, cte_params = _render_ctes(self)
-        sql_parts = [
-            cte_sql,
-            f"SELECT hash, {RANK_EXACT} AS rank FROM exact",
-            "UNION ALL",
-            f"SELECT hash, {RANK_SUBSTRING} AS rank FROM substring_only",
-            "ORDER BY rank, hash",
-        ]
-        params: list[object] = list(cte_params)
-        append_pagination(sql_parts, params, self.limit, self.offset)
-        return RenderedSql(sql=" ".join(sql_parts), params=tuple(params))
+        sql = " ".join(
+            [
+                cte_sql,
+                f"SELECT hash, {RANK_EXACT} AS rank FROM exact",
+                "UNION ALL",
+                f"SELECT hash, {RANK_SUBSTRING} AS rank FROM substring_only",
+                "ORDER BY rank, hash",
+            ]
+        )
+        return RenderedSql(sql=sql, params=tuple(cte_params))
 
     @override
-    def _run(self, s: Session) -> SearchAxiomsResult:
+    def _run(self, s: Session) -> list[AxiomHash]:
         page = self.render()
         rows = s.conn.execute(page.sql, page.params).fetchall()
-        hits = tuple(SearchAxiomsHit(hash=AxiomHash(h)) for h, _rank in rows)
-
-        count = _render_count(self)
-        total = s.conn.execute(count.sql, count.params).fetchone()[0]
-
-        return SearchAxiomsResult(hits=hits, total=total)
+        return [AxiomHash(h) for h, _rank in rows]
 
 
 def _render_ctes(q: SearchAxioms) -> tuple[str, tuple[object, ...]]:
@@ -79,12 +59,6 @@ def _render_ctes(q: SearchAxioms) -> tuple[str, tuple[object, ...]]:
         f"substring_only AS ({substring_arm} AND a.hash NOT IN (SELECT hash FROM exact))"
     )
     return sql, (*exact_params, *substring_params)
-
-
-def _render_count(q: SearchAxioms) -> RenderedSql:
-    cte_sql, cte_params = _render_ctes(q)
-    sql = f"{cte_sql} SELECT (SELECT COUNT(*) FROM exact) + (SELECT COUNT(*) FROM substring_only)"
-    return RenderedSql(sql=sql, params=cte_params)
 
 
 def _arm_sql(q: SearchAxioms, *, exact: bool) -> tuple[str, tuple[object, ...]]:
