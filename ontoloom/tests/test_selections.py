@@ -32,6 +32,7 @@ from ontoloom.selections.types import (
     EntitySelectionName,
     SelectionExistsError,
     SelectionExprError,
+    SelectionKindConflictError,
     SelectionName,
     SelectionNotFoundError,
     ShowFilter,
@@ -198,16 +199,13 @@ def test_single_input_union_returns_copy(s):
     assert card == 2
 
 
-def test_same_bare_name_does_not_collide_across_kinds(s):
-    """Bare name `foo` exists in both kinds; typed leaves route each call correctly."""
+def test_same_bare_name_forbidden_across_kinds(s):
+    """A bare name is unique across kinds: claiming `foo` as an axiom selection
+    forbids reusing it as an entity selection (and vice versa)."""
     upsert_axiom_selection(s, SelectionName("foo"), ["a" * 64, "b" * 64], "test")
-    upsert_entity_selection(s, SelectionName("foo"), ["ex:Dog"], "test")
 
-    ax_result = create_axiom_selection(s, _ax("from_ax"), AxiomUnionExpr(union=(_ax("foo"),)))
-    ent_result = create_entity_selection(s, _ent("from_ent"), EntityUnionExpr(union=(_ent("foo"),)))
-
-    assert ax_result.selection.size == 2
-    assert ent_result.selection.size == 1
+    with pytest.raises(SelectionKindConflictError):
+        upsert_entity_selection(s, SelectionName("foo"), ["ex:Dog"], "test")
 
 
 # -- P-03-8: Selection validation and boundary cases --
@@ -543,3 +541,14 @@ def test_create_axiom_selection_create_refuses_existing(s):
         create_axiom_selection(
             s, _ax("occupied"), AxiomUnionExpr(union=(_ax("occupied"),)), mode=WriteMode.CREATE
         )
+
+
+def test_create_refuses_name_taken_by_other_kind(s):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
+    from ontoloom.selections.types import SelectionKindConflictError, SelectionName
+
+    upsert_axiom_selection(s, SelectionName("shared"), [AxiomHash("a" * 64)], "t")
+
+    with pytest.raises(SelectionKindConflictError):
+        upsert_entity_selection(s, SelectionName("shared"), [IRI("ex:Dog")], "t")

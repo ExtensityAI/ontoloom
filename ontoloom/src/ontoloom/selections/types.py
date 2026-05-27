@@ -123,6 +123,17 @@ class SelectionExistsError(OntoloomError):
         super().__init__(msg)
 
 
+class SelectionKindConflictError(OntoloomError):
+    def __init__(self, name: SelectionName):
+        self.name = name
+        msg = (
+            f"Selection {dquoted(name)} already exists as the other kind; "
+            f"selection names are unique across axiom and entity selections. "
+            f"Remove it first to reuse the name."
+        )
+        super().__init__(msg)
+
+
 def _parse_kinded_name(value: str, kind: SelectionKind, type_name: str) -> str:
     """Validate `kind:NAME` wire form; return `value` unchanged."""
     prefix, sep, name = value.partition(":")

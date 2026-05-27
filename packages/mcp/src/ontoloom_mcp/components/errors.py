@@ -18,6 +18,7 @@ from ontoloom.prefixes.types import PrefixInUseError, PrefixNotFoundError, Undec
 from ontoloom.selections.types import (
     SelectionExistsError,
     SelectionExprError,
+    SelectionKindConflictError,
     SelectionNotFoundError,
 )
 from ontoloom.utils import dquoted
@@ -65,6 +66,12 @@ def format_error(e: Exception) -> str:  # noqa: C901
             return (
                 f"Selection {dquoted(e.name)} already exists ({e.existing_size} items). "
                 f'Pass mode="replace" to overwrite it.'
+            )
+        case SelectionKindConflictError():
+            return (
+                f"Selection {dquoted(e.name)} already exists as the other kind "
+                f"(axiom vs entity); names are unique across both kinds. "
+                f"Remove it first to reuse the name."
             )
         case SelectionExprError():
             return f"Invalid set expression: {e}"

@@ -24,6 +24,7 @@ from ontoloom.selections.types import (
     EntitySelectionName,
     SelectionContentHash,
     SelectionExistsError,
+    SelectionKindConflictError,
     SelectionName,
     SelectionNotFoundError,
     WriteMode,
@@ -97,6 +98,7 @@ def _upsert_selection(
     s: Session,
     sel_table: str,
     items_table: str,
+    other_table: str,
     name: SelectionName,
     items: Sequence[str],
     source: str,
@@ -105,6 +107,12 @@ def _upsert_selection(
     deduped = dedupe(items)
     content_hash = _hash_selection_items(deduped)
     size = len(deduped)
+
+    if (
+        s.conn.execute(f"SELECT 1 FROM {other_table} WHERE name = ?", (name,)).fetchone()
+        is not None
+    ):
+        raise SelectionKindConflictError(name)
 
     existing = s.conn.execute(f"SELECT size FROM {sel_table} WHERE name = ?", (name,)).fetchone()
 
@@ -168,7 +176,14 @@ def upsert_axiom_selection(
         SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
     outcome = _upsert_selection(
-        s, "axiom_selections", "axiom_selection_items", name, items, source, mode
+        s,
+        "axiom_selections",
+        "axiom_selection_items",
+        "entity_selections",
+        name,
+        items,
+        source,
+        mode,
     )
     return AxiomUpsertResult(
         selection=AxiomSelection(name=name, hash=outcome.hash, size=outcome.size, source=source),
@@ -266,7 +281,14 @@ def upsert_entity_selection(
         SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
     outcome = _upsert_selection(
-        s, "entity_selections", "entity_selection_items", name, items, source, mode
+        s,
+        "entity_selections",
+        "entity_selection_items",
+        "axiom_selections",
+        name,
+        items,
+        source,
+        mode,
     )
     return EntityUpsertResult(
         selection=EntitySelection(name=name, hash=outcome.hash, size=outcome.size, source=source),
