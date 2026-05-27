@@ -74,10 +74,6 @@ class InEntitySelection(FrozenModel):
     name: SelectionName
 
 
-class AlwaysFalse(FrozenModel):
-    pass
-
-
 type EntityConstraint = (
     InIRIs
     | WithRoles
@@ -90,7 +86,6 @@ type EntityConstraint = (
     | InPositions
     | InAxiomSelection
     | InEntitySelection
-    | AlwaysFalse
 )
 
 
@@ -113,13 +108,7 @@ class HasAnyAnnotation(FrozenModel):
 
 
 type AxiomConstraint = (
-    WithTypes
-    | MentionsAll
-    | MentionsAny
-    | HasAnyAnnotation
-    | InAxiomSelection
-    | InEntitySelection
-    | AlwaysFalse
+    WithTypes | MentionsAll | MentionsAny | HasAnyAnnotation | InAxiomSelection | InEntitySelection
 )
 
 

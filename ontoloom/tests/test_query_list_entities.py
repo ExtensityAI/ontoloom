@@ -4,7 +4,6 @@ from ontoloom.axioms.mutations import add_axioms
 from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.query.constraints import AlwaysFalse
 from ontoloom.query.dispatch import run
 from ontoloom.query.list_entities import ListEntities
 
@@ -66,11 +65,6 @@ def test_run_pagination_full_walk(s):
         + run(s, ListEntities(constraints=(), limit=1, offset=2))
     )
     assert paged == full
-
-
-def test_run_always_false(s):
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert run(s, ListEntities(constraints=(AlwaysFalse(),))) == []
 
 
 def test_run_returns_iri_typed_values(s):

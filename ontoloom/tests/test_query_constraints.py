@@ -5,7 +5,6 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
-    AlwaysFalse,
     Declared,
     Deprecated,
     HasAnyAnnotation,
@@ -81,21 +80,15 @@ def test_with_iris_sorted():
     assert result.iris == tuple(sorted({A, B}))
 
 
-# -- HasRole / AlwaysFalse / nullary identity --
+# -- HasRole / nullary identity --
 
 
 def test_has_entity_role_constructs():
     assert isinstance(HasRole(), HasRole)
 
 
-def test_always_false_constructs():
-    assert isinstance(AlwaysFalse(), AlwaysFalse)
-
-
 def test_nullary_variants_distinct():
     assert HasRole() != Deprecated(state=False)
-    assert HasRole() != AlwaysFalse()
-    assert Deprecated(state=False) != AlwaysFalse()
 
 
 # -- Declared --

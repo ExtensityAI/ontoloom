@@ -23,7 +23,6 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.constraints import (
-    AlwaysFalse,
     HasAnyAnnotation,
     WithTypes,
 )
@@ -124,16 +123,6 @@ def test_run_filter_by_of_types(s, query_cls: type, run_hashes: ResultHashes):
         s,
     )
     assert result == [HashedAxiom.of(sub).hash]
-
-
-@pytest.mark.parametrize(
-    ("query_cls", "run_hashes"),
-    [(cls, runner) for _, cls, _, _, runner in TRIO],
-    ids=[ident for ident, *_ in TRIO],
-)
-def test_run_always_false(s, query_cls: type, run_hashes: ResultHashes):
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert run_hashes(_make(query_cls, constraints=(AlwaysFalse(),)), s) == []
 
 
 # ---- pagination run (paginated queries only) ---------------------------------

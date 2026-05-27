@@ -16,7 +16,6 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.constraints import (
-    AlwaysFalse,
     HasRole,
     InAxiomSelection,
     InEntitySelection,
@@ -318,7 +317,7 @@ def test_cabt_run_returns_axiom_tag_keys(s):
 
 
 # =============================================================================
-# Cross-query shape: empty ontology and AlwaysFalse short-circuit
+# Cross-query shape: empty ontology
 #
 # Parametrized because the three queries differ only in their empty-result
 # value (0 vs Counter()) — the behaviour is identical.
@@ -335,18 +334,4 @@ def test_cabt_run_returns_axiom_tag_keys(s):
     ids=["CountEntities", "CountEntitiesByRole", "CountAxiomsByType"],
 )
 def test_run_empty_ontology(s, query, empty):
-    assert run(s, query) == empty
-
-
-@pytest.mark.parametrize(
-    ("query", "empty"),
-    [
-        (CountEntities(constraints=(AlwaysFalse(),)), 0),
-        (CountEntitiesByRole(constraints=(AlwaysFalse(),)), Counter()),
-        (CountAxiomsByType(constraints=(AlwaysFalse(),)), Counter()),
-    ],
-    ids=["CountEntities", "CountEntitiesByRole", "CountAxiomsByType"],
-)
-def test_run_always_false_returns_empty(s, query, empty):
-    add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     assert run(s, query) == empty

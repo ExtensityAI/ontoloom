@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from ontoloom.entities.text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
 from ontoloom.query.constraints import (
-    AlwaysFalse,
     AxiomConstraint,
     Declared,
     Deprecated,
@@ -67,10 +66,8 @@ class Predicate:
     """An AND-joined SQL fragment with bind params.
 
     `sql == "1"` is the tautology produced when no constraints are present
-    (caller emits `WHERE 1`; SQLite folds this away). `sql == "0"` is the
-    contradiction produced by `AlwaysFalse` (caller emits `WHERE 0`; SQLite
-    short-circuits). Callers always embed `pred.sql` literally; no special-case
-    inspection of these values is needed.
+    (caller emits `WHERE 1`; SQLite folds this away). Callers always embed
+    `pred.sql` literally; no special-case inspection of this value is needed.
     """
 
     sql: str
@@ -86,8 +83,6 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
 
     for c in constraints:
         match c:
-            case AlwaysFalse():
-                return Predicate(sql="0", params=())
             case InIRIs(iris=iris):
                 placeholders = ",".join("?" for _ in iris)
                 fragments.append(f"ae.entity_iri IN ({placeholders})")
@@ -154,7 +149,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
     return Predicate(sql=" AND ".join(fragments), params=tuple(params))
 
 
-def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
+def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
     if not constraints:
         return Predicate(sql="1", params=())
 
@@ -163,8 +158,6 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # n
 
     for c in constraints:
         match c:
-            case AlwaysFalse():
-                return Predicate(sql="0", params=())
             case WithTypes(tags=tags):
                 placeholders = ",".join("?" for _ in tags)
                 fragments.append(f"a.type IN ({placeholders})")
