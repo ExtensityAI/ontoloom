@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from ontoloom.entities.text import OWL_DEPRECATED_PROPERTY
 from ontoloom.owl.axioms import Declaration
 from ontoloom.query.constraints import (
+    AnnotationTextMatches,
     AxiomConstraint,
     Declared,
     Deprecated,
@@ -62,16 +63,25 @@ NOT_DEPRECATED = (
 
 
 @dataclass(frozen=True, slots=True)
-class Predicate:
-    """An AND-joined SQL fragment with bind params.
+class RankTerm:
+    """An ORDER BY expression (relevance ranking) with its bind params."""
 
-    `sql == "1"` is the tautology produced when no constraints are present
-    (caller emits `WHERE 1`; SQLite folds this away). Callers always embed
-    `pred.sql` literally; no special-case inspection of this value is needed.
+    sql: str
+    params: tuple[object, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Predicate:
+    """An AND-joined SQL fragment with bind params, plus optional ranking.
+
+    `sql == "1"` is the empty-constraint tautology. `rank` is a list of ORDER BY
+    expressions a rank-aware query appends before its stable tiebreak; non-ranking
+    constraints leave it empty.
     """
 
     sql: str
     params: tuple[object, ...]
+    rank: tuple[RankTerm, ...] = ()
 
 
 def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  # noqa: C901
@@ -149,12 +159,13 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
     return Predicate(sql=" AND ".join(fragments), params=tuple(params))
 
 
-def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
+def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
     if not constraints:
         return Predicate(sql="1", params=())
 
     fragments: list[str] = []
     params: list[object] = []
+    rank_terms: list[RankTerm] = []
 
     for c in constraints:
         match c:
@@ -185,6 +196,30 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
                     f"WHERE at.axiom_id = a.id AND at.property IN ({placeholders}))"
                 )
                 params.extend(properties)
+            case AnnotationTextMatches(query=q, properties=properties):
+                if properties:
+                    prop_ph = ",".join("?" for _ in properties)
+                    prop_clause = f"AND at.property IN ({prop_ph}) "
+                else:
+                    prop_clause = ""
+
+                # filter: substring (contains), case-insensitive
+                fragments.append(
+                    "EXISTS (SELECT 1 FROM axiom_text at "
+                    "WHERE at.axiom_id = a.id "
+                    f"{prop_clause}AND INSTR(LOWER(at.text), ?) > 0)"
+                )
+                params.extend(properties)
+                params.append(q.lower())
+
+                # rank: exact (=) before substring
+                rank_sql = (
+                    "CASE WHEN EXISTS (SELECT 1 FROM axiom_text at "
+                    "WHERE at.axiom_id = a.id "
+                    f"{prop_clause}AND LOWER(at.text) = ?) THEN 0 ELSE 1 END"
+                )
+                rank_params = (*properties, q.lower())
+                rank_terms.append(RankTerm(sql=rank_sql, params=rank_params))
             case InAxiomSelection(name=name):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM axiom_selection_items si_w "
@@ -204,4 +239,4 @@ def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:
                 msg = f"unknown axiom constraint variant: {type(c).__name__}"
                 raise ValueError(msg)
 
-    return Predicate(sql=" AND ".join(fragments), params=tuple(params))
+    return Predicate(sql=" AND ".join(fragments), params=tuple(params), rank=tuple(rank_terms))

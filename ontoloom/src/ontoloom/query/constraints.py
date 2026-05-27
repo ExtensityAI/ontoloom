@@ -107,8 +107,19 @@ class HasAnyAnnotation(FrozenModel):
     properties: Annotated[tuple[IRI, ...], Field(min_length=1), SortedUnique]
 
 
+class AnnotationTextMatches(FrozenModel):
+    query: str
+    properties: tuple[IRI, ...] = ()
+
+
 type AxiomConstraint = (
-    WithTypes | MentionsAll | MentionsAny | HasAnyAnnotation | InAxiomSelection | InEntitySelection
+    WithTypes
+    | MentionsAll
+    | MentionsAny
+    | HasAnyAnnotation
+    | AnnotationTextMatches
+    | InAxiomSelection
+    | InEntitySelection
 )
 
 
