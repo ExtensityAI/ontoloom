@@ -5,7 +5,6 @@ from typing import Annotated
 from pydantic import AfterValidator, Field, model_validator
 
 from ontoloom.axioms.hashing import AxiomHash
-from ontoloom.errors import OntoloomError
 from ontoloom.models import FrozenModel
 from ontoloom.owl.axioms import AxiomTag
 from ontoloom.owl.iri import IRI
@@ -15,18 +14,6 @@ from ontoloom.selections.types import SelectionName
 
 # Each IRI in a MentionsAll becomes its own EXISTS subquery in the SQL plan.
 _MENTIONS_ALL_CAP = 8
-
-
-class MentionsAllOverflowError(OntoloomError):
-    """Merged MentionsAll constraints exceed the per-constraint IRI cap."""
-
-    def __init__(self, count: int, cap: int):
-        self.count = count
-        self.cap = cap
-        super().__init__(
-            f"Cannot merge MentionsAll constraints: union has {count} IRIs "
-            f"but cap is {cap}. Reduce or split the constraint set."
-        )
 
 
 def _sorted_unique[T: str](v: tuple[T, ...]) -> tuple[T, ...]:
