@@ -6,12 +6,12 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
+    AnnotationTextMatches,
     AxiomConstraint,
     HasAnyAnnotation,
 )
 from ontoloom.query.dispatch import resolve_within, run
 from ontoloom.query.find_axioms import FindAxioms
-from ontoloom.query.search_axioms import SearchAxioms
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 from ontoloom.utils import dquoted
@@ -59,22 +59,14 @@ def search_axioms(
             (resolve_within(s, within),) if within is not None else ()
         )
 
-        if query is None:
-            hashes = run(
-                s,
-                FindAxioms(
-                    constraints=(HasAnyAnnotation(properties=props_tuple), *scope),
-                ),
+        if query is not None:
+            text: tuple[AxiomConstraint, ...] = (
+                AnnotationTextMatches(query=query, properties=props_tuple),
             )
         else:
-            hashes = run(
-                s,
-                SearchAxioms(
-                    query=query,
-                    properties=props_tuple,
-                    constraints=scope,
-                ),
-            )
+            text = (HasAnyAnnotation(properties=props_tuple),)
+
+        hashes = run(s, FindAxioms(constraints=(*text, *scope)))
 
         source = _build_source(query, props_tuple, within)
         upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)

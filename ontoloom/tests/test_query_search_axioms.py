@@ -1,4 +1,8 @@
-"""Tests for the SearchAxioms query: exact-then-substring annotation-text ranking."""
+"""Tests for axiom text search via FindAxioms + AnnotationTextMatches.
+
+Exact-then-substring annotation-text ranking, expressed as the
+`AnnotationTextMatches` constraint's filter (substring) and rank (exact-first).
+"""
 
 import pytest
 from ontoloom.axioms.mutations import add_axioms
@@ -8,9 +12,9 @@ from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.query.constraints import InAxiomSelection
+from ontoloom.query.constraints import AnnotationTextMatches, InAxiomSelection
 from ontoloom.query.dispatch import run
-from ontoloom.query.search_axioms import SearchAxioms
+from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName
 
@@ -36,7 +40,7 @@ def test_search_axioms_returns_exact_then_substring(s):
     )
     add_axioms(s, [exact, substring])
 
-    result = run(s, SearchAxioms(query="TODO"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="TODO"),)))
 
     assert len(result) == 2
     assert result[0] == HashedAxiom.of(exact).hash
@@ -51,7 +55,7 @@ def test_search_axioms_substring_only(s):
     )
     add_axioms(s, [substring])
 
-    result = run(s, SearchAxioms(query="TODO"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="TODO"),)))
 
     assert len(result) == 1
     assert result[0] == HashedAxiom.of(substring).hash
@@ -65,7 +69,7 @@ def test_search_axioms_exact_match_not_duplicated_as_substring(s):
     )
     add_axioms(s, [exact])
 
-    result = run(s, SearchAxioms(query="TODO"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="TODO"),)))
 
     assert len(result) == 1
     assert result[0] == HashedAxiom.of(exact).hash
@@ -79,7 +83,7 @@ def test_search_axioms_case_insensitive(s):
     )
     add_axioms(s, [upper])
 
-    result = run(s, SearchAxioms(query="todo"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="todo"),)))
 
     assert len(result) == 1
     assert result[0] == HashedAxiom.of(upper).hash
@@ -100,7 +104,9 @@ def test_search_axioms_filters_by_properties(s):
 
     result = run(
         s,
-        SearchAxioms(query="x", properties=(IRI("rdfs:comment"),)),
+        FindAxioms(
+            constraints=(AnnotationTextMatches(query="x", properties=(IRI("rdfs:comment"),)),)
+        ),
     )
 
     assert len(result) == 1
@@ -123,7 +129,7 @@ def test_search_axioms_ranks_exact_before_substring_over_full_result(s):
     )
     add_axioms(s, [exact, *substrings])
 
-    result = run(s, SearchAxioms(query="TODO"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="TODO"),)))
 
     # Exact match ranks first (before all substring matches).
     assert result[0] == HashedAxiom.of(exact).hash
@@ -137,7 +143,7 @@ def test_search_axioms_ranks_exact_before_substring_over_full_result(s):
 
 def test_search_axioms_empty_result(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = run(s, SearchAxioms(query="nonexistent"))
+    result = run(s, FindAxioms(constraints=(AnnotationTextMatches(query="nonexistent"),)))
     assert result == []
 
 
@@ -164,7 +170,9 @@ def test_search_axioms_respects_within_selection(s):
 
     result = run(
         s,
-        SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),)),
+        FindAxioms(
+            constraints=(AnnotationTextMatches(query="TODO"), InAxiomSelection(name=ref)),
+        ),
     )
 
     assert len(result) == 1
@@ -177,4 +185,9 @@ def test_search_axioms_missing_selection_raises(s):
     ref = SelectionName("does_not_exist")
 
     with pytest.raises(SelectionNotFoundError):
-        run(s, SearchAxioms(query="TODO", constraints=(InAxiomSelection(name=ref),)))
+        run(
+            s,
+            FindAxioms(
+                constraints=(AnnotationTextMatches(query="TODO"), InAxiomSelection(name=ref)),
+            ),
+        )
