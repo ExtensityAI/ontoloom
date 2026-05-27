@@ -12,7 +12,9 @@ import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
+from ontoloom.owl.iri import IRI
 from ontoloom.selections.types import (
     AxiomSelection,
     AxiomSelectionListing,
@@ -63,36 +65,92 @@ def _hash_selection_items(items: list[str]) -> SelectionContentHash:
     return SelectionContentHash(hashlib.sha256(content.encode()).hexdigest()[:16])
 
 
+@dataclass(frozen=True, slots=True)
+class _UpsertOutcome:
+    hash: SelectionContentHash
+    size: int
+    previous_size: int | None
+
+
+def _get_selection_row(s: Session, table: str, name: SelectionName) -> tuple[str, int, str] | None:
+    return s.conn.execute(
+        f"SELECT hash, size, source FROM {table} WHERE name = ?", (name,)
+    ).fetchone()
+
+
+def _selection_exists(s: Session, table: str, name: SelectionName) -> bool:
+    row = s.conn.execute(f"SELECT 1 FROM {table} WHERE name = ?", (name,)).fetchone()
+    return row is not None
+
+
+def _get_items(s: Session, items_table: str, name: SelectionName) -> list[str]:
+    return [
+        r[0]
+        for r in s.conn.execute(
+            f"SELECT item FROM {items_table} WHERE selection_name = ? ORDER BY id",
+            (name,),
+        )
+    ]
+
+
+def _upsert_selection(
+    s: Session,
+    sel_table: str,
+    items_table: str,
+    name: SelectionName,
+    items: Sequence[str],
+    source: str,
+    mode: WriteMode,
+) -> _UpsertOutcome:
+    deduped = dedupe(items)
+    content_hash = _hash_selection_items(deduped)
+    size = len(deduped)
+
+    existing = s.conn.execute(f"SELECT size FROM {sel_table} WHERE name = ?", (name,)).fetchone()
+
+    if existing is not None and mode is WriteMode.CREATE:
+        raise SelectionExistsError(name, existing[0])
+
+    s.conn.execute(f"DELETE FROM {items_table} WHERE selection_name = ?", (name,))
+    s.conn.execute(f"DELETE FROM {sel_table} WHERE name = ?", (name,))
+    s.conn.execute(
+        f"INSERT INTO {sel_table} (name, hash, size, source) VALUES (?, ?, ?, ?)",
+        (name, content_hash, size, source),
+    )
+
+    if deduped:
+        s.conn.executemany(
+            f"INSERT INTO {items_table} (selection_name, item) VALUES (?, ?)",
+            [(name, item) for item in deduped],
+        )
+
+    return _UpsertOutcome(
+        hash=content_hash, size=size, previous_size=existing[0] if existing else None
+    )
+
+
 # -- Axiom-side --
 
 
 def get_axiom_selection(s: Session, name: SelectionName) -> AxiomSelection:
     """Fetch axiom-selection metadata. Raises SelectionNotFoundError if absent."""
-    row = s.conn.execute(
-        "SELECT hash, size, source FROM axiom_selections WHERE name = ?", (name,)
-    ).fetchone()
+    row = _get_selection_row(s, "axiom_selections", name)
 
     if row is None:
         raise SelectionNotFoundError(name)
 
-    return AxiomSelection(
-        name=name,
-        hash=SelectionContentHash(row[0]),
-        size=row[1],
-        source=row[2],
-    )
+    return AxiomSelection(name=name, hash=SelectionContentHash(row[0]), size=row[1], source=row[2])
 
 
 def axiom_selection_exists(s: Session, name: SelectionName) -> bool:
     """True iff an axiom-selection row with the given name exists."""
-    row = s.conn.execute("SELECT 1 FROM axiom_selections WHERE name = ?", (name,)).fetchone()
-    return row is not None
+    return _selection_exists(s, "axiom_selections", name)
 
 
 def upsert_axiom_selection(
     s: Session,
     name: SelectionName,
-    items: Sequence[str],
+    items: Sequence[AxiomHash],
     source: str,
     mode: WriteMode = WriteMode.CREATE,
 ) -> AxiomUpsertResult:
@@ -109,38 +167,12 @@ def upsert_axiom_selection(
     Raises:
         SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
-    deduped = dedupe(items)
-    content_hash = _hash_selection_items(deduped)
-    size = len(deduped)
-
-    existing = s.conn.execute(
-        "SELECT size FROM axiom_selections WHERE name = ?", (name,)
-    ).fetchone()
-
-    if existing is not None and mode is WriteMode.CREATE:
-        raise SelectionExistsError(name, existing[0])
-
-    s.conn.execute("DELETE FROM axiom_selection_items WHERE selection_name = ?", (name,))
-    s.conn.execute("DELETE FROM axiom_selections WHERE name = ?", (name,))
-    s.conn.execute(
-        "INSERT INTO axiom_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
-        (name, content_hash, size, source),
+    outcome = _upsert_selection(
+        s, "axiom_selections", "axiom_selection_items", name, items, source, mode
     )
-
-    if deduped:
-        s.conn.executemany(
-            "INSERT INTO axiom_selection_items (selection_name, item) VALUES (?, ?)",
-            [(name, item) for item in deduped],
-        )
-
     return AxiomUpsertResult(
-        selection=AxiomSelection(
-            name=name,
-            hash=content_hash,
-            size=size,
-            source=source,
-        ),
-        previous_size=existing[0] if existing else None,
+        selection=AxiomSelection(name=name, hash=outcome.hash, size=outcome.size, source=source),
+        previous_size=outcome.previous_size,
     )
 
 
@@ -190,15 +222,9 @@ def remove_axiom_selections(
     return _remove_named(s, "axiom_selections", bare_names)
 
 
-def get_axiom_selection_items(s: Session, name: SelectionName) -> list[str]:
-    """Read the items of an axiom selection in insertion order."""
-    return [
-        r[0]
-        for r in s.conn.execute(
-            "SELECT item FROM axiom_selection_items WHERE selection_name = ? ORDER BY id",
-            (name,),
-        )
-    ]
+def get_axiom_selection_items(s: Session, name: SelectionName) -> list[AxiomHash]:
+    """Read the items of an axiom selection in insertion order, parsed to AxiomHash."""
+    return [AxiomHash(item) for item in _get_items(s, "axiom_selection_items", name)]
 
 
 # -- Entity-side (mirror) --
@@ -206,31 +232,23 @@ def get_axiom_selection_items(s: Session, name: SelectionName) -> list[str]:
 
 def get_entity_selection(s: Session, name: SelectionName) -> EntitySelection:
     """Fetch entity-selection metadata. Raises SelectionNotFoundError if absent."""
-    row = s.conn.execute(
-        "SELECT hash, size, source FROM entity_selections WHERE name = ?", (name,)
-    ).fetchone()
+    row = _get_selection_row(s, "entity_selections", name)
 
     if row is None:
         raise SelectionNotFoundError(name)
 
-    return EntitySelection(
-        name=name,
-        hash=SelectionContentHash(row[0]),
-        size=row[1],
-        source=row[2],
-    )
+    return EntitySelection(name=name, hash=SelectionContentHash(row[0]), size=row[1], source=row[2])
 
 
 def entity_selection_exists(s: Session, name: SelectionName) -> bool:
     """True iff an entity-selection row with the given name exists."""
-    row = s.conn.execute("SELECT 1 FROM entity_selections WHERE name = ?", (name,)).fetchone()
-    return row is not None
+    return _selection_exists(s, "entity_selections", name)
 
 
 def upsert_entity_selection(
     s: Session,
     name: SelectionName,
-    items: Sequence[str],
+    items: Sequence[IRI],
     source: str,
     mode: WriteMode = WriteMode.CREATE,
 ) -> EntityUpsertResult:
@@ -247,38 +265,12 @@ def upsert_entity_selection(
     Raises:
         SelectionExistsError: `mode=CREATE` and the name is already in use.
     """
-    deduped = dedupe(items)
-    content_hash = _hash_selection_items(deduped)
-    size = len(deduped)
-
-    existing = s.conn.execute(
-        "SELECT size FROM entity_selections WHERE name = ?", (name,)
-    ).fetchone()
-
-    if existing is not None and mode is WriteMode.CREATE:
-        raise SelectionExistsError(name, existing[0])
-
-    s.conn.execute("DELETE FROM entity_selection_items WHERE selection_name = ?", (name,))
-    s.conn.execute("DELETE FROM entity_selections WHERE name = ?", (name,))
-    s.conn.execute(
-        "INSERT INTO entity_selections (name, hash, size, source) VALUES (?, ?, ?, ?)",
-        (name, content_hash, size, source),
+    outcome = _upsert_selection(
+        s, "entity_selections", "entity_selection_items", name, items, source, mode
     )
-
-    if deduped:
-        s.conn.executemany(
-            "INSERT INTO entity_selection_items (selection_name, item) VALUES (?, ?)",
-            [(name, item) for item in deduped],
-        )
-
     return EntityUpsertResult(
-        selection=EntitySelection(
-            name=name,
-            hash=content_hash,
-            size=size,
-            source=source,
-        ),
-        previous_size=existing[0] if existing else None,
+        selection=EntitySelection(name=name, hash=outcome.hash, size=outcome.size, source=source),
+        previous_size=outcome.previous_size,
     )
 
 
@@ -331,15 +323,9 @@ def remove_entity_selections(
     return _remove_named(s, "entity_selections", bare_names)
 
 
-def get_entity_selection_items(s: Session, name: SelectionName) -> list[str]:
-    """Read the items of an entity selection in insertion order."""
-    return [
-        r[0]
-        for r in s.conn.execute(
-            "SELECT item FROM entity_selection_items WHERE selection_name = ? ORDER BY id",
-            (name,),
-        )
-    ]
+def get_entity_selection_items(s: Session, name: SelectionName) -> list[IRI]:
+    """Read the items of an entity selection in insertion order, parsed to IRI."""
+    return [IRI(item) for item in _get_items(s, "entity_selection_items", name)]
 
 
 # -- shared low-level helper --

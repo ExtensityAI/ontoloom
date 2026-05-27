@@ -69,7 +69,9 @@ class FindDuplicateEntities(Query[DuplicateResult]):
         groups = tuple(
             DuplicateGroup(value=value, iris=tuple(iris)) for value, iris in sorted_pairs
         )
-        affected = tuple(dict.fromkeys(iri for group in groups for iri in group.iris))
+        affected = tuple(
+            IRI(iri) for iri in dict.fromkeys(iri for group in groups for iri in group.iris)
+        )
 
         return DuplicateResult(
             groups=groups,

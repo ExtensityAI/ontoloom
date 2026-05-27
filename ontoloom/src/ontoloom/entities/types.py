@@ -85,4 +85,4 @@ class DuplicateGroup:
 class DuplicateResult:
     groups: tuple[DuplicateGroup, ...]
     total_groups: int
-    affected_iris: tuple[str, ...]
+    affected_iris: tuple[IRI, ...]

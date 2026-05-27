@@ -1,6 +1,6 @@
 """Evaluate `AxiomSetExpr` / `EntitySetExpr` trees and persist the result."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
@@ -45,7 +45,7 @@ from ontoloom.selections.types import (
     SetOp,
     WriteMode,
 )
-from ontoloom.utils import dquoted
+from ontoloom.utils import difference_ordered, dquoted, intersect_ordered, union_ordered
 
 
 def create_axiom_selection(
@@ -76,56 +76,57 @@ def create_entity_selection(
     return upsert_entity_selection(s, name.bare, items, auto_source, mode=mode)
 
 
-def _eval_axiom_expr(s: Session, expr: AxiomSetExpr) -> list[str]:
+def _eval_axiom_expr(s: Session, expr: AxiomSetExpr) -> list[AxiomHash]:
     match expr:
         case AxiomSelectionName():
             if not axiom_selection_exists(s, expr.bare):
                 raise SelectionNotFoundError(expr.bare)
-            return list(get_axiom_selection_items(s, expr.bare))
+
+            return get_axiom_selection_items(s, expr.bare)
         case AxiomUnionExpr():
-            return _combine_axioms(s, expr.union, SetOp.UNION)
+            return _combine(s, expr.union, SetOp.UNION, _eval_axiom_expr)
         case AxiomIntersectExpr():
-            return _combine_axioms(s, expr.intersect, SetOp.INTERSECTION)
+            return _combine(s, expr.intersect, SetOp.INTERSECTION, _eval_axiom_expr)
         case AxiomDiffExpr():
-            return _combine_axioms(s, expr.diff, SetOp.DIFFERENCE)
+            return _combine(s, expr.diff, SetOp.DIFFERENCE, _eval_axiom_expr)
         case AxiomsForExpr():
             entity_items = _eval_entity_expr(s, expr.axioms_for)
-            return list(_axioms_for(s, entity_items))
+            return _axioms_for(s, entity_items)
         case _:
             msg = f"Unknown AxiomSetExpr variant: {type(expr).__name__}"
             raise ValueError(msg)
 
 
-def _eval_entity_expr(s: Session, expr: EntitySetExpr) -> list[str]:
+def _eval_entity_expr(s: Session, expr: EntitySetExpr) -> list[IRI]:
     match expr:
         case EntitySelectionName():
             if not entity_selection_exists(s, expr.bare):
                 raise SelectionNotFoundError(expr.bare)
-            return list(get_entity_selection_items(s, expr.bare))
+
+            return get_entity_selection_items(s, expr.bare)
         case EntityUnionExpr():
-            return _combine_entities(s, expr.union, SetOp.UNION)
+            return _combine(s, expr.union, SetOp.UNION, _eval_entity_expr)
         case EntityIntersectExpr():
-            return _combine_entities(s, expr.intersect, SetOp.INTERSECTION)
+            return _combine(s, expr.intersect, SetOp.INTERSECTION, _eval_entity_expr)
         case EntityDiffExpr():
-            return _combine_entities(s, expr.diff, SetOp.DIFFERENCE)
+            return _combine(s, expr.diff, SetOp.DIFFERENCE, _eval_entity_expr)
         case EntitiesInExpr():
             axiom_items = _eval_axiom_expr(s, expr.entities_in)
-            return list(_entities_in(s, axiom_items, expr.position))
+            return _entities_in(s, axiom_items, expr.position)
         case _:
             msg = f"Unknown EntitySetExpr variant: {type(expr).__name__}"
             raise ValueError(msg)
 
 
-def _combine_axioms(s: Session, operands: Sequence[AxiomSetExpr], op: SetOp) -> list[str]:
+def _combine[X, E: str](
+    s: Session,
+    operands: Sequence[X],
+    op: SetOp,
+    eval_fn: Callable[[Session, X], list[E]],
+) -> list[E]:
     _check_arity(op, len(operands))
-    results = [_eval_axiom_expr(s, sub) for sub in operands]
-    return sorted(_apply_set_op(results, op))
-
-
-def _combine_entities(s: Session, operands: Sequence[EntitySetExpr], op: SetOp) -> list[str]:
-    _check_arity(op, len(operands))
-    results = [_eval_entity_expr(s, sub) for sub in operands]
-    return sorted(_apply_set_op(results, op))
+    results = [eval_fn(s, sub) for sub in operands]
+    return _apply_set_op(results, op)
 
 
 def _check_arity(op: SetOp, count: int):
@@ -138,45 +139,35 @@ def _check_arity(op: SetOp, count: int):
         raise SelectionExprError(msg)
 
 
-def _apply_set_op(results: Sequence[Sequence[str]], op: SetOp) -> set[str]:
+def _apply_set_op[E: str](results: Sequence[Sequence[E]], op: SetOp) -> list[E]:
     match op:
         case SetOp.UNION:
-            items: set[str] = set()
-            for op_items in results:
-                items |= set(op_items)
-            return items
+            return union_ordered(*results)
         case SetOp.INTERSECTION:
-            items = set(results[0])
-            for op_items in results[1:]:
-                items &= set(op_items)
-            return items
+            return intersect_ordered(results[0], *results[1:])
         case SetOp.DIFFERENCE:
-            items = set(results[0])
-            for op_items in results[1:]:
-                items -= set(op_items)
-            return items
+            return difference_ordered(results[0], *results[1:])
         case _:
             msg = f"Unknown set operation: {op}"
             raise ValueError(msg)
 
 
-def _axioms_for(s: Session, entity_iris: Sequence[str]) -> list[AxiomHash]:
+def _axioms_for(s: Session, entity_iris: Sequence[IRI]) -> list[AxiomHash]:
     if not entity_iris:
         return []
-    return run(
-        s,
-        ListAxiomHashes(
-            constraints=(MentionsAny(iris=tuple(IRI(i) for i in entity_iris)),),
-        ),
-    )
+
+    return run(s, ListAxiomHashes(constraints=(MentionsAny(iris=tuple(entity_iris)),)))
 
 
-def _entities_in(s: Session, axiom_hashes: Sequence[str], field: Position | None) -> list[IRI]:
+def _entities_in(
+    s: Session, axiom_hashes: Sequence[AxiomHash], field: Position | None
+) -> list[IRI]:
     if not axiom_hashes:
         return []
-    constraints: list[EntityConstraint] = [
-        MentionedIn(hashes=tuple(AxiomHash(h) for h in axiom_hashes))
-    ]
+
+    constraints: list[EntityConstraint] = [MentionedIn(hashes=tuple(axiom_hashes))]
+
     if field is not None:
         constraints.append(InPositions(positions=(field,)))
+
     return run(s, ListEntities(constraints=tuple(constraints)))
