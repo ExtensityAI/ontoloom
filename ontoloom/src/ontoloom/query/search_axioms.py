@@ -26,7 +26,6 @@ RANK_SUBSTRING = 1
 @dataclass(frozen=True, slots=True)
 class SearchAxiomsHit:
     hash: AxiomHash
-    rank: int  # 0 = exact, 1 = substring
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +57,7 @@ class SearchAxioms(HasAxiomConstraints, HasPagination, Query[SearchAxiomsResult]
     def _run(self, s: Session) -> SearchAxiomsResult:
         page = self.render()
         rows = s.conn.execute(page.sql, page.params).fetchall()
-        hits = tuple(SearchAxiomsHit(hash=AxiomHash(h), rank=r) for h, r in rows)
+        hits = tuple(SearchAxiomsHit(hash=AxiomHash(h)) for h, _rank in rows)
 
         count = _render_count(self)
         total = s.conn.execute(count.sql, count.params).fetchone()[0]

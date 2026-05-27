@@ -43,9 +43,7 @@ def test_search_axioms_returns_exact_then_substring(s):
     assert len(result.hits) == 2
     assert all(isinstance(h, SearchAxiomsHit) for h in result.hits)
     assert result.hits[0].hash == HashedAxiom.of(exact).hash
-    assert result.hits[0].rank == 0
     assert result.hits[1].hash == HashedAxiom.of(substring).hash
-    assert result.hits[1].rank == 1
 
 
 def test_search_axioms_substring_only(s):
@@ -60,7 +58,6 @@ def test_search_axioms_substring_only(s):
 
     assert result.total == 1
     assert result.hits[0].hash == HashedAxiom.of(substring).hash
-    assert result.hits[0].rank == 1
 
 
 def test_search_axioms_exact_match_not_duplicated_as_substring(s):
@@ -74,7 +71,7 @@ def test_search_axioms_exact_match_not_duplicated_as_substring(s):
     result = run(s, SearchAxioms(query="TODO", limit=10))
 
     assert result.total == 1
-    assert result.hits[0].rank == 0
+    assert result.hits[0].hash == HashedAxiom.of(exact).hash
 
 
 def test_search_axioms_case_insensitive(s):
@@ -88,7 +85,7 @@ def test_search_axioms_case_insensitive(s):
     result = run(s, SearchAxioms(query="todo", limit=10))
 
     assert result.total == 1
-    assert result.hits[0].rank == 0
+    assert result.hits[0].hash == HashedAxiom.of(upper).hash
 
 
 def test_search_axioms_filters_by_properties(s):
@@ -141,10 +138,8 @@ def test_search_axioms_paginates_after_rank(s):
     assert len(page2.hits) == 2
     assert len(page3.hits) == 2
 
-    # Exact match is first.
-    assert page1.hits[0].rank == 0
-    # All other hits are substring (rank=1).
-    assert all(h.rank == 1 for h in (*page1.hits[1:], *page2.hits, *page3.hits))
+    # Exact match ranks first (before all substring matches).
+    assert page1.hits[0].hash == HashedAxiom.of(exact).hash
 
     all_hashes = [h.hash for h in (*page1.hits, *page2.hits, *page3.hits)]
     assert len(set(all_hashes)) == 6
