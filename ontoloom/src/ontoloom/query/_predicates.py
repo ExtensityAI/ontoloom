@@ -15,6 +15,7 @@ from ontoloom.query.constraints import (
     Declared,
     Deprecated,
     EntityConstraint,
+    EntityTextMatches,
     HasAnyAnnotation,
     HasAnyProperty,
     HasRole,
@@ -90,6 +91,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
 
     fragments: list[str] = []
     params: list[object] = []
+    rank_terms: list[RankTerm] = []
 
     for c in constraints:
         match c:
@@ -137,6 +139,46 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                 placeholders = ",".join("?" for _ in positions)
                 fragments.append(f"ae.position IN ({placeholders})")
                 params.extend(positions)
+            case EntityTextMatches(query=q, properties=properties):
+                ql = q.lower()
+
+                if properties:
+                    ann_scope = "IN (" + ",".join("?" for _ in properties) + ")"
+                else:
+                    ann_scope = "!= 'local_name'"
+
+                def _ln(op: str) -> str:
+                    return (
+                        "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
+                        f"AND et.property = 'local_name' AND {op})"
+                    )
+
+                def _ann(op: str, scope: str = ann_scope) -> str:
+                    return (
+                        "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
+                        f"AND et.property {scope} AND {op})"
+                    )
+
+                ln_contains = _ln("INSTR(LOWER(et.text), ?) > 0")
+                ln_exact = _ln("LOWER(et.text) = ?")
+                ann_contains = _ann("INSTR(LOWER(et.text), ?) > 0")
+                ann_exact = _ann("LOWER(et.text) = ?")
+
+                # filter: matched local-name or annotation as substring (case-insensitive)
+                fragments.append(f"({ln_contains} OR {ann_contains})")
+                params.append(ql)  # ln_contains
+                params.extend(properties)  # ann_contains scope
+                params.append(ql)  # ann_contains
+
+                # rank: single ordinal CASE, ordered WHENs (first match wins).
+                # local-name claims the source; quality is taken within it.
+                rank_sql = (
+                    f"CASE WHEN {ln_exact} THEN 0 "
+                    f"WHEN {ln_contains} THEN 2 "
+                    f"WHEN {ann_exact} THEN 1 ELSE 3 END"
+                )
+                rank_params = (ql, ql, *properties, ql)  # ln_exact, ln_contains, ann_exact
+                rank_terms.append(RankTerm(sql=rank_sql, params=rank_params))
             case InEntitySelection(name=name):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM entity_selection_items si_w "
@@ -156,7 +198,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                 msg = f"unknown entity constraint variant: {type(c).__name__}"
                 raise ValueError(msg)
 
-    return Predicate(sql=" AND ".join(fragments), params=tuple(params))
+    return Predicate(sql=" AND ".join(fragments), params=tuple(params), rank=tuple(rank_terms))
 
 
 def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901

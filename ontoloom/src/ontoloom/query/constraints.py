@@ -66,6 +66,11 @@ class InPositions(FrozenModel):
     positions: Annotated[tuple[Position, ...], Field(min_length=1), SortedUnique]
 
 
+class EntityTextMatches(FrozenModel):
+    query: str
+    properties: tuple[IRI, ...] = ()
+
+
 class InAxiomSelection(FrozenModel):
     name: SelectionName
 
@@ -84,6 +89,7 @@ type EntityConstraint = (
     | HasAnyProperty
     | MentionedIn
     | InPositions
+    | EntityTextMatches
     | InAxiomSelection
     | InEntitySelection
 )
