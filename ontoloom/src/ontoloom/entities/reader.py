@@ -155,7 +155,7 @@ def search_entities(
     return execute(s, FindEntities(constraints=constraints))
 
 
-def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
+def summarize_entities(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
     constraints: tuple[EntityConstraint, ...] = (
         HasRole(),
         *((resolve_within(s, within),) if within is not None else ()),
@@ -219,7 +219,7 @@ def _build_entity_constraints(
     return tuple(constraints)
 
 
-def undeclared_entity_count(
+def count_undeclared_entities(
     s: Session,
     within: SelectionName | None = None,
     *,

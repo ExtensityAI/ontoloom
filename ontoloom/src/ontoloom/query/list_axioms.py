@@ -4,7 +4,7 @@ from typing import override
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
-from ontoloom.query._predicates import _axiom_predicates
+from ontoloom.query._predicates import build_axiom_predicate
 from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasAxiomConstraints
 
@@ -12,7 +12,7 @@ from ontoloom.query.constraints import HasAxiomConstraints
 class ListAxioms(HasAxiomConstraints, Query[list[tuple[AxiomHash, str]]]):
     @override
     def render(self) -> RenderedSql:
-        pred = _axiom_predicates(self.constraints)
+        pred = build_axiom_predicate(self.constraints)
         sql = f"SELECT a.hash, json(a.data) FROM axioms a WHERE {pred.sql} ORDER BY a.hash"
         return RenderedSql(sql=sql, params=pred.params)
 

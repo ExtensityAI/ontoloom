@@ -69,7 +69,7 @@ def remove_prefix(s: Session, name: PrefixName):
     s.conn.execute("DELETE FROM prefixes WHERE name = ?", (name,))
 
 
-def prefix_usage_counts(s: Session) -> dict[PrefixName, int]:
+def count_prefix_usage(s: Session) -> dict[PrefixName, int]:
     """Count how many distinct entities use each registered prefix namespace."""
     registered = list_prefixes(s)
     db_counts = {

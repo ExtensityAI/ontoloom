@@ -41,10 +41,10 @@ def _walk_model(model: FrozenModel, position: Position | None) -> Iterator[Entit
         if name in _SKIP:
             continue
         field_pos = find_marker(info, Position) or position  # explicit marker beats inherited
-        yield from _walk_value(getattr(model, name), _field_kind(info), field_pos)
+        yield from _walk_value(getattr(model, name), resolve_field_kind(info), field_pos)
 
 
-def _field_kind(info: FieldInfo) -> EntityType | None:
+def resolve_field_kind(info: FieldInfo) -> EntityType | None:
     return find_marker(info, EntityType) or _peel_entity_type(info.annotation)
 
 

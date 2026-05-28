@@ -1,4 +1,4 @@
-"""Tests for `undeclared_entity_count`.
+"""Tests for `count_undeclared_entities`.
 
 Verifies the post-migration semantics: only IRIs that appear in entity-role
 positions (i.e. carry a role in `axiom_entities`) are counted. IRIs that
@@ -6,7 +6,7 @@ appear only as annotation values (role=None) are excluded.
 """
 
 from ontoloom.axioms.mutations import add_axioms
-from ontoloom.entities.reader import undeclared_entity_count
+from ontoloom.entities.reader import count_undeclared_entities
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
@@ -38,7 +38,7 @@ def test_undeclared_count_excludes_annotation_only_iris(s):
 
     # Only ex:Undeclared satisfies (HasRole AND no Declaration).
     # ex:OnlyAsAnnotationValue has role=None, so it is excluded.
-    assert undeclared_entity_count(s) == 1
+    assert count_undeclared_entities(s) == 1
 
 
 def test_undeclared_count_excludes_annotation_assertion_value_iri(s):
@@ -59,7 +59,7 @@ def test_undeclared_count_excludes_annotation_assertion_value_iri(s):
     # ex:Dog: declared. ex:Referenced: role=None (annotation value). rdfs:seeAlso:
     # appears as an annotation property (role=ANNOTATION_PROPERTY) but is
     # undeclared. Expected count: 1 (rdfs:seeAlso only).
-    assert undeclared_entity_count(s) == 1
+    assert count_undeclared_entities(s) == 1
 
 
 def test_undeclared_count_zero_when_all_role_iris_declared(s):
@@ -71,7 +71,7 @@ def test_undeclared_count_zero_when_all_role_iris_declared(s):
         ],
     )
 
-    assert undeclared_entity_count(s) == 0
+    assert count_undeclared_entities(s) == 0
 
 
 def test_undeclared_count_deprecated_excluded_by_default(s):
@@ -97,6 +97,6 @@ def test_undeclared_count_deprecated_excluded_by_default(s):
     )
 
     # By default the deprecated entity is excluded.
-    assert undeclared_entity_count(s, exclude_deprecated=True) == 0
+    assert count_undeclared_entities(s, exclude_deprecated=True) == 0
     # Including deprecated should surface it.
-    assert undeclared_entity_count(s, exclude_deprecated=False) == 1
+    assert count_undeclared_entities(s, exclude_deprecated=False) == 1

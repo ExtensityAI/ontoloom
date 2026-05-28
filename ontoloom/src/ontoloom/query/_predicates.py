@@ -85,7 +85,7 @@ class Predicate:
     rank: tuple[RankTerm, ...] = ()
 
 
-def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  # noqa: C901
+def build_entity_predicate(constraints: Sequence[EntityConstraint]) -> Predicate:  # noqa: C901
     if not constraints:
         return Predicate(sql="1", params=())
 
@@ -147,22 +147,22 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
                 else:
                     ann_scope = "!= 'local_name'"
 
-                def _ln(op: str) -> str:
+                def _local_name_exists(op: str) -> str:
                     return (
                         "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
                         f"AND et.property = 'local_name' AND {op})"
                     )
 
-                def _ann(op: str, scope: str = ann_scope) -> str:
+                def _annotation_exists(op: str, scope: str = ann_scope) -> str:
                     return (
                         "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
                         f"AND et.property {scope} AND {op})"
                     )
 
-                ln_contains = _ln("INSTR(LOWER(et.text), ?) > 0")
-                ln_exact = _ln("LOWER(et.text) = ?")
-                ann_contains = _ann("INSTR(LOWER(et.text), ?) > 0")
-                ann_exact = _ann("LOWER(et.text) = ?")
+                ln_contains = _local_name_exists("INSTR(LOWER(et.text), ?) > 0")
+                ln_exact = _local_name_exists("LOWER(et.text) = ?")
+                ann_contains = _annotation_exists("INSTR(LOWER(et.text), ?) > 0")
+                ann_exact = _annotation_exists("LOWER(et.text) = ?")
 
                 # filter: matched local-name or annotation as substring (case-insensitive)
                 fragments.append(f"({ln_contains} OR {ann_contains})")
@@ -201,7 +201,7 @@ def _entity_predicates(constraints: Sequence[EntityConstraint]) -> Predicate:  #
     return Predicate(sql=" AND ".join(fragments), params=tuple(params), rank=tuple(rank_terms))
 
 
-def _axiom_predicates(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
+def build_axiom_predicate(constraints: Sequence[AxiomConstraint]) -> Predicate:  # noqa: C901
     if not constraints:
         return Predicate(sql="1", params=())
 

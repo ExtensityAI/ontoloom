@@ -4,7 +4,7 @@ from typing import override
 
 from ontoloom.connection import Session
 from ontoloom.owl.iri import IRI
-from ontoloom.query._predicates import _entity_predicates
+from ontoloom.query._predicates import build_entity_predicate
 from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasEntityConstraints
 
@@ -12,7 +12,7 @@ from ontoloom.query.constraints import HasEntityConstraints
 class FindEntities(HasEntityConstraints, Query[list[IRI]]):
     @override
     def render(self) -> RenderedSql:
-        pred = _entity_predicates(self.constraints)
+        pred = build_entity_predicate(self.constraints)
         order_terms = [rt.sql for rt in pred.rank] + ["ae.entity_iri"]
         sql = (
             f"SELECT DISTINCT ae.entity_iri FROM axiom_entities ae WHERE {pred.sql} "

@@ -47,8 +47,8 @@ from ontoloom.owl.iri import IRI
 from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType, Position
 from ontoloom.prefixes.store import (
+    count_prefix_usage,
     list_prefixes,
-    prefix_usage_counts,
     remove_prefix,
     set_prefix,
 )
@@ -549,7 +549,7 @@ def test_prefix_usage_counts(s):
         ],
     )
 
-    counts = prefix_usage_counts(s)
+    counts = count_prefix_usage(s)
     assert counts[EX] == 2
     assert counts[PrefixName("other")] == 1
     assert counts[PrefixName("unused")] == 0

@@ -62,7 +62,7 @@ class AxiomHash(TypedStr):
         return normalized
 
 
-def disambiguating_prefixes(hashes: Sequence[str]) -> list[str]:
+def compute_disambiguating_prefixes(hashes: Sequence[str]) -> list[str]:
     """Shortest prefix of each input string that uniquely identifies it. Order-preserving."""
     if len(hashes) == 1:
         return [hashes[0]]
@@ -149,7 +149,7 @@ def resolve_hash_prefix(s: Session, prefix: AxiomHashPrefix) -> AxiomHash:
         raise AxiomNotFoundError(prefix)
     if len(rows) > 1:
         full_hashes = [r[0] for r in rows]
-        raise AmbiguousHashError(prefix, len(rows), disambiguating_prefixes(full_hashes))
+        raise AmbiguousHashError(prefix, len(rows), compute_disambiguating_prefixes(full_hashes))
     return AxiomHash(rows[0][0])
 
 

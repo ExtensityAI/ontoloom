@@ -3,7 +3,7 @@
 from typing import override
 
 from ontoloom.connection import Session
-from ontoloom.query._predicates import _entity_predicates
+from ontoloom.query._predicates import build_entity_predicate
 from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasEntityConstraints
 
@@ -11,7 +11,7 @@ from ontoloom.query.constraints import HasEntityConstraints
 class CountEntities(HasEntityConstraints, Query[int]):
     @override
     def render(self) -> RenderedSql:
-        pred = _entity_predicates(self.constraints)
+        pred = build_entity_predicate(self.constraints)
         sql = f"SELECT COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae WHERE {pred.sql}"
         return RenderedSql(sql=sql, params=pred.params)
 

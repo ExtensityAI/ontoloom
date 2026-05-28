@@ -224,12 +224,12 @@ def _substitute_iri(axiom: BaseAxiom, old_iri: IRI, new_iri: IRI) -> BaseAxiom:
     Only IRI-typed fields are substituted; plain str fields (e.g. LangLiteral.value,
     TypedLiteral.value) are left unchanged even if they coincidentally equal old_iri.
     """
-    # cast is correct by construction: _sub returns the same shape it received,
-    # and pyright can't model that without overloads for every input type.
-    return cast("BaseAxiom", _sub(axiom, old_iri, new_iri))
+    # cast is correct by construction: _substitute_value returns the same shape it
+    # received, and pyright can't model that without overloads for every input type.
+    return cast("BaseAxiom", _substitute_value(axiom, old_iri, new_iri))
 
 
-def _sub(value: object, old_iri: IRI, new_iri: IRI):
+def _substitute_value(value: object, old_iri: IRI, new_iri: IRI):
     """Recursively rebuild `value`, replacing every IRI equal to `old_iri` with `new_iri`.
 
     Walks IRIs directly, tuples element-wise, and FrozenModel fields by name.
@@ -237,12 +237,12 @@ def _sub(value: object, old_iri: IRI, new_iri: IRI):
     if isinstance(value, IRI):
         return new_iri if value == old_iri else value
     if isinstance(value, tuple):
-        return tuple(_sub(v, old_iri, new_iri) for v in value)
+        return tuple(_substitute_value(v, old_iri, new_iri) for v in value)
     if isinstance(value, FrozenModel):
         updates = {}
         for name in type(value).model_fields:
             v = getattr(value, name)
-            replaced = _sub(v, old_iri, new_iri)
+            replaced = _substitute_value(v, old_iri, new_iri)
             if replaced is not v:
                 updates[name] = replaced
         return value.model_copy(update=updates) if updates else value

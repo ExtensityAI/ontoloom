@@ -20,7 +20,7 @@ from ontoloom.selections.types import (
 _EXISTS_FRAGMENT = "EXISTS (SELECT 1 FROM axiom_entities ae WHERE ae.entity_iri = si.item)"
 
 
-def _show_filter_clause(show: ShowFilter) -> str:
+def build_show_filter_clause(show: ShowFilter) -> str:
     match show:
         case ShowFilter.ALL:
             return ""
@@ -58,7 +58,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
         ]
         params: list[object] = [self.selection]
 
-        filter_clause = _show_filter_clause(self.show)
+        filter_clause = build_show_filter_clause(self.show)
         if filter_clause:
             sql_parts.append(filter_clause.lstrip())
 
@@ -71,7 +71,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
         name = self.selection
         meta = get_entity_selection(s, name)
 
-        filter_clause = _show_filter_clause(self.show)
+        filter_clause = build_show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(
             f"SELECT COUNT(*) FROM entity_selection_items si "

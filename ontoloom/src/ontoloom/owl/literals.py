@@ -6,7 +6,13 @@ from typing import Annotated, override
 
 from pydantic import Field
 
-from ontoloom.models import FrozenModel, TypedStr, make_tag_resolver, tagged, tagged_union_meta
+from ontoloom.models import (
+    FrozenModel,
+    TypedStr,
+    make_tag_resolver,
+    tagged,
+    tagged_union_meta,
+)
 from ontoloom.owl.markers import Unordered
 from ontoloom.utils import dquoted
 

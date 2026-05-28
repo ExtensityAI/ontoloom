@@ -1,4 +1,4 @@
-from ontoloom.axioms.hashing import HASH_DISPLAY_LEN, disambiguating_prefixes
+from ontoloom.axioms.hashing import HASH_DISPLAY_LEN, compute_disambiguating_prefixes
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.canonical import canonical_json
 from ontoloom.connection import Ontology, session
@@ -350,22 +350,22 @@ def test_truncate_hash_uses_display_len():
 
 def test_min_distinguishing_prefixes_single():
     h = "abcdef0123"
-    assert disambiguating_prefixes([h]) == [h]
+    assert compute_disambiguating_prefixes([h]) == [h]
 
 
 def test_min_distinguishing_prefixes_disjoint():
     # All hashes diverge at the first character -> each gets a 1-char prefix.
-    assert disambiguating_prefixes(["abcd", "bcde", "cdef"]) == ["a", "b", "c"]
+    assert compute_disambiguating_prefixes(["abcd", "bcde", "cdef"]) == ["a", "b", "c"]
 
 
 def test_min_distinguishing_prefixes_shared_prefix():
     # "a3f1b2c4" and "a3f1c5d6" share "a3f1"; need 5 chars to disambiguate.
     # "a3a2..." diverges at char 2, so 3 chars suffice.
-    out = disambiguating_prefixes(["a3f1b2c4", "a3f1c5d6", "a3a2ffff"])
+    out = compute_disambiguating_prefixes(["a3f1b2c4", "a3f1c5d6", "a3a2ffff"])
     assert out == ["a3f1b", "a3f1c", "a3a"]
 
 
 def test_min_distinguishing_prefixes_preserves_input_order():
     # Input order is preserved; only distinguishing length is computed.
-    out = disambiguating_prefixes(["zzz9", "aaa1", "aaa2"])
+    out = compute_disambiguating_prefixes(["zzz9", "aaa1", "aaa2"])
     assert out == ["z", "aaa1", "aaa2"]

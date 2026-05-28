@@ -5,7 +5,7 @@ from typing import override
 
 from ontoloom.connection import Session
 from ontoloom.owl.markers import EntityType
-from ontoloom.query._predicates import _entity_predicates
+from ontoloom.query._predicates import build_entity_predicate
 from ontoloom.query.base import Query, RenderedSql
 from ontoloom.query.constraints import HasEntityConstraints
 
@@ -13,7 +13,7 @@ from ontoloom.query.constraints import HasEntityConstraints
 class CountEntitiesByRole(HasEntityConstraints, Query[Counter[EntityType]]):
     @override
     def render(self) -> RenderedSql:
-        pred = _entity_predicates(self.constraints)
+        pred = build_entity_predicate(self.constraints)
         sql = (
             "SELECT ae.role, COUNT(DISTINCT ae.entity_iri) FROM axiom_entities ae "
             f"WHERE {pred.sql} AND ae.role IS NOT NULL "

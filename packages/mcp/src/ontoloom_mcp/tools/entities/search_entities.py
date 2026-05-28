@@ -84,18 +84,20 @@ def search_entities(
         sel = upserted.selection
 
         if not iris:
-            no_results = _no_results_msg(query, role, namespace, declared, properties or (), within)
+            no_results = build_no_results_message(
+                query, role, namespace, declared, properties or (), within
+            )
             s.commit()
             return f"0 entities -> {format_selection_ref(sel)}.\n{no_results}"
 
         limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = _preview_page(s, iris, limit_n)
+        page = build_preview_page(s, iris, limit_n)
         page_text = _format_entity_search_page(page)
 
         result = format_selection_result(upserted, page_text)
 
         if within is not None:
-            result += "\n" + _within_metadata(s, within)
+            result += "\n" + build_within_metadata(s, within)
 
         s.commit()
 
@@ -105,7 +107,7 @@ def search_entities(
 _EMPTY_DISPLAY = EntityDisplay(roles=frozenset(), annotations=())
 
 
-def _preview_page(s: Session, iris: list[IRI], limit: int) -> EntitySearchPage:
+def build_preview_page(s: Session, iris: list[IRI], limit: int) -> EntitySearchPage:
     """Slice the ranked IRI list in memory and attach display data for the preview."""
     preview = iris[:limit]
     display = batch_fetch_entity_display(s, [str(i) for i in preview])
@@ -124,7 +126,7 @@ def _preview_page(s: Session, iris: list[IRI], limit: int) -> EntitySearchPage:
     )
 
 
-def _within_metadata(s: Session, within: SelectionName):
+def build_within_metadata(s: Session, within: SelectionName):
     constraint = resolve_within(s, within)
 
     if isinstance(constraint, InAxiomSelection):
@@ -135,7 +137,7 @@ def _within_metadata(s: Session, within: SelectionName):
     return f"\nWithin selection {format_selection_ref(ent)} (entities, {ent.size} items)"
 
 
-def _filter_parts(
+def build_filter_parts(
     query: str | None,
     role: EntityType | None,
     namespace: PrefixName | None,
@@ -159,7 +161,7 @@ def _filter_parts(
     return parts
 
 
-def _no_results_msg(
+def build_no_results_message(
     query: str | None,
     role: EntityType | None,
     namespace: PrefixName | None,
@@ -167,7 +169,7 @@ def _no_results_msg(
     properties: Sequence[IRI],
     within: SelectionName | None,
 ):
-    parts = _filter_parts(query, role, namespace, declared, properties, within)
+    parts = build_filter_parts(query, role, namespace, declared, properties, within)
     desc = ", ".join(parts) if parts else "no filters"
     return f"No entities found ({desc})."
 
@@ -180,7 +182,7 @@ def _build_source(
     properties: Sequence[IRI],
     within: SelectionName | None,
 ):
-    parts = _filter_parts(query, role, namespace, declared, properties, within)
+    parts = build_filter_parts(query, role, namespace, declared, properties, within)
     return f"search_entities({', '.join(parts)})"
 
 

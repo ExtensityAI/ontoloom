@@ -6,7 +6,7 @@ from ontoloom.query.dispatch import execute, resolve_within
 from ontoloom.selections.types import SelectionName
 
 
-def axiom_summary(
+def summarize_axioms(
     s: Session,
     *,
     within: SelectionName | None = None,

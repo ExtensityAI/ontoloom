@@ -1,16 +1,14 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.reader import axiom_summary as compute_axiom_summary
+from ontoloom.axioms.reader import summarize_axioms
 from ontoloom.axioms.types import AxiomSummary
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.projections import top_entities_by_axiom_count
+from ontoloom.entities.projections import find_top_entities_by_axiom_count
 from ontoloom.entities.reader import (
-    entity_summary as compute_entity_summary,
-)
-from ontoloom.entities.reader import (
-    undeclared_entity_count,
+    count_undeclared_entities,
+    summarize_entities,
 )
 from ontoloom.entities.types import EntitySummary
-from ontoloom.prefixes.store import list_prefixes, prefix_usage_counts
+from ontoloom.prefixes.store import count_prefix_usage, list_prefixes
 from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import resolve_within
 from ontoloom.selections.store import get_axiom_selection, get_entity_selection
@@ -38,8 +36,8 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
     """
     ont = Ontology(path)
     with session(ont) as s:
-        ax_summary = compute_axiom_summary(s, within=within)
-        ent_summary = compute_entity_summary(s, within=within)
+        ax_summary = summarize_axioms(s, within=within)
+        ent_summary = summarize_entities(s, within=within)
         prefix_map = list_prefixes(s)
 
         parts = []
@@ -58,8 +56,8 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
 
         # `excl` matches `search_entities(declared=False)` (exclude_deprecated=True);
         # `incl` is the raw count for transparency.
-        undeclared_excl = undeclared_entity_count(s, within, exclude_deprecated=True)
-        undeclared_incl = undeclared_entity_count(s, within, exclude_deprecated=False)
+        undeclared_excl = count_undeclared_entities(s, within, exclude_deprecated=True)
+        undeclared_incl = count_undeclared_entities(s, within, exclude_deprecated=False)
         if undeclared_incl > 0:
             base = (
                 f"Undeclared references: {undeclared_excl} entities appear in axioms "
@@ -69,7 +67,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
                 base += f" ({undeclared_incl} including deprecated)"
             parts.append(base + ".")
 
-        top_rows = top_entities_by_axiom_count(s, _TOP_ENTITIES)
+        top_rows = find_top_entities_by_axiom_count(s, _TOP_ENTITIES)
         if top_rows:
             top_refs = build_refs(s, [iri for iri, _ in top_rows])
             top_lines = [f"Top {len(top_rows)} entities by axiom count:"]
@@ -79,7 +77,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
 
         if within is None:
             if prefix_map:
-                usage = prefix_usage_counts(s)
+                usage = count_prefix_usage(s)
                 prefix_lines = ["Prefixes:"]
                 for name, iri in sorted(prefix_map.items()):
                     count = usage.get(name, 0)

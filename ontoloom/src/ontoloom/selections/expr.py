@@ -1,7 +1,7 @@
 """Set expressions over selections — a single kind-agnostic grammar.
 
 Leaves are bare selection names (`SelectionName`); kind is resolved during
-evaluation (`compose.eval_set_expr`), not encoded in the wire form. Set ops
+evaluation (`compose.evaluate_set_expr`), not encoded in the wire form. Set ops
 (`union`/`intersect`/`diff`) require all operands to resolve to the same kind;
 the cross-kind operators `axioms_for` (entities -> axioms) and `entities_in`
 (axioms -> entities) flip kind.

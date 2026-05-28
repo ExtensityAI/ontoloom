@@ -52,7 +52,7 @@ def create_selection_from_expr(
     mode: WriteMode = WriteMode.CREATE,
 ) -> AxiomUpsertResult | EntityUpsertResult:
     """Evaluate a set-expr and persist the result under `name`, kind inferred from the expr."""
-    kind, items = eval_set_expr(s, expr)
+    kind, items = evaluate_set_expr(s, expr)
     auto_source = str(expr)
 
     if kind is SelectionKind.AXIOMS:
@@ -63,7 +63,7 @@ def create_selection_from_expr(
     return upsert_entity_selection(s, name, [IRI(i) for i in items], auto_source, mode=mode)
 
 
-def eval_set_expr(s: Session, expr: SetExpr) -> tuple[SelectionKind, list[str]]:  # noqa: C901
+def evaluate_set_expr(s: Session, expr: SetExpr) -> tuple[SelectionKind, list[str]]:  # noqa: C901
     match expr:
         case SelectionName():
             if axiom_selection_exists(s, expr):
@@ -80,22 +80,22 @@ def eval_set_expr(s: Session, expr: SetExpr) -> tuple[SelectionKind, list[str]]:
         case DiffExpr():
             return _combine(s, expr.diff, SetOp.DIFFERENCE)
         case AxiomsForExpr():
-            kind, items = eval_set_expr(s, expr.axioms_for)
+            kind, items = evaluate_set_expr(s, expr.axioms_for)
 
             if kind is not SelectionKind.ENTITIES:
                 msg = "axioms_for requires an entity-producing operand."
                 raise SelectionExprError(msg)
 
-            return SelectionKind.AXIOMS, list(_axioms_for(s, [IRI(i) for i in items]))
+            return SelectionKind.AXIOMS, list(find_axioms_for(s, [IRI(i) for i in items]))
         case EntitiesInExpr():
-            kind, items = eval_set_expr(s, expr.entities_in)
+            kind, items = evaluate_set_expr(s, expr.entities_in)
 
             if kind is not SelectionKind.AXIOMS:
                 msg = "entities_in requires an axiom-producing operand."
                 raise SelectionExprError(msg)
 
             return SelectionKind.ENTITIES, list(
-                _entities_in(s, [AxiomHash(i) for i in items], expr.position)
+                find_entities_in(s, [AxiomHash(i) for i in items], expr.position)
             )
         case _:
             msg = f"Unknown SetExpr variant: {type(expr).__name__}"
@@ -104,7 +104,7 @@ def eval_set_expr(s: Session, expr: SetExpr) -> tuple[SelectionKind, list[str]]:
 
 def _combine(s: Session, operands: Sequence[SetExpr], op: SetOp) -> tuple[SelectionKind, list[str]]:
     _check_arity(op, len(operands))
-    evaluated = [eval_set_expr(s, sub) for sub in operands]
+    evaluated = [evaluate_set_expr(s, sub) for sub in operands]
     kinds = {kind for kind, _ in evaluated}
 
     if len(kinds) > 1:
@@ -138,14 +138,14 @@ def _apply_set_op[E: str](results: Sequence[Sequence[E]], op: SetOp) -> list[E]:
             raise ValueError(msg)
 
 
-def _axioms_for(s: Session, entity_iris: Sequence[IRI]) -> list[AxiomHash]:
+def find_axioms_for(s: Session, entity_iris: Sequence[IRI]) -> list[AxiomHash]:
     if not entity_iris:
         return []
 
     return execute(s, FindAxioms(constraints=(MentionsAny(iris=tuple(entity_iris)),)))
 
 
-def _entities_in(
+def find_entities_in(
     s: Session, axiom_hashes: Sequence[AxiomHash], field: Position | None
 ) -> list[IRI]:
     if not axiom_hashes:

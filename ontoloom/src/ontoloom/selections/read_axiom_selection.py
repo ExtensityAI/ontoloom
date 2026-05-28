@@ -17,7 +17,7 @@ from ontoloom.selections.types import (
 )
 
 
-def _show_filter_clause(show: ShowFilter) -> str:
+def build_show_filter_clause(show: ShowFilter) -> str:
     match show:
         case ShowFilter.ALL:
             return ""
@@ -55,7 +55,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
         ]
         params: list[object] = [self.selection]
 
-        filter_clause = _show_filter_clause(self.show)
+        filter_clause = build_show_filter_clause(self.show)
         if filter_clause:
             sql_parts.append(filter_clause.lstrip())
 
@@ -68,7 +68,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
         name = self.selection
         meta = get_axiom_selection(s, name)
 
-        filter_clause = _show_filter_clause(self.show)
+        filter_clause = build_show_filter_clause(self.show)
 
         total_filtered = s.conn.execute(
             "SELECT COUNT(*) FROM axiom_selection_items si "

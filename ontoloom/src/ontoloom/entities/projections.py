@@ -4,8 +4,8 @@ These reads are deliberately not in the DSL — they project from a third table
 (`entity_text`) that the DSL does not model. Adding them to the query DSL would
 extend the predicate dispatcher to configurable column aliases and a new
 projection tier for a small number of call sites. The bespoke-aggregation
-allowlist in CLAUDE.md covers this surface alongside `prefix_usage_counts` and
-`top_entities_by_axiom_count`.
+allowlist in CLAUDE.md covers this surface alongside `count_prefix_usage` and
+`find_top_entities_by_axiom_count`.
 """
 
 from ontoloom.connection import Session
@@ -46,7 +46,7 @@ def batch_fetch_entity_display(s: Session, iris: list[str]) -> dict[str, EntityD
     }
 
 
-def top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
+def find_top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
     """Top n entities by number of distinct axioms they appear in."""
     return [
         (IRI(row[0]), row[1])
