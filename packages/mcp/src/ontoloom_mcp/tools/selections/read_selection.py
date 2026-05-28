@@ -1,7 +1,7 @@
 from mcp.types import ToolAnnotations
 from ontoloom.axioms.hashing import short_hash
 from ontoloom.connection import Ontology, session
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import axiom_selection_exists, entity_selection_exists
@@ -41,14 +41,14 @@ def read_selection(
     ont = Ontology(path)
     with session(ont) as s:
         if axiom_selection_exists(s, name):
-            page_ax: AxiomSelectionPage = run(
+            page_ax: AxiomSelectionPage = execute(
                 s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
             )
             s.commit()
             return _format_axiom_page(page_ax, offset=offset, show=show)
 
         if entity_selection_exists(s, name):
-            page_ent: EntitySelectionPage = run(
+            page_ent: EntitySelectionPage = execute(
                 s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
             )
             s.commit()

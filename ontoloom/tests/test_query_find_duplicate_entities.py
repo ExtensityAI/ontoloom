@@ -7,7 +7,7 @@ from ontoloom.owl.axioms import AnnotationAssertion, Declaration
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import BCP47Tag, LangLiteral
 from ontoloom.owl.markers import EntityType
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.selections.store import upsert_entity_selection
 from ontoloom.selections.types import SelectionName
 from pydantic import ValidationError
@@ -57,7 +57,7 @@ def test_field_validator_accepts_within():
 
 
 def test_run_empty_ontology(s):
-    result = run(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
+    result = execute(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
     assert result.groups == ()
     assert result.total_groups == 0
     assert result.affected_iris == ()
@@ -73,7 +73,7 @@ def test_run_no_duplicates(s):
             _label("ex:B", "Beta"),
         ],
     )
-    result = run(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
+    result = execute(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
     assert result.groups == ()
     assert result.total_groups == 0
 
@@ -88,7 +88,7 @@ def test_run_one_duplicate_group(s):
             _label("ex:B", "Same"),
         ],
     )
-    result = run(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
+    result = execute(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
     assert result.total_groups == 1
     assert len(result.groups) == 1
     group = result.groups[0]
@@ -113,7 +113,7 @@ def test_run_groups_sorted_by_size_desc(s):
             _label("ex:E", "Triple"),
         ],
     )
-    result = run(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
+    result = execute(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
     assert result.total_groups == 2
     assert result.groups[0].value == "Triple"
     assert len(result.groups[0].iris) == 3
@@ -135,7 +135,7 @@ def test_run_scoped_to_entity_selection(s):
     )
     upsert_entity_selection(s, SelectionName("scope"), ["ex:A", "ex:B"], "test")
 
-    result = run(
+    result = execute(
         s,
         FindDuplicateEntities(
             annotation_property=IRI(RDFS_LABEL),
@@ -162,6 +162,6 @@ def test_run_affected_iris_has_no_duplicates(s):
             _label("ex:D", "Group2"),
         ],
     )
-    result = run(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
+    result = execute(s, FindDuplicateEntities(annotation_property=IRI(RDFS_LABEL)))
     assert len(result.affected_iris) == len(set(result.affected_iris))
     assert set(result.affected_iris) == {"ex:A", "ex:B", "ex:C", "ex:D"}

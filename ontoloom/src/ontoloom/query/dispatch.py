@@ -1,4 +1,4 @@
-"""Public `run()` — verifies selection-scope constraint refs, then delegates to `_run`.
+"""Public `execute()` — verifies selection-scope constraint refs, then delegates to `_run`.
 
 `selection` / `within` fields on a query are the query's own responsibility:
 each `_run` calls `get_*_selection` upfront on any such ref so a missing
@@ -53,6 +53,6 @@ def _verify_in_selection_refs[T](s: Session, q: Query[T]) -> None:
                 continue
 
 
-def run[T](s: Session, q: Query[T]) -> T:
+def execute[T](s: Session, q: Query[T]) -> T:
     _verify_in_selection_refs(s, q)
     return q._run(s)

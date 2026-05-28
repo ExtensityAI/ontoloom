@@ -307,7 +307,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
     Ontology.create(db_path)
     script = textwrap.dedent(f"""\
         from pathlib import Path
-        from ontoloom.query.dispatch import run
+        from ontoloom.query.dispatch import execute
         from ontoloom.selections.compose import create_selection_from_expr
         from ontoloom.selections.expr import IntersectExpr
         from ontoloom.selections.store import upsert_entity_selection
@@ -323,7 +323,7 @@ def test_selection_pagination_stable_across_processes(tmp_path):
                 ["ex:Z", "ex:A", "ex:M", "ex:R", "ex:C"], "src", mode=WriteMode.REPLACE)
             r = SelectionName("r")
             create_selection_from_expr(s, SelectionName("r"), IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))), mode=WriteMode.REPLACE)
-            page = run(s, ReadEntitySelection(selection=r, limit=5))
+            page = execute(s, ReadEntitySelection(selection=r, limit=5))
             print(",".join(item.iri for item in page.items))
             s.commit()
     """)

@@ -12,7 +12,7 @@ from ontoloom.query.constraints import (
     MentionedIn,
     MentionsAny,
 )
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.find_entities import FindEntities
 from ontoloom.selections.expr import (
@@ -142,7 +142,7 @@ def _axioms_for(s: Session, entity_iris: Sequence[IRI]) -> list[AxiomHash]:
     if not entity_iris:
         return []
 
-    return run(s, FindAxioms(constraints=(MentionsAny(iris=tuple(entity_iris)),)))
+    return execute(s, FindAxioms(constraints=(MentionsAny(iris=tuple(entity_iris)),)))
 
 
 def _entities_in(
@@ -156,4 +156,4 @@ def _entities_in(
     if field is not None:
         constraints.append(InPositions(positions=(field,)))
 
-    return run(s, FindEntities(constraints=tuple(constraints)))
+    return execute(s, FindEntities(constraints=tuple(constraints)))

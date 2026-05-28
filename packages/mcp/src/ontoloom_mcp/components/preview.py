@@ -2,7 +2,7 @@
 
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Session
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.store import AxiomUpsertResult
 from ontoloom.selections.types import ShowFilter
@@ -30,7 +30,7 @@ def format_axiom_selection_preview(
     if limit is not None:
         page_size = min(page_size, limit)
 
-    page = run(
+    page = execute(
         s,
         ReadAxiomSelection(
             selection=sel.name,

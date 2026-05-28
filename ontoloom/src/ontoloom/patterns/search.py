@@ -23,7 +23,7 @@ from ontoloom.query.constraints import (
     MentionsAll,
     WithTypes,
 )
-from ontoloom.query.dispatch import resolve_within, run
+from ontoloom.query.dispatch import execute, resolve_within
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.types import SelectionName
 
@@ -128,7 +128,7 @@ def _iter_candidates(
     if within is not None:
         constraints.append(resolve_within(s, within))
 
-    return run(s, StreamAxioms(constraints=tuple(constraints)))
+    return execute(s, StreamAxioms(constraints=tuple(constraints)))
 
 
 def _extract_concrete_iris(pattern: BasePattern) -> list[str]:

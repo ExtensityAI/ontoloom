@@ -24,7 +24,7 @@ from ontoloom.owl.literals import LangLiteral, TypedLiteral
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.store import check_iri_prefixes
 from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection, MentionsAll
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import SelectionName
@@ -268,7 +268,7 @@ def rename_iri(
     if within is not None:
         constraints.append(InAxiomSelection(name=within))
 
-    rows = list(run(s, ListAxioms(constraints=tuple(constraints))))
+    rows = list(execute(s, ListAxioms(constraints=tuple(constraints))))
 
     for old_full_hash, old_json_data in rows:
         try:

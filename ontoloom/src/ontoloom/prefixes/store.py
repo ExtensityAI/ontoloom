@@ -13,7 +13,7 @@ from ontoloom.prefixes.types import (
 )
 from ontoloom.query.constraints import InNamespaces
 from ontoloom.query.count_entities import CountEntities
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +47,7 @@ def set_prefix(s: Session, name: PrefixName, iri: NamespaceIRI) -> SetPrefixResu
     in_use_count = 0
 
     if previous_iri is not None and previous_iri != iri:
-        in_use_count = run(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
+        in_use_count = execute(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
 
     s.conn.execute(
         "INSERT INTO prefixes (name, namespace_iri) VALUES (?, ?) "
@@ -62,7 +62,7 @@ def remove_prefix(s: Session, name: PrefixName):
     if row is None:
         raise PrefixNotFoundError(name)
 
-    count = run(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
+    count = execute(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
     if count > 0:
         raise PrefixInUseError(name, count)
 

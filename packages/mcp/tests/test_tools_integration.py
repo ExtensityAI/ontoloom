@@ -593,12 +593,12 @@ def _make_dogs_selection(path):
 
 
 def _count_axioms(path):
-    from ontoloom.query.dispatch import run
+    from ontoloom.query.dispatch import execute
     from ontoloom.query.list_axioms import ListAxioms
 
     ont = Ontology(path)
     with session(ont) as s:
-        count = len(run(s, ListAxioms(constraints=())))
+        count = len(execute(s, ListAxioms(constraints=())))
         s.commit()
     return count
 
@@ -668,13 +668,13 @@ def test_remove_axioms_by_selection_stale_token_re_previews(populated_db):
 
 
 def test_remove_axioms_by_hashes_removes_without_confirmation(populated_db):
-    from ontoloom.query.dispatch import run
+    from ontoloom.query.dispatch import execute
     from ontoloom.query.list_axioms import ListAxioms
     from ontoloom_mcp.tools.axioms.remove_axioms import ByHashes
 
     ont = Ontology(populated_db)
     with session(ont) as s:
-        first_hash = run(s, ListAxioms(constraints=()))[0][0]
+        first_hash = execute(s, ListAxioms(constraints=()))[0][0]
         s.commit()
     before = _count_axioms(populated_db)
 

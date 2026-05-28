@@ -26,7 +26,7 @@ from ontoloom.query.constraints import (
     HasAnyAnnotation,
     WithTypes,
 )
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.query.stream_axioms import StreamAxioms
@@ -40,15 +40,15 @@ ResultHashes = Callable[[Any, Session], list[AxiomHash]]
 
 
 def _find_axioms_hashes(q: FindAxioms, s: Session) -> list[AxiomHash]:
-    return run(s, q)
+    return execute(s, q)
 
 
 def _list_axioms_hashes(q: ListAxioms, s: Session) -> list[AxiomHash]:
-    return [h for h, _ in run(s, q)]
+    return [h for h, _ in execute(s, q)]
 
 
 def _stream_axioms_hashes(q: StreamAxioms, s: Session) -> list[AxiomHash]:
-    with run(s, q) as it:
+    with execute(s, q) as it:
         return [h for h, _ in it]
 
 
@@ -127,7 +127,7 @@ def test_run_filter_by_of_types(s, query_cls: type, run_hashes: ResultHashes):
 def test_list_axioms_run_returns_hash_and_json(s):
     decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     add_axioms(s, [decl])
-    result = run(s, ListAxioms(constraints=()))
+    result = execute(s, ListAxioms(constraints=()))
     assert len(result) == 1
     h, data = result[0]
     assert isinstance(h, AxiomHash)
@@ -144,7 +144,7 @@ def test_list_axioms_run_returns_hash_and_json(s):
 def test_stream_run_yields_hash_and_json(s):
     decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
     add_axioms(s, [decl])
-    with run(s, StreamAxioms(constraints=())) as it:
+    with execute(s, StreamAxioms(constraints=())) as it:
         rows = list(it)
     assert len(rows) == 1
     h, data = rows[0]
@@ -159,7 +159,7 @@ def test_stream_run_early_break_closes_cleanly(s):
     add_axioms(s, decls)
 
     seen: list[AxiomHash] = []
-    with run(s, StreamAxioms(constraints=())) as it:
+    with execute(s, StreamAxioms(constraints=())) as it:
         for h, _ in it:
             seen.append(h)
             if len(seen) == 3:
@@ -167,7 +167,7 @@ def test_stream_run_early_break_closes_cleanly(s):
 
     assert len(seen) == 3
     # The session must remain usable after early break.
-    with run(s, StreamAxioms(constraints=())) as it2:
+    with execute(s, StreamAxioms(constraints=())) as it2:
         assert sum(1 for _ in it2) == 10
 
 
@@ -178,7 +178,7 @@ def test_stream_run_iteration_lazy_within_with_block(s):
         Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:C")),
     ]
     add_axioms(s, decls)
-    with run(s, StreamAxioms(constraints=())) as it:
+    with execute(s, StreamAxioms(constraints=())) as it:
         first = next(it)
         rest = list(it)
     assert isinstance(first[0], AxiomHash)
@@ -210,7 +210,7 @@ def test_run_has_any_annotation_existence(s):
         super_class=IRI("ex:Animal"),
     )
     add_axioms(s, [sourced, commented, unannotated])
-    result = run(
+    result = execute(
         s,
         FindAxioms(
             constraints=(HasAnyAnnotation(properties=(IRI("rdfs:isDefinedBy"),)),),

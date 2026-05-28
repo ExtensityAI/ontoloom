@@ -28,7 +28,7 @@ from ontoloom.query.constraints import (
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
 from ontoloom.selections.types import SelectionName
 
@@ -39,7 +39,7 @@ from ontoloom.selections.types import SelectionName
 
 def test_ce_run_single_declaration(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    assert run(s, CountEntities(constraints=())) == 1
+    assert execute(s, CountEntities(constraints=())) == 1
 
 
 def test_ce_run_multiple_role_filter(s):
@@ -51,9 +51,12 @@ def test_ce_run_multiple_role_filter(s):
             Declaration(entity_type=EntityType.OBJECT_PROPERTY, iri=IRI("ex:hasOwner")),
         ],
     )
-    assert run(s, CountEntities(constraints=(HasRole(),))) == 3
-    assert run(s, CountEntities(constraints=(WithRoles(roles=(EntityType.CLASS,)),))) == 2
-    assert run(s, CountEntities(constraints=(WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),))) == 1
+    assert execute(s, CountEntities(constraints=(HasRole(),))) == 3
+    assert execute(s, CountEntities(constraints=(WithRoles(roles=(EntityType.CLASS,)),))) == 2
+    assert (
+        execute(s, CountEntities(constraints=(WithRoles(roles=(EntityType.OBJECT_PROPERTY,)),)))
+        == 1
+    )
 
 
 def test_ce_run_in_selection_entities(s):
@@ -72,7 +75,7 @@ def test_ce_run_in_selection_entities(s):
         source="test",
     )
     ref = SelectionName("dogs_and_cats")
-    assert run(s, CountEntities(constraints=(InEntitySelection(name=ref),))) == 2
+    assert execute(s, CountEntities(constraints=(InEntitySelection(name=ref),))) == 2
 
 
 def test_ce_run_in_selection_axioms(s):
@@ -86,7 +89,7 @@ def test_ce_run_in_selection_axioms(s):
         source="test",
     )
     ref = SelectionName("dog_only")
-    assert run(s, CountEntities(constraints=(InAxiomSelection(name=ref),))) == 1
+    assert execute(s, CountEntities(constraints=(InAxiomSelection(name=ref),))) == 1
 
 
 def test_ce_run_namespace_filter(s):
@@ -97,9 +100,11 @@ def test_ce_run_namespace_filter(s):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("other:Fish")),
         ],
     )
-    assert run(s, CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))) == 1
     assert (
-        run(
+        execute(s, CountEntities(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),))) == 1
+    )
+    assert (
+        execute(
             s,
             CountEntities(
                 constraints=(InNamespaces(namespaces=(PrefixName("ex"), PrefixName("other"))),)
@@ -127,7 +132,7 @@ def test_cebr_run_groups_by_role(s):
             Declaration(entity_type=EntityType.NAMED_INDIVIDUAL, iri=IRI("ex:rex")),
         ],
     )
-    result = run(s, CountEntitiesByRole(constraints=()))
+    result = execute(s, CountEntitiesByRole(constraints=()))
     assert result == Counter(
         {
             EntityType.CLASS: 3,
@@ -140,7 +145,7 @@ def test_cebr_run_groups_by_role(s):
 
 def test_cebr_run_returns_entity_type_keys(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = run(s, CountEntitiesByRole(constraints=()))
+    result = execute(s, CountEntitiesByRole(constraints=()))
     assert len(result) == 1
     key = next(iter(result))
     assert isinstance(key, EntityType)
@@ -170,7 +175,7 @@ def test_cebr_run_excludes_iris_appearing_only_in_non_role_positions(s):
             ),
         ],
     )
-    result = run(s, CountEntitiesByRole(constraints=()))
+    result = execute(s, CountEntitiesByRole(constraints=()))
     # 2 classes (Dog, Cat). `ex:OnlyAsAnnotationValue` has no role so does
     # not appear under any key. `rdfs:seeAlso` carries role=ANNOTATION_PROPERTY.
     assert result[EntityType.CLASS] == 2
@@ -188,7 +193,7 @@ def test_cebr_run_filtered_by_namespace(s):
             Declaration(entity_type=EntityType.OBJECT_PROPERTY, iri=IRI("ex:hasOwner")),
         ],
     )
-    result = run(
+    result = execute(
         s,
         CountEntitiesByRole(constraints=(InNamespaces(namespaces=(PrefixName("ex"),)),)),
     )
@@ -211,7 +216,7 @@ def test_cabt_run_groups_by_type(s):
             SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")),
         ],
     )
-    result = run(s, CountAxiomsByType(constraints=()))
+    result = execute(s, CountAxiomsByType(constraints=()))
     assert result == Counter({AxiomTag.DECLARATION: 3, AxiomTag.SUB_CLASS_OF: 2})
 
 
@@ -223,7 +228,7 @@ def test_cabt_run_filter_by_of_types(s):
             SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
         ],
     )
-    result = run(s, CountAxiomsByType(constraints=(WithTypes(tags=(AxiomTag.SUB_CLASS_OF,)),)))
+    result = execute(s, CountAxiomsByType(constraints=(WithTypes(tags=(AxiomTag.SUB_CLASS_OF,)),)))
     assert result == Counter({AxiomTag.SUB_CLASS_OF: 1})
 
 
@@ -236,7 +241,7 @@ def test_cabt_run_mentions_all_requires_all_iris_present(s):
             SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Mammal")),
         ],
     )
-    result = run(
+    result = execute(
         s,
         CountAxiomsByType(constraints=(MentionsAll(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)),
     )
@@ -252,7 +257,7 @@ def test_cabt_run_mentions_any_any_of_iris(s):
             SubClassOf(sub_class=IRI("ex:Fish"), super_class=IRI("ex:Vertebrate")),
         ],
     )
-    result = run(
+    result = execute(
         s,
         CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Cat"))),)),
     )
@@ -262,7 +267,7 @@ def test_cabt_run_mentions_any_any_of_iris(s):
 def test_cabt_run_count_star_no_row_multiplicity_with_mentions_any(s):
     # An axiom mentioning BOTH iris in a MentionsAny list must still count once.
     add_axioms(s, [SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))])
-    result = run(
+    result = execute(
         s,
         CountAxiomsByType(constraints=(MentionsAny(iris=(IRI("ex:Dog"), IRI("ex:Animal"))),)),
     )
@@ -281,7 +286,7 @@ def test_cabt_run_in_selection_axioms(s):
         source="test",
     )
     ref = SelectionName("axiom_pair")
-    result = run(s, CountAxiomsByType(constraints=(InAxiomSelection(name=ref),)))
+    result = execute(s, CountAxiomsByType(constraints=(InAxiomSelection(name=ref),)))
     assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
 
 
@@ -301,7 +306,7 @@ def test_cabt_run_in_selection_entities(s):
         source="test",
     )
     ref = SelectionName("dog_only")
-    result = run(s, CountAxiomsByType(constraints=(InEntitySelection(name=ref),)))
+    result = execute(s, CountAxiomsByType(constraints=(InEntitySelection(name=ref),)))
     # Dog declaration mentions ex:Dog; SubClassOf mentions ex:Dog.
     # Cat declaration does not mention ex:Dog.
     assert result == Counter({AxiomTag.DECLARATION: 1, AxiomTag.SUB_CLASS_OF: 1})
@@ -309,7 +314,7 @@ def test_cabt_run_in_selection_entities(s):
 
 def test_cabt_run_returns_axiom_tag_keys(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
-    result = run(s, CountAxiomsByType(constraints=()))
+    result = execute(s, CountAxiomsByType(constraints=()))
     assert len(result) == 1
     key = next(iter(result))
     assert isinstance(key, AxiomTag)
@@ -334,4 +339,4 @@ def test_cabt_run_returns_axiom_tag_keys(s):
     ids=["CountEntities", "CountEntitiesByRole", "CountAxiomsByType"],
 )
 def test_run_empty_ontology(s, query, empty):
-    assert run(s, query) == empty
+    assert execute(s, query) == empty

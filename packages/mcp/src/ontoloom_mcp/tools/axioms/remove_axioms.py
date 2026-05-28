@@ -9,7 +9,7 @@ from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.query.constraints import InAxiomSelection
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import SelectionName
@@ -68,7 +68,7 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
                 token = confirmation_token("remove_axioms", name, meta.hash, str(meta.size))
 
                 if confirm != token:
-                    rows = run(s, ListAxioms(constraints=(InAxiomSelection(name=name),)))
+                    rows = execute(s, ListAxioms(constraints=(InAxiomSelection(name=name),)))
                     entries = [
                         ("-", HashedAxiom(axiom=load_axiom(data), hash=h)) for h, data in rows
                     ]

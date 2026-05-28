@@ -30,7 +30,7 @@ from ontoloom.query.constraints import (
 from ontoloom.query.count_axioms_by_type import CountAxiomsByType
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.count_entities_by_role import CountEntitiesByRole
-from ontoloom.query.dispatch import resolve_within, run
+from ontoloom.query.dispatch import execute, resolve_within
 from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.query.find_entities import FindEntities
 from ontoloom.selections.types import SelectionName
@@ -99,7 +99,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
         MentionsAll(iris=(iri,)),
         *((InAxiomSelection(name=within),) if within is not None else ()),
     )
-    axiom_counts = run(s, CountAxiomsByType(constraints=axiom_count_constraints))
+    axiom_counts = execute(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
     if not roles and not annotations and not axiom_counts:
         near = search_entities(s, query=iri.local_name)[:_NEAR_MATCH_LIMIT]
@@ -117,7 +117,7 @@ def axiom_hashes_for_entity(
         MentionsAll(iris=(iri,)),
         *((InAxiomSelection(name=within),) if within is not None else ()),
     )
-    return run(s, FindAxioms(constraints=constraints))
+    return execute(s, FindAxioms(constraints=constraints))
 
 
 def search_entities(
@@ -152,7 +152,7 @@ def search_entities(
         properties=properties,
         exclude_deprecated=exclude_deprecated,
     )
-    return run(s, FindEntities(constraints=constraints))
+    return execute(s, FindEntities(constraints=constraints))
 
 
 def entity_summary(s: Session, *, within: SelectionName | None = None) -> EntitySummary:
@@ -160,8 +160,8 @@ def entity_summary(s: Session, *, within: SelectionName | None = None) -> Entity
         HasRole(),
         *((resolve_within(s, within),) if within is not None else ()),
     )
-    total = run(s, CountEntities(constraints=constraints))
-    by_role = run(s, CountEntitiesByRole(constraints=constraints))
+    total = execute(s, CountEntities(constraints=constraints))
+    by_role = execute(s, CountEntitiesByRole(constraints=constraints))
     return EntitySummary(total=total, by_role=by_role)
 
 
@@ -172,7 +172,7 @@ def find_duplicate_entities(
     within: SelectionName | None = None,
 ) -> DuplicateResult:
     """Find annotation values shared by multiple entities."""
-    return run(s, FindDuplicateEntities(annotation_property=annotation_property, within=within))
+    return execute(s, FindDuplicateEntities(annotation_property=annotation_property, within=within))
 
 
 # -- Private helpers --
@@ -236,4 +236,4 @@ def undeclared_entity_count(
         *((Deprecated(state=False),) if exclude_deprecated else ()),
         *((resolve_within(s, within),) if within is not None else ()),
     )
-    return run(s, CountEntities(constraints=constraints))
+    return execute(s, CountEntities(constraints=constraints))

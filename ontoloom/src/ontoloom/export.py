@@ -13,7 +13,7 @@ from ontoloom.connection import (
 from ontoloom.prefixes.store import list_prefixes
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.query.constraints import AxiomConstraint, InAxiomSelection
-from ontoloom.query.dispatch import run
+from ontoloom.query.dispatch import execute
 from ontoloom.query.stream_axioms import StreamAxioms
 from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import SelectionName
@@ -69,7 +69,7 @@ def export_jsonl(
     with output_path.open("w") as f:
         f.write(header.model_dump_json())
         f.write("\n")
-        with run(s, StreamAxioms(constraints=tuple(constraints))) as it:
+        with execute(s, StreamAxioms(constraints=tuple(constraints))) as it:
             for _h, json_text in it:
                 f.write(json_text)
                 f.write("\n")
