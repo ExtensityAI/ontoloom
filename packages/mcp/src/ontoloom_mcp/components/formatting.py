@@ -11,11 +11,44 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
-from ontoloom.selections.types import AxiomSelection, EntitySelection
+from ontoloom.selections.types import AxiomSelection, EntitySelection, SelectionKind
 from ontoloom.utils import dquoted
 
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
+
+_KIND_NOUN: dict[SelectionKind, tuple[str, str]] = {
+    SelectionKind.AXIOMS: ("axiom", "axioms"),
+    SelectionKind.ENTITIES: ("entity", "entities"),
+}
+
+
+def format_kinded_count(kind: SelectionKind, n: int):
+    """Render `n <noun>`, pluralizing the kind's noun unless `n == 1`.
+
+    The sole place a selection kind surfaces as a noun.
+    """
+    singular, plural = _KIND_NOUN[kind]
+    return f"{n} {singular if n == 1 else plural}"
+
+
+def format_drift(present: int, missing: int):
+    """Render `<present> present, <missing> missing`, or `""` when nothing is missing."""
+    if missing == 0:
+        return ""
+
+    return f"{present} present, {missing} missing"
+
+
+def format_overwrite_note(previous_size: int | None):
+    """A leading-space sentence noting an overwrite, or `""` when nothing was replaced.
+
+    The leading space lets callers concatenate directly onto a prior sentence.
+    """
+    if previous_size is None:
+        return ""
+
+    return f" Replaced previous ({previous_size} items)."
 
 
 @dataclass(frozen=True, slots=True)
