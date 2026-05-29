@@ -36,3 +36,10 @@ class InternalError(OntoloomError):
     def __init__(self, detail: str):
         self.detail = detail
         super().__init__(detail)
+
+
+class InvalidArgumentsError(OntoloomError):
+    """Caller passed an invalid combination of arguments."""
+
+    def __init__(self, message: str):
+        super().__init__(message)

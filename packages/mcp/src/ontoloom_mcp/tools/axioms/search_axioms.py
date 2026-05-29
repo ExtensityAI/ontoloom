@@ -4,6 +4,7 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
+from ontoloom.errors import InvalidArgumentsError
 from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
     AnnotationTextMatches,
@@ -49,7 +50,7 @@ def search_axioms(
     """
     if query is None and properties is None:
         msg = "search_axioms requires at least one of `query` or `properties`."
-        raise ValueError(msg)
+        raise InvalidArgumentsError(msg)
 
     props_tuple = tuple(properties or ())
 

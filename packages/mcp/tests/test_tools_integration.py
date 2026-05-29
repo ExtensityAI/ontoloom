@@ -386,8 +386,10 @@ def test_search_axioms_no_results_message(empty_db):
 def test_search_axioms_requires_query_or_properties(empty_db):
     from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 
-    with pytest.raises(ValueError, match="search_axioms requires at least one of"):
-        search_axioms(path=empty_db, into=SelectionName("x"))
+    wrapped = translate_errors(search_axioms)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=empty_db, into=SelectionName("x"))
+    assert str(exc_info.value) == "search_axioms requires at least one of `query` or `properties`."
 
 
 # -- Error translation --
