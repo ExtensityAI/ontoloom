@@ -259,9 +259,9 @@ def test_entity_run_present_and_missing_classified(s):
     page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
     by_iri = {item.iri: item for item in page.items}
     assert by_iri[IRI("ex:Dog")].present is True
-    assert by_iri[IRI("ex:Dog")].role == EntityType.CLASS
+    assert by_iri[IRI("ex:Dog")].roles == frozenset({EntityType.CLASS})
     assert by_iri[IRI("ex:Ghost")].present is False
-    assert by_iri[IRI("ex:Ghost")].role is None
+    assert by_iri[IRI("ex:Ghost")].roles == frozenset()
 
 
 def test_entity_run_show_present_returns_only_dog(s):
@@ -308,6 +308,20 @@ def test_entity_run_punned_entity_present_missing_invariant(s):
     assert page.present + page.missing == page.meta.size
     assert page.present == 1
     assert page.missing == 1
+
+
+def test_entity_run_punned_entity_reports_all_roles(s):
+    add_axioms(
+        s,
+        [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Pun")),
+            Declaration(entity_type=EntityType.OBJECT_PROPERTY, iri=IRI("ex:Pun")),
+        ],
+    )
+    upsert_entity_selection(s, SEL, ["ex:Pun"], "test")
+    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    item = next(i for i in page.items if i.iri == IRI("ex:Pun"))
+    assert item.roles == frozenset({EntityType.CLASS, EntityType.OBJECT_PROPERTY})
 
 
 # -- axiom-only behavioral assertions --

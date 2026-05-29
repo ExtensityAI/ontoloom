@@ -194,13 +194,14 @@ class AxiomItem:
 class EntityItem:
     """One row of an entity selection. `present` is False iff the IRI is unreferenced.
 
-    `role` and `label` are populated only when the entity is declared (and indexed),
-    so they may be None even for present entities.
+    `roles` holds every role the entity appears in (empty when the IRI is missing
+    or carries no role-bearing positions). `label` is populated only when the
+    entity is indexed, so it may be None even for present entities.
     """
 
     iri: IRI
     present: bool
-    role: EntityType | None
+    roles: frozenset[EntityType]
     label: str | None
 
     @property

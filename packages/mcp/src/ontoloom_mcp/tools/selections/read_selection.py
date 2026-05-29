@@ -102,7 +102,7 @@ def _format_entity_page(page: EntitySelectionPage, *, offset: int, show: ShowFil
             lines.append(f"{item.iri} *missing*")
             continue
 
-        role_str = f" ({item.role})" if item.role else ""
+        role_str = f" ({', '.join(sorted(str(r) for r in item.roles))})" if item.roles else ""
         label_str = f" {dquoted(item.label)}" if item.label else ""
         lines.append(f"{item.iri}{role_str}{label_str}")
     return "\n".join(lines)

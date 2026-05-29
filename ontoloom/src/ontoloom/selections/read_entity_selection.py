@@ -1,10 +1,10 @@
 """Paginated read of an entity selection with role/label hydration."""
 
+from collections import defaultdict
 from typing import override
 
 from ontoloom.connection import Session
 from ontoloom.entities.reader import lookup_entity_labels
-from ontoloom.owl.axioms import Declaration
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.query.base import Query, RenderedSql, append_pagination
@@ -90,20 +90,18 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
         rows = s.conn.execute(compiled.sql, compiled.params).fetchall()
 
         present_iris = [iri for iri, is_present in rows if is_present]
-        roles_map: dict[str, EntityType] = {}
+        roles_map: defaultdict[str, set[EntityType]] = defaultdict(set)
         labels_map: dict[str, str] = {}
 
         if present_iris:
             placeholders = ",".join("?" for _ in present_iris)
-            roles_map.update(
-                (iri, EntityType(role))
-                for iri, role in s.conn.execute(
-                    f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
-                    f"JOIN axioms a ON a.id = ae.axiom_id "
-                    f"WHERE a.type = '{Declaration.tag()}' AND ae.entity_iri IN ({placeholders})",
-                    present_iris,
-                )
-            )
+            for iri, role in s.conn.execute(
+                f"SELECT DISTINCT ae.entity_iri, ae.role FROM axiom_entities ae "
+                f"WHERE ae.role IS NOT NULL AND ae.entity_iri IN ({placeholders})",
+                present_iris,
+            ):
+                roles_map[iri].add(EntityType(role))
+
             labels_map.update(
                 {k: v for k, v in lookup_entity_labels(s, present_iris).items() if v is not None}
             )
@@ -112,7 +110,7 @@ class ReadEntitySelection(HasPagination, Query[EntitySelectionPage]):
             EntityItem(
                 iri=IRI(iri),
                 present=bool(is_present),
-                role=roles_map.get(iri) if is_present else None,
+                roles=frozenset(roles_map.get(iri, ())) if is_present else frozenset(),
                 label=labels_map.get(iri) if is_present else None,
             )
             for iri, is_present in rows
