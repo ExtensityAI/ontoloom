@@ -29,6 +29,7 @@ from ontoloom.selections.store import (
 from ontoloom.selections.types import (
     SelectionExistsError,
     SelectionExprError,
+    SelectionKind,
     SelectionKindConflictError,
     SelectionName,
     SelectionNotFoundError,
@@ -449,7 +450,9 @@ def test_remove_selections_any_drops_entity_side(s):
     """`remove_selections_any` resolves kind by lookup and drops an entity-side name."""
     upsert_entity_selection(s, SelectionName("foo"), ["ex:Dog"], "test")
     result = remove_selections_any(s, [_ent("foo")])
-    assert result.dropped == (DroppedSelection(name=SelectionName("foo"), size=1),)
+    assert result.dropped == (
+        DroppedSelection(name=SelectionName("foo"), size=1, kind=SelectionKind.ENTITIES),
+    )
     assert result.not_found == ()
     assert not entity_selection_exists(s, SelectionName("foo"))
 
@@ -458,7 +461,9 @@ def test_remove_selections_any_drops_axiom_side(s):
     """`remove_selections_any` drops an axiom-side name."""
     upsert_axiom_selection(s, SelectionName("foo"), [AxiomHash("a" * 64)], "test")
     result = remove_selections_any(s, [_ax("foo")])
-    assert result.dropped == (DroppedSelection(name=SelectionName("foo"), size=1),)
+    assert result.dropped == (
+        DroppedSelection(name=SelectionName("foo"), size=1, kind=SelectionKind.AXIOMS),
+    )
     assert result.not_found == ()
     assert not axiom_selection_exists(s, SelectionName("foo"))
 
@@ -468,6 +473,20 @@ def test_remove_selections_any_tolerates_missing(s):
     result = remove_selections_any(s, [_ent("ghost")])
     assert result.dropped == ()
     assert result.not_found == (SelectionName("ghost"),)
+
+
+def test_remove_selections_any_stamps_kind(s):
+    """A sweep over both tables stamps each DroppedSelection with its own kind."""
+    upsert_axiom_selection(s, SelectionName("ax"), [AxiomHash("a" * 64)], "test")
+    upsert_entity_selection(s, SelectionName("ent"), ["ex:Dog"], "test")
+
+    result = remove_selections_any(s, [_ax("ax"), _ent("ent")])
+
+    kinds = {d.name: d.kind for d in result.dropped}
+    assert kinds == {
+        SelectionName("ax"): SelectionKind.AXIOMS,
+        SelectionName("ent"): SelectionKind.ENTITIES,
+    }
 
 
 # -- compose surfaces SelectionNotFoundError for missing leaves --

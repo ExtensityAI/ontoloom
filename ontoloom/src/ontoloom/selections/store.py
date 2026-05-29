@@ -22,6 +22,7 @@ from ontoloom.selections.types import (
     EntitySelectionListing,
     SelectionContentHash,
     SelectionExistsError,
+    SelectionKind,
     SelectionKindConflictError,
     SelectionName,
     SelectionNotFoundError,
@@ -46,6 +47,7 @@ class EntityUpsertResult:
 class DroppedSelection:
     name: SelectionName
     size: int
+    kind: SelectionKind
 
 
 @dataclass(frozen=True, slots=True)
@@ -337,9 +339,9 @@ def remove_selections_any(s: Session, names: Sequence[SelectionName]) -> RemoveS
     `not_found`, not as an exception.
     """
     deduped = dedupe(names)
-    ax = _remove_named(s, "axiom_selections", deduped)
+    ax = _remove_named(s, "axiom_selections", SelectionKind.AXIOMS, deduped)
     remaining = [n for n in deduped if n not in {d.name for d in ax.dropped}]
-    ent = _remove_named(s, "entity_selections", remaining)
+    ent = _remove_named(s, "entity_selections", SelectionKind.ENTITIES, remaining)
 
     dropped = ax.dropped + ent.dropped
     found = {d.name for d in dropped}
@@ -348,14 +350,14 @@ def remove_selections_any(s: Session, names: Sequence[SelectionName]) -> RemoveS
 
 
 def _remove_named(
-    s: Session, table: str, bare_names: Sequence[SelectionName]
+    s: Session, table: str, kind: SelectionKind, bare_names: Sequence[SelectionName]
 ) -> RemoveSelectionsResult:
     if not bare_names:
         return RemoveSelectionsResult(dropped=(), not_found=())
 
     placeholders = ",".join("?" for _ in bare_names)
     dropped = [
-        DroppedSelection(name=SelectionName(r[0]), size=r[1])
+        DroppedSelection(name=SelectionName(r[0]), size=r[1], kind=kind)
         for r in s.conn.execute(
             f"SELECT name, size FROM {table} WHERE name IN ({placeholders}) ORDER BY name",
             tuple(bare_names),
