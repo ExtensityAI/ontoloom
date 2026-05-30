@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from typing import Annotated
 
 from annotated_types import MinLen
@@ -15,12 +14,15 @@ from ontoloom.query.dispatch import execute, resolve_within
 from ontoloom.query.find_axioms import FindAxioms
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
-from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.formatting import format_selection_ref, format_selection_result
-from ontoloom_mcp.components.preview import format_axiom_selection_preview
+from ontoloom_mcp.components.formatting import (
+    ToolFilterSource,
+    format_selection_preview,
+    format_selection_write,
+    format_source,
+)
 from ontoloom_mcp.components.tool import create_tool
-from ontoloom_mcp.components.types import Limit, OntologyPath
+from ontoloom_mcp.components.types import OntologyPath
 
 
 def search_axioms(
@@ -30,7 +32,6 @@ def search_axioms(
     query: Annotated[str, MinLen(1)] | None = None,
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
     within: SelectionName | None = None,
-    limit: Limit = 100,
 ):
     """Search axioms by axiom-level annotation text or property; save matches to a selection.
 
@@ -46,13 +47,18 @@ def search_axioms(
       these properties; without query, finds axioms with any annotation whose
       property is in the set.
     - `within`: Restrict search to a named selection.
-    - `limit`: Cap on inline page preview.
     """
     if query is None and properties is None:
         msg = "search_axioms requires at least one of `query` or `properties`."
         raise InvalidArgumentsError(msg)
 
     props_tuple = tuple(properties or ())
+
+    filters: dict[str, object] = {}
+    if query is not None:
+        filters["query"] = query
+    if props_tuple:
+        filters["properties"] = [str(p) for p in props_tuple]
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -69,33 +75,17 @@ def search_axioms(
 
         hashes = execute(s, FindAxioms(constraints=(*text, *scope)))
 
-        source = _build_source(query, props_tuple, within)
+        source = format_source(ToolFilterSource("search_axioms", filters, within=within))
         upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
-        sel = upserted.selection
 
-        if not hashes:
-            s.commit()
-            return f"0 axioms -> {format_selection_ref(sel)}.\nNo axioms found ({source})."
-
-        page_text = format_axiom_selection_preview(s, upserted, limit=limit)
+        preview = format_selection_preview(s, upserted)
         s.commit()
 
-    return format_selection_result(upserted, page_text)
-
-
-def _build_source(
-    query: str | None,
-    properties: Sequence[IRI],
-    within: SelectionName | None,
-) -> str:
-    parts = []
-    if query:
-        parts.append(f"query={dquoted(query)}")
-    if properties:
-        parts.append(f"properties=[{', '.join(dquoted(str(p)) for p in properties)}]")
-    if within is not None:
-        parts.append(f"within={dquoted(str(within))}")
-    return f"search_axioms({', '.join(parts)})"
+    return format_selection_write(
+        upserted,
+        preview=preview,
+        no_results=f"No matches for {source}.",
+    )
 
 
 tool_search_axioms = create_tool(

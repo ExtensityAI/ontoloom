@@ -180,9 +180,8 @@ def test_search_axioms_by_text(empty_db):
         query="TODO",
     )
 
-    assert '"axioms:todos"' in result
-    assert "axioms:todos@" not in result
-    assert "1 axioms" in result
+    assert 'Saved 1 axiom to "todos".' in result
+    assert "axioms:todos" not in result
     assert "SubClassOf" in result
 
     page = read_selection(path=empty_db, name=SelectionName("todos"))
@@ -378,9 +377,9 @@ def test_search_axioms_no_results_message(empty_db):
         query="nonexistent",
     )
 
-    assert result.startswith("0 axioms ->")
-    assert "search_axioms(query=" in result
-    assert "No axioms found" in result
+    assert result == (
+        'Saved 0 axioms to "empty". No matches for search_axioms(query="nonexistent").'
+    )
 
 
 def test_search_axioms_requires_query_or_properties(empty_db):
@@ -963,8 +962,8 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
     )
 
     first = search_axioms(path=empty_db, into=SelectionName("t"), query="dog")
-    assert '"axioms:t"' in first
-    assert "axioms:t@" not in first
+    assert 'Saved 1 axiom to "t".' in first
+    assert "axioms:t" not in first
 
     wrapped = translate_errors(search_axioms)
     with pytest.raises(ToolError) as exc_info:
@@ -979,8 +978,9 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
         query="dog",
         mode=WriteMode.REPLACE,
     )
-    assert '"axioms:t"' in overwrote
-    assert "axioms:t@" not in overwrote
+    assert 'Saved 1 axiom to "t".' in overwrote
+    assert "Replaced previous (1 items)." in overwrote
+    assert "axioms:t" not in overwrote
 
 
 def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
