@@ -79,8 +79,126 @@ def test_add_axioms_returns_diff(empty_db):
 
 def test_get_entity_returns_info(populated_db):
     result = get_entity(path=populated_db, iri=IRI("ex:Dog"))
-    assert "ex:Dog" in result
-    assert "Class" in result
+    # Header is roles-then-label form; no label set so just `iri (roles)`.
+    assert result.startswith("ex:Dog (Class)\n")
+    assert "Axioms (asserted): 2" in result
+    assert "1 Declaration" in result
+    assert "1 SubClassOf" in result
+    # No into= -> no trailing saved line.
+    assert "Saved" not in result
+
+
+def test_get_entity_with_into_appends_saved_line(populated_db):
+    result = get_entity(
+        path=populated_db,
+        iri=IRI("ex:Dog"),
+        into=SelectionName("dog_axioms"),
+    )
+    # Inspect block at the top.
+    assert result.startswith("ex:Dog (Class)\n")
+    assert "Axioms (asserted): 2" in result
+    # Saved line at the bottom, bare name (no `axioms:` prefix).
+    assert result.endswith('Saved 2 axioms to "dog_axioms".')
+    assert "axioms:dog_axioms" not in result
+    # Source persisted on the selection.
+    from ontoloom.selections.store import get_axiom_selection
+
+    with session(Ontology(populated_db)) as s:
+        meta = get_axiom_selection(s, SelectionName("dog_axioms"))
+        s.commit()
+    assert meta.source == 'get_entity(iri="ex:Dog")'
+
+
+def test_get_entity_with_into_replace_notes_overwrite(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom.selections.types import WriteMode
+
+    # Seed a selection with three distinct placeholder hashes so the overwrite tail fires.
+    decoys = [
+        HashedAxiom.of(Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))).hash,
+        HashedAxiom.of(Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:B"))).hash,
+        HashedAxiom.of(Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:C"))).hash,
+    ]
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("dog_axioms"), decoys, "fixture")
+        s.commit()
+
+    result = get_entity(
+        path=populated_db,
+        iri=IRI("ex:Dog"),
+        into=SelectionName("dog_axioms"),
+        mode=WriteMode.REPLACE,
+    )
+    assert result.endswith('Saved 2 axioms to "dog_axioms". Replaced previous (3 items).')
+
+
+def test_get_entity_with_into_zero_axioms_still_renders_inspect(populated_db):
+    # Build a within-scope that contains an unrelated axiom so ex:Dog has zero
+    # in-scope axioms. The entity still exists globally, so get_entity returns
+    # successfully and the inspect block renders with `Axioms (asserted): 0`.
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    unrelated = HashedAxiom.of(Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))).hash
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("animal_only"), [unrelated], "fixture")
+        s.commit()
+
+    result = get_entity(
+        path=populated_db,
+        iri=IRI("ex:Dog"),
+        into=SelectionName("empty_dog"),
+        within=SelectionName("animal_only"),
+    )
+    # Inspect block still renders.
+    assert result.startswith("ex:Dog (Class)\n")
+    assert "Axioms (asserted): 0" in result
+    # Saved 0 tail, no "No matches" sentence.
+    assert result.endswith('Saved 0 axioms to "empty_dog".')
+    assert "No matches" not in result
+
+
+def test_get_entity_with_label_renders_label_after_roles(populated_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+
+    add_axioms(
+        path=populated_db,
+        axioms=[
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            )
+        ],
+    )
+    result = get_entity(path=populated_db, iri=IRI("ex:Dog"))
+    # Roles before label.
+    assert result.startswith('ex:Dog (Class) "Dog"\n')
+    assert "Annotations:" in result
+    assert 'rdfs:label "Dog"' in result
+
+
+def test_get_entity_within_persists_source_with_within_suffix(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import get_axiom_selection, upsert_axiom_selection
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope_ax"), [dog_hash], "fixture")
+        s.commit()
+
+    get_entity(
+        path=populated_db,
+        iri=IRI("ex:Dog"),
+        into=SelectionName("scoped_dog"),
+        within=SelectionName("scope_ax"),
+    )
+    with session(Ontology(populated_db)) as s:
+        meta = get_axiom_selection(s, SelectionName("scoped_dog"))
+        s.commit()
+    assert meta.source == 'get_entity(iri="ex:Dog") within "scope_ax"'
 
 
 def test_search_entities_creates_selection(populated_db):

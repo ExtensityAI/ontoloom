@@ -10,10 +10,11 @@ from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     Ref,
+    ToolFilterSource,
     build_refs,
-    format_ref,
-    format_roles,
-    format_selection_ref,
+    format_entity_line,
+    format_saved_line,
+    format_source,
 )
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -46,13 +47,9 @@ def get_entity(
 
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
-            source = f"get_entity(iri={dquoted(iri)})"
+            source = format_source(ToolFilterSource("get_entity", {"iri": str(iri)}, within=within))
             upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
-            sel = upserted.selection
-            sel_msg = f"\n\n{sel.size} axiom hashes -> {format_selection_ref(sel)}."
-            if upserted.previous_size is not None:
-                sel_msg += f" Overwrote previous ({upserted.previous_size} items)."
-            result += sel_msg
+            result += f"\n\n{format_saved_line(upserted)}"
 
         s.commit()
 
@@ -60,7 +57,7 @@ def get_entity(
 
 
 def _format_entity_inspect(ref: Ref, info: EntityInfo):
-    lines = [f"{format_ref(ref)} ({format_roles(info.roles)})", ""]
+    lines = [format_entity_line(ref, info.roles), ""]
 
     if info.annotations:
         lines.append("Annotations:")
@@ -68,10 +65,9 @@ def _format_entity_inspect(ref: Ref, info: EntityInfo):
         lines.append("")
 
     total = sum(info.axiom_counts.values())
-    if total:
-        lines.append(f"Axioms (asserted): {total}")
-        for typ, count in info.axiom_counts.most_common():
-            lines.append(f"  {count} {typ}")
+    lines.append(f"Axioms (asserted): {total}")
+    for typ, count in info.axiom_counts.most_common():
+        lines.append(f"  {count} {typ}")
 
     return "\n".join(lines).rstrip()
 
