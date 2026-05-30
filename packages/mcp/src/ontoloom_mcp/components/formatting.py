@@ -40,6 +40,71 @@ def format_drift(present: int, missing: int):
     return f"{present} present, {missing} missing"
 
 
+def _kind_of(meta: AxiomSelection | EntitySelection) -> SelectionKind:
+    return SelectionKind.AXIOMS if isinstance(meta, AxiomSelection) else SelectionKind.ENTITIES
+
+
+def format_pagination(
+    x: int,
+    y: int,
+    z: int,
+    kind: SelectionKind,
+    *,
+    filter: str | None = None,  # noqa: A002
+):
+    """Render a paginated header: either an empty-page sentence or a `Showing X-Y of Z <noun>:` line.
+
+    Empty form when `z == 0` or `x > y`; range form otherwise. Filter, when
+    given, surfaces as a parenthesized `(filter: <value>)` tail before the
+    terminator (period for empty, colon for range).
+    """
+    filter_tail = f" (filter: {filter})" if filter is not None else ""
+
+    if z == 0 or x > y:
+        return f"{format_kinded_count(kind, 0)}{filter_tail}."
+
+    return f"Showing {x}-{y} of {format_kinded_count(kind, z)}{filter_tail}:"
+
+
+def format_read_header(meta: AxiomSelection | EntitySelection, present: int, missing: int):
+    """Noun-led header for a read response; drift is shown unconditionally.
+
+    Total count is `present + missing` (so singular/plural follows the total,
+    not the selection's stored size). Unlike `format_drift`, the drift tail
+    appears even when `missing == 0`.
+    """
+    kind = _kind_of(meta)
+    total = present + missing
+    return (
+        f"{dquoted(meta.name)}: {format_kinded_count(kind, total)} "
+        f"— {present} present, {missing} missing"
+    )
+
+
+def format_list_row(
+    meta: AxiomSelection | EntitySelection, present: int, missing: int, source: str
+):
+    """Indented per-selection row: `  "name": N <noun>[, M missing] — source: <source>`.
+
+    Drift appears as a comma-tail inside the noun phrase only when `missing > 0`.
+    """
+    kind = _kind_of(meta)
+    total = present + missing
+    drift_tail = f", {missing} missing" if missing > 0 else ""
+    return (
+        f"  {dquoted(meta.name)}: {format_kinded_count(kind, total)}{drift_tail} — source: {source}"
+    )
+
+
+def format_within_scope(meta: AxiomSelection | EntitySelection):
+    """Render a `Within "name" (N <noun>)` scope fragment from already-resolved meta.
+
+    No trailing colon; callers append one if they're using it as a header.
+    """
+    kind = _kind_of(meta)
+    return f"Within {dquoted(meta.name)} ({format_kinded_count(kind, meta.size)})"
+
+
 def format_overwrite_note(previous_size: int | None):
     """A leading-space sentence noting an overwrite, or `""` when nothing was replaced.
 

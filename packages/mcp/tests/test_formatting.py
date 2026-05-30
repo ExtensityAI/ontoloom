@@ -5,16 +5,42 @@ from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.axioms import SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
-from ontoloom.selections.types import SelectionKind
+from ontoloom.selections.types import (
+    AxiomSelection,
+    EntitySelection,
+    SelectionContentHash,
+    SelectionKind,
+    SelectionName,
+)
 from ontoloom_mcp.components.formatting import (
     Ref,
     _format_axiom_line,
     format_drift,
     format_entity_line,
     format_kinded_count,
+    format_list_row,
     format_missing_axiom_line,
     format_overwrite_note,
+    format_pagination,
+    format_read_header,
+    format_within_scope,
 )
+
+
+def _axiom_sel(name: str, size: int) -> AxiomSelection:
+    return AxiomSelection(
+        name=SelectionName(name),
+        hash=SelectionContentHash("0123456789abcdef"),
+        size=size,
+    )
+
+
+def _entity_sel(name: str, size: int) -> EntitySelection:
+    return EntitySelection(
+        name=SelectionName(name),
+        hash=SelectionContentHash("0123456789abcdef"),
+        size=size,
+    )
 
 
 def test_kinded_count_axioms_singular():
@@ -95,3 +121,100 @@ def test_entity_line_label_no_roles():
 def test_entity_line_no_label_no_roles():
     ref = Ref(iri=IRI("ex:Dog"), label=None)
     assert format_entity_line(ref, frozenset()) == "ex:Dog"
+
+
+def test_pagination_empty_page_axioms_no_filter():
+    assert format_pagination(0, 0, 0, SelectionKind.AXIOMS) == "0 axioms."
+
+
+def test_pagination_empty_page_axioms_with_filter():
+    assert (
+        format_pagination(0, 0, 0, SelectionKind.AXIOMS, filter="present")
+        == "0 axioms (filter: present)."
+    )
+
+
+def test_pagination_empty_page_entities_no_filter():
+    assert format_pagination(0, 0, 0, SelectionKind.ENTITIES) == "0 entities."
+
+
+def test_pagination_empty_when_x_greater_than_y():
+    assert format_pagination(5, 4, 10, SelectionKind.AXIOMS) == "0 axioms."
+
+
+def test_pagination_range_entities_no_filter():
+    assert format_pagination(1, 6, 6, SelectionKind.ENTITIES) == "Showing 1-6 of 6 entities:"
+
+
+def test_pagination_range_axioms_with_filter():
+    assert (
+        format_pagination(1, 3, 3, SelectionKind.AXIOMS, filter="all")
+        == "Showing 1-3 of 3 axioms (filter: all):"
+    )
+
+
+def test_pagination_range_axioms_singular_total():
+    # z=1 should still pluralize correctly via format_kinded_count
+    assert format_pagination(1, 1, 1, SelectionKind.AXIOMS) == "Showing 1-1 of 1 axiom:"
+
+
+def test_read_header_axioms_no_missing_still_shows_drift():
+    meta = _axiom_sel("subclass_animal", 2)
+    assert (
+        format_read_header(meta, present=2, missing=0)
+        == '"subclass_animal": 2 axioms — 2 present, 0 missing'
+    )
+
+
+def test_read_header_axioms_singular_total_all_missing():
+    meta = _axiom_sel("review", 1)
+    assert (
+        format_read_header(meta, present=0, missing=1) == '"review": 1 axiom — 0 present, 1 missing'
+    )
+
+
+def test_read_header_entities():
+    meta = _entity_sel("all_classes", 6)
+    assert (
+        format_read_header(meta, present=6, missing=0)
+        == '"all_classes": 6 entities — 6 present, 0 missing'
+    )
+
+
+def test_list_row_axioms_no_drift():
+    meta = _axiom_sel("subclass_animal", 2)
+    assert (
+        format_list_row(meta, present=2, missing=0, source="match_axioms")
+        == '  "subclass_animal": 2 axioms — source: match_axioms'
+    )
+
+
+def test_list_row_axioms_with_drift():
+    meta = _axiom_sel("review", 1)
+    assert (
+        format_list_row(meta, present=0, missing=1, source='search_axioms(query="review")')
+        == '  "review": 1 axiom, 1 missing — source: search_axioms(query="review")'
+    )
+
+
+def test_list_row_entities_no_drift():
+    meta = _entity_sel("all_classes", 6)
+    assert (
+        format_list_row(meta, present=6, missing=0, source='search_entities(role="Class")')
+        == '  "all_classes": 6 entities — source: search_entities(role="Class")'
+    )
+
+
+def test_within_scope_axioms():
+    meta = _axiom_sel("dogs", 7)
+    assert format_within_scope(meta) == 'Within "dogs" (7 axioms)'
+
+
+def test_within_scope_entities():
+    meta = _entity_sel("all_classes", 12)
+    assert format_within_scope(meta) == 'Within "all_classes" (12 entities)'
+
+
+def test_within_scope_singular_axiom():
+    meta = _axiom_sel("only_one", 1)
+    assert format_within_scope(meta) == 'Within "only_one" (1 axiom)'
