@@ -89,8 +89,54 @@ def test_search_entities_creates_selection(populated_db):
         into=SelectionName("dogs"),
         query="Dog",
     )
-    assert '"entities:dogs"' in result
-    assert "entities:dogs@" not in result
+    # Bare selection name in the saved-line; no `entities:` wire prefix surfaces.
+    assert result.startswith('Saved 1 entity to "dogs".\n\n')
+    assert "entities:dogs" not in result
+    assert "ex:Dog" in result
+    # No "Showing 1-N of N entities:" header in the write-block preview.
+    assert "Showing" not in result
+
+
+def test_search_entities_no_results_renders_source(populated_db):
+    result = search_entities(
+        path=populated_db,
+        into=SelectionName("empty_search"),
+        query="zzzznomatch",
+    )
+    assert result == (
+        'Saved 0 entities to "empty_search". '
+        'No entities found (search_entities(query="zzzznomatch")).'
+    )
+
+
+def test_search_entities_source_includes_role_and_within(populated_db):
+    # Build an axiom selection to scope into; check that role + within render in
+    # the persisted source string and surface in no_results messages.
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.owl.axioms import Declaration as _Declaration
+    from ontoloom.selections.store import get_entity_selection, upsert_axiom_selection
+
+    dog_decl = _Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope_ax"), [dog_hash], "test fixture")
+        s.commit()
+
+    result = search_entities(
+        path=populated_db,
+        into=SelectionName("scoped"),
+        role=EntityType.CLASS,
+        within=SelectionName("scope_ax"),
+    )
+    # No separate "Within selection" footer; within surfaces only via the source.
+    assert "Within selection" not in result
+    assert result.startswith('Saved 1 entity to "scoped".')
+
+    # Persisted source carries the rendered descriptor.
+    with session(Ontology(populated_db)) as s:
+        meta = get_entity_selection(s, SelectionName("scoped"))
+        s.commit()
+    assert meta.source == 'search_entities(role="Class") within "scope_ax"'
 
 
 def test_create_selection_returns_clean_one_liner_no_preview(empty_db):
@@ -1099,8 +1145,9 @@ def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
         query="Dog",
         mode=WriteMode.REPLACE,
     )
-    assert '"entities:t"' in overwrote
-    assert "entities:t@" not in overwrote
+    assert 'Saved 1 entity to "t".' in overwrote
+    assert "Replaced previous (1 items)." in overwrote
+    assert "entities:t" not in overwrote
 
 
 def test_producer_tools_accept_mode_argument(populated_db):

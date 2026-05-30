@@ -1,34 +1,20 @@
-from collections.abc import Sequence
 from typing import Annotated
 
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
-from ontoloom.connection import Ontology, Session, session
-from ontoloom.entities.projections import batch_fetch_entity_display
+from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import search_entities as core_search_entities
-from ontoloom.entities.types import EntityDisplay, EntityMatch, EntitySearchPage
-from ontoloom.owl.iri import IRI, RDFS_LABEL
+from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
-from ontoloom.query.constraints import InAxiomSelection
-from ontoloom.query.dispatch import resolve_within
-from ontoloom.selections.store import (
-    get_axiom_selection,
-    get_entity_selection,
-    upsert_entity_selection,
-)
-from ontoloom.selections.types import (
-    SelectionName,
-    WriteMode,
-)
-from ontoloom.utils import dquoted
+from ontoloom.selections.store import upsert_entity_selection
+from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    SELECT_INLINE_MAX,
-    SELECT_PREVIEW,
-    format_roles,
-    format_selection_ref,
-    format_selection_result,
+    ToolFilterSource,
+    format_selection_preview,
+    format_selection_write,
+    format_source,
 )
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
@@ -66,144 +52,44 @@ def search_entities(
       axiom selection restricts to entities mentioned in those axioms.
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
+    props_tuple = tuple(properties or ())
+
+    filters: dict[str, object] = {}
+    if query is not None:
+        filters["query"] = query
+    if role is not None:
+        filters["role"] = str(role)
+    if namespace is not None:
+        filters["namespace"] = namespace
+    if declared is not None:
+        filters["declared"] = declared
+    if props_tuple:
+        filters["properties"] = [str(p) for p in props_tuple]
+
+    source = format_source(ToolFilterSource("search_entities", filters, within=within))
+
     ont = Ontology(path)
     with session(ont) as s:
-        kwargs = {
-            "query": query,
-            "role": role,
-            "namespace": namespace,
-            "within": within,
-            "declared": declared,
-            "properties": properties or (),
-            "exclude_deprecated": exclude_deprecated,
-        }
+        iris = core_search_entities(
+            s,
+            query=query,
+            role=role,
+            namespace=namespace,
+            within=within,
+            declared=declared,
+            properties=props_tuple,
+            exclude_deprecated=exclude_deprecated,
+        )
 
-        iris = core_search_entities(s, **kwargs)
-        source = _build_source(query, role, namespace, declared, properties or (), within)
         upserted = upsert_entity_selection(s, into, iris, source, mode=mode)
-        sel = upserted.selection
-
-        if not iris:
-            no_results = build_no_results_message(
-                query, role, namespace, declared, properties or (), within
-            )
-            s.commit()
-            return f"0 entities -> {format_selection_ref(sel)}.\n{no_results}"
-
-        limit_n = sel.size if sel.size <= SELECT_INLINE_MAX else SELECT_PREVIEW
-        page = build_preview_page(s, iris, limit_n)
-        page_text = _format_entity_search_page(page)
-
-        result = format_selection_result(upserted, page_text)
-
-        if within is not None:
-            result += "\n" + build_within_metadata(s, within)
-
+        preview = format_selection_preview(s, upserted)
         s.commit()
 
-    return result
-
-
-_EMPTY_DISPLAY = EntityDisplay(roles=frozenset(), annotations=())
-
-
-def build_preview_page(s: Session, iris: list[IRI], limit: int) -> EntitySearchPage:
-    """Slice the ranked IRI list in memory and attach display data for the preview."""
-    preview = iris[:limit]
-    display = batch_fetch_entity_display(s, [str(i) for i in preview])
-
-    return EntitySearchPage(
-        matches=tuple(
-            EntityMatch(
-                iri=iri,
-                roles=display.get(str(iri), _EMPTY_DISPLAY).roles,
-                annotations=display.get(str(iri), _EMPTY_DISPLAY).annotations,
-            )
-            for iri in preview
-        ),
-        total=len(iris),
-        offset=0,
+    return format_selection_write(
+        upserted,
+        preview=preview,
+        no_results=f"No entities found ({source}).",
     )
-
-
-def build_within_metadata(s: Session, within: SelectionName):
-    constraint = resolve_within(s, within)
-
-    if isinstance(constraint, InAxiomSelection):
-        sel = get_axiom_selection(s, within)
-        return f"\nWithin selection {format_selection_ref(sel)} (axioms, {sel.size} items)"
-
-    ent = get_entity_selection(s, within)
-    return f"\nWithin selection {format_selection_ref(ent)} (entities, {ent.size} items)"
-
-
-def build_filter_parts(
-    query: str | None,
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    declared: bool | None,
-    properties: Sequence[IRI],
-    within: SelectionName | None,
-) -> list[str]:
-    parts = []
-    if query:
-        parts.append(f"query={dquoted(query)}")
-    if role:
-        parts.append(f"role={dquoted(role)}")
-    if namespace:
-        parts.append(f"namespace={dquoted(namespace)}")
-    if declared is not None:
-        parts.append(f"declared={declared}")
-    if properties:
-        parts.append(f"properties=[{', '.join(dquoted(p) for p in properties)}]")
-    if within is not None:
-        parts.append(f"within={dquoted(str(within))}")
-    return parts
-
-
-def build_no_results_message(
-    query: str | None,
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    declared: bool | None,
-    properties: Sequence[IRI],
-    within: SelectionName | None,
-):
-    parts = build_filter_parts(query, role, namespace, declared, properties, within)
-    desc = ", ".join(parts) if parts else "no filters"
-    return f"No entities found ({desc})."
-
-
-def _build_source(
-    query: str | None,
-    role: EntityType | None,
-    namespace: PrefixName | None,
-    declared: bool | None,
-    properties: Sequence[IRI],
-    within: SelectionName | None,
-):
-    parts = build_filter_parts(query, role, namespace, declared, properties, within)
-    return f"search_entities({', '.join(parts)})"
-
-
-def _format_entity_search_page(page: EntitySearchPage):
-    end = page.offset + len(page.matches)
-    lines = [f"Showing {page.offset + 1}-{end} of {page.total} entities:"]
-    lines.append("")
-    for m in page.matches:
-        role_str = format_roles(m.roles)
-        label = ""
-        for ann in m.annotations:
-            if ann.property == RDFS_LABEL:
-                label = f" {dquoted(ann.value)}"
-                break
-        lines.append(f"  {m.iri} ({role_str}){label}")
-        lines.extend(
-            f"    {ann.property} {dquoted(ann.value)}"
-            for ann in m.annotations
-            if ann.property != RDFS_LABEL
-        )
-    return "\n".join(lines)
 
 
 tool_search_entities = create_tool(
