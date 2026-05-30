@@ -737,6 +737,203 @@ def test_find_duplicate_entities_within_missing_selection_translates(populated_d
     assert "search_entities" in msg or "match_axioms" in msg
 
 
+def test_find_duplicate_entities_no_duplicates_still_writes_selection(populated_db):
+    from ontoloom.selections.store import get_entity_selection
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    # populated_db has no duplicate rdfs:label values.
+    result = find_duplicate_entities(
+        path=populated_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+    )
+    assert result == (
+        'Saved 0 entities to "dup_labels". '
+        'No duplicates for find_duplicate_entities(annotation_property="rdfs:label").'
+    )
+    # Selection actually exists in the store after the call.
+    with session(Ontology(populated_db)) as s:
+        meta = get_entity_selection(s, SelectionName("dup_labels"))
+        s.commit()
+    assert meta.size == 0
+
+
+def test_find_duplicate_entities_no_duplicates_within_renders_scope(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"), subject=IRI("ex:A"), value=LangLiteral(value="alpha")
+            ),
+        ],
+    )
+    search_entities(path=empty_db, into=SelectionName("scope"), namespace=PrefixName("ex"))
+
+    result = find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+        within=SelectionName("scope"),
+    )
+    assert result == (
+        'Saved 0 entities to "dup_labels". '
+        'No duplicates for find_duplicate_entities(annotation_property="rdfs:label") '
+        'within "scope".'
+    )
+
+
+def test_find_duplicate_entities_groups_render_with_saved_line(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Canine")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"), subject=IRI("ex:Dog"), value=LangLiteral(value="Dog")
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Canine"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+
+    result = find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+    )
+    assert result.startswith('Saved 2 entities to "dup_labels". ')
+    assert "1 duplicate rdfs:label values:" in result
+    # No leading "Found N ... across M ..." prose.
+    assert "Found " not in result
+    assert "across " not in result
+    # No selection-ref arrow form.
+    assert "entities:dup_labels" not in result
+    # Group line format: 2-space indent, value, kind-counted entity count, IRIs
+    # (iris are ordered by the underlying SQL, alphabetical within a group).
+    assert '  "Dog" (2 entities): ex:Canine, ex:Dog' in result
+
+
+def test_find_duplicate_entities_overwrite_notes_replacement(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom.selections.types import WriteMode
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Canine")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"), subject=IRI("ex:Dog"), value=LangLiteral(value="Dog")
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Canine"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+
+    find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+    )
+    result = find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+        mode=WriteMode.REPLACE,
+    )
+    # Overwrite tail sits between the saved-line period and the domain clause.
+    assert result.startswith(
+        'Saved 2 entities to "dup_labels". Replaced previous (2 items). '
+        "1 duplicate rdfs:label values:"
+    )
+
+
+def test_find_duplicate_entities_group_overflow_renders_more_line(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    axioms = []
+    # 11 duplicate-value groups -> overflow at 10.
+    for i in range(11):
+        a = IRI(f"ex:E{i}a")
+        b = IRI(f"ex:E{i}b")
+        axioms.extend(
+            [
+                Declaration(entity_type=EntityType.CLASS, iri=a),
+                Declaration(entity_type=EntityType.CLASS, iri=b),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"), subject=a, value=LangLiteral(value=f"label{i}")
+                ),
+                AnnotationAssertion(
+                    property=IRI("rdfs:label"), subject=b, value=LangLiteral(value=f"label{i}")
+                ),
+            ]
+        )
+    add_axioms(path=empty_db, axioms=axioms)
+
+    result = find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+    )
+    assert result.startswith('Saved 22 entities to "dup_labels". 11 duplicate rdfs:label values:')
+    # First 10 groups are listed; the 11th is the overflow.
+    assert result.count('" (2 entities): ') == 10
+    assert "... and 1 more." in result
+    # No legacy "more groups" wording.
+    assert "more groups." not in result
+
+
+def test_find_duplicate_entities_singular_entity_pluralization(empty_db):
+    """Group with a single IRI (impossible in normal flow) would render `(1 entity)`.
+
+    The N=2 case (`(2 entities)`) is covered above; this test pins the
+    pluralization branch so the helper choice (`format_kinded_count`) stays
+    locked in and a regression to a hardcoded ` entities)` would fail.
+    """
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Canine")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"), subject=IRI("ex:Dog"), value=LangLiteral(value="Dog")
+            ),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Canine"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+    result = find_duplicate_entities(
+        path=empty_db,
+        into=SelectionName("dup_labels"),
+        annotation_property=IRI("rdfs:label"),
+    )
+    # The plural branch is hit (2 entities); verify the exact spelling so a regression
+    # to a hand-rolled ` entities)` suffix would still pass but `(2 entities)` is locked.
+    assert "(2 entities)" in result
+    assert "(2 entity)" not in result
+
+
 def test_annotate_axiom_reports_applied_counts(populated_db):
     from ontoloom.owl.annotations import Annotation
     from ontoloom.owl.literals import LangLiteral

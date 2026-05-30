@@ -1,16 +1,22 @@
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.entities.reader import find_duplicate_entities as _find_duplicate_entities
+from ontoloom.entities.types import DuplicateGroup
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import upsert_entity_selection
-from ontoloom.selections.types import SelectionName, WriteMode
+from ontoloom.selections.types import SelectionKind, SelectionName, WriteMode
 from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.formatting import format_selection_ref
+from ontoloom_mcp.components.formatting import (
+    PREVIEW_ROWS,
+    ToolFilterSource,
+    format_kinded_count,
+    format_saved_line,
+    format_selection_write,
+    format_source,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
-
-_PREVIEW_GROUPS = 20
 
 
 def find_duplicate_entities(
@@ -23,7 +29,8 @@ def find_duplicate_entities(
     """Find annotation values shared by multiple entities.
 
     Reports groups of entities that share the same value for `annotation_property`
-    (e.g., "rdfs:label"). Saves all affected entities as an entity selection.
+    (e.g., "rdfs:label"). Saves all affected entities as an entity selection;
+    when no duplicates exist, an empty selection is still written.
 
     Args:
     - `into`: Name for the output selection (e.g. `"dup_labels"`).
@@ -33,43 +40,42 @@ def find_duplicate_entities(
     - `within`: Optional entity selection (e.g. `"my_classes"`) to
       restrict the check to.
     """
+    source = format_source(
+        ToolFilterSource(
+            "find_duplicate_entities",
+            {"annotation_property": str(annotation_property)},
+            within=within,
+        )
+    )
+
     ont = Ontology(path)
     with session(ont) as s:
         result = _find_duplicate_entities(s, annotation_property, within=within)
-
-        if not result.affected_iris:
-            return f"No duplicate {annotation_property} values found."
-
-        source = f"find_duplicate_entities(annotation_property={dquoted(annotation_property)})"
-        if within is not None:
-            source += f", within={dquoted(str(within))}"
-        upserted = upsert_entity_selection(
-            s,
-            into,
-            result.affected_iris,
-            source=source,
-            mode=mode,
-        )
-        sel = upserted.selection
+        upserted = upsert_entity_selection(s, into, result.affected_iris, source, mode=mode)
         s.commit()
 
-    lines = [
-        f"Found {result.total_groups} duplicate {annotation_property} values "
-        f"across {sel.size} entities -> {format_selection_ref(sel)}."
-    ]
-    if upserted.previous_size is not None:
-        lines.append(f"Overwrote previous ({upserted.previous_size} items).")
-    lines.append("")
+    if not result.groups:
+        return format_selection_write(upserted, no_results=f"No duplicates for {source}.")
 
-    lines.extend(
-        f"  {dquoted(group.value)} ({len(group.iris)} entities): {', '.join(group.iris)}"
-        for group in result.groups[:_PREVIEW_GROUPS]
-    )
+    prop = str(annotation_property)
+    g = result.total_groups
+    head = f"{format_saved_line(upserted)} {g} duplicate {prop} values:"
+    body = _format_groups(result.groups)
+    return f"{head}\n\n{body}"
 
-    if result.total_groups > _PREVIEW_GROUPS:
-        lines.append(f"\n  ... and {result.total_groups - _PREVIEW_GROUPS} more groups.")
 
+def _format_groups(groups: tuple[DuplicateGroup, ...]):
+    lines = [_format_group_line(group) for group in groups[:PREVIEW_ROWS]]
+
+    if len(groups) > PREVIEW_ROWS:
+        lines.append(f"\n  ... and {len(groups) - PREVIEW_ROWS} more.")
     return "\n".join(lines)
+
+
+def _format_group_line(group: DuplicateGroup):
+    count = format_kinded_count(SelectionKind.ENTITIES, len(group.iris))
+    iris = ", ".join(group.iris)
+    return f"  {dquoted(group.value)} ({count}): {iris}"
 
 
 tool_find_duplicate_entities = create_tool(
