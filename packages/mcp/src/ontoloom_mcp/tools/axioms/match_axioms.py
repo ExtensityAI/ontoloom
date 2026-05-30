@@ -5,8 +5,12 @@ from ontoloom.patterns.types import Pattern
 from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 
-from ontoloom_mcp.components.formatting import format_selection_ref, format_selection_result
-from ontoloom_mcp.components.preview import format_axiom_selection_preview
+from ontoloom_mcp.components.formatting import (
+    ToolFilterSource,
+    format_selection_preview,
+    format_selection_write,
+    format_source,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, OntologyPath
 
@@ -37,8 +41,11 @@ def match_axioms(
     - `into`: Name for the axiom selection to save results (e.g. `"my_matches"`).
     - `mode`: `create` (default) refuses if the selection name already exists; `replace` overwrites it.
     - `within`: Optional selection name (axiom or entity) to restrict the search to.
-    - `limit`: Cap on matches collected before iteration stops; raise to widen the scan.
+    - `limit`: Cap on matches collected before iteration stops; preview is
+      independently capped at PREVIEW_ROWS.
     """
+    source = format_source(ToolFilterSource("match_axioms", {}, within=within))
+
     ont = Ontology(path)
     with session(ont) as s:
         result = core_match(s, pattern, within=within, limit=limit)
@@ -46,24 +53,19 @@ def match_axioms(
             s,
             into,
             result.axiom_hashes,
-            "match_axioms",
+            source,
             mode=mode,
         )
-        sel = upserted.selection
 
-        truncated_hint = (
-            f" (truncated at limit={limit}; raise it to see more)" if result.truncated else ""
-        )
-        header = f"{len(result.axiom_hashes)} axioms matched{truncated_hint}"
-
-        if not result.axiom_hashes:
-            s.commit()
-            return f"{header} -> {format_selection_ref(sel)}."
-
-        page_text = format_axiom_selection_preview(s, upserted)
+        preview = format_selection_preview(s, upserted)
         s.commit()
 
-    return f"{header}. " + format_selection_result(upserted, page_text)
+    return format_selection_write(
+        upserted,
+        preview=preview,
+        no_results=f"No matches for {source}.",
+        truncated_limit=limit if result.truncated else None,
+    )
 
 
 tool_match_axioms = create_tool(

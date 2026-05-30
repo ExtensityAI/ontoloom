@@ -391,6 +391,104 @@ def test_search_axioms_requires_query_or_properties(empty_db):
     assert str(exc_info.value) == "search_axioms requires at least one of `query` or `properties`."
 
 
+def test_match_axioms_saves_matches_with_unified_output(empty_db):
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")),
+        ],
+    )
+
+    result = match_axioms(
+        path=empty_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=SelectionName("subclass_animal"),
+    )
+
+    assert result.startswith('Saved 2 axioms to "subclass_animal".\n\n')
+    assert "axioms:subclass_animal" not in result
+    assert "axioms matched" not in result
+    assert "SubClassOf(ex:Dog, ex:Animal)" in result
+    assert "SubClassOf(ex:Cat, ex:Animal)" in result
+
+
+def test_match_axioms_truncation_folds_into_saved_line(empty_db):
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")),
+        ],
+    )
+
+    result = match_axioms(
+        path=empty_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=SelectionName("limited"),
+        limit=1,
+    )
+
+    assert result.startswith(
+        'Saved 1 axiom to "limited" (truncated at limit=1; raise it to see more).\n\n'
+    )
+    assert "SubClassOf" in result
+
+
+def test_match_axioms_no_results_message(empty_db):
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+
+    add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))],
+    )
+
+    result = match_axioms(
+        path=empty_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=SelectionName("no_matches"),
+    )
+
+    assert result == 'Saved 0 axioms to "no_matches". No matches for match_axioms.'
+
+
+def test_match_axioms_no_results_within_scope_renders_within_suffix(empty_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+
+    decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    add_axioms(path=empty_db, axioms=[decl])
+
+    decl_hash = HashedAxiom.of(decl).hash
+    with session(Ontology(empty_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope"), [decl_hash], "test fixture")
+        s.commit()
+
+    result = match_axioms(
+        path=empty_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=SelectionName("no_matches"),
+        within=SelectionName("scope"),
+    )
+
+    assert result == 'Saved 0 axioms to "no_matches". No matches for match_axioms within "scope".'
+
+
 # -- Error translation --
 
 
