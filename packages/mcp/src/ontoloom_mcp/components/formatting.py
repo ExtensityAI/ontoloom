@@ -11,15 +11,20 @@ from ontoloom.entities.reader import lookup_entity_labels
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.query.dispatch import execute
+from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
+from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
 from ontoloom.selections.types import (
     AxiomSelection,
     EntitySelection,
     SelectionKind,
     SelectionName,
+    ShowFilter,
 )
 from ontoloom.utils import dquoted
 
+PREVIEW_ROWS = 10
 SELECT_PREVIEW = 5
 SELECT_INLINE_MAX = 20
 
@@ -341,6 +346,109 @@ def format_source(src: SourceDescriptor) -> str:
     if src.within is None:
         return body
     return f"{body} within {dquoted(str(src.within))}"
+
+
+def format_saved_line(
+    upserted: AxiomUpsertResult | EntityUpsertResult,
+    *,
+    truncated_limit: int | None = None,
+):
+    """Render the one-line summary for a just-upserted selection.
+
+    Form: `Saved N <noun> to "<name>"[ (truncated...)].[ Replaced previous (M items).]`
+    """
+    sel = upserted.selection
+    kind = _kind_of(sel)
+    count = format_kinded_count(kind, sel.size)
+    trunc_tail = (
+        f" (truncated at limit={truncated_limit}; raise it to see more)"
+        if truncated_limit is not None
+        else ""
+    )
+    overwrite_tail = format_overwrite_note(upserted.previous_size)
+    return f"Saved {count} to {dquoted(sel.name)}{trunc_tail}.{overwrite_tail}"
+
+
+def format_selection_preview(
+    s: Session,
+    upserted: AxiomUpsertResult | EntityUpsertResult,
+):
+    """Render the head page of a just-upserted selection, with optional `... and N more` footer.
+
+    Dispatches by selection kind. Footer is appended (with one blank line
+    separator) when `upserted.selection.size > PREVIEW_ROWS`.
+    """
+    sel = upserted.selection
+    body = _render_preview_rows(s, upserted)
+
+    if sel.size <= PREVIEW_ROWS:
+        return body
+
+    remaining = sel.size - PREVIEW_ROWS
+    footer = (
+        f"... and {remaining} more. Use `read_selection` with "
+        f"{dquoted(sel.name)} to see all {sel.size}."
+    )
+    return f"{body}\n\n{footer}"
+
+
+def _render_preview_rows(
+    s: Session,
+    upserted: AxiomUpsertResult | EntityUpsertResult,
+):
+    if isinstance(upserted, AxiomUpsertResult):
+        page = execute(
+            s,
+            ReadAxiomSelection(
+                selection=upserted.selection.name,
+                limit=PREVIEW_ROWS,
+                offset=0,
+                show=ShowFilter.ALL,
+            ),
+        )
+        page_axioms = [
+            HashedAxiom(axiom=item.axiom, hash=item.hash)
+            for item in page.items
+            if item.axiom is not None
+        ]
+        refs_per_axiom = build_refs_per_axiom(s, page_axioms)
+        return format_axiom_listing(page_axioms, refs_per_axiom=refs_per_axiom)
+
+    page = execute(
+        s,
+        ReadEntitySelection(
+            selection=upserted.selection.name,
+            limit=PREVIEW_ROWS,
+            offset=0,
+            show=ShowFilter.ALL,
+        ),
+    )
+    lines = [
+        format_entity_line(Ref(iri=item.iri, label=item.label), item.roles)
+        for item in page.items
+        if item.present
+    ]
+    return "\n".join(lines)
+
+
+def format_selection_write(
+    upserted: AxiomUpsertResult | EntityUpsertResult,
+    *,
+    preview: str = "",
+    no_results: str = "",
+    truncated_limit: int | None = None,
+):
+    """Compose the saved-line plus body for a selection-writing tool.
+
+    Empty selection (`size == 0`): saved line + single space + `no_results`.
+    Non-empty: saved line + blank line + `preview` body.
+    `truncated_limit` is passed through to `format_saved_line`.
+    """
+    saved = format_saved_line(upserted, truncated_limit=truncated_limit)
+
+    if upserted.selection.size == 0:
+        return f"{saved} {no_results}"
+    return f"{saved}\n\n{preview}"
 
 
 def format_selection_result(

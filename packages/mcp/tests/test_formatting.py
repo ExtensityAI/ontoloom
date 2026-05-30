@@ -1,10 +1,23 @@
 """Golden-string tests for the shared formatting vocabulary helpers."""
 
+import pytest
 from ontoloom.axioms.hashing import AxiomHash, short_hash
+from ontoloom.axioms.mutations import add_axioms as core_add_axioms
 from ontoloom.axioms.types import HashedAxiom
-from ontoloom.owl.axioms import SubClassOf
-from ontoloom.owl.iri import IRI
+from ontoloom.connection import Ontology, session
+from ontoloom.owl.annotations import Annotation
+from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
+from ontoloom.owl.iri import IRI, RDFS_LABEL
+from ontoloom.owl.literals import LangLiteral
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes.store import set_prefix
+from ontoloom.prefixes.types import NamespaceIRI, PrefixName
+from ontoloom.selections.store import (
+    AxiomUpsertResult,
+    EntityUpsertResult,
+    upsert_axiom_selection,
+    upsert_entity_selection,
+)
 from ontoloom.selections.types import (
     AxiomSelection,
     EntitySelection,
@@ -13,6 +26,7 @@ from ontoloom.selections.types import (
     SelectionName,
 )
 from ontoloom_mcp.components.formatting import (
+    PREVIEW_ROWS,
     Ref,
     RenameSource,
     SetExprSource,
@@ -26,6 +40,9 @@ from ontoloom_mcp.components.formatting import (
     format_overwrite_note,
     format_pagination,
     format_read_header,
+    format_saved_line,
+    format_selection_preview,
+    format_selection_write,
     format_source,
     format_within_scope,
 )
@@ -45,6 +62,14 @@ def _entity_sel(name: str, size: int) -> EntitySelection:
         hash=SelectionContentHash("0123456789abcdef"),
         size=size,
     )
+
+
+def _axiom_upserted(name: str, size: int, previous_size: int | None = None) -> AxiomUpsertResult:
+    return AxiomUpsertResult(selection=_axiom_sel(name, size), previous_size=previous_size)
+
+
+def _entity_upserted(name: str, size: int, previous_size: int | None = None) -> EntityUpsertResult:
+    return EntityUpsertResult(selection=_entity_sel(name, size), previous_size=previous_size)
 
 
 def test_kinded_count_axioms_singular():
@@ -285,3 +310,174 @@ def test_source_set_expr_within_suffix():
     assert (
         format_source(SetExprSource("union(a, b)", within="scope")) == 'union(a, b) within "scope"'
     )
+
+
+# -- format_saved_line --
+
+
+def test_saved_line_axioms_plural_no_overwrite():
+    assert format_saved_line(_axiom_upserted("x", 2)) == 'Saved 2 axioms to "x".'
+
+
+def test_saved_line_axioms_singular_no_overwrite():
+    assert format_saved_line(_axiom_upserted("x", 1)) == 'Saved 1 axiom to "x".'
+
+
+def test_saved_line_axioms_with_overwrite():
+    assert (
+        format_saved_line(_axiom_upserted("x", 2, previous_size=3))
+        == 'Saved 2 axioms to "x". Replaced previous (3 items).'
+    )
+
+
+def test_saved_line_axioms_with_truncated_limit():
+    assert (
+        format_saved_line(_axiom_upserted("limited", 2), truncated_limit=1)
+        == 'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).'
+    )
+
+
+def test_saved_line_axioms_truncated_and_overwrite():
+    assert format_saved_line(_axiom_upserted("limited", 2, previous_size=3), truncated_limit=1) == (
+        'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).'
+        " Replaced previous (3 items)."
+    )
+
+
+def test_saved_line_entities_plural():
+    assert format_saved_line(_entity_upserted("dogs", 4)) == 'Saved 4 entities to "dogs".'
+
+
+def test_saved_line_entities_singular():
+    assert format_saved_line(_entity_upserted("dogs", 1)) == 'Saved 1 entity to "dogs".'
+
+
+# -- format_selection_write --
+
+
+def test_write_block_empty_uses_no_results():
+    out = format_selection_write(
+        _axiom_upserted("review", 0),
+        no_results='No matches for search_axioms(query="review").',
+    )
+    assert out == ('Saved 0 axioms to "review". No matches for search_axioms(query="review").')
+
+
+def test_write_block_nonempty_joins_saved_then_blank_then_preview():
+    out = format_selection_write(_axiom_upserted("x", 2), preview="line1\nline2")
+    assert out == 'Saved 2 axioms to "x".\n\nline1\nline2'
+
+
+def test_write_block_nonempty_with_overwrite_in_saved_line():
+    out = format_selection_write(
+        _axiom_upserted("x", 2, previous_size=3),
+        preview="line1\nline2",
+    )
+    assert out == ('Saved 2 axioms to "x". Replaced previous (3 items).\n\nline1\nline2')
+
+
+def test_write_block_nonempty_with_truncated_limit_passthrough():
+    out = format_selection_write(
+        _axiom_upserted("limited", 2),
+        preview="row1",
+        truncated_limit=1,
+    )
+    assert out == (
+        'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).\n\nrow1'
+    )
+
+
+# -- format_selection_preview (DB fixtures) --
+
+
+@pytest.fixture()
+def ont(tmp_path):
+    path = tmp_path / "preview.ontology.db"
+    Ontology.create(path)
+    with session(Ontology(path)) as s:
+        set_prefix(s, PrefixName("ex"), NamespaceIRI("http://example.org/"))
+        s.commit()
+    return Ontology(path)
+
+
+def _label_ann(text: str) -> Annotation:
+    return Annotation(property=RDFS_LABEL, value=LangLiteral(value=text))
+
+
+def _label_assertion(iri: IRI, text: str) -> AnnotationAssertion:
+    return AnnotationAssertion(property=RDFS_LABEL, subject=iri, value=LangLiteral(value=text))
+
+
+def test_preview_axiom_selection_small(ont):
+    with session(ont) as s:
+        axioms = [Declaration(entity_type=EntityType.CLASS, iri=IRI(f"ex:C{i}")) for i in range(3)]
+        core_add_axioms(s, axioms)
+        hashes = [HashedAxiom.of(a).hash for a in axioms]
+        upserted = upsert_axiom_selection(s, SelectionName("small"), hashes, "test")
+        out = format_selection_preview(s, upserted)
+        s.commit()
+
+    lines = out.splitlines()
+    assert len(lines) == 3
+    for i, line in enumerate(lines):
+        assert f"Declaration(Class, ex:C{i})" in line
+    assert "more" not in out
+
+
+def test_preview_axiom_selection_large_appends_footer(ont):
+    with session(ont) as s:
+        axioms = [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(f"ex:C{i:02d}")) for i in range(15)
+        ]
+        core_add_axioms(s, axioms)
+        hashes = [HashedAxiom.of(a).hash for a in axioms]
+        upserted = upsert_axiom_selection(s, SelectionName("big"), hashes, "test")
+        out = format_selection_preview(s, upserted)
+        s.commit()
+
+    parts = out.split("\n\n")
+    assert len(parts) == 2
+    row_lines = parts[0].splitlines()
+    assert len(row_lines) == PREVIEW_ROWS
+    assert parts[1] == ('... and 5 more. Use `read_selection` with "big" to see all 15.')
+
+
+def test_preview_entity_selection_small(ont):
+    with session(ont) as s:
+        core_add_axioms(
+            s,
+            [
+                Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+                Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+                _label_assertion(IRI("ex:Dog"), "Dog"),
+            ],
+        )
+        iris = [IRI("ex:Cat"), IRI("ex:Dog")]
+        upserted = upsert_entity_selection(s, SelectionName("ents"), iris, "test")
+        out = format_selection_preview(s, upserted)
+        s.commit()
+
+    lines = out.splitlines()
+    assert len(lines) == 2
+    # ReadEntitySelection orders by IRI lexicographically: Cat before Dog.
+    assert lines[0] == "ex:Cat (Class)"
+    assert lines[1] == 'ex:Dog (Class) "Dog"'
+    assert "more" not in out
+
+
+def test_preview_entity_selection_large_appends_footer(ont):
+    with session(ont) as s:
+        axioms = [
+            Declaration(entity_type=EntityType.CLASS, iri=IRI(f"ex:E{i:02d}")) for i in range(12)
+        ]
+        core_add_axioms(s, axioms)
+        iris = [IRI(f"ex:E{i:02d}") for i in range(12)]
+        upserted = upsert_entity_selection(s, SelectionName("ebig"), iris, "test")
+        out = format_selection_preview(s, upserted)
+        s.commit()
+
+    parts = out.split("\n\n")
+    assert len(parts) == 2
+    row_lines = parts[0].splitlines()
+    assert len(row_lines) == PREVIEW_ROWS
+    assert parts[1] == ('... and 2 more. Use `read_selection` with "ebig" to see all 12.')
