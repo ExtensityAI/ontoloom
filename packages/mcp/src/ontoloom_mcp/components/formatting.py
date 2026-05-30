@@ -77,14 +77,14 @@ def format_read_header(meta: AxiomSelection | EntitySelection, present: int, mis
     total = present + missing
     return (
         f"{dquoted(meta.name)}: {format_kinded_count(kind, total)} "
-        f"— {present} present, {missing} missing"
+        f"- {present} present, {missing} missing"
     )
 
 
 def format_list_row(
     meta: AxiomSelection | EntitySelection, present: int, missing: int, source: str
 ):
-    """Indented per-selection row: `  "name": N <noun>[, M missing] — source: <source>`.
+    """Indented per-selection row: `  "name": N <noun>[, M missing] - source: <source>`.
 
     Drift appears as a comma-tail inside the noun phrase only when `missing > 0`.
     """
@@ -92,7 +92,7 @@ def format_list_row(
     total = present + missing
     drift_tail = f", {missing} missing" if missing > 0 else ""
     return (
-        f"  {dquoted(meta.name)}: {format_kinded_count(kind, total)}{drift_tail} — source: {source}"
+        f"  {dquoted(meta.name)}: {format_kinded_count(kind, total)}{drift_tail} - source: {source}"
     )
 
 

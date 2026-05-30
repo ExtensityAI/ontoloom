@@ -162,14 +162,14 @@ def test_read_header_axioms_no_missing_still_shows_drift():
     meta = _axiom_sel("subclass_animal", 2)
     assert (
         format_read_header(meta, present=2, missing=0)
-        == '"subclass_animal": 2 axioms — 2 present, 0 missing'
+        == '"subclass_animal": 2 axioms - 2 present, 0 missing'
     )
 
 
 def test_read_header_axioms_singular_total_all_missing():
     meta = _axiom_sel("review", 1)
     assert (
-        format_read_header(meta, present=0, missing=1) == '"review": 1 axiom — 0 present, 1 missing'
+        format_read_header(meta, present=0, missing=1) == '"review": 1 axiom - 0 present, 1 missing'
     )
 
 
@@ -177,7 +177,7 @@ def test_read_header_entities():
     meta = _entity_sel("all_classes", 6)
     assert (
         format_read_header(meta, present=6, missing=0)
-        == '"all_classes": 6 entities — 6 present, 0 missing'
+        == '"all_classes": 6 entities - 6 present, 0 missing'
     )
 
 
@@ -185,7 +185,7 @@ def test_list_row_axioms_no_drift():
     meta = _axiom_sel("subclass_animal", 2)
     assert (
         format_list_row(meta, present=2, missing=0, source="match_axioms")
-        == '  "subclass_animal": 2 axioms — source: match_axioms'
+        == '  "subclass_animal": 2 axioms - source: match_axioms'
     )
 
 
@@ -193,7 +193,7 @@ def test_list_row_axioms_with_drift():
     meta = _axiom_sel("review", 1)
     assert (
         format_list_row(meta, present=0, missing=1, source='search_axioms(query="review")')
-        == '  "review": 1 axiom, 1 missing — source: search_axioms(query="review")'
+        == '  "review": 1 axiom, 1 missing - source: search_axioms(query="review")'
     )
 
 
@@ -201,7 +201,7 @@ def test_list_row_entities_no_drift():
     meta = _entity_sel("all_classes", 6)
     assert (
         format_list_row(meta, present=6, missing=0, source='search_entities(role="Class")')
-        == '  "all_classes": 6 entities — source: search_entities(role="Class")'
+        == '  "all_classes": 6 entities - source: search_entities(role="Class")'
     )
 
 
