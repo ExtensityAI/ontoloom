@@ -14,6 +14,9 @@ from ontoloom.selections.types import (
 )
 from ontoloom_mcp.components.formatting import (
     Ref,
+    RenameSource,
+    SetExprSource,
+    ToolFilterSource,
     _format_axiom_line,
     format_drift,
     format_entity_line,
@@ -23,6 +26,7 @@ from ontoloom_mcp.components.formatting import (
     format_overwrite_note,
     format_pagination,
     format_read_header,
+    format_source,
     format_within_scope,
 )
 
@@ -218,3 +222,66 @@ def test_within_scope_entities():
 def test_within_scope_singular_axiom():
     meta = _axiom_sel("only_one", 1)
     assert format_within_scope(meta) == 'Within "only_one" (1 axiom)'
+
+
+def test_source_tool_no_filters_bare_name():
+    assert format_source(ToolFilterSource("match_axioms", {})) == "match_axioms"
+
+
+def test_source_tool_quoted_string_filter():
+    assert (
+        format_source(ToolFilterSource("search_axioms", {"query": "x"}))
+        == 'search_axioms(query="x")'
+    )
+
+
+def test_source_tool_mixed_string_and_bool_filters():
+    assert (
+        format_source(ToolFilterSource("search_entities", {"role": "Class", "declared": True}))
+        == 'search_entities(role="Class", declared=True)'
+    )
+
+
+def test_source_tool_list_of_strings_filter():
+    assert (
+        format_source(ToolFilterSource("search_axioms", {"properties": ["rdfs:comment"]}))
+        == 'search_axioms(properties=["rdfs:comment"])'
+    )
+
+
+def test_source_rename_uses_ascii_arrow():
+    assert format_source(RenameSource("ex:Cat", "ex:Dog")) == "rename_iri(ex:Cat -> ex:Dog)"
+
+
+def test_source_set_expr_verbatim():
+    assert (
+        format_source(SetExprSource("union(all_classes, dog_search)"))
+        == "union(all_classes, dog_search)"
+    )
+
+
+def test_source_tool_with_filters_within_suffix():
+    assert (
+        format_source(ToolFilterSource("search_entities", {"role": "Class"}, within="dogs"))
+        == 'search_entities(role="Class") within "dogs"'
+    )
+
+
+def test_source_tool_no_filters_within_suffix():
+    assert (
+        format_source(ToolFilterSource("match_axioms", {}, within="dogs"))
+        == 'match_axioms within "dogs"'
+    )
+
+
+def test_source_rename_within_suffix():
+    assert (
+        format_source(RenameSource("ex:Cat", "ex:Dog", within="scope"))
+        == 'rename_iri(ex:Cat -> ex:Dog) within "scope"'
+    )
+
+
+def test_source_set_expr_within_suffix():
+    assert (
+        format_source(SetExprSource("union(a, b)", within="scope")) == 'union(a, b) within "scope"'
+    )

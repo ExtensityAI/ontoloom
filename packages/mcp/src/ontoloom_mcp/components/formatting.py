@@ -1,6 +1,7 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from collections.abc import Set as AbstractSet
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from typing import Literal
 
 from ontoloom.axioms.entity_walker import iter_axiom_entities
 from ontoloom.axioms.hashing import AxiomHash, short_hash
@@ -11,7 +12,12 @@ from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
-from ontoloom.selections.types import AxiomSelection, EntitySelection, SelectionKind
+from ontoloom.selections.types import (
+    AxiomSelection,
+    EntitySelection,
+    SelectionKind,
+    SelectionName,
+)
 from ontoloom.utils import dquoted
 
 SELECT_PREVIEW = 5
@@ -248,6 +254,93 @@ def format_axiom_listing(
     return "\n".join(
         _format_axiom_line(ha, refs) for ha, refs in zip(axioms, refs_list, strict=True)
     )
+
+
+@dataclass(frozen=True, slots=True)
+class ToolFilterSource:
+    """Source for a tool invocation: tool name plus its non-default filter args.
+
+    Filters are stored as `tuple[tuple[str, object], ...]` so the descriptor
+    stays hashable under `frozen=True`; the constructor accepts any Mapping
+    and preserves insertion order.
+    """
+
+    kind: Literal["tool"] = field(init=False, default="tool")
+    tool: str
+    filters: tuple[tuple[str, object], ...]
+    within: SelectionName | str | None = None
+
+    def __init__(
+        self,
+        tool: str,
+        filters: Mapping[str, object],
+        within: SelectionName | str | None = None,
+    ):
+        object.__setattr__(self, "tool", tool)
+        object.__setattr__(self, "filters", tuple(filters.items()))
+        object.__setattr__(self, "within", within)
+
+
+@dataclass(frozen=True, slots=True)
+class RenameSource:
+    """Source for a `rename_iri` invocation."""
+
+    kind: Literal["rename"] = field(init=False, default="rename")
+    old: str
+    new: str
+    within: SelectionName | str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SetExprSource:
+    """Source for a `create_selection` invocation; `expr` is the rendered set-expression."""
+
+    kind: Literal["set_expr"] = field(init=False, default="set_expr")
+    expr: str
+    within: SelectionName | str | None = None
+
+
+type SourceDescriptor = ToolFilterSource | RenameSource | SetExprSource
+
+
+def _format_filter_value(v: object) -> str:
+    # Per-filter value formatting is intentionally type-discriminated so quoted
+    # strings, bare bools/ints, and bracketed string lists all render naturally.
+    # `repr` is the safe fallback for anything else.
+    if isinstance(v, bool):
+        return str(v)
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, str):
+        return dquoted(v)
+    if isinstance(v, list):
+        return "[" + ", ".join(dquoted(item) for item in v) + "]"
+    return repr(v)
+
+
+def format_source(src: SourceDescriptor) -> str:
+    """Render a source descriptor to its breadcrumb string.
+
+    A uniform ` within "<name>"` suffix is appended when `src.within` is set.
+    """
+    match src:
+        case ToolFilterSource():
+            if src.filters:
+                args = ", ".join(f"{k}={_format_filter_value(v)}" for k, v in src.filters)
+                body = f"{src.tool}({args})"
+            else:
+                body = src.tool
+        case RenameSource():
+            body = f"rename_iri({src.old} -> {src.new})"
+        case SetExprSource():
+            body = src.expr
+        case _:
+            msg = f"Unknown source descriptor: {type(src).__name__}"
+            raise ValueError(msg)
+
+    if src.within is None:
+        return body
+    return f"{body} within {dquoted(str(src.within))}"
 
 
 def format_selection_result(
