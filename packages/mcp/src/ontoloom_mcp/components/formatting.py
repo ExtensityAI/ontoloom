@@ -3,7 +3,7 @@ from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 
 from ontoloom.axioms.entity_walker import iter_axiom_entities
-from ontoloom.axioms.hashing import short_hash
+from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Session
 from ontoloom.entities.reader import lookup_entity_labels
@@ -134,6 +134,11 @@ def _format_axiom_line(ha: HashedAxiom, refs: Sequence[Ref] = ()):
     if annotation_lines:
         return head + "\n" + "\n".join(annotation_lines)
     return head
+
+
+def format_missing_axiom_line(h: AxiomHash):
+    """Render the head line for a selection item whose axiom is no longer present."""
+    return f"[{short_hash(h)}] *missing*"
 
 
 def format_diff(
