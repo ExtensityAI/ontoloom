@@ -4,11 +4,13 @@ from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.owl.axioms import SubClassOf
 from ontoloom.owl.iri import IRI
+from ontoloom.owl.markers import EntityType
 from ontoloom.selections.types import SelectionKind
 from ontoloom_mcp.components.formatting import (
     Ref,
     _format_axiom_line,
     format_drift,
+    format_entity_line,
     format_kinded_count,
     format_missing_axiom_line,
     format_overwrite_note,
@@ -71,3 +73,25 @@ def test_axiom_line_present_with_label_hint_unchanged():
 def test_missing_axiom_line_renders_bracketed_short_hash():
     full = AxiomHash("a1b2c3d4e5f6" + "0" * 52)
     assert format_missing_axiom_line(full) == "[a1b2c3d4e5f6] *missing*"
+
+
+def test_entity_line_label_and_multiple_roles():
+    ref = Ref(iri=IRI("ex:Dog"), label="Dog")
+    roles = frozenset({EntityType.CLASS, EntityType.OBJECT_PROPERTY})
+    assert format_entity_line(ref, roles) == 'ex:Dog (Class, ObjectProperty) "Dog"'
+
+
+def test_entity_line_no_label_with_role():
+    ref = Ref(iri=IRI("ex:Tail"), label=None)
+    roles = frozenset({EntityType.CLASS})
+    assert format_entity_line(ref, roles) == "ex:Tail (Class)"
+
+
+def test_entity_line_label_no_roles():
+    ref = Ref(iri=IRI("ex:Dog"), label="Dog")
+    assert format_entity_line(ref, frozenset()) == 'ex:Dog "Dog"'
+
+
+def test_entity_line_no_label_no_roles():
+    ref = Ref(iri=IRI("ex:Dog"), label=None)
+    assert format_entity_line(ref, frozenset()) == "ex:Dog"

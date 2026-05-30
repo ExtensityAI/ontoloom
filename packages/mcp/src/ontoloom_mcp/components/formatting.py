@@ -111,6 +111,21 @@ def format_roles(roles: AbstractSet[EntityType]):
     return ", ".join(sorted(str(r) for r in roles)) or "none"
 
 
+def format_entity_line(ref: Ref, roles: frozenset[EntityType]):
+    """Canonical one-line entity row: `iri[ (roles)][ "label"]`.
+
+    Roles render as a sorted, comma-joined enum-value list inside parens;
+    the parens are omitted entirely when `roles` is empty. The label, when
+    present, is double-quoted and trails the roles.
+    """
+    parts = [str(ref.iri)]
+    if roles:
+        parts.append(f"({', '.join(sorted(str(r) for r in roles))})")
+    if ref.label:
+        parts.append(dquoted(ref.label))
+    return " ".join(parts)
+
+
 def format_axiom_annotations(axiom: BaseAxiom):
     """Indented Turtle-style `# prop value` lines for an axiom's metadata annotations.
 
