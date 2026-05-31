@@ -1279,28 +1279,102 @@ def test_set_prefix_reassign_in_use_with_wrong_token_raises(populated_db):
 # -- rename_iri confirmation flow --
 
 
-def test_rename_iri_no_collision_succeeds_without_confirm(populated_db):
+def test_rename_iri_no_collision_renders_diff_with_summary(populated_db):
+    from ontoloom.axioms.hashing import short_hash
+    from ontoloom.axioms.types import HashedAxiom
+
+    new_dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Puppy"))
+    new_sub = SubClassOf(sub_class=IRI("ex:Puppy"), super_class=IRI("ex:Animal"))
+    old_dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    old_sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    old_dog_h = HashedAxiom.of(old_dog_decl).hash
+    old_sub_h = HashedAxiom.of(old_sub).hash
+    new_dog_h = HashedAxiom.of(new_dog_decl).hash
+    new_sub_h = HashedAxiom.of(new_sub).hash
+
     result = rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Puppy"))
-    assert "ex:Dog" in result
-    assert "ex:Puppy" in result
-    assert "replaced" in result
+
+    expected = (
+        "Renamed ex:Dog -> ex:Puppy: 2 axioms replaced.\n\n"
+        "```diff\n"
+        f"- [{short_hash(old_sub_h)}] {old_sub}\n"
+        f"+ [{short_hash(new_sub_h)}] {new_sub}\n"
+        f"- [{short_hash(old_dog_h)}] {old_dog_decl}\n"
+        f"+ [{short_hash(new_dog_h)}] {new_dog_decl}\n"
+        "```"
+    )
+    assert result == expected
 
 
 def test_rename_iri_no_op_when_iri_absent(populated_db):
     result = rename_iri(path=populated_db, old_iri=IRI("ex:NotPresent"), new_iri=IRI("ex:Other"))
-    assert "No-op" in result
+    assert result == "No axioms found mentioning ex:NotPresent. No-op."
 
 
-def test_rename_iri_collision_without_confirm_raises(populated_db):
-    # Both ex:Dog (Class) declaration and ex:Animal (Class) declaration exist.
+def test_rename_iri_into_appends_saved_line(populated_db):
+    result = rename_iri(
+        path=populated_db,
+        old_iri=IRI("ex:Dog"),
+        new_iri=IRI("ex:Puppy"),
+        into=SelectionName("renamed_dog"),
+    )
+    # Body is the summary + diff; saved line trails after a blank line.
+    assert result.startswith("Renamed ex:Dog -> ex:Puppy: 2 axioms replaced.\n\n```diff\n")
+    assert result.endswith('\n```\n\nSaved 2 axioms to "renamed_dog".')
+
+
+def test_rename_iri_within_persists_source_with_within_suffix(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import (
+        get_axiom_selection,
+        upsert_axiom_selection,
+    )
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_decl_hash = HashedAxiom.of(dog_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("scope"), [dog_decl_hash], "test fixture")
+        s.commit()
+
+    rename_iri(
+        path=populated_db,
+        old_iri=IRI("ex:Dog"),
+        new_iri=IRI("ex:Puppy"),
+        within=SelectionName("scope"),
+        into=SelectionName("renamed_dog"),
+    )
+
+    with session(Ontology(populated_db)) as s:
+        meta = get_axiom_selection(s, SelectionName("renamed_dog"))
+        s.commit()
+    assert meta.source == 'rename_iri(ex:Dog -> ex:Puppy) within "scope"'
+
+
+def test_rename_iri_collision_without_confirm_raises_with_short_hashes(populated_db):
+    from ontoloom.axioms.hashing import short_hash
+    from ontoloom.axioms.types import HashedAxiom
+
     # Renaming ex:Dog -> ex:Animal collides on the Declaration axiom.
+    new_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    new_decl_h = HashedAxiom.of(new_decl).hash
+
     with pytest.raises(ConfirmationRequiredError) as exc_info:
         rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Animal"))
-    assert exc_info.value.token
-    assert "confirm=" in str(exc_info.value)
+
+    msg = str(exc_info.value)
+    expected_body = (
+        "Renaming ex:Dog -> ex:Animal would merge 1 axiom(s) into existing axioms "
+        "(annotations on the merged axioms may be lost). "
+        f"Colliding new hashes: [{short_hash(new_decl_h)}]."
+    )
+    assert msg.startswith(expected_body)
+    assert msg.endswith(f'To proceed, call again with confirm="{exc_info.value.token}".')
+    # No raw AxiomHash(...) repr leaked into the message.
+    assert "AxiomHash(" not in msg
 
 
-def test_rename_iri_collision_with_correct_token_succeeds(populated_db):
+def test_rename_iri_collision_with_correct_token_renders_merge_note(populated_db):
     with pytest.raises(ConfirmationRequiredError) as exc_info:
         rename_iri(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI("ex:Animal"))
     token = exc_info.value.token
@@ -1311,9 +1385,12 @@ def test_rename_iri_collision_with_correct_token_succeeds(populated_db):
         new_iri=IRI("ex:Animal"),
         confirm=token,
     )
-    assert "ex:Dog" in result
-    assert "ex:Animal" in result
-    assert "merged" in result
+    # Two axioms get rewritten: the Declaration collides (merged), the SubClassOf does not.
+    assert result.startswith(
+        "Renamed ex:Dog -> ex:Animal: 2 axioms replaced. 1 merged into existing axioms.\n\n"
+        "```diff\n"
+    )
+    assert result.endswith("\n```")
 
 
 def test_rename_iri_collision_with_wrong_token_raises(populated_db):
@@ -1344,7 +1421,7 @@ def test_rename_iri_within_bare_scope_limits_rename(populated_db):
         new_iri=IRI("ex:Puppy"),
         within=SelectionName("scope"),
     )
-    assert "1 axioms replaced" in result
+    assert result.startswith("Renamed ex:Dog -> ex:Puppy: 1 axioms replaced.\n\n```diff\n")
 
     # The SubClassOf is out of scope, so it still mentions ex:Dog.
     with session(Ontology(populated_db)) as s:
@@ -1383,7 +1460,7 @@ def test_rename_iri_within_scope_collision_token_round_trips(populated_db):
         within=SelectionName("scope"),
         confirm=token,
     )
-    assert "merged" in result
+    assert "1 merged into existing axioms." in result
 
 
 def test_rename_iri_within_scope_change_invalidates_token(populated_db):

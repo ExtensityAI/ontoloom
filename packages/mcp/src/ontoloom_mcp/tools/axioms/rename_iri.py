@@ -1,5 +1,7 @@
 from mcp.types import ToolAnnotations
+from ontoloom.axioms.hashing import short_hash
 from ontoloom.axioms.mutations import rename_iri as core_rename_iri
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.iri import IRI
 from ontoloom.selections.store import get_axiom_selection, upsert_axiom_selection
@@ -9,9 +11,16 @@ from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.formatting import format_selection_ref
+from ontoloom_mcp.components.formatting import (
+    RenameSource,
+    format_diff,
+    format_saved_line,
+    format_source,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
+
+DIFF_MAX_ROWS = 20
 
 
 def rename_iri(
@@ -43,6 +52,8 @@ def rename_iri(
       call raises `ConfirmationRequiredError` with a token. Pass that token
       here to apply the change.
     """
+    source = format_source(RenameSource(str(old_iri), str(new_iri), within=within))
+
     ont = Ontology(path)
     with session(ont) as s:
         result = core_rename_iri(s, old_iri, new_iri, within=within)
@@ -54,24 +65,21 @@ def rename_iri(
 
             token = confirmation_token(*parts)
             if confirm != token:
+                short_hashes = ", ".join(
+                    f"[{short_hash(h)}]" for h in sorted(result.colliding_hashes)
+                )
                 msg = (
                     f"Renaming {old_iri} -> {new_iri} would merge "
                     f"{len(result.colliding_hashes)} axiom(s) into existing axioms "
                     f"(annotations on the merged axioms may be lost). "
-                    f"Colliding new hashes: {sorted(result.colliding_hashes)}."
+                    f"Colliding new hashes: {short_hashes}."
                 )
                 raise ConfirmationRequiredError(msg, token)
 
         upserted = None
         if into is not None:
             new_hashes = [r.new.hash for r in result.replaced if not r.was_noop]
-            upserted = upsert_axiom_selection(
-                s,
-                into,
-                new_hashes,
-                f"rename_iri({old_iri} -> {new_iri})",
-                mode=mode,
-            )
+            upserted = upsert_axiom_selection(s, into, new_hashes, source, mode=mode)
 
         s.commit()
 
@@ -80,13 +88,22 @@ def rename_iri(
 
     actual = [r for r in result.replaced if not r.was_noop]
     merged = [r for r in actual if r.was_merged_into_existing]
-    parts = [f"Renamed {old_iri} -> {new_iri}: {len(actual)} axioms replaced."]
+
+    summary = f"Renamed {old_iri} -> {new_iri}: {len(actual)} axioms replaced."
     if merged:
-        parts.append(f"{len(merged)} merged into existing axioms.")
+        summary += f" {len(merged)} merged into existing axioms."
+
+    entries: list[tuple[str, HashedAxiom]] = []
+    for r in actual:
+        entries.append(("-", r.old))
+        entries.append(("+", r.new))
+
+    body = format_diff(entries, summary=summary, max_rows=DIFF_MAX_ROWS)
+
     if upserted is not None:
-        sel = upserted.selection
-        parts.append(f"Saved to {format_selection_ref(sel)} ({sel.size} items).")
-    return " ".join(parts)
+        body += "\n\n" + format_saved_line(upserted)
+
+    return body
 
 
 tool_rename_iri = create_tool(
