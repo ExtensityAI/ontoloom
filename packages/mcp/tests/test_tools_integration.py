@@ -1134,11 +1134,12 @@ def test_remove_axioms_by_selection_first_call_previews_and_requires_confirm(pop
         remove_axioms(path=populated_db, target=BySelection(name=SelectionName("dogs_ax")))
 
     msg = str(exc_info.value)
-    assert "Removing" in msg
     # The ex:Dog declaration and the SubClassOf axiom mention Dog -> count of 2.
-    assert "Removing 2 axioms" in msg
+    # Bare dquoted selection name, no "axioms:" kind prefix; diff body, then the
+    # `To proceed` confirm-token trailer appended by ConfirmationRequiredError.
+    assert msg.startswith('Removing 2 axioms in selection "dogs_ax".\n\n```diff\n')
+    assert msg.endswith(f'\n```\n\nTo proceed, call again with confirm="{exc_info.value.token}".')
     assert "ex:Dog" in msg
-    assert "confirm=" in msg
     assert exc_info.value.token
     # Nothing removed on the preview call.
     assert _count_axioms(populated_db) == before
@@ -1156,7 +1157,11 @@ def test_remove_axioms_by_selection_confirm_token_removes(populated_db):
     token = exc_info.value.token
 
     result = remove_axioms(path=populated_db, target=target, confirm=token)
-    assert "Removed 2 axioms" in result
+    # Bare dquoted selection name (no "axioms:" prefix); kinded count.
+    assert result.startswith(
+        'Removed 2 axioms (0 already absent). Selection "dogs_ax" retained.\n\n```diff\n'
+    )
+    assert result.endswith("\n```")
     assert _count_axioms(populated_db) == before - 2
 
 
@@ -1202,8 +1207,31 @@ def test_remove_axioms_by_hashes_removes_without_confirmation(populated_db):
     result = remove_axioms(
         path=populated_db, target=ByHashes(hashes=(AxiomHashPrefix(first_hash),))
     )
-    assert "Removed 1 axioms" in result
+    # Singular axiom count via format_kinded_count: "1 axiom", not "1 axioms".
+    assert result.startswith("Removed 1 axiom.\n\n```diff\n")
+    assert result.endswith("\n```")
     assert _count_axioms(populated_db) == before - 1
+
+
+def test_remove_axioms_by_hashes_plural_summary(populated_db):
+    from ontoloom.query.dispatch import execute
+    from ontoloom.query.list_axioms import ListAxioms
+    from ontoloom_mcp.tools.axioms.remove_axioms import ByHashes
+
+    ont = Ontology(populated_db)
+    with session(ont) as s:
+        rows = execute(s, ListAxioms(constraints=()))
+        h1, h2 = rows[0][0], rows[1][0]
+        s.commit()
+    before = _count_axioms(populated_db)
+
+    result = remove_axioms(
+        path=populated_db,
+        target=ByHashes(hashes=(AxiomHashPrefix(h1), AxiomHashPrefix(h2))),
+    )
+    assert result.startswith("Removed 2 axioms.\n\n```diff\n")
+    assert result.endswith("\n```")
+    assert _count_axioms(populated_db) == before - 2
 
 
 def test_axiom_dispatch_failure_renders_focused_mcp_message():

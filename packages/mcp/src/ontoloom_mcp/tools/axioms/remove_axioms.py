@@ -12,14 +12,14 @@ from ontoloom.query.constraints import InAxiomSelection
 from ontoloom.query.dispatch import execute
 from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
-from ontoloom.selections.types import SelectionName
+from ontoloom.selections.types import SelectionKind, SelectionName
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.confirmation import (
     ConfirmationRequiredError,
     confirmation_token,
 )
-from ontoloom_mcp.components.formatting import format_diff, format_selection_ref
+from ontoloom_mcp.components.formatting import format_diff, format_kinded_count
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -69,30 +69,38 @@ def remove_axioms(path: OntologyPath, target: RemoveAxiomsTarget, confirm: str |
 
                 if confirm != token:
                     rows = execute(s, ListAxioms(constraints=(InAxiomSelection(name=name),)))
-                    entries = [
+                    preview_entries = [
                         ("-", HashedAxiom(axiom=load_axiom(data), hash=h)) for h, data in rows
                     ]
-                    summary = f"Removing {len(entries)} axioms in selection {dquoted(name)}."
+                    preview_summary = (
+                        f"Removing "
+                        f"{format_kinded_count(SelectionKind.AXIOMS, len(preview_entries))} "
+                        f"in selection {dquoted(name)}."
+                    )
                     raise ConfirmationRequiredError(
-                        format_diff(entries, summary, max_rows=20), token
+                        format_diff(preview_entries, preview_summary, max_rows=20), token
                     )
 
                 sel_result = remove_by_selection(s, name)
                 s.commit()
                 entries = [("-", ha) for ha in sel_result.removed]
                 summary = (
-                    f"Removed {len(sel_result.removed)} axioms "
+                    f"Removed "
+                    f"{format_kinded_count(SelectionKind.AXIOMS, len(sel_result.removed))} "
                     f"({sel_result.absent} already absent). "
-                    f"Selection {format_selection_ref(sel_result.meta)} retained."
+                    f"Selection {dquoted(sel_result.meta.name)} retained."
                 )
                 return format_diff(entries, summary, max_rows=20)
 
             case ByHashes(hashes=hashes):
                 resolved = [resolve_hash_prefix(s, p) for p in hashes]
                 result = remove_by_hash(s, resolved)
-                entries = [("-", ha) for ha in result.removed]
                 s.commit()
-                return format_diff(entries, f"Removed {len(result.removed)} axioms.")
+                entries = [("-", ha) for ha in result.removed]
+                summary = (
+                    f"Removed {format_kinded_count(SelectionKind.AXIOMS, len(result.removed))}."
+                )
+                return format_diff(entries, summary)
 
             case _:
                 msg = f"unhandled RemoveAxiomsTarget variant: {type(target).__name__}"
