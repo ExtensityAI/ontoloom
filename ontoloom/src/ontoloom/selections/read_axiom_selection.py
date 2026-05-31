@@ -35,7 +35,7 @@ class ReadAxiomSelection(HasPagination, Query[AxiomSelectionPage]):
 
     Page order is insertion order (`id`, which aliases rowid), so any ranking
     baked into the insertion sequence (e.g. exact-match-first in
-    `search_axioms`) survives pagination.
+    `find_axioms`) survives pagination.
     """
 
     selection: SelectionName

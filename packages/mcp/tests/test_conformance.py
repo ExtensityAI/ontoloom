@@ -6,8 +6,8 @@ followed by a parenthetical (`(truncated at limit=...)`), an overwrite tail
 (`Replaced previous (N items).`), or a domain clause (e.g. `N duplicate
 ... values:`).
 
-The four block-with-preview sites (`create_selection`, `search_axioms`,
-`search_entities`, `match_axioms`) start their output with the saved-line.
+The four block-with-preview sites (`create_selection`, `find_axioms`,
+`find_entities`, `match_axioms`) start their output with the saved-line.
 The three embedded-saved-line sites (`get_entity` with `into=`, `rename_iri`
 with `into=`, `find_duplicate_entities`) emit the saved-line after an
 inspect/diff/group body. This module asserts every site renders a
@@ -27,12 +27,12 @@ from ontoloom.patterns.types import SubClassOfPattern
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.selections.types import SelectionName
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
+from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
 from ontoloom_mcp.tools.axioms.rename_iri import rename_iri
-from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
 from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+from ontoloom_mcp.tools.entities.find_entities import find_entities
 from ontoloom_mcp.tools.entities.get_entity import get_entity
-from ontoloom_mcp.tools.entities.search_entities import search_entities
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
 from ontoloom_mcp.tools.selections.create_selection import create_selection
 
@@ -68,7 +68,7 @@ def ont(tmp_path):
     )
     # Pre-existing entity selection: lets create_selection compose against
     # a known leaf, and find_duplicate_entities can restrict via within=.
-    search_entities(path=path, into=SelectionName("all_ents"), namespace=PrefixName("ex"))
+    find_entities(path=path, into=SelectionName("all_ents"), namespace=PrefixName("ex"))
     return path
 
 
@@ -97,8 +97,8 @@ def test_create_selection_starts_with_saved_line(ont):
     _assert_starts_with_saved_line(out)
 
 
-def test_search_axioms_starts_with_saved_line(ont):
-    out = search_axioms(
+def test_find_axioms_starts_with_saved_line(ont):
+    out = find_axioms(
         path=ont,
         into=SelectionName("labels"),
         query="Dog",
@@ -106,8 +106,8 @@ def test_search_axioms_starts_with_saved_line(ont):
     _assert_starts_with_saved_line(out)
 
 
-def test_search_entities_starts_with_saved_line(ont):
-    out = search_entities(
+def test_find_entities_starts_with_saved_line(ont):
+    out = find_entities(
         path=ont,
         into=SelectionName("dogs"),
         query="Dog",

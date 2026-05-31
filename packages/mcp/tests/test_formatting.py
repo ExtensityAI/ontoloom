@@ -29,13 +29,13 @@ from ontoloom_mcp.components.formatting import (
     PREVIEW_ROWS,
     AxiomPreviewData,
     EntityPreviewData,
+    FindAxiomsSource,
     FindDuplicatesSource,
+    FindEntitiesSource,
     GetEntitySource,
     MatchAxiomsSource,
     Ref,
     RenameSource,
-    SearchAxiomsSource,
-    SearchEntitiesSource,
     SetExprSource,
     _empty_message,
     _format_axiom_line,
@@ -262,16 +262,16 @@ def test_list_row_axioms_no_drift():
 def test_list_row_axioms_with_drift():
     meta = _axiom_sel("review", 1)
     assert (
-        format_list_row(meta, present=0, missing=1, source='search_axioms(query="review")')
-        == '  "review": 1 axiom, 1 missing - source: search_axioms(query="review")'
+        format_list_row(meta, present=0, missing=1, source='find_axioms(query="review")')
+        == '  "review": 1 axiom, 1 missing - source: find_axioms(query="review")'
     )
 
 
 def test_list_row_entities_no_drift():
     meta = _entity_sel("all_classes", 6)
     assert (
-        format_list_row(meta, present=6, missing=0, source='search_entities(role="Class")')
-        == '  "all_classes": 6 entities - source: search_entities(role="Class")'
+        format_list_row(meta, present=6, missing=0, source='find_entities(role="Class")')
+        == '  "all_classes": 6 entities - source: find_entities(role="Class")'
     )
 
 
@@ -290,43 +290,39 @@ def test_within_scope_singular_axiom():
     assert format_within_scope(meta) == 'Within "only_one" (1 axiom)'
 
 
-def test_source_search_axioms_no_filters_bare_name():
+def test_source_find_axioms_no_filters_bare_name():
+    assert format_source(FindAxiomsSource(query=None, properties=(), within=None)) == "find_axioms"
+
+
+def test_source_find_axioms_query_only():
     assert (
-        format_source(SearchAxiomsSource(query=None, properties=(), within=None)) == "search_axioms"
+        format_source(FindAxiomsSource(query="x", properties=(), within=None))
+        == 'find_axioms(query="x")'
     )
 
 
-def test_source_search_axioms_query_only():
+def test_source_find_axioms_properties_only():
     assert (
-        format_source(SearchAxiomsSource(query="x", properties=(), within=None))
-        == 'search_axioms(query="x")'
+        format_source(FindAxiomsSource(query=None, properties=(IRI("rdfs:comment"),), within=None))
+        == 'find_axioms(properties=["rdfs:comment"])'
     )
 
 
-def test_source_search_axioms_properties_only():
+def test_source_find_axioms_query_and_properties_and_within():
     assert (
         format_source(
-            SearchAxiomsSource(query=None, properties=(IRI("rdfs:comment"),), within=None)
-        )
-        == 'search_axioms(properties=["rdfs:comment"])'
-    )
-
-
-def test_source_search_axioms_query_and_properties_and_within():
-    assert (
-        format_source(
-            SearchAxiomsSource(
+            FindAxiomsSource(
                 query="x", properties=(IRI("rdfs:comment"),), within=SelectionName("dogs")
             )
         )
-        == 'search_axioms(query="x", properties=["rdfs:comment"]) within "dogs"'
+        == 'find_axioms(query="x", properties=["rdfs:comment"]) within "dogs"'
     )
 
 
-def test_source_search_entities_role_and_declared():
+def test_source_find_entities_role_and_declared():
     assert (
         format_source(
-            SearchEntitiesSource(
+            FindEntitiesSource(
                 query=None,
                 role=EntityType.CLASS,
                 namespace=None,
@@ -336,14 +332,14 @@ def test_source_search_entities_role_and_declared():
                 within=None,
             )
         )
-        == 'search_entities(role="Class", declared=True)'
+        == 'find_entities(role="Class", declared=True)'
     )
 
 
-def test_source_search_entities_with_within_suffix():
+def test_source_find_entities_with_within_suffix():
     assert (
         format_source(
-            SearchEntitiesSource(
+            FindEntitiesSource(
                 query=None,
                 role=EntityType.CLASS,
                 namespace=None,
@@ -353,13 +349,13 @@ def test_source_search_entities_with_within_suffix():
                 within=SelectionName("dogs"),
             )
         )
-        == 'search_entities(role="Class") within "dogs"'
+        == 'find_entities(role="Class") within "dogs"'
     )
 
 
-def test_source_search_entities_omits_default_exclude_deprecated():
+def test_source_find_entities_omits_default_exclude_deprecated():
     # Default `exclude_deprecated=True` is not surfaced; non-default is.
-    src = SearchEntitiesSource(
+    src = FindEntitiesSource(
         query=None,
         role=None,
         namespace=None,
@@ -368,11 +364,11 @@ def test_source_search_entities_omits_default_exclude_deprecated():
         exclude_deprecated=True,
         within=None,
     )
-    assert format_source(src) == "search_entities"
+    assert format_source(src) == "find_entities"
 
 
-def test_source_search_entities_surfaces_non_default_exclude_deprecated():
-    src = SearchEntitiesSource(
+def test_source_find_entities_surfaces_non_default_exclude_deprecated():
+    src = FindEntitiesSource(
         query=None,
         role=None,
         namespace=None,
@@ -381,11 +377,11 @@ def test_source_search_entities_surfaces_non_default_exclude_deprecated():
         exclude_deprecated=False,
         within=None,
     )
-    assert format_source(src) == "search_entities(exclude_deprecated=False)"
+    assert format_source(src) == "find_entities(exclude_deprecated=False)"
 
 
-def test_source_search_entities_namespace_dquoted():
-    src = SearchEntitiesSource(
+def test_source_find_entities_namespace_dquoted():
+    src = FindEntitiesSource(
         query=None,
         role=None,
         namespace=PrefixName("ex"),
@@ -394,7 +390,7 @@ def test_source_search_entities_namespace_dquoted():
         exclude_deprecated=True,
         within=None,
     )
-    assert format_source(src) == 'search_entities(namespace="ex")'
+    assert format_source(src) == 'find_entities(namespace="ex")'
 
 
 def test_source_match_axioms_bare():
@@ -463,13 +459,13 @@ def test_source_set_expr_renders_via_str():
 # -- _empty_message per variant --
 
 
-def test_empty_message_search_axioms():
-    src = SearchAxiomsSource(query="x", properties=(), within=None)
-    assert _empty_message(src) == 'No matches for search_axioms(query="x").'
+def test_empty_message_find_axioms():
+    src = FindAxiomsSource(query="x", properties=(), within=None)
+    assert _empty_message(src) == 'No matches for find_axioms(query="x").'
 
 
-def test_empty_message_search_entities_uses_parenthesized_form():
-    src = SearchEntitiesSource(
+def test_empty_message_find_entities_uses_parenthesized_form():
+    src = FindEntitiesSource(
         query=None,
         role=EntityType.CLASS,
         namespace=None,
@@ -478,7 +474,7 @@ def test_empty_message_search_entities_uses_parenthesized_form():
         exclude_deprecated=True,
         within=None,
     )
-    assert _empty_message(src) == 'No entities found (search_entities(role="Class")).'
+    assert _empty_message(src) == 'No entities found (find_entities(role="Class")).'
 
 
 def test_empty_message_match_axioms():
@@ -541,9 +537,9 @@ def test_saved_line_entities_singular():
 
 
 def test_write_block_empty_uses_source_empty_message():
-    src = SearchAxiomsSource(query="review", properties=(), within=None)
+    src = FindAxiomsSource(query="review", properties=(), within=None)
     out = format_selection_write(_axiom_upserted("review", 0), None, src)
-    assert out == ('Saved 0 axioms to "review". No matches for search_axioms(query="review").')
+    assert out == ('Saved 0 axioms to "review". No matches for find_axioms(query="review").')
 
 
 def test_write_block_nonempty_joins_saved_then_blank_then_preview():
@@ -590,7 +586,7 @@ def test_write_block_entities_renders_entity_lines():
             (Ref(iri=IRI("ex:Dog"), label="Dog"), frozenset({EntityType.CLASS})),
         ),
     )
-    src = SearchEntitiesSource(
+    src = FindEntitiesSource(
         query=None,
         role=None,
         namespace=None,

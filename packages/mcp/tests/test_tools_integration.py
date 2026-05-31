@@ -20,8 +20,8 @@ from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
 from ontoloom_mcp.tools.axioms.remove_axioms import remove_axioms
 from ontoloom_mcp.tools.axioms.rename_iri import rename_iri
+from ontoloom_mcp.tools.entities.find_entities import find_entities
 from ontoloom_mcp.tools.entities.get_entity import get_entity
-from ontoloom_mcp.tools.entities.search_entities import search_entities
 from ontoloom_mcp.tools.ontology.create_ontology import create_ontology
 from ontoloom_mcp.tools.ontology.describe_ontology import describe_ontology
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
@@ -298,8 +298,8 @@ def test_get_entity_within_persists_source_with_within_suffix(populated_db):
     assert meta.source == 'get_entity(iri="ex:Dog") within "scope_ax"'
 
 
-def test_search_entities_creates_selection(populated_db):
-    result = search_entities(
+def test_find_entities_creates_selection(populated_db):
+    result = find_entities(
         path=populated_db,
         into=SelectionName("dogs"),
         query="Dog",
@@ -312,19 +312,19 @@ def test_search_entities_creates_selection(populated_db):
     assert "Showing" not in result
 
 
-def test_search_entities_no_results_renders_source(populated_db):
-    result = search_entities(
+def test_find_entities_no_results_renders_source(populated_db):
+    result = find_entities(
         path=populated_db,
         into=SelectionName("empty_search"),
         query="zzzznomatch",
     )
     assert result == (
         'Saved 0 entities to "empty_search". '
-        'No entities found (search_entities(query="zzzznomatch")).'
+        'No entities found (find_entities(query="zzzznomatch")).'
     )
 
 
-def test_search_entities_source_includes_role_and_within(populated_db):
+def test_find_entities_source_includes_role_and_within(populated_db):
     # Build an axiom selection to scope into; check that role + within render in
     # the persisted source string and surface in no_results messages.
     from ontoloom.axioms.types import HashedAxiom
@@ -337,7 +337,7 @@ def test_search_entities_source_includes_role_and_within(populated_db):
         upsert_axiom_selection(s, SelectionName("scope_ax"), [dog_hash], "test fixture")
         s.commit()
 
-    result = search_entities(
+    result = find_entities(
         path=populated_db,
         into=SelectionName("scoped"),
         role=EntityType.CLASS,
@@ -351,7 +351,7 @@ def test_search_entities_source_includes_role_and_within(populated_db):
     with session(Ontology(populated_db)) as s:
         meta = get_entity_selection(s, SelectionName("scoped"))
         s.commit()
-    assert meta.source == 'search_entities(role="Class") within "scope_ax"'
+    assert meta.source == 'find_entities(role="Class") within "scope_ax"'
 
 
 def test_create_selection_renders_write_block_with_preview(empty_db):
@@ -427,7 +427,7 @@ def test_create_selection_empty_result_renders_clean_saved_line(empty_db):
 
 
 def test_read_selection_after_search(populated_db):
-    search_entities(
+    find_entities(
         path=populated_db,
         into=SelectionName("dogs"),
         query="Dog",
@@ -527,7 +527,7 @@ def test_read_selection_entity_page_includes_roles_and_label(empty_db):
             ),
         ],
     )
-    search_entities(path=empty_db, into=SelectionName("dogs"), query="Dog")
+    find_entities(path=empty_db, into=SelectionName("dogs"), query="Dog")
 
     result = read_selection(path=empty_db, name=SelectionName("dogs"))
     assert result.startswith('"dogs": 1 entity - 1 present, 0 missing\n')
@@ -548,8 +548,8 @@ def test_read_selection_entity_page_shows_missing_rows(empty_db):
     assert "ex:Ghost *missing*" in result
 
 
-def test_search_axioms_by_text(empty_db):
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+def test_find_axioms_by_text(empty_db):
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     todo_comment = Annotation(
         property=IRI("rdfs:comment"),
@@ -580,7 +580,7 @@ def test_search_axioms_by_text(empty_db):
         ],
     )
 
-    result = search_axioms(
+    result = find_axioms(
         path=empty_db,
         into=SelectionName("todos"),
         query="TODO",
@@ -598,8 +598,8 @@ def test_search_axioms_by_text(empty_db):
     assert "TODO" in page
 
 
-def test_search_axioms_by_property_only(empty_db):
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+def test_find_axioms_by_property_only(empty_db):
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     is_defined_by = Annotation(
         property=IRI("rdfs:isDefinedBy"),
@@ -630,7 +630,7 @@ def test_search_axioms_by_property_only(empty_db):
         ],
     )
 
-    search_axioms(
+    find_axioms(
         path=empty_db,
         into=SelectionName("defined"),
         properties=[IRI("rdfs:isDefinedBy")],
@@ -652,10 +652,10 @@ def test_search_axioms_by_property_only(empty_db):
     assert commented_hash not in hashes
 
 
-def test_search_axioms_with_within_scope(empty_db):
+def test_find_axioms_with_within_scope(empty_db):
     from ontoloom.axioms.types import HashedAxiom
     from ontoloom.selections.store import upsert_axiom_selection
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     todo = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
     in_scope_todo = SubClassOf(
@@ -700,7 +700,7 @@ def test_search_axioms_with_within_scope(empty_db):
         )
         s.commit()
 
-    search_axioms(
+    find_axioms(
         path=empty_db,
         into=SelectionName("hits"),
         query="TODO",
@@ -719,9 +719,9 @@ def test_search_axioms_with_within_scope(empty_db):
     assert no_anno_hash not in hashes
 
 
-def test_search_axioms_exact_ranked_before_substring(empty_db):
+def test_find_axioms_exact_ranked_before_substring(empty_db):
     from ontoloom.axioms.types import HashedAxiom
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     exact = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="TODO"))
     substring = Annotation(
@@ -749,7 +749,7 @@ def test_search_axioms_exact_ranked_before_substring(empty_db):
         ],
     )
 
-    search_axioms(
+    find_axioms(
         path=empty_db,
         into=SelectionName("ranked"),
         query="TODO",
@@ -771,32 +771,30 @@ def test_search_axioms_exact_ranked_before_substring(empty_db):
     assert ordered == [hash_a, hash_b]
 
 
-def test_search_axioms_no_results_message(empty_db):
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+def test_find_axioms_no_results_message(empty_db):
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     add_axioms(
         path=empty_db,
         axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))],
     )
 
-    result = search_axioms(
+    result = find_axioms(
         path=empty_db,
         into=SelectionName("empty"),
         query="nonexistent",
     )
 
-    assert result == (
-        'Saved 0 axioms to "empty". No matches for search_axioms(query="nonexistent").'
-    )
+    assert result == ('Saved 0 axioms to "empty". No matches for find_axioms(query="nonexistent").')
 
 
-def test_search_axioms_requires_query_or_properties(empty_db):
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+def test_find_axioms_requires_query_or_properties(empty_db):
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
-    wrapped = translate_errors(search_axioms)
+    wrapped = translate_errors(find_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=empty_db, into=SelectionName("x"))
-    assert str(exc_info.value) == "search_axioms requires at least one of `query` or `properties`."
+    assert str(exc_info.value) == "find_axioms requires at least one of `query` or `properties`."
 
 
 def test_match_axioms_saves_matches_with_unified_output(empty_db):
@@ -978,7 +976,7 @@ def test_find_duplicate_entities_within_missing_selection_translates(populated_d
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
-    assert "search_entities" in msg or "match_axioms" in msg
+    assert "find_entities" in msg or "match_axioms" in msg
 
 
 def test_find_duplicate_entities_no_duplicates_still_writes_selection(populated_db):
@@ -1015,7 +1013,7 @@ def test_find_duplicate_entities_no_duplicates_within_renders_scope(empty_db):
             ),
         ],
     )
-    search_entities(path=empty_db, into=SelectionName("scope"), namespace=PrefixName("ex"))
+    find_entities(path=empty_db, into=SelectionName("scope"), namespace=PrefixName("ex"))
 
     result = find_duplicate_entities(
         path=empty_db,
@@ -1236,7 +1234,7 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
             SubClassOf(sub_class=IRI("ex:Wolf"), super_class=IRI("ex:Animal")),
         ],
     )
-    search_entities(
+    find_entities(
         path=empty_db,
         into=SelectionName("undeclared"),
         declared=False,
@@ -1280,7 +1278,7 @@ def test_read_selection_not_found_translates(populated_db):
         )
     msg = str(exc_info.value)
     assert "nonexistent" in msg
-    assert "search_entities" in msg or "match_axioms" in msg
+    assert "find_entities" in msg or "match_axioms" in msg
 
 
 def _make_dogs_selection(path):
@@ -1288,7 +1286,7 @@ def _make_dogs_selection(path):
     from ontoloom.selections.expr import AxiomsForExpr
     from ontoloom_mcp.tools.selections.create_selection import create_selection
 
-    search_entities(path=path, into=SelectionName("dogs_ent"), query="Dog")
+    find_entities(path=path, into=SelectionName("dogs_ent"), query="Dog")
     create_selection(
         path=path,
         name=SelectionName("dogs_ax"),
@@ -1362,7 +1360,7 @@ def test_remove_axioms_by_selection_stale_token_re_previews(populated_db):
     old_token = exc_info.value.token
 
     # Overwrite the selection's contents (now the ex:Animal axioms instead).
-    search_entities(path=populated_db, into=SelectionName("animals_ent"), query="Animal")
+    find_entities(path=populated_db, into=SelectionName("animals_ent"), query="Animal")
     create_selection(
         path=populated_db,
         name=SelectionName("dogs_ax"),
@@ -1769,9 +1767,9 @@ def test_replace_axiom_no_op_when_new_hashes_to_old(populated_db):
 # -- WriteMode: non-destructive selection writes --
 
 
-def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
+def test_find_axioms_create_refuses_then_replace_overwrites(empty_db):
     from ontoloom.selections.types import WriteMode
-    from ontoloom_mcp.tools.axioms.search_axioms import search_axioms
+    from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
     add_axioms(
         path=empty_db,
@@ -1786,18 +1784,18 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
         ],
     )
 
-    first = search_axioms(path=empty_db, into=SelectionName("t"), query="dog")
+    first = find_axioms(path=empty_db, into=SelectionName("t"), query="dog")
     assert 'Saved 1 axiom to "t".' in first
     assert "axioms:t" not in first
 
-    wrapped = translate_errors(search_axioms)
+    wrapped = translate_errors(find_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=empty_db, into=SelectionName("t"), query="dog")
     msg = str(exc_info.value)
     assert "already exists" in msg
     assert 'mode="replace"' in msg
 
-    overwrote = search_axioms(
+    overwrote = find_axioms(
         path=empty_db,
         into=SelectionName("t"),
         query="dog",
@@ -1808,19 +1806,19 @@ def test_search_axioms_create_refuses_then_replace_overwrites(empty_db):
     assert "axioms:t" not in overwrote
 
 
-def test_search_entities_create_refuses_then_replace_overwrites(populated_db):
+def test_find_entities_create_refuses_then_replace_overwrites(populated_db):
     from ontoloom.selections.types import WriteMode
 
-    search_entities(path=populated_db, into=SelectionName("t"), query="Dog")
+    find_entities(path=populated_db, into=SelectionName("t"), query="Dog")
 
-    wrapped = translate_errors(search_entities)
+    wrapped = translate_errors(find_entities)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=populated_db, into=SelectionName("t"), query="Dog")
     msg = str(exc_info.value)
     assert "already exists" in msg
     assert 'mode="replace"' in msg
 
-    overwrote = search_entities(
+    overwrote = find_entities(
         path=populated_db,
         into=SelectionName("t"),
         query="Dog",
@@ -1912,7 +1910,7 @@ def test_list_selections_axioms_before_entities_with_bare_names(populated_db):
             s,
             SelectionName("all_classes"),
             [IRI("ex:Dog"), IRI("ex:Animal")],
-            'search_entities(role="Class")',
+            'find_entities(role="Class")',
         )
         s.commit()
 
@@ -1920,7 +1918,7 @@ def test_list_selections_axioms_before_entities_with_bare_names(populated_db):
     assert result == (
         "Selections:\n"
         '  "subclass_animal": 2 axioms - source: match_axioms\n'
-        '  "all_classes": 2 entities - source: search_entities(role="Class")'
+        '  "all_classes": 2 entities - source: find_entities(role="Class")'
     )
 
 
@@ -1940,7 +1938,7 @@ def test_list_selections_drift_tail_appears_only_when_missing(populated_db):
             s,
             SelectionName("review"),
             [dog_hash, missing_hash],
-            'search_axioms(query="review")',
+            'find_axioms(query="review")',
         )
         # Singular entity; one missing IRI (not referenced by any axiom).
         upsert_entity_selection(
@@ -1957,7 +1955,7 @@ def test_list_selections_drift_tail_appears_only_when_missing(populated_db):
     # `solo`: 1 IRI referenced by no axiom -> total 1, missing 1.
     assert result == (
         "Selections:\n"
-        '  "review": 2 axioms, 1 missing - source: search_axioms(query="review")\n'
+        '  "review": 2 axioms, 1 missing - source: find_axioms(query="review")\n'
         '  "solo": 1 entity, 1 missing - source: test fixture'
     )
 
@@ -1972,7 +1970,7 @@ def test_list_selections_no_wire_prefix_or_kind_label(populated_db):
 
     with session(Ontology(populated_db)) as s:
         upsert_axiom_selection(s, SelectionName("a_sel"), [dog_hash], "match_axioms")
-        upsert_entity_selection(s, SelectionName("e_sel"), [IRI("ex:Dog")], "search_entities")
+        upsert_entity_selection(s, SelectionName("e_sel"), [IRI("ex:Dog")], "find_entities")
         s.commit()
 
     result = list_selections(path=populated_db)

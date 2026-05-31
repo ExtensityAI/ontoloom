@@ -3,7 +3,7 @@ from typing import Annotated
 from annotated_types import MinLen
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.entities.reader import search_entities as core_search_entities
+from ontoloom.entities.reader import find_entities as core_find_entities
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import PrefixName
@@ -11,7 +11,7 @@ from ontoloom.selections.store import upsert_entity_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    SearchEntitiesSource,
+    FindEntitiesSource,
     fetch_preview_data,
     format_selection_write,
     format_source,
@@ -20,7 +20,7 @@ from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def search_entities(
+def find_entities(
     path: OntologyPath,
     into: SelectionName,
     mode: WriteMode = WriteMode.CREATE,
@@ -32,7 +32,7 @@ def search_entities(
     within: SelectionName | None = None,
     exclude_deprecated: bool = True,
 ):
-    """Search for entities by name, type, or namespace; save the result as a selection.
+    """Find entities by name, type, or namespace; save the result as a selection.
 
     Use `read_selection` to paginate the saved selection, `create_selection` to
     compose it with other selections.
@@ -53,7 +53,7 @@ def search_entities(
     - `exclude_deprecated`: Skip deprecated entities (default true).
     """
     props_tuple = tuple(properties or ())
-    src = SearchEntitiesSource(
+    src = FindEntitiesSource(
         query=query,
         role=role,
         namespace=namespace,
@@ -65,7 +65,7 @@ def search_entities(
 
     ont = Ontology(path)
     with session(ont) as s:
-        iris = core_search_entities(
+        iris = core_find_entities(
             s,
             query=query,
             role=role,
@@ -83,8 +83,8 @@ def search_entities(
     return format_selection_write(upserted, preview, src)
 
 
-tool_search_entities = create_tool(
-    search_entities,
-    name="search_entities",
+tool_find_entities = create_tool(
+    find_entities,
+    name="find_entities",
     annotations=ToolAnnotations(readOnlyHint=True, idempotentHint=True),
 )

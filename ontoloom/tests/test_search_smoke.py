@@ -1,4 +1,4 @@
-"""Exhaustive smoke test for search_entities.
+"""Exhaustive smoke test for find_entities.
 
 Builds a realistic ontology with diverse axiom types, then verifies that
 every entity is discoverable through the applicable search paths.
@@ -10,8 +10,8 @@ from ontoloom.connection import Session
 from ontoloom.entities.projections import batch_fetch_entity_display
 from ontoloom.entities.reader import (
     EntityNotFoundError,
+    find_entities,
     get_entity,
-    search_entities,
 )
 from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import (
@@ -78,19 +78,19 @@ def nc(iri: str) -> IRI:
 
 def _all_entity_iris(s: Session) -> set[str]:
     """Collect all entity IRIs via list-all search."""
-    return {str(i) for i in search_entities(s)}
+    return {str(i) for i in find_entities(s)}
 
 
-def _search_entities_text(s: Session, query: str) -> set[str]:
-    return {str(i) for i in search_entities(s, query=query)}
+def _find_entities_text(s: Session, query: str) -> set[str]:
+    return {str(i) for i in find_entities(s, query=query)}
 
 
-def _search_entities_role(s: Session, role: EntityType) -> set[str]:
-    return {str(i) for i in search_entities(s, role=role)}
+def _find_entities_role(s: Session, role: EntityType) -> set[str]:
+    return {str(i) for i in find_entities(s, role=role)}
 
 
-def _search_entities_ns(s: Session, namespace: PrefixName) -> set[str]:
-    return {str(i) for i in search_entities(s, namespace=namespace)}
+def _find_entities_ns(s: Session, namespace: PrefixName) -> set[str]:
+    return {str(i) for i in find_entities(s, namespace=namespace)}
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +286,7 @@ AXIOMS = [
 # ---------------------------------------------------------------------------
 
 
-class TestSearchEntitiesComprehensive:
+class TestFindEntitiesComprehensive:
     """Verify every entity is findable through all applicable search paths."""
 
     def test_all_declared_entities_are_listed(self, s):
@@ -322,36 +322,36 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_by_local_name_exact(self, s):
         add_axioms(s, AXIOMS)
-        results = _search_entities_text(s, "Dog")
+        results = _find_entities_text(s, "Dog")
         assert ":Dog" in results
 
     def test_search_by_local_name_substring(self, s):
         add_axioms(s, AXIOMS)
         # "art" is substring of "hasPart"
-        results = _search_entities_text(s, "art")
+        results = _find_entities_text(s, "art")
         assert ":hasPart" in results
 
     def test_search_by_annotation_value_exact(self, s):
         add_axioms(s, AXIOMS)
         # "Hund" is an exact rdfs:label value for :Dog
-        results = _search_entities_text(s, "Hund")
+        results = _find_entities_text(s, "Hund")
         assert ":Dog" in results
 
     def test_search_by_annotation_value_substring(self, s):
         add_axioms(s, AXIOMS)
         # "living creature" is a substring of :Animal's rdfs:comment
-        results = _search_entities_text(s, "living creature")
+        results = _find_entities_text(s, "living creature")
         assert ":Animal" in results
 
     def test_search_by_annotation_value_definition(self, s):
         add_axioms(s, AXIOMS)
         # :Pet has a skos:definition containing "domesticated"
-        results = _search_entities_text(s, "domesticated")
+        results = _find_entities_text(s, "domesticated")
         assert ":Pet" in results
 
     def test_search_individual_by_label(self, s):
         add_axioms(s, AXIOMS)
-        results = _search_entities_text(s, "Alice Smith")
+        results = _find_entities_text(s, "Alice Smith")
         assert ":Alice" in results
 
     @pytest.mark.parametrize(
@@ -420,7 +420,7 @@ class TestSearchEntitiesComprehensive:
     )
     def test_search_by_role(self, s, role, expected_includes, expected_excludes):
         add_axioms(s, AXIOMS)
-        results = _search_entities_role(s, role)
+        results = _find_entities_role(s, role)
         for iri in expected_includes:
             assert iri in results, f"{iri} should be in role={role} results"
         for iri in expected_excludes:
@@ -428,7 +428,7 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_by_namespace(self, s):
         add_axioms(s, AXIOMS)
-        rdfs_ns = _search_entities_ns(s, PrefixName("rdfs"))
+        rdfs_ns = _find_entities_ns(s, PrefixName("rdfs"))
         assert "rdfs:label" in rdfs_ns
         assert "rdfs:comment" in rdfs_ns
         assert ":Dog" not in rdfs_ns
@@ -436,14 +436,14 @@ class TestSearchEntitiesComprehensive:
     def test_search_combined_query_and_role(self, s):
         add_axioms(s, AXIOMS)
         # Search "Dog" but only classes
-        iris = {str(i) for i in search_entities(s, query="Dog", role=EntityType.CLASS)}
+        iris = {str(i) for i in find_entities(s, query="Dog", role=EntityType.CLASS)}
         assert ":Dog" in iris
         # :Fido (individual) should not match even though it's a Dog instance
         assert ":Fido" not in iris
 
     def test_search_combined_query_and_namespace(self, s):
         add_axioms(s, AXIOMS)
-        iris = {str(i) for i in search_entities(s, query="label", namespace=PrefixName("rdfs"))}
+        iris = {str(i) for i in find_entities(s, query="label", namespace=PrefixName("rdfs"))}
         assert "rdfs:label" in iris
         # skos:definition should not match (wrong namespace)
         assert "skos:definition" not in iris
@@ -451,7 +451,7 @@ class TestSearchEntitiesComprehensive:
     def test_search_match_quality_ordering(self, s):
         add_axioms(s, AXIOMS)
         # "Dog" should match :Dog as exact (local_name) before substring matches
-        iris = search_entities(s, query="Dog")
+        iris = find_entities(s, query="Dog")
         if iris:
             # :Dog is an exact local-name match, so it sorts ahead of every
             # substring match and lands first in the ordered result.
@@ -459,7 +459,7 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_returns_annotations(self, s):
         add_axioms(s, AXIOMS)
-        iris = search_entities(s, query="Dog")
+        iris = find_entities(s, query="Dog")
         assert IRI(":Dog") in iris
         display = batch_fetch_entity_display(s, [":Dog"])
         ann_values = {a.value for a in display[":Dog"].annotations}
@@ -468,7 +468,7 @@ class TestSearchEntitiesComprehensive:
 
     def test_search_returns_roles(self, s):
         add_axioms(s, AXIOMS)
-        iris = search_entities(s, query="Dog")
+        iris = find_entities(s, query="Dog")
         assert IRI(":Dog") in iris
         display = batch_fetch_entity_display(s, [":Dog"])
         assert EntityType.CLASS in display[":Dog"].roles
@@ -478,16 +478,16 @@ class TestSearchEntitiesComprehensive:
         all_results = _all_entity_iris(s)
         assert len(all_results) > 5, "Need enough entities to exercise the full feed"
 
-        iris = {str(i) for i in search_entities(s)}
+        iris = {str(i) for i in find_entities(s)}
         assert iris == all_results
 
     def test_text_search_full_result(self, s):
         add_axioms(s, AXIOMS)
         # "has" matches many entities by local_name substring
-        iris = search_entities(s, query="has")
+        iris = find_entities(s, query="has")
         assert len(iris) > 3
         # No truncation: a repeat call returns the same set.
-        assert {str(i) for i in search_entities(s, query="has")} == {str(i) for i in iris}
+        assert {str(i) for i in find_entities(s, query="has")} == {str(i) for i in iris}
 
 
 class TestGetEntityComprehensive:
@@ -634,7 +634,7 @@ class TestEnhancedEntitySearch:
         self, s, extra_axioms, kwargs, expected_includes, expected_excludes
     ):
         add_axioms(s, [*AXIOMS, *extra_axioms])
-        iris = {str(i) for i in search_entities(s, **kwargs)}
+        iris = {str(i) for i in find_entities(s, **kwargs)}
         # Special case: declared=True must cover every Declaration IRI in AXIOMS
         if kwargs.get("declared") is True and "query" not in kwargs:
             for ax in AXIOMS:
@@ -650,7 +650,7 @@ class TestEnhancedEntitySearch:
         # "Dog" appears in rdfs:label and as local_name. Restrict annotation search to rdfs:label.
         iris = {
             str(i)
-            for i in search_entities(
+            for i in find_entities(
                 s, query="Dog", properties=[IRI("rdfs:label")], exclude_deprecated=False
             )
         }
@@ -663,7 +663,7 @@ class TestEnhancedEntitySearch:
         # Restrict to rdfs:label only -> should NOT find :Pet via annotation
         iris = {
             str(i)
-            for i in search_entities(
+            for i in find_entities(
                 s, query="domesticated", properties=[IRI("rdfs:label")], exclude_deprecated=False
             )
         }
@@ -674,7 +674,7 @@ class TestEnhancedEntitySearch:
         # "domesticated" in skos:definition -> should find :Pet
         iris = {
             str(i)
-            for i in search_entities(
+            for i in find_entities(
                 s,
                 query="domesticated",
                 properties=[IRI("skos:definition")],
@@ -688,9 +688,7 @@ class TestEnhancedEntitySearch:
         # Without query: find entities that have skos:definition annotations
         iris = {
             str(i)
-            for i in search_entities(
-                s, properties=[IRI("skos:definition")], exclude_deprecated=False
-            )
+            for i in find_entities(s, properties=[IRI("skos:definition")], exclude_deprecated=False)
         }
         # :Pet has skos:definition
         assert ":Pet" in iris
@@ -699,11 +697,11 @@ class TestEnhancedEntitySearch:
 
     def test_collect_iris_declared(self, s):
         add_axioms(s, AXIOMS)
-        declared_iris = search_entities(s, declared=True, exclude_deprecated=False)
+        declared_iris = find_entities(s, declared=True, exclude_deprecated=False)
         assert IRI(":Dog") in declared_iris
         assert IRI(":Heart") not in declared_iris
 
-        undeclared_iris = search_entities(s, declared=False, exclude_deprecated=False)
+        undeclared_iris = find_entities(s, declared=False, exclude_deprecated=False)
         assert IRI(":Heart") in undeclared_iris
         assert IRI(":Dog") not in undeclared_iris
 
@@ -719,23 +717,23 @@ class TestEnhancedEntitySearch:
         ]
         add_axioms(s, extra)
 
-        iris_excl = search_entities(s, exclude_deprecated=True)
+        iris_excl = find_entities(s, exclude_deprecated=True)
         assert IRI(":Obsolete") not in iris_excl
         assert IRI(":Dog") in iris_excl
 
-        iris_incl = search_entities(s, exclude_deprecated=False)
+        iris_incl = find_entities(s, exclude_deprecated=False)
         assert IRI(":Obsolete") in iris_incl
 
     def test_collect_iris_properties_with_query(self, s):
         add_axioms(s, AXIOMS)
         # "domesticated" in skos:definition for :Pet
-        iris = search_entities(
+        iris = find_entities(
             s, query="domesticated", properties=[IRI("skos:definition")], exclude_deprecated=False
         )
         assert IRI(":Pet") in iris
 
         # Same query restricted to rdfs:label -> should not find :Pet
-        iris2 = search_entities(
+        iris2 = find_entities(
             s, query="domesticated", properties=[IRI("rdfs:label")], exclude_deprecated=False
         )
         assert IRI(":Pet") not in iris2
@@ -780,7 +778,7 @@ class TestTextSearchTiebreakers:
             ],
         )
 
-        iris = [str(i) for i in search_entities(s, query="target")]
+        iris = [str(i) for i in find_entities(s, query="target")]
 
         assert ":target" in iris
         assert ":aaa" in iris
@@ -827,7 +825,7 @@ class TestTextSearchTiebreakers:
             ],
         )
 
-        iris = [str(i) for i in search_entities(s, query="target")]
+        iris = [str(i) for i in find_entities(s, query="target")]
 
         ann_exact = iris.index(":aaa")
         cross = iris.index(":target_cross")

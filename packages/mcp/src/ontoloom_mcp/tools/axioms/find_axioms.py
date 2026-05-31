@@ -16,7 +16,7 @@ from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    SearchAxiomsSource,
+    FindAxiomsSource,
     fetch_preview_data,
     format_selection_write,
     format_source,
@@ -25,7 +25,7 @@ from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
 
-def search_axioms(
+def find_axioms(
     path: OntologyPath,
     into: SelectionName,
     mode: WriteMode = WriteMode.CREATE,
@@ -33,7 +33,7 @@ def search_axioms(
     properties: Annotated[list[IRI], MinLen(1)] | None = None,
     within: SelectionName | None = None,
 ):
-    """Search axioms by axiom-level annotation text or property; save matches to a selection.
+    """Find axioms by axiom-level annotation text or property; save matches to a selection.
 
     Use `read_selection` to paginate the saved selection; combine with `match_axioms`
     via `within=` to narrow by structural shape.
@@ -49,11 +49,11 @@ def search_axioms(
     - `within`: Restrict search to a named selection.
     """
     if query is None and properties is None:
-        msg = "search_axioms requires at least one of `query` or `properties`."
+        msg = "find_axioms requires at least one of `query` or `properties`."
         raise InvalidArgumentsError(msg)
 
     props_tuple = tuple(properties or ())
-    src = SearchAxiomsSource(query=query, properties=props_tuple, within=within)
+    src = FindAxiomsSource(query=query, properties=props_tuple, within=within)
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -77,8 +77,8 @@ def search_axioms(
     return format_selection_write(upserted, preview, src)
 
 
-tool_search_axioms = create_tool(
-    search_axioms,
-    name="search_axioms",
+tool_find_axioms = create_tool(
+    find_axioms,
+    name="find_axioms",
     annotations=ToolAnnotations(readOnlyHint=False, idempotentHint=True),
 )

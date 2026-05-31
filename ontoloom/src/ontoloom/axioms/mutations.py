@@ -368,7 +368,7 @@ def _populate_indexes(s: Session, axiom: BaseAxiom, axiom_id: int):
     )
 
     # axiom_text indexes axiom-level annotation values, keyed by axiom id and
-    # annotation property. Powers `search_axioms`.
+    # annotation property. Powers `find_axioms`.
     axiom_text_rows = [
         (axiom_id, _annotation_value_to_text(ann.value), str(ann.property))
         for ann in axiom.annotations

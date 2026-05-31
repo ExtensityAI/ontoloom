@@ -50,7 +50,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
             else:
                 scope_meta = get_entity_selection(s, within)
 
-        # `excl` matches `search_entities(declared=False)` (exclude_deprecated=True);
+        # `excl` matches `find_entities(declared=False)` (exclude_deprecated=True);
         # `incl` is the raw count for transparency.
         undeclared_excl = count_undeclared_entities(s, within, exclude_deprecated=True)
         undeclared_incl = count_undeclared_entities(s, within, exclude_deprecated=False)

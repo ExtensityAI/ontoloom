@@ -27,7 +27,7 @@ def _label(text: str) -> Annotation:
     return Annotation(property=IRI("rdfs:label"), value=LangLiteral(value=text))
 
 
-def test_search_axioms_returns_exact_then_substring(s):
+def test_find_axioms_returns_exact_then_substring(s):
     exact = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -47,7 +47,7 @@ def test_search_axioms_returns_exact_then_substring(s):
     assert result[1] == HashedAxiom.of(substring).hash
 
 
-def test_search_axioms_substring_only(s):
+def test_find_axioms_substring_only(s):
     substring = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -61,7 +61,7 @@ def test_search_axioms_substring_only(s):
     assert result[0] == HashedAxiom.of(substring).hash
 
 
-def test_search_axioms_exact_match_not_duplicated_as_substring(s):
+def test_find_axioms_exact_match_not_duplicated_as_substring(s):
     exact = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -75,7 +75,7 @@ def test_search_axioms_exact_match_not_duplicated_as_substring(s):
     assert result[0] == HashedAxiom.of(exact).hash
 
 
-def test_search_axioms_case_insensitive(s):
+def test_find_axioms_case_insensitive(s):
     upper = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -89,7 +89,7 @@ def test_search_axioms_case_insensitive(s):
     assert result[0] == HashedAxiom.of(upper).hash
 
 
-def test_search_axioms_filters_by_properties(s):
+def test_find_axioms_filters_by_properties(s):
     commented = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -113,7 +113,7 @@ def test_search_axioms_filters_by_properties(s):
     assert result[0] == HashedAxiom.of(commented).hash
 
 
-def test_search_axioms_ranks_exact_before_substring_over_full_result(s):
+def test_find_axioms_ranks_exact_before_substring_over_full_result(s):
     substrings = [
         SubClassOf(
             sub_class=IRI(f"ex:C{i}"),
@@ -141,13 +141,13 @@ def test_search_axioms_ranks_exact_before_substring_over_full_result(s):
     assert set(result) == expected
 
 
-def test_search_axioms_empty_result(s):
+def test_find_axioms_empty_result(s):
     add_axioms(s, [Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))])
     result = execute(s, FindAxioms(constraints=(AnnotationTextMatches(query="nonexistent"),)))
     assert result == []
 
 
-def test_search_axioms_respects_within_selection(s):
+def test_find_axioms_respects_within_selection(s):
     in_scope = SubClassOf(
         sub_class=IRI("ex:Dog"),
         super_class=IRI("ex:Animal"),
@@ -179,7 +179,7 @@ def test_search_axioms_respects_within_selection(s):
     assert result[0] == HashedAxiom.of(in_scope).hash
 
 
-def test_search_axioms_missing_selection_raises(s):
+def test_find_axioms_missing_selection_raises(s):
     from ontoloom.selections.types import SelectionNotFoundError
 
     ref = SelectionName("does_not_exist")

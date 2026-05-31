@@ -269,24 +269,24 @@ def format_axiom_listing(
 
 
 @dataclass(frozen=True, slots=True)
-class SearchAxiomsSource:
-    """Source for a `search_axioms` invocation."""
+class FindAxiomsSource:
+    """Source for a `find_axioms` invocation."""
 
-    kind: Literal["search_axioms"] = field(init=False, default="search_axioms")
+    kind: Literal["find_axioms"] = field(init=False, default="find_axioms")
     query: str | None
     properties: tuple[IRI, ...]
     within: SelectionName | None
 
 
 @dataclass(frozen=True, slots=True)
-class SearchEntitiesSource:
-    """Source for a `search_entities` invocation.
+class FindEntitiesSource:
+    """Source for a `find_entities` invocation.
 
     `exclude_deprecated` is carried so non-default values surface in the
     breadcrumb; the default (`True`) is omitted.
     """
 
-    kind: Literal["search_entities"] = field(init=False, default="search_entities")
+    kind: Literal["find_entities"] = field(init=False, default="find_entities")
     query: str | None
     role: EntityType | None
     namespace: PrefixName | None
@@ -345,8 +345,8 @@ class SetExprSource:
 
 
 type StorageSource = (
-    SearchAxiomsSource
-    | SearchEntitiesSource
+    FindAxiomsSource
+    | FindEntitiesSource
     | MatchAxiomsSource
     | GetEntitySource
     | FindDuplicatesSource
@@ -355,11 +355,7 @@ type StorageSource = (
 )
 
 type WriteBlockSource = (
-    SearchAxiomsSource
-    | SearchEntitiesSource
-    | MatchAxiomsSource
-    | FindDuplicatesSource
-    | SetExprSource
+    FindAxiomsSource | FindEntitiesSource | MatchAxiomsSource | FindDuplicatesSource | SetExprSource
 )
 
 
@@ -381,15 +377,15 @@ def format_source(src: StorageSource) -> str:  # noqa: C901
     `str(expr)` and carries no separate within.
     """
     match src:
-        case SearchAxiomsSource():
+        case FindAxiomsSource():
             args: list[str] = []
             if src.query is not None:
                 args.append(f"query={dquoted(src.query)}")
             if src.properties:
                 args.append(f"properties={_properties_arg(src.properties)}")
-            body = f"search_axioms({', '.join(args)})" if args else "search_axioms"
+            body = f"find_axioms({', '.join(args)})" if args else "find_axioms"
             return f"{body}{_within_suffix(src.within)}"
-        case SearchEntitiesSource():
+        case FindEntitiesSource():
             ents_args: list[str] = []
             if src.query is not None:
                 ents_args.append(f"query={dquoted(src.query)}")
@@ -403,7 +399,7 @@ def format_source(src: StorageSource) -> str:  # noqa: C901
                 ents_args.append(f"properties={_properties_arg(src.properties)}")
             if not src.exclude_deprecated:
                 ents_args.append(f"exclude_deprecated={src.exclude_deprecated}")
-            body = f"search_entities({', '.join(ents_args)})" if ents_args else "search_entities"
+            body = f"find_entities({', '.join(ents_args)})" if ents_args else "find_entities"
             return f"{body}{_within_suffix(src.within)}"
         case MatchAxiomsSource():
             return f"match_axioms{_within_suffix(src.within)}"
@@ -427,9 +423,9 @@ def _empty_message(src: WriteBlockSource) -> str:
     """Compose the trailing sentence for the empty-selection case, per source kind."""
     rendered = format_source(src)
     match src:
-        case SearchAxiomsSource():
+        case FindAxiomsSource():
             return f"No matches for {rendered}."
-        case SearchEntitiesSource():
+        case FindEntitiesSource():
             return f"No entities found ({rendered})."
         case MatchAxiomsSource():
             return f"No matches for {rendered}."

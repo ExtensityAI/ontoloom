@@ -60,7 +60,7 @@ def format_error(e: Exception) -> str:  # noqa: C901
         case SelectionNotFoundError():
             return (
                 f"Selection {dquoted(e.name)} does not exist. "
-                f"Use `search_entities` or `match_axioms` (with `into=` set) to create one."
+                f"Use `find_entities` or `match_axioms` (with `into=` set) to create one."
             )
         case SelectionExistsError():
             return (
@@ -81,7 +81,7 @@ def format_error(e: Exception) -> str:  # noqa: C901
             near = f" Similar entities: {', '.join(e.near_matches)}." if e.near_matches else ""
             return (
                 f"Entity {dquoted(e.iri)} not found.{near} "
-                f"Use `search_entities` to find entities by name."
+                f"Use `find_entities` to find entities by name."
             )
         case AmbiguousHashError():
             more = f", ... ({e.count - 10} more)" if e.count > 10 else ""

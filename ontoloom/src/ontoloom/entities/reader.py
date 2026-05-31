@@ -102,7 +102,7 @@ def get_entity(s: Session, iri: IRI, *, within: SelectionName | None = None) -> 
     axiom_counts = execute(s, CountAxiomsByType(constraints=axiom_count_constraints))
 
     if not roles and not annotations and not axiom_counts:
-        near = search_entities(s, query=iri.local_name)[:_NEAR_MATCH_LIMIT]
+        near = find_entities(s, query=iri.local_name)[:_NEAR_MATCH_LIMIT]
         raise EntityNotFoundError(iri_str, [str(m) for m in near])
     return EntityInfo(
         roles=frozenset(roles), annotations=tuple(annotations), axiom_counts=axiom_counts
@@ -120,7 +120,7 @@ def axiom_hashes_for_entity(
     return execute(s, FindAxioms(constraints=constraints))
 
 
-def search_entities(
+def find_entities(
     s: Session,
     *,
     query: str | None = None,
@@ -227,7 +227,7 @@ def count_undeclared_entities(
 ) -> int:
     """Count distinct entities that lack a Declaration axiom.
 
-    `exclude_deprecated=True` matches `search_entities(declared=False)` defaults.
+    `exclude_deprecated=True` matches `find_entities(declared=False)` defaults.
     Set False to count every undeclared entity including deprecated ones.
     """
     constraints: tuple[EntityConstraint, ...] = (

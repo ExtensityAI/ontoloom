@@ -6,7 +6,7 @@ removal.
 """
 
 from ontoloom.axioms.mutations import add_axioms, remove_by_hash
-from ontoloom.entities.reader import search_entities
+from ontoloom.entities.reader import find_entities
 from ontoloom.owl.axioms import Declaration, SubClassOf
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
@@ -28,7 +28,7 @@ def test_entity_text_survives_partial_removal(s):
     remove_by_hash(s, [subclassof_hash])
 
     # ex:Dog should still be searchable (Declaration still references it)
-    iris = search_entities(s, query="Dog")
+    iris = find_entities(s, query="Dog")
     assert IRI("ex:Dog") in iris
 
 
@@ -42,7 +42,7 @@ def test_search_with_like_wildcards(s):
         ],
     )
     # "100%" should NOT match "100Points" -> the % must be literal
-    iris = search_entities(s, query="100%")
+    iris = find_entities(s, query="100%")
     for iri in iris:
         assert "100%" in str(iri) or "100%" in iri.local_name
 
@@ -56,7 +56,7 @@ def test_namespace_filter_escapes_underscore(s):
             Declaration(entity_type=EntityType.CLASS, iri=IRI("aXb:Y")),
         ],
     )
-    iris = search_entities(s, namespace=PrefixName("a_b"))
+    iris = find_entities(s, namespace=PrefixName("a_b"))
     # Without ESCAPE, `a_b:%` would match `aXb:Y` because `_` is a LIKE wildcard.
     assert IRI("a_b:X") in iris
     assert IRI("aXb:Y") not in iris
