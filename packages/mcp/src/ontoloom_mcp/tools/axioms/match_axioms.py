@@ -6,7 +6,7 @@ from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    ToolFilterSource,
+    MatchAxiomsSource,
     fetch_preview_data,
     format_selection_write,
     format_source,
@@ -44,7 +44,7 @@ def match_axioms(
     - `limit`: Cap on matches collected before iteration stops; preview is
       independently capped at PREVIEW_ROWS.
     """
-    source = format_source(ToolFilterSource("match_axioms", {}, within=within))
+    src = MatchAxiomsSource(within=within)
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -53,7 +53,7 @@ def match_axioms(
             s,
             into,
             result.axiom_hashes,
-            source,
+            format_source(src),
             mode=mode,
         )
         preview = fetch_preview_data(s, upserted)
@@ -62,7 +62,7 @@ def match_axioms(
     return format_selection_write(
         upserted,
         preview,
-        no_results=f"No matches for {source}.",
+        src,
         truncated_limit=limit if result.truncated else None,
     )
 

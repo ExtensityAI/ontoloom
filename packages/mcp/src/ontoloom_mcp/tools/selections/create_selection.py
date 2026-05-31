@@ -5,6 +5,7 @@ from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
+    SetExprSource,
     fetch_preview_data,
     format_selection_write,
 )
@@ -41,6 +42,7 @@ def create_selection(
 
     `mode`: `create` (default) refuses if the name already exists; `replace` overwrites it.
     """
+    src = SetExprSource(expr=expr)
     ont = Ontology(path)
 
     with session(ont) as s:
@@ -48,7 +50,7 @@ def create_selection(
         preview = fetch_preview_data(s, upserted)
         s.commit()
 
-    return format_selection_write(upserted, preview)
+    return format_selection_write(upserted, preview, src)
 
 
 tool_create_selection = create_tool(

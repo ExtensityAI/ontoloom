@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass, field
 from typing import Literal
@@ -11,7 +11,9 @@ from ontoloom.entities.reader import lookup_entity_labels
 from ontoloom.owl.axioms import BaseAxiom
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.prefixes.types import PrefixName
 from ontoloom.query.dispatch import execute
+from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
 from ontoloom.selections.store import AxiomUpsertResult, EntityUpsertResult
@@ -267,90 +269,177 @@ def format_axiom_listing(
 
 
 @dataclass(frozen=True, slots=True)
-class ToolFilterSource:
-    """Source for a tool invocation: tool name plus its non-default filter args.
+class SearchAxiomsSource:
+    """Source for a `search_axioms` invocation."""
 
-    Filters are stored as `tuple[tuple[str, object], ...]` so the descriptor
-    stays hashable under `frozen=True`; the constructor accepts any Mapping
-    and preserves insertion order.
+    kind: Literal["search_axioms"] = field(init=False, default="search_axioms")
+    query: str | None
+    properties: tuple[IRI, ...]
+    within: SelectionName | None
+
+
+@dataclass(frozen=True, slots=True)
+class SearchEntitiesSource:
+    """Source for a `search_entities` invocation.
+
+    `exclude_deprecated` is carried so non-default values surface in the
+    breadcrumb; the default (`True`) is omitted.
     """
 
-    kind: Literal["tool"] = field(init=False, default="tool")
-    tool: str
-    filters: tuple[tuple[str, object], ...]
-    within: SelectionName | str | None = None
+    kind: Literal["search_entities"] = field(init=False, default="search_entities")
+    query: str | None
+    role: EntityType | None
+    namespace: PrefixName | None
+    declared: bool | None
+    properties: tuple[IRI, ...]
+    exclude_deprecated: bool
+    within: SelectionName | None
 
-    def __init__(
-        self,
-        tool: str,
-        filters: Mapping[str, object],
-        within: SelectionName | str | None = None,
-    ):
-        object.__setattr__(self, "tool", tool)
-        object.__setattr__(self, "filters", tuple(filters.items()))
-        object.__setattr__(self, "within", within)
+
+@dataclass(frozen=True, slots=True)
+class MatchAxiomsSource:
+    """Source for a `match_axioms` invocation.
+
+    The structural pattern is intentionally omitted - no compact textual
+    rendering is meaningful, so only the `within` scope surfaces.
+    """
+
+    kind: Literal["match_axioms"] = field(init=False, default="match_axioms")
+    within: SelectionName | None
+
+
+@dataclass(frozen=True, slots=True)
+class GetEntitySource:
+    """Source for a `get_entity` invocation that populates an axiom selection."""
+
+    kind: Literal["get_entity"] = field(init=False, default="get_entity")
+    iri: IRI
+    within: SelectionName | None
+
+
+@dataclass(frozen=True, slots=True)
+class FindDuplicatesSource:
+    """Source for a `find_duplicate_entities` invocation."""
+
+    kind: Literal["find_duplicate_entities"] = field(init=False, default="find_duplicate_entities")
+    annotation_property: IRI
+    within: SelectionName | None
 
 
 @dataclass(frozen=True, slots=True)
 class RenameSource:
     """Source for a `rename_iri` invocation."""
 
-    kind: Literal["rename"] = field(init=False, default="rename")
-    old: str
-    new: str
-    within: SelectionName | str | None = None
+    kind: Literal["rename_iri"] = field(init=False, default="rename_iri")
+    old: IRI
+    new: IRI
+    within: SelectionName | None
 
 
 @dataclass(frozen=True, slots=True)
 class SetExprSource:
-    """Source for a `create_selection` invocation; `expr` is the rendered set-expression."""
+    """Source for a `create_selection` invocation; renders via `str(expr)`."""
 
     kind: Literal["set_expr"] = field(init=False, default="set_expr")
-    expr: str
-    within: SelectionName | str | None = None
+    expr: SetExpr
 
 
-type SourceDescriptor = ToolFilterSource | RenameSource | SetExprSource
+type StorageSource = (
+    SearchAxiomsSource
+    | SearchEntitiesSource
+    | MatchAxiomsSource
+    | GetEntitySource
+    | FindDuplicatesSource
+    | RenameSource
+    | SetExprSource
+)
+
+type WriteBlockSource = (
+    SearchAxiomsSource
+    | SearchEntitiesSource
+    | MatchAxiomsSource
+    | FindDuplicatesSource
+    | SetExprSource
+)
 
 
-def _format_filter_value(v: object) -> str:
-    # Per-filter value formatting is intentionally type-discriminated so quoted
-    # strings, bare bools/ints, and bracketed string lists all render naturally.
-    # `repr` is the safe fallback for anything else.
-    if isinstance(v, bool):
-        return str(v)
-    if isinstance(v, int):
-        return str(v)
-    if isinstance(v, str):
-        return dquoted(v)
-    if isinstance(v, list):
-        return "[" + ", ".join(dquoted(item) for item in v) + "]"
-    return repr(v)
+def _within_suffix(within: SelectionName | None) -> str:
+    if within is None:
+        return ""
+    return f" within {dquoted(within)}"
 
 
-def format_source(src: SourceDescriptor) -> str:
+def _properties_arg(properties: tuple[IRI, ...]) -> str:
+    return "[" + ", ".join(dquoted(p) for p in properties) + "]"
+
+
+def format_source(src: StorageSource) -> str:  # noqa: C901
     """Render a source descriptor to its breadcrumb string.
 
-    A uniform ` within "<name>"` suffix is appended when `src.within` is set.
+    A uniform ` within "<name>"` suffix is appended when `src.within` is set
+    (variants that have a `within` field). `SetExprSource` defers to
+    `str(expr)` and carries no separate within.
     """
     match src:
-        case ToolFilterSource():
-            if src.filters:
-                args = ", ".join(f"{k}={_format_filter_value(v)}" for k, v in src.filters)
-                body = f"{src.tool}({args})"
-            else:
-                body = src.tool
+        case SearchAxiomsSource():
+            args: list[str] = []
+            if src.query is not None:
+                args.append(f"query={dquoted(src.query)}")
+            if src.properties:
+                args.append(f"properties={_properties_arg(src.properties)}")
+            body = f"search_axioms({', '.join(args)})" if args else "search_axioms"
+            return f"{body}{_within_suffix(src.within)}"
+        case SearchEntitiesSource():
+            ents_args: list[str] = []
+            if src.query is not None:
+                ents_args.append(f"query={dquoted(src.query)}")
+            if src.role is not None:
+                ents_args.append(f"role={dquoted(src.role)}")
+            if src.namespace is not None:
+                ents_args.append(f"namespace={dquoted(src.namespace)}")
+            if src.declared is not None:
+                ents_args.append(f"declared={src.declared}")
+            if src.properties:
+                ents_args.append(f"properties={_properties_arg(src.properties)}")
+            if not src.exclude_deprecated:
+                ents_args.append(f"exclude_deprecated={src.exclude_deprecated}")
+            body = f"search_entities({', '.join(ents_args)})" if ents_args else "search_entities"
+            return f"{body}{_within_suffix(src.within)}"
+        case MatchAxiomsSource():
+            return f"match_axioms{_within_suffix(src.within)}"
+        case GetEntitySource():
+            return f"get_entity(iri={dquoted(src.iri)}){_within_suffix(src.within)}"
+        case FindDuplicatesSource():
+            return (
+                f"find_duplicate_entities(annotation_property={dquoted(src.annotation_property)})"
+                f"{_within_suffix(src.within)}"
+            )
         case RenameSource():
-            body = f"rename_iri({src.old} -> {src.new})"
+            return f"rename_iri({src.old} -> {src.new}){_within_suffix(src.within)}"
         case SetExprSource():
-            body = src.expr
+            return str(src.expr)
         case _:
             msg = f"Unknown source descriptor: {type(src).__name__}"
             raise ValueError(msg)
 
-    if src.within is None:
-        return body
-    return f"{body} within {dquoted(str(src.within))}"
+
+def _empty_message(src: WriteBlockSource) -> str:
+    """Compose the trailing sentence for the empty-selection case, per source kind."""
+    rendered = format_source(src)
+    match src:
+        case SearchAxiomsSource():
+            return f"No matches for {rendered}."
+        case SearchEntitiesSource():
+            return f"No entities found ({rendered})."
+        case MatchAxiomsSource():
+            return f"No matches for {rendered}."
+        case FindDuplicatesSource():
+            return f"No duplicates for {rendered}."
+        case SetExprSource():
+            return ""
+        case _:
+            msg = f"Unknown write-block source: {type(src).__name__}"
+            raise ValueError(msg)
 
 
 def format_saved_line(
@@ -459,28 +548,34 @@ def _render_preview_body(preview: SelectionPreviewData) -> str:
 
 def format_selection_write(
     upserted: AxiomUpsertResult | EntityUpsertResult,
-    preview: SelectionPreviewData | None = None,
+    preview: SelectionPreviewData | None,
+    source: WriteBlockSource,
     *,
-    no_results: str = "",
     truncated_limit: int | None = None,
 ):
     """Compose the saved-line plus body for a selection-writing tool.
 
-    Empty selection (`size == 0`): saved line + space + `no_results`, with any
-    trailing whitespace stripped (so an empty `no_results` yields just the
-    saved line).
+    Empty selection (`size == 0`): saved line + space + the variant-specific
+    empty-case sentence from `_empty_message(source)`, with any trailing
+    whitespace stripped (so a variant whose empty message is `""` - e.g.
+    `SetExprSource` - yields just the saved line).
     Non-empty: saved line + blank line + rendered preview body, with an
     `... and N more.` footer appended (separated by a blank line) when
-    `upserted.selection.size > PREVIEW_ROWS`.
+    `upserted.selection.size > PREVIEW_ROWS`. `preview` must be supplied
+    when the selection is non-empty.
     `truncated_limit` is passed through to `format_saved_line`.
     """
     saved = format_saved_line(upserted, truncated_limit=truncated_limit)
     sel = upserted.selection
 
     if sel.size == 0:
-        return f"{saved} {no_results}".rstrip()
+        tail = _empty_message(source)
+        return f"{saved} {tail}".rstrip() if tail else saved
 
-    body = _render_preview_body(preview) if preview is not None else ""
+    if preview is None:
+        msg = "format_selection_write requires `preview` when the selection is non-empty"
+        raise ValueError(msg)
+    body = _render_preview_body(preview)
 
     if sel.size > PREVIEW_ROWS:
         footer = (

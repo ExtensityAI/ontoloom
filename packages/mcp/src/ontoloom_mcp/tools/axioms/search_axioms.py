@@ -16,7 +16,7 @@ from ontoloom.selections.store import upsert_axiom_selection
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    ToolFilterSource,
+    SearchAxiomsSource,
     fetch_preview_data,
     format_selection_write,
     format_source,
@@ -53,12 +53,7 @@ def search_axioms(
         raise InvalidArgumentsError(msg)
 
     props_tuple = tuple(properties or ())
-
-    filters: dict[str, object] = {}
-    if query is not None:
-        filters["query"] = query
-    if props_tuple:
-        filters["properties"] = [str(p) for p in props_tuple]
+    src = SearchAxiomsSource(query=query, properties=props_tuple, within=within)
 
     ont = Ontology(path)
     with session(ont) as s:
@@ -75,16 +70,11 @@ def search_axioms(
 
         hashes = execute(s, FindAxioms(constraints=(*text, *scope)))
 
-        source = format_source(ToolFilterSource("search_axioms", filters, within=within))
-        upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
+        upserted = upsert_axiom_selection(s, into, hashes, format_source(src), mode=mode)
         preview = fetch_preview_data(s, upserted)
         s.commit()
 
-    return format_selection_write(
-        upserted,
-        preview,
-        no_results=f"No matches for {source}.",
-    )
+    return format_selection_write(upserted, preview, src)
 
 
 tool_search_axioms = create_tool(

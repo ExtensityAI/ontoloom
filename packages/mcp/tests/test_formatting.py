@@ -29,10 +29,15 @@ from ontoloom_mcp.components.formatting import (
     PREVIEW_ROWS,
     AxiomPreviewData,
     EntityPreviewData,
+    FindDuplicatesSource,
+    GetEntitySource,
+    MatchAxiomsSource,
     Ref,
     RenameSource,
+    SearchAxiomsSource,
+    SearchEntitiesSource,
     SetExprSource,
-    ToolFilterSource,
+    _empty_message,
     _format_axiom_line,
     fetch_preview_data,
     format_axiom_blocks,
@@ -285,67 +290,211 @@ def test_within_scope_singular_axiom():
     assert format_within_scope(meta) == 'Within "only_one" (1 axiom)'
 
 
-def test_source_tool_no_filters_bare_name():
-    assert format_source(ToolFilterSource("match_axioms", {})) == "match_axioms"
-
-
-def test_source_tool_quoted_string_filter():
+def test_source_search_axioms_no_filters_bare_name():
     assert (
-        format_source(ToolFilterSource("search_axioms", {"query": "x"}))
+        format_source(SearchAxiomsSource(query=None, properties=(), within=None)) == "search_axioms"
+    )
+
+
+def test_source_search_axioms_query_only():
+    assert (
+        format_source(SearchAxiomsSource(query="x", properties=(), within=None))
         == 'search_axioms(query="x")'
     )
 
 
-def test_source_tool_mixed_string_and_bool_filters():
+def test_source_search_axioms_properties_only():
     assert (
-        format_source(ToolFilterSource("search_entities", {"role": "Class", "declared": True}))
-        == 'search_entities(role="Class", declared=True)'
-    )
-
-
-def test_source_tool_list_of_strings_filter():
-    assert (
-        format_source(ToolFilterSource("search_axioms", {"properties": ["rdfs:comment"]}))
+        format_source(
+            SearchAxiomsSource(query=None, properties=(IRI("rdfs:comment"),), within=None)
+        )
         == 'search_axioms(properties=["rdfs:comment"])'
     )
 
 
-def test_source_rename_uses_ascii_arrow():
-    assert format_source(RenameSource("ex:Cat", "ex:Dog")) == "rename_iri(ex:Cat -> ex:Dog)"
-
-
-def test_source_set_expr_verbatim():
+def test_source_search_axioms_query_and_properties_and_within():
     assert (
-        format_source(SetExprSource("union(all_classes, dog_search)"))
-        == "union(all_classes, dog_search)"
+        format_source(
+            SearchAxiomsSource(
+                query="x", properties=(IRI("rdfs:comment"),), within=SelectionName("dogs")
+            )
+        )
+        == 'search_axioms(query="x", properties=["rdfs:comment"]) within "dogs"'
     )
 
 
-def test_source_tool_with_filters_within_suffix():
+def test_source_search_entities_role_and_declared():
     assert (
-        format_source(ToolFilterSource("search_entities", {"role": "Class"}, within="dogs"))
+        format_source(
+            SearchEntitiesSource(
+                query=None,
+                role=EntityType.CLASS,
+                namespace=None,
+                declared=True,
+                properties=(),
+                exclude_deprecated=True,
+                within=None,
+            )
+        )
+        == 'search_entities(role="Class", declared=True)'
+    )
+
+
+def test_source_search_entities_with_within_suffix():
+    assert (
+        format_source(
+            SearchEntitiesSource(
+                query=None,
+                role=EntityType.CLASS,
+                namespace=None,
+                declared=None,
+                properties=(),
+                exclude_deprecated=True,
+                within=SelectionName("dogs"),
+            )
+        )
         == 'search_entities(role="Class") within "dogs"'
     )
 
 
-def test_source_tool_no_filters_within_suffix():
+def test_source_search_entities_omits_default_exclude_deprecated():
+    # Default `exclude_deprecated=True` is not surfaced; non-default is.
+    src = SearchEntitiesSource(
+        query=None,
+        role=None,
+        namespace=None,
+        declared=None,
+        properties=(),
+        exclude_deprecated=True,
+        within=None,
+    )
+    assert format_source(src) == "search_entities"
+
+
+def test_source_search_entities_surfaces_non_default_exclude_deprecated():
+    src = SearchEntitiesSource(
+        query=None,
+        role=None,
+        namespace=None,
+        declared=None,
+        properties=(),
+        exclude_deprecated=False,
+        within=None,
+    )
+    assert format_source(src) == "search_entities(exclude_deprecated=False)"
+
+
+def test_source_search_entities_namespace_dquoted():
+    src = SearchEntitiesSource(
+        query=None,
+        role=None,
+        namespace=PrefixName("ex"),
+        declared=None,
+        properties=(),
+        exclude_deprecated=True,
+        within=None,
+    )
+    assert format_source(src) == 'search_entities(namespace="ex")'
+
+
+def test_source_match_axioms_bare():
+    assert format_source(MatchAxiomsSource(within=None)) == "match_axioms"
+
+
+def test_source_match_axioms_with_within():
     assert (
-        format_source(ToolFilterSource("match_axioms", {}, within="dogs"))
+        format_source(MatchAxiomsSource(within=SelectionName("dogs")))
         == 'match_axioms within "dogs"'
+    )
+
+
+def test_source_get_entity():
+    assert (
+        format_source(GetEntitySource(iri=IRI("ex:Dog"), within=None)) == 'get_entity(iri="ex:Dog")'
+    )
+
+
+def test_source_get_entity_with_within():
+    assert (
+        format_source(GetEntitySource(iri=IRI("ex:Dog"), within=SelectionName("scope")))
+        == 'get_entity(iri="ex:Dog") within "scope"'
+    )
+
+
+def test_source_find_duplicate_entities():
+    assert (
+        format_source(FindDuplicatesSource(annotation_property=IRI("rdfs:label"), within=None))
+        == 'find_duplicate_entities(annotation_property="rdfs:label")'
+    )
+
+
+def test_source_find_duplicate_entities_with_within():
+    assert (
+        format_source(
+            FindDuplicatesSource(
+                annotation_property=IRI("rdfs:label"), within=SelectionName("scope")
+            )
+        )
+        == 'find_duplicate_entities(annotation_property="rdfs:label") within "scope"'
+    )
+
+
+def test_source_rename_uses_ascii_arrow():
+    assert (
+        format_source(RenameSource(old=IRI("ex:Cat"), new=IRI("ex:Dog"), within=None))
+        == "rename_iri(ex:Cat -> ex:Dog)"
     )
 
 
 def test_source_rename_within_suffix():
     assert (
-        format_source(RenameSource("ex:Cat", "ex:Dog", within="scope"))
+        format_source(
+            RenameSource(old=IRI("ex:Cat"), new=IRI("ex:Dog"), within=SelectionName("scope"))
+        )
         == 'rename_iri(ex:Cat -> ex:Dog) within "scope"'
     )
 
 
-def test_source_set_expr_within_suffix():
-    assert (
-        format_source(SetExprSource("union(a, b)", within="scope")) == 'union(a, b) within "scope"'
+def test_source_set_expr_renders_via_str():
+    # Bare SelectionName operand evaluates to its name string.
+    assert format_source(SetExprSource(expr=SelectionName("all_classes"))) == "all_classes"
+
+
+# -- _empty_message per variant --
+
+
+def test_empty_message_search_axioms():
+    src = SearchAxiomsSource(query="x", properties=(), within=None)
+    assert _empty_message(src) == 'No matches for search_axioms(query="x").'
+
+
+def test_empty_message_search_entities_uses_parenthesized_form():
+    src = SearchEntitiesSource(
+        query=None,
+        role=EntityType.CLASS,
+        namespace=None,
+        declared=None,
+        properties=(),
+        exclude_deprecated=True,
+        within=None,
     )
+    assert _empty_message(src) == 'No entities found (search_entities(role="Class")).'
+
+
+def test_empty_message_match_axioms():
+    assert _empty_message(MatchAxiomsSource(within=None)) == "No matches for match_axioms."
+
+
+def test_empty_message_find_duplicates():
+    src = FindDuplicatesSource(annotation_property=IRI("rdfs:label"), within=None)
+    assert (
+        _empty_message(src)
+        == 'No duplicates for find_duplicate_entities(annotation_property="rdfs:label").'
+    )
+
+
+def test_empty_message_set_expr_is_empty_string():
+    assert _empty_message(SetExprSource(expr=SelectionName("all_classes"))) == ""
 
 
 # -- format_saved_line --
@@ -391,25 +540,25 @@ def test_saved_line_entities_singular():
 # -- format_selection_write --
 
 
-def test_write_block_empty_uses_no_results():
-    out = format_selection_write(
-        _axiom_upserted("review", 0),
-        no_results='No matches for search_axioms(query="review").',
-    )
+def test_write_block_empty_uses_source_empty_message():
+    src = SearchAxiomsSource(query="review", properties=(), within=None)
+    out = format_selection_write(_axiom_upserted("review", 0), None, src)
     assert out == ('Saved 0 axioms to "review". No matches for search_axioms(query="review").')
 
 
 def test_write_block_nonempty_joins_saved_then_blank_then_preview():
     ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
     preview = AxiomPreviewData(rows=((ha, ()),))
-    out = format_selection_write(_axiom_upserted("x", 2), preview)
+    src = MatchAxiomsSource(within=None)
+    out = format_selection_write(_axiom_upserted("x", 2), preview, src)
     assert out == f'Saved 2 axioms to "x".\n\n[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)'
 
 
 def test_write_block_nonempty_with_overwrite_in_saved_line():
     ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
     preview = AxiomPreviewData(rows=((ha, ()),))
-    out = format_selection_write(_axiom_upserted("x", 2, previous_size=3), preview)
+    src = MatchAxiomsSource(within=None)
+    out = format_selection_write(_axiom_upserted("x", 2, previous_size=3), preview, src)
     assert out == (
         f'Saved 2 axioms to "x". Replaced previous (3 items).\n\n'
         f"[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)"
@@ -419,15 +568,18 @@ def test_write_block_nonempty_with_overwrite_in_saved_line():
 def test_write_block_nonempty_with_truncated_limit_passthrough():
     ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
     preview = AxiomPreviewData(rows=((ha, ()),))
-    out = format_selection_write(_axiom_upserted("limited", 2), preview, truncated_limit=1)
+    src = MatchAxiomsSource(within=None)
+    out = format_selection_write(_axiom_upserted("limited", 2), preview, src, truncated_limit=1)
     assert out == (
         f'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).\n\n'
         f"[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)"
     )
 
 
-def test_write_block_empty_with_no_results_omitted_strips_trailing_space():
-    out = format_selection_write(_axiom_upserted("review", 0))
+def test_write_block_empty_with_set_expr_source_yields_only_saved_line():
+    # SetExprSource's empty message is "", so the trailing space gets stripped.
+    src = SetExprSource(expr=SelectionName("all_classes"))
+    out = format_selection_write(_axiom_upserted("review", 0), None, src)
     assert out == 'Saved 0 axioms to "review".'
 
 
@@ -438,7 +590,16 @@ def test_write_block_entities_renders_entity_lines():
             (Ref(iri=IRI("ex:Dog"), label="Dog"), frozenset({EntityType.CLASS})),
         ),
     )
-    out = format_selection_write(_entity_upserted("ents", 2), preview)
+    src = SearchEntitiesSource(
+        query=None,
+        role=None,
+        namespace=None,
+        declared=None,
+        properties=(),
+        exclude_deprecated=True,
+        within=None,
+    )
+    out = format_selection_write(_entity_upserted("ents", 2), preview, src)
     assert out == ('Saved 2 entities to "ents".\n\nex:Cat (Class)\nex:Dog (Class) "Dog"')
 
 
@@ -467,7 +628,7 @@ def test_preview_axiom_selection_small(ont):
         upserted = upsert_axiom_selection(s, SelectionName("small"), hashes, "test")
         preview = fetch_preview_data(s, upserted)
         s.commit()
-    out = format_selection_write(upserted, preview)
+    out = format_selection_write(upserted, preview, MatchAxiomsSource(within=None))
 
     body = out.split("\n\n", 1)[1]
     lines = body.splitlines()
@@ -487,7 +648,7 @@ def test_preview_axiom_selection_large_appends_footer(ont):
         upserted = upsert_axiom_selection(s, SelectionName("big"), hashes, "test")
         preview = fetch_preview_data(s, upserted)
         s.commit()
-    out = format_selection_write(upserted, preview)
+    out = format_selection_write(upserted, preview, MatchAxiomsSource(within=None))
 
     parts = out.split("\n\n")
     # saved-line, body, footer
@@ -511,7 +672,7 @@ def test_preview_entity_selection_small(ont):
         upserted = upsert_entity_selection(s, SelectionName("ents"), iris, "test")
         preview = fetch_preview_data(s, upserted)
         s.commit()
-    out = format_selection_write(upserted, preview)
+    out = format_selection_write(upserted, preview, MatchAxiomsSource(within=None))
 
     body = out.split("\n\n", 1)[1]
     lines = body.splitlines()
@@ -532,7 +693,7 @@ def test_preview_entity_selection_large_appends_footer(ont):
         upserted = upsert_entity_selection(s, SelectionName("ebig"), iris, "test")
         preview = fetch_preview_data(s, upserted)
         s.commit()
-    out = format_selection_write(upserted, preview)
+    out = format_selection_write(upserted, preview, MatchAxiomsSource(within=None))
 
     parts = out.split("\n\n")
     # saved-line, body, footer

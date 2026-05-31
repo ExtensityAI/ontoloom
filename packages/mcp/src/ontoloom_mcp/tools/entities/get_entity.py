@@ -9,8 +9,8 @@ from ontoloom.selections.types import SelectionName, WriteMode
 from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
+    GetEntitySource,
     Ref,
-    ToolFilterSource,
     build_refs,
     format_entity_line,
     format_saved_line,
@@ -47,8 +47,8 @@ def get_entity(
 
         if into is not None:
             hashes = axiom_hashes_for_entity(s, iri, within=within)
-            source = format_source(ToolFilterSource("get_entity", {"iri": str(iri)}, within=within))
-            upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
+            src = GetEntitySource(iri=iri, within=within)
+            upserted = upsert_axiom_selection(s, into, hashes, format_source(src), mode=mode)
             result += f"\n\n{format_saved_line(upserted)}"
 
         s.commit()

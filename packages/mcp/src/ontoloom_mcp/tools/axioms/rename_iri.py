@@ -52,7 +52,7 @@ def rename_iri(
       call raises `ConfirmationRequiredError` with a token. Pass that token
       here to apply the change.
     """
-    source = format_source(RenameSource(str(old_iri), str(new_iri), within=within))
+    source = format_source(RenameSource(old=old_iri, new=new_iri, within=within))
 
     ont = Ontology(path)
     with session(ont) as s:

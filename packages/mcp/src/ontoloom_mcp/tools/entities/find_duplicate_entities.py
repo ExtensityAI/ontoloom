@@ -9,7 +9,7 @@ from ontoloom.utils import dquoted
 
 from ontoloom_mcp.components.formatting import (
     PREVIEW_ROWS,
-    ToolFilterSource,
+    FindDuplicatesSource,
     format_kinded_count,
     format_saved_line,
     format_selection_write,
@@ -40,22 +40,18 @@ def find_duplicate_entities(
     - `within`: Optional entity selection (e.g. `"my_classes"`) to
       restrict the check to.
     """
-    source = format_source(
-        ToolFilterSource(
-            "find_duplicate_entities",
-            {"annotation_property": str(annotation_property)},
-            within=within,
-        )
-    )
+    src = FindDuplicatesSource(annotation_property=annotation_property, within=within)
 
     ont = Ontology(path)
     with session(ont) as s:
         result = _find_duplicate_entities(s, annotation_property, within=within)
-        upserted = upsert_entity_selection(s, into, result.affected_iris, source, mode=mode)
+        upserted = upsert_entity_selection(
+            s, into, result.affected_iris, format_source(src), mode=mode
+        )
         s.commit()
 
     if not result.groups:
-        return format_selection_write(upserted, no_results=f"No duplicates for {source}.")
+        return format_selection_write(upserted, None, src)
 
     prop = str(annotation_property)
     g = result.total_groups
