@@ -23,6 +23,7 @@ from ontoloom_mcp.tools.axioms.rename_iri import rename_iri
 from ontoloom_mcp.tools.entities.get_entity import get_entity
 from ontoloom_mcp.tools.entities.search_entities import search_entities
 from ontoloom_mcp.tools.ontology.create_ontology import create_ontology
+from ontoloom_mcp.tools.ontology.describe_ontology import describe_ontology
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
 from ontoloom_mcp.tools.selections.create_selection import create_selection
 from ontoloom_mcp.tools.selections.read_selection import read_selection
@@ -66,6 +67,74 @@ def test_create_ontology_creates_file(tmp_path):
     result = create_ontology(path=path)
     assert path.exists()
     assert "Created ontology" in result
+
+
+def test_describe_ontology_within_axiom_selection_renders_kinded_header(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("dogs"), [HashedAxiom.of(sub).hash], "test fixture")
+        s.commit()
+
+    result = describe_ontology(path=populated_db, within=SelectionName("dogs"))
+    header = result.splitlines()[0]
+    assert header == 'Within "dogs" (1 axiom):'
+
+
+def test_describe_ontology_within_axiom_selection_plural(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    decl_dog = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("pair"),
+            [HashedAxiom.of(decl_dog).hash, HashedAxiom.of(sub).hash],
+            "test fixture",
+        )
+        s.commit()
+
+    result = describe_ontology(path=populated_db, within=SelectionName("pair"))
+    header = result.splitlines()[0]
+    assert header == 'Within "pair" (2 axioms):'
+
+
+def test_describe_ontology_within_entity_selection_renders_kinded_header(populated_db):
+    from ontoloom.selections.store import upsert_entity_selection
+
+    with session(Ontology(populated_db)) as s:
+        upsert_entity_selection(s, SelectionName("just_dog"), [IRI("ex:Dog")], "test fixture")
+        s.commit()
+
+    result = describe_ontology(path=populated_db, within=SelectionName("just_dog"))
+    header = result.splitlines()[0]
+    assert header == 'Within "just_dog" (1 entity):'
+
+
+def test_describe_ontology_within_entity_selection_plural(populated_db):
+    from ontoloom.selections.store import upsert_entity_selection
+
+    with session(Ontology(populated_db)) as s:
+        upsert_entity_selection(
+            s,
+            SelectionName("pair_ents"),
+            [IRI("ex:Dog"), IRI("ex:Animal")],
+            "test fixture",
+        )
+        s.commit()
+
+    result = describe_ontology(path=populated_db, within=SelectionName("pair_ents"))
+    header = result.splitlines()[0]
+    assert header == 'Within "pair_ents" (2 entities):'
+    # Old prefixed/labeled forms are gone.
+    assert "axioms:" not in header
+    assert "entities:" not in header
+    assert "(axioms)" not in result
+    assert "(entities):" not in result
 
 
 def test_add_axioms_returns_diff(empty_db):
