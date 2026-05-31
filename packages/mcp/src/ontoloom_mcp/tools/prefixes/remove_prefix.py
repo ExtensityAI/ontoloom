@@ -14,7 +14,7 @@ def remove_prefix(path: OntologyPath, name: PrefixName):
         core_remove_prefix(s, name)
         s.commit()
 
-    return f"Removed prefix `{name}:`"
+    return f"Removed prefix `{name}:`."
 
 
 tool_remove_prefix = create_tool(

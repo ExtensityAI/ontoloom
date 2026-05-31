@@ -2143,3 +2143,103 @@ def test_remove_selections_removed_plus_not_found(populated_db):
     )
     # foo has 3 distinct axioms after dedup
     assert result == 'Removed 1 selection: "foo" (3 axioms). Not found: "ghost".'
+
+
+# -- set_prefix confirmation body uses backticks --
+
+
+def test_set_prefix_reassign_confirmation_body_uses_backticks(populated_db):
+    set_prefix(path=populated_db, name=EX, iri=EX_IRI)
+
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        set_prefix(path=populated_db, name=EX, iri=OTHER_EX_IRI)
+    token = exc_info.value.token
+
+    expected = (
+        "Reassigning prefix `ex:` from `http://example.org/` to "
+        "`http://other.example.org/` would change the meaning of 2 entities."
+        f'\n\nTo proceed, call again with confirm="{token}".'
+    )
+    assert str(exc_info.value) == expected
+
+
+# -- remove_prefix --
+
+
+def test_remove_prefix_returns_message_with_trailing_period(empty_db):
+    from ontoloom_mcp.tools.prefixes.remove_prefix import remove_prefix
+
+    set_prefix(path=empty_db, name=FOO, iri=FOO_IRI)
+    result = remove_prefix(path=empty_db, name=FOO)
+    assert result == "Removed prefix `foo:`."
+
+
+# -- export_jsonl --
+
+
+def test_export_jsonl_full_export_canonical_form(populated_db, tmp_path):
+    from ontoloom_mcp.tools.ontology.export_jsonl import export_jsonl
+
+    out = tmp_path / "out.jsonl"
+    result = export_jsonl(path=populated_db, output_path=out)
+    assert result == f"Exported 3 axioms to `{out}`."
+
+
+def test_export_jsonl_within_export_bare_name(populated_db, tmp_path):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.ontology.export_jsonl import export_jsonl
+
+    decl_dog = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("dogs"),
+            [HashedAxiom.of(decl_dog).hash, HashedAxiom.of(sub).hash],
+            "test",
+        )
+        s.commit()
+
+    out = tmp_path / "out.jsonl"
+    result = export_jsonl(path=populated_db, output_path=out, within=SelectionName("dogs"))
+    assert result == f'Exported 2 axioms from selection "dogs" to `{out}`.'
+    assert "axioms:dogs" not in result
+
+
+def test_export_jsonl_within_singular_axiom(populated_db, tmp_path):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.ontology.export_jsonl import export_jsonl
+
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("solo"), [HashedAxiom.of(sub).hash], "test")
+        s.commit()
+
+    out = tmp_path / "out.jsonl"
+    result = export_jsonl(path=populated_db, output_path=out, within=SelectionName("solo"))
+    assert result == f'Exported 1 axiom from selection "solo" to `{out}`.'
+
+
+def test_export_jsonl_within_skipped_missing_items_insert(populated_db, tmp_path):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.ontology.export_jsonl import export_jsonl
+
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    real_hash = HashedAxiom.of(sub).hash
+    # Two synthetic 64-hex hashes that do not exist in the store.
+    ghost_a = AxiomHash("a" * 64)
+    ghost_b = AxiomHash("b" * 64)
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("mixed"), [real_hash, ghost_a, ghost_b], "test")
+        s.commit()
+
+    out = tmp_path / "out.jsonl"
+    result = export_jsonl(path=populated_db, output_path=out, within=SelectionName("mixed"))
+    assert result == (
+        f'Exported 1 axiom from selection "mixed" (skipped 2 missing items) to `{out}`.'
+    )
