@@ -1982,3 +1982,164 @@ def test_list_selections_no_wire_prefix_or_kind_label(populated_db):
     assert "(entities)" not in result
     assert "-> " not in result
     assert " items" not in result
+
+
+# -- remove_selections kinded sizes --
+
+
+def test_remove_selections_all_not_found(empty_db):
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    result = remove_selections(
+        path=empty_db,
+        names=(SelectionName("ghost_one"), SelectionName("ghost_two")),
+    )
+    assert result == 'Not found: "ghost_one", "ghost_two".'
+
+
+def test_remove_selections_axiom_selection_renders_kinded_count(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    animal_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+    animal_hash = HashedAxiom.of(animal_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("foo"), [dog_hash, animal_hash], "test")
+        s.commit()
+
+    result = remove_selections(path=populated_db, names=(SelectionName("foo"),))
+    assert result == 'Removed 1 selection: "foo" (2 axioms).'
+
+
+def test_remove_selections_entity_selection_renders_kinded_count(populated_db):
+    from ontoloom.selections.store import upsert_entity_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    with session(Ontology(populated_db)) as s:
+        upsert_entity_selection(
+            s,
+            SelectionName("bar"),
+            [IRI("ex:Dog"), IRI("ex:Animal")],
+            "test",
+        )
+        s.commit()
+
+    result = remove_selections(path=populated_db, names=(SelectionName("bar"),))
+    assert result == 'Removed 1 selection: "bar" (2 entities).'
+
+
+def test_remove_selections_singular_axiom(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("solo"), [dog_hash], "test")
+        s.commit()
+
+    result = remove_selections(path=populated_db, names=(SelectionName("solo"),))
+    assert result == 'Removed 1 selection: "solo" (1 axiom).'
+
+
+def test_remove_selections_singular_entity(populated_db):
+    from ontoloom.selections.store import upsert_entity_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    with session(Ontology(populated_db)) as s:
+        upsert_entity_selection(s, SelectionName("solo"), [IRI("ex:Dog")], "test")
+        s.commit()
+
+    result = remove_selections(path=populated_db, names=(SelectionName("solo"),))
+    assert result == 'Removed 1 selection: "solo" (1 entity).'
+
+
+def test_remove_selections_mixed_kinds_canonical_form(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    animal_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    subclass = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    hashes = [
+        HashedAxiom.of(dog_decl).hash,
+        HashedAxiom.of(animal_decl).hash,
+        HashedAxiom.of(subclass).hash,
+    ]
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("foo"),
+            [hashes[0], hashes[1], hashes[2], hashes[0], hashes[1]],
+            "test",
+        )
+        # 12 entity rows by repeating Dog/Animal IRIs; entity selections dedupe,
+        # so build distinct IRIs.
+        upsert_entity_selection(
+            s,
+            SelectionName("bar"),
+            [
+                IRI("ex:Dog"),
+                IRI("ex:Animal"),
+                IRI("ex:C1"),
+                IRI("ex:C2"),
+                IRI("ex:C3"),
+                IRI("ex:C4"),
+                IRI("ex:C5"),
+                IRI("ex:C6"),
+                IRI("ex:C7"),
+                IRI("ex:C8"),
+                IRI("ex:C9"),
+                IRI("ex:C10"),
+            ],
+            "test",
+        )
+        s.commit()
+
+    # Order in dropped is axioms-first, then entities (see remove_selections_any).
+    result = remove_selections(
+        path=populated_db,
+        names=(SelectionName("bar"), SelectionName("foo")),
+    )
+    # `foo` is axiom-side (3 distinct axioms after dedup); `bar` is entity-side (12).
+    assert result == 'Removed 2 selections: "foo" (3 axioms), "bar" (12 entities).'
+
+
+def test_remove_selections_removed_plus_not_found(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom_mcp.tools.selections.remove_selections import remove_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    animal_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    subclass = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("foo"),
+            [
+                HashedAxiom.of(dog_decl).hash,
+                HashedAxiom.of(animal_decl).hash,
+                HashedAxiom.of(subclass).hash,
+                HashedAxiom.of(dog_decl).hash,
+                HashedAxiom.of(animal_decl).hash,
+            ],
+            "test",
+        )
+        s.commit()
+
+    result = remove_selections(
+        path=populated_db,
+        names=(SelectionName("foo"), SelectionName("ghost")),
+    )
+    # foo has 3 distinct axioms after dedup
+    assert result == 'Removed 1 selection: "foo" (3 axioms). Not found: "ghost".'

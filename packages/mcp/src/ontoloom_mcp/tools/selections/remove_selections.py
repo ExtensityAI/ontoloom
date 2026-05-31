@@ -7,6 +7,7 @@ from ontoloom.selections.store import remove_selections_any
 from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dquoted
 
+from ontoloom_mcp.components.formatting import format_kinded_count
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -28,13 +29,16 @@ def remove_selections(
         res = remove_selections_any(s, names)
         s.commit()
 
-        parts = []
-        if res.dropped:
-            items = ", ".join(f"{dquoted(d.name)} ({d.size})" for d in res.dropped)
-            parts.append(f"Removed {len(res.dropped)} selections: {items}.")
-        if res.not_found:
-            parts.append(f"Not found: {', '.join(dquoted(n) for n in res.not_found)}.")
-        return " ".join(parts) or "Nothing to remove."
+    parts = []
+    if res.dropped:
+        items = ", ".join(
+            f"{dquoted(d.name)} ({format_kinded_count(d.kind, d.size)})" for d in res.dropped
+        )
+        noun = "selection" if len(res.dropped) == 1 else "selections"
+        parts.append(f"Removed {len(res.dropped)} {noun}: {items}.")
+    if res.not_found:
+        parts.append(f"Not found: {', '.join(dquoted(n) for n in res.not_found)}.")
+    return " ".join(parts)
 
 
 tool_remove_selections = create_tool(
