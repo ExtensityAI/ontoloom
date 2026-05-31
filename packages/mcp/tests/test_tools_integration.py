@@ -1420,7 +1420,7 @@ def test_remove_axioms_by_hashes_plural_summary(populated_db):
 def test_axiom_dispatch_failure_renders_focused_mcp_message():
     """A bad axiom dict, validated through the Axiom union adapter, should
     raise UnionDispatchError; the MCP-layer formatter renders it as a focused
-    single-line message — not the multi-KB union signature dump."""
+    single-line message - not the multi-KB union signature dump."""
     from ontoloom.models import UnionDispatchError
     from ontoloom.owl.axioms import Axiom
     from ontoloom_mcp.components.errors import format_error
