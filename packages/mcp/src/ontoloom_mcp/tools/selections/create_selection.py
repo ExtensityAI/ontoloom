@@ -2,10 +2,12 @@ from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
 from ontoloom.selections.compose import create_selection_from_expr
 from ontoloom.selections.expr import SetExpr
-from ontoloom.selections.store import AxiomUpsertResult
 from ontoloom.selections.types import SelectionName, WriteMode
 
-from ontoloom_mcp.components.formatting import format_selection_ref
+from ontoloom_mcp.components.formatting import (
+    format_selection_preview,
+    format_selection_write,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -43,16 +45,11 @@ def create_selection(
 
     with session(ont) as s:
         upserted = create_selection_from_expr(s, name, expr, mode=mode)
+        preview = format_selection_preview(s, upserted)
+        out = format_selection_write(upserted, preview=preview).rstrip()
         s.commit()
 
-    sel = upserted.selection
-    kind_label = "axioms" if isinstance(upserted, AxiomUpsertResult) else "entities"
-    parts = [f"Selection {format_selection_ref(sel)}: {sel.size} {kind_label}"]
-
-    if upserted.previous_size is not None:
-        parts.append(f"(overwrote previous: {upserted.previous_size} items)")
-
-    return " ".join(parts)
+    return out
 
 
 tool_create_selection = create_tool(

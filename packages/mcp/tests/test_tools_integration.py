@@ -257,13 +257,17 @@ def test_search_entities_source_includes_role_and_within(populated_db):
     assert meta.source == 'search_entities(role="Class") within "scope_ax"'
 
 
-def test_create_selection_returns_clean_one_liner_no_preview(empty_db):
+def test_create_selection_renders_write_block_with_preview(empty_db):
     from ontoloom.selections.store import upsert_entity_selection
 
-    items = [IRI(f"ex:E{i}") for i in range(25)]
+    iris = [IRI(f"ex:E{i}") for i in range(25)]
+    add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=iri) for iri in iris],
+    )
 
     with session(Ontology(empty_db)) as s:
-        upsert_entity_selection(s, SelectionName("source"), items, "test fixture")
+        upsert_entity_selection(s, SelectionName("source"), iris, "test fixture")
         s.commit()
 
     result = create_selection(
@@ -271,20 +275,28 @@ def test_create_selection_returns_clean_one_liner_no_preview(empty_db):
         name=SelectionName("derived"),
         expr=SelectionName("source"),
     )
-    assert result == 'Selection "entities:derived": 25 entities'
-    assert "Preview" not in result
-    assert "\n" not in result
+    # Saved line: bare name, no `entities:` prefix; preview body follows after a blank line.
+    assert result.startswith('Saved 25 entities to "derived".\n\n')
+    assert "entities:derived" not in result
+    # First entity row appears in the preview body (with role from declaration).
+    assert "ex:E0 (Class)" in result
+    # Preview is capped at PREVIEW_ROWS=10; footer points back to read_selection
+    # with the bare name and notes the remaining count.
+    assert '... and 15 more. Use `read_selection` with "derived" to see all 25.' in result
 
 
 def test_create_selection_replace_notes_overwrite(empty_db):
     from ontoloom.selections.store import upsert_entity_selection
+    from ontoloom.selections.types import WriteMode
 
+    add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:A"))],
+    )
     with session(Ontology(empty_db)) as s:
         upsert_entity_selection(s, SelectionName("source"), [IRI("ex:A")], "test fixture")
         upsert_entity_selection(s, SelectionName("derived"), [IRI("ex:Old")], "test fixture")
         s.commit()
-
-    from ontoloom.selections.types import WriteMode
 
     result = create_selection(
         path=empty_db,
@@ -292,8 +304,29 @@ def test_create_selection_replace_notes_overwrite(empty_db):
         expr=SelectionName("source"),
         mode=WriteMode.REPLACE,
     )
-    assert result == 'Selection "entities:derived": 1 entities (overwrote previous: 1 items)'
-    assert "Preview" not in result
+    # New saved-line shape: singular "1 entity", bare name, `Replaced previous (N items).` tail.
+    assert result.startswith('Saved 1 entity to "derived". Replaced previous (1 items).\n\n')
+    assert "entities:derived" not in result
+    assert "overwrote previous" not in result
+    assert "ex:A (Class)" in result
+
+
+def test_create_selection_empty_result_renders_clean_saved_line(empty_db):
+    from ontoloom.selections.expr import IntersectExpr
+    from ontoloom.selections.store import upsert_entity_selection
+
+    with session(Ontology(empty_db)) as s:
+        upsert_entity_selection(s, SelectionName("a"), [IRI("ex:A")], "test fixture")
+        upsert_entity_selection(s, SelectionName("b"), [IRI("ex:B")], "test fixture")
+        s.commit()
+
+    result = create_selection(
+        path=empty_db,
+        name=SelectionName("empty_result"),
+        expr=IntersectExpr(intersect=(SelectionName("a"), SelectionName("b"))),
+    )
+    # Empty form: saved line ends cleanly with a period, no trailing space, no preview body.
+    assert result == 'Saved 0 entities to "empty_result".'
 
 
 def test_read_selection_after_search(populated_db):
