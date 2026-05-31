@@ -1,6 +1,7 @@
 from mcp.types import ToolAnnotations
-from ontoloom.axioms.hashing import short_hash
+from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
+from ontoloom.entities.reader import lookup_entity_labels
 from ontoloom.query.dispatch import execute
 from ontoloom.selections.read_axiom_selection import ReadAxiomSelection
 from ontoloom.selections.read_entity_selection import ReadEntitySelection
@@ -8,13 +9,21 @@ from ontoloom.selections.store import axiom_selection_exists, entity_selection_e
 from ontoloom.selections.types import (
     AxiomSelectionPage,
     EntitySelectionPage,
+    SelectionKind,
     SelectionName,
     SelectionNotFoundError,
     ShowFilter,
 )
-from ontoloom.utils import dquoted
 
-from ontoloom_mcp.components.formatting import format_axiom_annotations, format_selection_ref
+from ontoloom_mcp.components.formatting import (
+    Ref,
+    build_refs_per_axiom,
+    format_axiom_listing,
+    format_entity_line,
+    format_missing_axiom_line,
+    format_pagination,
+    format_read_header,
+)
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import Limit, Offset, OntologyPath
 
@@ -44,68 +53,84 @@ def read_selection(
             page_ax: AxiomSelectionPage = execute(
                 s, ReadAxiomSelection(selection=name, limit=limit, offset=offset, show=show)
             )
+            present_axioms = tuple(
+                HashedAxiom(axiom=item.axiom, hash=item.hash)
+                for item in page_ax.items
+                if item.axiom is not None
+            )
+            refs_per_axiom = build_refs_per_axiom(s, present_axioms)
             s.commit()
-            return _format_axiom_page(page_ax, offset=offset, show=show)
+            return _render_axiom_page(
+                page_ax, present_axioms, refs_per_axiom, offset=offset, show=show
+            )
 
         if entity_selection_exists(s, name):
             page_ent: EntitySelectionPage = execute(
                 s, ReadEntitySelection(selection=name, limit=limit, offset=offset, show=show)
             )
+            present_iris = [item.iri for item in page_ent.items if item.present]
+            labels = lookup_entity_labels(s, present_iris)
             s.commit()
-            return _format_entity_page(page_ent, offset=offset, show=show)
+            return _render_entity_page(page_ent, labels, offset=offset, show=show)
 
         raise SelectionNotFoundError(name)
 
 
-def _format_axiom_page(page: AxiomSelectionPage, *, offset: int, show: ShowFilter):
-    meta = page.meta
-    header = (
-        f"Selection {format_selection_ref(meta)} (axioms): "
-        f"{meta.size} total ({page.present} present, {page.missing} missing)"
+def _render_axiom_page(
+    page: AxiomSelectionPage,
+    present_axioms: tuple[HashedAxiom, ...],
+    refs_per_axiom: list[list[Ref]],
+    *,
+    offset: int,
+    show: ShowFilter,
+):
+    header = format_read_header(page.meta, page.present, page.missing)
+    end = offset + len(page.items)
+    pagination = format_pagination(
+        offset + 1, end, page.total_filtered, SelectionKind.AXIOMS, filter=str(show)
     )
 
-    end = offset + len(page.items)
     if not page.items:
-        showing = f"0 results (filter: {show})."
-    else:
-        showing = f"Showing {offset + 1}-{end} of {page.total_filtered} (filter: {show}):"
+        return f"{header}\n{pagination}"
 
-    lines = [header, showing, ""]
+    refs_by_hash = {ha.hash: refs for ha, refs in zip(present_axioms, refs_per_axiom, strict=True)}
+    body_lines: list[str] = []
     for item in page.items:
-        h = short_hash(item.hash)
-
         if item.axiom is None:
-            lines.append(f"[{h}] *missing*")
+            body_lines.append(format_missing_axiom_line(item.hash))
             continue
 
-        lines.append(f"[{h}] {item.axiom}")
-        lines.extend(format_axiom_annotations(item.axiom))
-    return "\n".join(lines)
+        ha = HashedAxiom(axiom=item.axiom, hash=item.hash)
+        body_lines.append(format_axiom_listing([ha], refs_per_axiom=[refs_by_hash[item.hash]]))
+    return f"{header}\n{pagination}\n\n" + "\n".join(body_lines)
 
 
-def _format_entity_page(page: EntitySelectionPage, *, offset: int, show: ShowFilter):
-    meta = page.meta
-    header = (
-        f"Selection {format_selection_ref(meta)} (entities): "
-        f"{meta.size} total ({page.present} present, {page.missing} missing)"
+def _render_entity_page(
+    page: EntitySelectionPage,
+    labels: dict[str, str | None],
+    *,
+    offset: int,
+    show: ShowFilter,
+):
+    header = format_read_header(page.meta, page.present, page.missing)
+    end = offset + len(page.items)
+    pagination = format_pagination(
+        offset + 1, end, page.total_filtered, SelectionKind.ENTITIES, filter=str(show)
     )
 
-    end = offset + len(page.items)
     if not page.items:
-        showing = f"0 results (filter: {show})."
-    else:
-        showing = f"Showing {offset + 1}-{end} of {page.total_filtered} (filter: {show}):"
+        return f"{header}\n{pagination}"
 
-    lines = [header, showing, ""]
+    body_lines: list[str] = []
     for item in page.items:
         if not item.present:
-            lines.append(f"{item.iri} *missing*")
+            body_lines.append(f"{item.iri} *missing*")
             continue
 
-        role_str = f" ({', '.join(sorted(str(r) for r in item.roles))})" if item.roles else ""
-        label_str = f" {dquoted(item.label)}" if item.label else ""
-        lines.append(f"{item.iri}{role_str}{label_str}")
-    return "\n".join(lines)
+        body_lines.append(
+            format_entity_line(Ref(iri=item.iri, label=labels.get(item.iri)), item.roles)
+        )
+    return f"{header}\n{pagination}\n\n" + "\n".join(body_lines)
 
 
 tool_read_selection = create_tool(

@@ -364,7 +364,119 @@ def test_read_selection_after_search(populated_db):
         query="Dog",
     )
     result = read_selection(path=populated_db, name=SelectionName("dogs"))
-    assert "ex:Dog" in result
+    # New header shape: bare name, kinded count, ASCII hyphen, drift always shown.
+    assert result.startswith('"dogs": 1 entity - 1 present, 0 missing\n')
+    # New pagination shape: now includes kind noun.
+    assert "Showing 1-1 of 1 entity (filter: all):" in result
+    # Entity rows use format_entity_line: `iri (roles) "label"`; no label here.
+    assert "ex:Dog (Class)" in result
+
+
+def test_read_selection_axiom_page_includes_label_hints(empty_db):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.owl.axioms import AnnotationAssertion
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            ),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+        ],
+    )
+    with session(Ontology(empty_db)) as s:
+        rows = s.conn.execute("SELECT hash FROM axioms WHERE type = 'SubClassOf'").fetchall()
+        sub_hash = AxiomHash(rows[0][0])
+        upsert_axiom_selection(s, SelectionName("subs"), [sub_hash], "test fixture")
+        s.commit()
+
+    result = read_selection(path=empty_db, name=SelectionName("subs"))
+    assert result.startswith('"subs": 1 axiom - 1 present, 0 missing\n')
+    assert "Showing 1-1 of 1 axiom (filter: all):" in result
+    # Label hint trailing the head line (only ex:Dog has a label).
+    assert 'SubClassOf(ex:Dog, ex:Animal)  # ex:Dog "Dog"' in result
+
+
+def test_read_selection_axiom_page_shows_missing_rows(empty_db):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+        ],
+    )
+
+    bogus = AxiomHash("0" * 64)
+    with session(Ontology(empty_db)) as s:
+        rows = s.conn.execute("SELECT hash FROM axioms LIMIT 1").fetchall()
+        present_hash = AxiomHash(rows[0][0])
+        upsert_axiom_selection(s, SelectionName("review"), [present_hash, bogus], "test fixture")
+        s.commit()
+
+    result = read_selection(path=empty_db, name=SelectionName("review"))
+    assert result.startswith('"review": 2 axioms - 1 present, 1 missing\n')
+    assert "Showing 1-2 of 2 axioms (filter: all):" in result
+    assert "[000000000000] *missing*" in result
+
+
+def test_read_selection_axiom_page_empty_filter(empty_db):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.selections.store import upsert_axiom_selection
+    from ontoloom.selections.types import ShowFilter
+
+    bogus = AxiomHash("0" * 64)
+    with session(Ontology(empty_db)) as s:
+        upsert_axiom_selection(s, SelectionName("review"), [bogus], "test fixture")
+        s.commit()
+
+    result = read_selection(path=empty_db, name=SelectionName("review"), show=ShowFilter.PRESENT)
+    assert result.startswith('"review": 1 axiom - 0 present, 1 missing\n')
+    assert "0 axioms (filter: present)." in result
+
+
+def test_read_selection_entity_page_includes_roles_and_label(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+    search_entities(path=empty_db, into=SelectionName("dogs"), query="Dog")
+
+    result = read_selection(path=empty_db, name=SelectionName("dogs"))
+    assert result.startswith('"dogs": 1 entity - 1 present, 0 missing\n')
+    assert "Showing 1-1 of 1 entity (filter: all):" in result
+    assert 'ex:Dog (Class) "Dog"' in result
+
+
+def test_read_selection_entity_page_shows_missing_rows(empty_db):
+    from ontoloom.selections.store import upsert_entity_selection
+
+    with session(Ontology(empty_db)) as s:
+        upsert_entity_selection(s, SelectionName("ghosts"), [IRI("ex:Ghost")], "test fixture")
+        s.commit()
+
+    result = read_selection(path=empty_db, name=SelectionName("ghosts"))
+    assert result.startswith('"ghosts": 1 entity - 0 present, 1 missing\n')
+    assert "Showing 1-1 of 1 entity (filter: all):" in result
+    assert "ex:Ghost *missing*" in result
 
 
 def test_search_axioms_by_text(empty_db):
@@ -410,6 +522,8 @@ def test_search_axioms_by_text(empty_db):
     assert "SubClassOf" in result
 
     page = read_selection(path=empty_db, name=SelectionName("todos"))
+    assert page.startswith('"todos": 1 axiom - 1 present, 0 missing\n')
+    assert "Showing 1-1 of 1 axiom (filter: all):" in page
     assert "ex:Dog" in page
     assert "ex:Cat" not in page
     assert "TODO" in page
