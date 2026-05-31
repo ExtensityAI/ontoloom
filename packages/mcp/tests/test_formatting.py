@@ -5,7 +5,6 @@ from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.axioms.mutations import add_axioms as core_add_axioms
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
-from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import LangLiteral
@@ -27,11 +26,14 @@ from ontoloom.selections.types import (
 )
 from ontoloom_mcp.components.formatting import (
     PREVIEW_ROWS,
+    AxiomPreviewData,
+    EntityPreviewData,
     Ref,
     RenameSource,
     SetExprSource,
     ToolFilterSource,
     _format_axiom_line,
+    fetch_preview_data,
     format_drift,
     format_entity_line,
     format_kinded_count,
@@ -41,7 +43,6 @@ from ontoloom_mcp.components.formatting import (
     format_pagination,
     format_read_header,
     format_saved_line,
-    format_selection_preview,
     format_selection_write,
     format_source,
     format_within_scope,
@@ -364,30 +365,49 @@ def test_write_block_empty_uses_no_results():
 
 
 def test_write_block_nonempty_joins_saved_then_blank_then_preview():
-    out = format_selection_write(_axiom_upserted("x", 2), preview="line1\nline2")
-    assert out == 'Saved 2 axioms to "x".\n\nline1\nline2'
+    ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
+    preview = AxiomPreviewData(rows=((ha, ()),))
+    out = format_selection_write(_axiom_upserted("x", 2), preview)
+    assert out == f'Saved 2 axioms to "x".\n\n[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)'
 
 
 def test_write_block_nonempty_with_overwrite_in_saved_line():
-    out = format_selection_write(
-        _axiom_upserted("x", 2, previous_size=3),
-        preview="line1\nline2",
+    ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
+    preview = AxiomPreviewData(rows=((ha, ()),))
+    out = format_selection_write(_axiom_upserted("x", 2, previous_size=3), preview)
+    assert out == (
+        f'Saved 2 axioms to "x". Replaced previous (3 items).\n\n'
+        f"[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)"
     )
-    assert out == ('Saved 2 axioms to "x". Replaced previous (3 items).\n\nline1\nline2')
 
 
 def test_write_block_nonempty_with_truncated_limit_passthrough():
-    out = format_selection_write(
-        _axiom_upserted("limited", 2),
-        preview="row1",
-        truncated_limit=1,
-    )
+    ha = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
+    preview = AxiomPreviewData(rows=((ha, ()),))
+    out = format_selection_write(_axiom_upserted("limited", 2), preview, truncated_limit=1)
     assert out == (
-        'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).\n\nrow1'
+        f'Saved 2 axioms to "limited" (truncated at limit=1; raise it to see more).\n\n'
+        f"[{short_hash(ha.hash)}] SubClassOf(ex:Dog, ex:Animal)"
     )
 
 
-# -- format_selection_preview (DB fixtures) --
+def test_write_block_empty_with_no_results_omitted_strips_trailing_space():
+    out = format_selection_write(_axiom_upserted("review", 0))
+    assert out == 'Saved 0 axioms to "review".'
+
+
+def test_write_block_entities_renders_entity_lines():
+    preview = EntityPreviewData(
+        rows=(
+            (Ref(iri=IRI("ex:Cat"), label=None), frozenset({EntityType.CLASS})),
+            (Ref(iri=IRI("ex:Dog"), label="Dog"), frozenset({EntityType.CLASS})),
+        ),
+    )
+    out = format_selection_write(_entity_upserted("ents", 2), preview)
+    assert out == ('Saved 2 entities to "ents".\n\nex:Cat (Class)\nex:Dog (Class) "Dog"')
+
+
+# -- fetch_preview_data (DB fixtures) --
 
 
 @pytest.fixture()
@@ -400,10 +420,6 @@ def ont(tmp_path):
     return Ontology(path)
 
 
-def _label_ann(text: str) -> Annotation:
-    return Annotation(property=RDFS_LABEL, value=LangLiteral(value=text))
-
-
 def _label_assertion(iri: IRI, text: str) -> AnnotationAssertion:
     return AnnotationAssertion(property=RDFS_LABEL, subject=iri, value=LangLiteral(value=text))
 
@@ -414,10 +430,12 @@ def test_preview_axiom_selection_small(ont):
         core_add_axioms(s, axioms)
         hashes = [HashedAxiom.of(a).hash for a in axioms]
         upserted = upsert_axiom_selection(s, SelectionName("small"), hashes, "test")
-        out = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
+    out = format_selection_write(upserted, preview)
 
-    lines = out.splitlines()
+    body = out.split("\n\n", 1)[1]
+    lines = body.splitlines()
     assert len(lines) == 3
     for i, line in enumerate(lines):
         assert f"Declaration(Class, ex:C{i})" in line
@@ -432,14 +450,16 @@ def test_preview_axiom_selection_large_appends_footer(ont):
         core_add_axioms(s, axioms)
         hashes = [HashedAxiom.of(a).hash for a in axioms]
         upserted = upsert_axiom_selection(s, SelectionName("big"), hashes, "test")
-        out = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
+    out = format_selection_write(upserted, preview)
 
     parts = out.split("\n\n")
-    assert len(parts) == 2
-    row_lines = parts[0].splitlines()
+    # saved-line, body, footer
+    assert len(parts) == 3
+    row_lines = parts[1].splitlines()
     assert len(row_lines) == PREVIEW_ROWS
-    assert parts[1] == ('... and 5 more. Use `read_selection` with "big" to see all 15.')
+    assert parts[2] == ('... and 5 more. Use `read_selection` with "big" to see all 15.')
 
 
 def test_preview_entity_selection_small(ont):
@@ -454,10 +474,12 @@ def test_preview_entity_selection_small(ont):
         )
         iris = [IRI("ex:Cat"), IRI("ex:Dog")]
         upserted = upsert_entity_selection(s, SelectionName("ents"), iris, "test")
-        out = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
+    out = format_selection_write(upserted, preview)
 
-    lines = out.splitlines()
+    body = out.split("\n\n", 1)[1]
+    lines = body.splitlines()
     assert len(lines) == 2
     # ReadEntitySelection orders by IRI lexicographically: Cat before Dog.
     assert lines[0] == "ex:Cat (Class)"
@@ -473,11 +495,13 @@ def test_preview_entity_selection_large_appends_footer(ont):
         core_add_axioms(s, axioms)
         iris = [IRI(f"ex:E{i:02d}") for i in range(12)]
         upserted = upsert_entity_selection(s, SelectionName("ebig"), iris, "test")
-        out = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
+    out = format_selection_write(upserted, preview)
 
     parts = out.split("\n\n")
-    assert len(parts) == 2
-    row_lines = parts[0].splitlines()
+    # saved-line, body, footer
+    assert len(parts) == 3
+    row_lines = parts[1].splitlines()
     assert len(row_lines) == PREVIEW_ROWS
-    assert parts[1] == ('... and 2 more. Use `read_selection` with "ebig" to see all 12.')
+    assert parts[2] == ('... and 2 more. Use `read_selection` with "ebig" to see all 12.')

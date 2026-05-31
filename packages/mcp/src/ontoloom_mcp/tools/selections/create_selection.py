@@ -5,7 +5,7 @@ from ontoloom.selections.expr import SetExpr
 from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
-    format_selection_preview,
+    fetch_preview_data,
     format_selection_write,
 )
 from ontoloom_mcp.components.tool import create_tool
@@ -45,11 +45,10 @@ def create_selection(
 
     with session(ont) as s:
         upserted = create_selection_from_expr(s, name, expr, mode=mode)
-        preview = format_selection_preview(s, upserted)
-        out = format_selection_write(upserted, preview=preview).rstrip()
+        preview = fetch_preview_data(s, upserted)
         s.commit()
 
-    return out
+    return format_selection_write(upserted, preview)
 
 
 tool_create_selection = create_tool(

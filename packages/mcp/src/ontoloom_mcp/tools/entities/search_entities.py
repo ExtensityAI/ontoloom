@@ -12,7 +12,7 @@ from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
     ToolFilterSource,
-    format_selection_preview,
+    fetch_preview_data,
     format_selection_write,
     format_source,
 )
@@ -82,12 +82,12 @@ def search_entities(
         )
 
         upserted = upsert_entity_selection(s, into, iris, source, mode=mode)
-        preview = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
 
     return format_selection_write(
         upserted,
-        preview=preview,
+        preview,
         no_results=f"No entities found ({source}).",
     )
 

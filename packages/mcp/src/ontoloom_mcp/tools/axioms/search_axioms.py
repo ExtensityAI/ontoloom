@@ -17,7 +17,7 @@ from ontoloom.selections.types import SelectionName, WriteMode
 
 from ontoloom_mcp.components.formatting import (
     ToolFilterSource,
-    format_selection_preview,
+    fetch_preview_data,
     format_selection_write,
     format_source,
 )
@@ -77,13 +77,12 @@ def search_axioms(
 
         source = format_source(ToolFilterSource("search_axioms", filters, within=within))
         upserted = upsert_axiom_selection(s, into, hashes, source, mode=mode)
-
-        preview = format_selection_preview(s, upserted)
+        preview = fetch_preview_data(s, upserted)
         s.commit()
 
     return format_selection_write(
         upserted,
-        preview=preview,
+        preview,
         no_results=f"No matches for {source}.",
     )
 

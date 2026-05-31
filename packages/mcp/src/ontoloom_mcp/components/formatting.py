@@ -369,33 +369,42 @@ def format_saved_line(
     return f"Saved {count} to {dquoted(sel.name)}{trunc_tail}.{overwrite_tail}"
 
 
-def format_selection_preview(
-    s: Session,
-    upserted: AxiomUpsertResult | EntityUpsertResult,
-):
-    """Render the head page of a just-upserted selection, with optional `... and N more` footer.
+@dataclass(frozen=True, slots=True)
+class AxiomPreviewData:
+    """Pre-fetched preview rows for an axiom selection.
 
-    Dispatches by selection kind. Footer is appended (with one blank line
-    separator) when `upserted.selection.size > PREVIEW_ROWS`.
+    Each row pairs a hashed axiom with the label refs for the entities it
+    mentions, so rendering does not need a session.
     """
-    sel = upserted.selection
-    body = _render_preview_rows(s, upserted)
 
-    if sel.size <= PREVIEW_ROWS:
-        return body
-
-    remaining = sel.size - PREVIEW_ROWS
-    footer = (
-        f"... and {remaining} more. Use `read_selection` with "
-        f"{dquoted(sel.name)} to see all {sel.size}."
-    )
-    return f"{body}\n\n{footer}"
+    kind: Literal["axioms"] = field(init=False, default="axioms")
+    rows: tuple[tuple[HashedAxiom, tuple[Ref, ...]], ...]
 
 
-def _render_preview_rows(
+@dataclass(frozen=True, slots=True)
+class EntityPreviewData:
+    """Pre-fetched preview rows for an entity selection.
+
+    Each row pairs a Ref (iri + label) with the entity's roles.
+    """
+
+    kind: Literal["entities"] = field(init=False, default="entities")
+    rows: tuple[tuple[Ref, frozenset[EntityType]], ...]
+
+
+type SelectionPreviewData = AxiomPreviewData | EntityPreviewData
+
+
+def fetch_preview_data(
     s: Session,
     upserted: AxiomUpsertResult | EntityUpsertResult,
-):
+) -> SelectionPreviewData:
+    """Fetch the first PREVIEW_ROWS rows of a just-upserted selection for rendering.
+
+    Dispatches by selection kind and returns a discriminated-union of pre-paired
+    rows (axioms with refs, or entity refs with roles). Render with
+    `format_selection_write`.
+    """
     if isinstance(upserted, AxiomUpsertResult):
         page = execute(
             s,
@@ -412,7 +421,10 @@ def _render_preview_rows(
             if item.axiom is not None
         ]
         refs_per_axiom = build_refs_per_axiom(s, page_axioms)
-        return format_axiom_listing(page_axioms, refs_per_axiom=refs_per_axiom)
+        rows = tuple(
+            (ha, tuple(refs)) for ha, refs in zip(page_axioms, refs_per_axiom, strict=True)
+        )
+        return AxiomPreviewData(rows=rows)
 
     page = execute(
         s,
@@ -423,32 +435,55 @@ def _render_preview_rows(
             show=ShowFilter.ALL,
         ),
     )
-    lines = [
-        format_entity_line(Ref(iri=item.iri, label=item.label), item.roles)
-        for item in page.items
-        if item.present
-    ]
-    return "\n".join(lines)
+    entity_rows = tuple(
+        (Ref(iri=item.iri, label=item.label), item.roles) for item in page.items if item.present
+    )
+    return EntityPreviewData(rows=entity_rows)
+
+
+def _render_preview_body(preview: SelectionPreviewData) -> str:
+    match preview:
+        case AxiomPreviewData():
+            return "\n".join(_format_axiom_line(ha, refs) for ha, refs in preview.rows)
+        case EntityPreviewData():
+            return "\n".join(format_entity_line(ref, roles) for ref, roles in preview.rows)
+        case _:
+            msg = f"Unknown preview data: {type(preview).__name__}"
+            raise ValueError(msg)
 
 
 def format_selection_write(
     upserted: AxiomUpsertResult | EntityUpsertResult,
+    preview: SelectionPreviewData | None = None,
     *,
-    preview: str = "",
     no_results: str = "",
     truncated_limit: int | None = None,
 ):
     """Compose the saved-line plus body for a selection-writing tool.
 
-    Empty selection (`size == 0`): saved line + single space + `no_results`.
-    Non-empty: saved line + blank line + `preview` body.
+    Empty selection (`size == 0`): saved line + space + `no_results`, with any
+    trailing whitespace stripped (so an empty `no_results` yields just the
+    saved line).
+    Non-empty: saved line + blank line + rendered preview body, with an
+    `... and N more.` footer appended (separated by a blank line) when
+    `upserted.selection.size > PREVIEW_ROWS`.
     `truncated_limit` is passed through to `format_saved_line`.
     """
     saved = format_saved_line(upserted, truncated_limit=truncated_limit)
+    sel = upserted.selection
 
-    if upserted.selection.size == 0:
-        return f"{saved} {no_results}"
-    return f"{saved}\n\n{preview}"
+    if sel.size == 0:
+        return f"{saved} {no_results}".rstrip()
+
+    body = _render_preview_body(preview) if preview is not None else ""
+
+    if sel.size > PREVIEW_ROWS:
+        footer = (
+            f"... and {sel.size - PREVIEW_ROWS} more. Use `read_selection` with "
+            f"{dquoted(sel.name)} to see all {sel.size}."
+        )
+        body = f"{body}\n\n{footer}"
+    return f"{saved}\n\n{body}"
 
 
 def format_selection_result(
