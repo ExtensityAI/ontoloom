@@ -5,6 +5,7 @@ from ontoloom.axioms.hashing import AxiomHash, short_hash
 from ontoloom.axioms.mutations import add_axioms as core_add_axioms
 from ontoloom.axioms.types import HashedAxiom
 from ontoloom.connection import Ontology, session
+from ontoloom.owl.annotations import Annotation
 from ontoloom.owl.axioms import AnnotationAssertion, Declaration, SubClassOf
 from ontoloom.owl.iri import IRI, RDFS_LABEL
 from ontoloom.owl.literals import LangLiteral
@@ -34,6 +35,7 @@ from ontoloom_mcp.components.formatting import (
     ToolFilterSource,
     _format_axiom_line,
     fetch_preview_data,
+    format_axiom_blocks,
     format_drift,
     format_entity_line,
     format_kinded_count,
@@ -129,6 +131,39 @@ def test_axiom_line_present_with_label_hint_unchanged():
 def test_missing_axiom_line_renders_bracketed_short_hash():
     full = AxiomHash("a1b2c3d4e5f6" + "0" * 52)
     assert format_missing_axiom_line(full) == "[a1b2c3d4e5f6] *missing*"
+
+
+def test_axiom_blocks_one_entry_per_axiom():
+    h1 = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")))
+    h2 = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")))
+    blocks = format_axiom_blocks([h1, h2])
+    assert blocks == [
+        f"[{short_hash(h1.hash)}] SubClassOf(ex:Dog, ex:Animal)",
+        f"[{short_hash(h2.hash)}] SubClassOf(ex:Cat, ex:Animal)",
+    ]
+
+
+def test_axiom_blocks_annotation_continuations_stay_grouped():
+    annotated = SubClassOf(
+        sub_class=IRI("ex:Dog"),
+        super_class=IRI("ex:Animal"),
+        annotations=(Annotation(property=RDFS_LABEL, value=LangLiteral(value="note")),),
+    )
+    h1 = HashedAxiom.of(annotated)
+    h2 = HashedAxiom.of(SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")))
+    blocks = format_axiom_blocks([h1, h2])
+    # Two axioms in -> two blocks out, even though h1 spans two lines.
+    assert len(blocks) == 2
+    # The annotation continuation is part of h1's single block, not a sibling entry.
+    assert "\n" in blocks[0]
+    head1, cont1 = blocks[0].split("\n", 1)
+    assert head1 == f"[{short_hash(h1.hash)}] {annotated}"
+    assert cont1.startswith("  # ")
+    assert "\n" not in blocks[1]
+
+
+def test_axiom_blocks_empty_returns_empty_list():
+    assert format_axiom_blocks([]) == []
 
 
 def test_entity_line_label_and_multiple_roles():

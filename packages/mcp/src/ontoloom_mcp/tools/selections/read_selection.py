@@ -18,7 +18,7 @@ from ontoloom.selections.types import (
 from ontoloom_mcp.components.formatting import (
     Ref,
     build_refs_per_axiom,
-    format_axiom_listing,
+    format_axiom_blocks,
     format_entity_line,
     format_missing_axiom_line,
     format_pagination,
@@ -93,16 +93,12 @@ def _render_axiom_page(
     if not page.items:
         return f"{header}\n{pagination}"
 
-    refs_by_hash = {ha.hash: refs for ha, refs in zip(present_axioms, refs_per_axiom, strict=True)}
-    body_lines: list[str] = []
-    for item in page.items:
-        if item.axiom is None:
-            body_lines.append(format_missing_axiom_line(item.hash))
-            continue
-
-        ha = HashedAxiom(axiom=item.axiom, hash=item.hash)
-        body_lines.append(format_axiom_listing([ha], refs_per_axiom=[refs_by_hash[item.hash]]))
-    return f"{header}\n{pagination}\n\n" + "\n".join(body_lines)
+    present_blocks = iter(format_axiom_blocks(present_axioms, refs_per_axiom=refs_per_axiom))
+    rows = [
+        next(present_blocks) if item.axiom is not None else format_missing_axiom_line(item.hash)
+        for item in page.items
+    ]
+    return f"{header}\n{pagination}\n\n" + "\n".join(rows)
 
 
 def _render_entity_page(

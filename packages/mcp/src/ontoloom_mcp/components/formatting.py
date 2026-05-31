@@ -242,16 +242,28 @@ def format_diff(
     return f"{summary}\n\n```diff\n{changes}\n```"
 
 
+def format_axiom_blocks(
+    axioms: Sequence[HashedAxiom],
+    refs_per_axiom: Sequence[Sequence[Ref]] = (),
+) -> list[str]:
+    """Render one block per axiom.
+
+    Each entry is the complete block for one axiom (head line plus any
+    annotation continuation lines joined as a single multi-line string),
+    so callers can interleave with other rows without splitting heads from
+    their continuations.
+    """
+    if not axioms:
+        return []
+    refs_list: Sequence[Sequence[Ref]] = refs_per_axiom or [()] * len(axioms)
+    return [_format_axiom_line(ha, refs) for ha, refs in zip(axioms, refs_list, strict=True)]
+
+
 def format_axiom_listing(
     axioms: Sequence[HashedAxiom],
     refs_per_axiom: Sequence[Sequence[Ref]] = (),
 ):
-    if not axioms:
-        return ""
-    refs_list: Sequence[Sequence[Ref]] = refs_per_axiom or [()] * len(axioms)
-    return "\n".join(
-        _format_axiom_line(ha, refs) for ha, refs in zip(axioms, refs_list, strict=True)
-    )
+    return "\n".join(format_axiom_blocks(axioms, refs_per_axiom))
 
 
 @dataclass(frozen=True, slots=True)
