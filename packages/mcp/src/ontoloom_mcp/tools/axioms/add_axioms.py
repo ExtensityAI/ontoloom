@@ -5,8 +5,9 @@ from mcp.types import ToolAnnotations
 from ontoloom.axioms.mutations import add_axioms as core_add_axioms
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.axioms import Axiom
+from ontoloom.selections.types import SelectionKind
 
-from ontoloom_mcp.components.formatting import format_diff
+from ontoloom_mcp.components.formatting import format_diff, format_kinded_count
 from ontoloom_mcp.components.tool import create_tool
 from ontoloom_mcp.components.types import OntologyPath
 
@@ -21,7 +22,9 @@ def add_axioms(
         result = core_add_axioms(s, axioms)
         s.commit()
 
-    summary = f"Added {len(result.added)}, skipped {len(result.skipped)} axioms."
+    added_count = format_kinded_count(SelectionKind.AXIOMS, len(result.added))
+    skipped_count = format_kinded_count(SelectionKind.AXIOMS, len(result.skipped))
+    summary = f"Added {added_count}, skipped {skipped_count}."
     entries = [("+", ha) for ha in result.added] + [("=", ha) for ha in result.skipped]
     return format_diff(entries, summary)
 

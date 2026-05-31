@@ -73,8 +73,36 @@ def test_add_axioms_returns_diff(empty_db):
         path=empty_db,
         axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))],
     )
-    assert "Added 1, skipped 0" in result
+    assert result.startswith("Added 1 axiom, skipped 0 axioms.\n\n```diff\n")
     assert "+" in result
+
+
+def test_add_axioms_summary_singular_skipped(empty_db):
+    dog = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    cat = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
+    add_axioms(path=empty_db, axioms=[dog])
+    result = add_axioms(path=empty_db, axioms=[cat, dog])
+    assert result.startswith("Added 1 axiom, skipped 1 axiom.\n\n```diff\n")
+
+
+def test_add_axioms_summary_plural_both(empty_db):
+    result = add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat")),
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Bird")),
+        ],
+    )
+    assert result.startswith("Added 3 axioms, skipped 0 axioms.\n\n```diff\n")
+
+
+def test_add_axioms_summary_all_duplicates(empty_db):
+    dog = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    cat = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Cat"))
+    add_axioms(path=empty_db, axioms=[dog, cat])
+    result = add_axioms(path=empty_db, axioms=[dog, cat])
+    assert result.startswith("Added 0 axioms, skipped 2 axioms.\n\n```diff\n")
 
 
 def test_get_entity_returns_info(populated_db):
