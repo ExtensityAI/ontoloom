@@ -1510,6 +1510,23 @@ def test_rename_iri_within_scope_change_invalidates_token(populated_db):
     assert token_before != token_after
 
 
+def test_replace_axiom_no_op_when_new_hashes_to_old(populated_db):
+    from ontoloom.axioms.hashing import short_hash
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom_mcp.tools.axioms.replace_axiom import replace_axiom
+
+    sub = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    sub_h = HashedAxiom.of(sub).hash
+
+    result = replace_axiom(
+        path=populated_db,
+        axiom_hash=AxiomHashPrefix(short_hash(sub_h)),
+        new_axiom=sub,
+    )
+
+    assert result == f"No-op: new axiom has same hash as old [{short_hash(sub_h)}]."
+
+
 # -- WriteMode: non-destructive selection writes --
 
 

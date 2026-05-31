@@ -34,7 +34,7 @@ def replace_axiom(
         s.commit()
 
     if result.was_noop:
-        return f"No-op: new axiom has same hash as old ({short_hash(result.old.hash)})."
+        return f"No-op: new axiom has same hash as old [{short_hash(result.old.hash)}]."
 
     summary = f"Replaced [{short_hash(result.old.hash)}] with [{short_hash(result.new.hash)}]."
     if result.was_merged_into_existing:
