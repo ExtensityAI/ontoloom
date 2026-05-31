@@ -1699,3 +1699,103 @@ def test_producer_tools_accept_mode_argument(populated_db):
         expr=UnionExpr(union=(SelectionName("m"),)),
         mode=WriteMode.CREATE,
     )
+
+
+def test_list_selections_empty_store_returns_no_selections(empty_db):
+    from ontoloom_mcp.tools.selections.list_selections import list_selections
+
+    result = list_selections(path=empty_db)
+    assert result == "No selections."
+
+
+def test_list_selections_axioms_before_entities_with_bare_names(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
+    from ontoloom_mcp.tools.selections.list_selections import list_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    animal_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Animal"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+    animal_hash = HashedAxiom.of(animal_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("subclass_animal"),
+            [dog_hash, animal_hash],
+            "match_axioms",
+        )
+        upsert_entity_selection(
+            s,
+            SelectionName("all_classes"),
+            [IRI("ex:Dog"), IRI("ex:Animal")],
+            'search_entities(role="Class")',
+        )
+        s.commit()
+
+    result = list_selections(path=populated_db)
+    assert result == (
+        "Selections:\n"
+        '  "subclass_animal": 2 axioms - source: match_axioms\n'
+        '  "all_classes": 2 entities - source: search_entities(role="Class")'
+    )
+
+
+def test_list_selections_drift_tail_appears_only_when_missing(populated_db):
+    from ontoloom.axioms.hashing import AxiomHash
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
+    from ontoloom_mcp.tools.selections.list_selections import list_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+    # An axiom hash that does not exist in the store (drift).
+    missing_hash = AxiomHash("0" * 64)
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(
+            s,
+            SelectionName("review"),
+            [dog_hash, missing_hash],
+            'search_axioms(query="review")',
+        )
+        # Singular entity; one missing IRI (not referenced by any axiom).
+        upsert_entity_selection(
+            s,
+            SelectionName("solo"),
+            [IRI("ex:GhostEntity")],
+            "test fixture",
+        )
+        s.commit()
+
+    result = list_selections(path=populated_db)
+    # `format_list_row` reports total = present + missing; drift tail only when missing > 0.
+    # `review`: 1 real axiom + 1 stale hash -> total 2, missing 1.
+    # `solo`: 1 IRI referenced by no axiom -> total 1, missing 1.
+    assert result == (
+        "Selections:\n"
+        '  "review": 2 axioms, 1 missing - source: search_axioms(query="review")\n'
+        '  "solo": 1 entity, 1 missing - source: test fixture'
+    )
+
+
+def test_list_selections_no_wire_prefix_or_kind_label(populated_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_selection
+    from ontoloom_mcp.tools.selections.list_selections import list_selections
+
+    dog_decl = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    dog_hash = HashedAxiom.of(dog_decl).hash
+
+    with session(Ontology(populated_db)) as s:
+        upsert_axiom_selection(s, SelectionName("a_sel"), [dog_hash], "match_axioms")
+        upsert_entity_selection(s, SelectionName("e_sel"), [IRI("ex:Dog")], "search_entities")
+        s.commit()
+
+    result = list_selections(path=populated_db)
+    assert "axioms:a_sel" not in result
+    assert "entities:e_sel" not in result
+    assert "(axioms)" not in result
+    assert "(entities)" not in result
+    assert "-> " not in result
+    assert " items" not in result
