@@ -25,8 +25,6 @@ from ontoloom.selections.types import (
 from ontoloom.utils import dquoted
 
 PREVIEW_ROWS = 10
-SELECT_PREVIEW = 5
-SELECT_INLINE_MAX = 20
 
 _KIND_NOUN: dict[SelectionKind, tuple[str, str]] = {
     SelectionKind.AXIOMS: ("axiom", "axioms"),
@@ -171,11 +169,6 @@ def build_refs_per_axiom(s: Session, axioms: Sequence[HashedAxiom]) -> list[list
     return [
         [Ref(iri=iri, label=labels.get(iri)) for iri in unique_iris_in(ha.axiom)] for ha in axioms
     ]
-
-
-def format_selection_ref(meta: AxiomSelection | EntitySelection) -> str:
-    kind = "axioms" if isinstance(meta, AxiomSelection) else "entities"
-    return dquoted(f"{kind}:{meta.name}")
 
 
 def format_ref(ref: Ref) -> str:
@@ -484,27 +477,3 @@ def format_selection_write(
         )
         body = f"{body}\n\n{footer}"
     return f"{saved}\n\n{body}"
-
-
-def format_selection_result(
-    upserted: AxiomUpsertResult | EntityUpsertResult,
-    page_text: str,
-):
-    sel = upserted.selection
-    kind_label = "axioms" if isinstance(upserted, AxiomUpsertResult) else "entities"
-    parts = [f"{sel.size} {kind_label} -> {format_selection_ref(sel)}."]
-    if upserted.previous_size is not None:
-        parts.append(f"Overwrote previous ({upserted.previous_size} items).")
-
-    if sel.size <= SELECT_INLINE_MAX:
-        parts.append("")
-        parts.append(page_text)
-    else:
-        parts.append(f"Preview (first {SELECT_PREVIEW}):")
-        parts.append("")
-        parts.append(page_text)
-        parts.append(
-            f"\nUse `read_selection` with name {dquoted(sel.name)} to browse all {sel.size} results."
-        )
-
-    return "\n".join(parts)
