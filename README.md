@@ -12,7 +12,7 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 A coding agent sketching a tiny solar-system ontology:
 
-``````
+````
 create_ontology(path="solar.ontology.db")
 Created ontology at `solar.ontology.db`.
 
@@ -30,11 +30,11 @@ Added 6 axioms, skipped 0 axioms.
 + [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 + [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
-``````
+````
 
 Now the agent queries the structure. `match_axioms` does structural pattern matching with `?vars` - same variable in two positions enforces equality, and every solution comes back as a saved selection:
 
-``````
+```
 match_axioms(path="solar.ontology.db",
              pattern={"sub_class": "?body",
                       "super_class": {"property": "sol:orbits", "filler": "?center"}},
@@ -43,11 +43,11 @@ Saved 2 axioms to "orbits".
 
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
-``````
+```
 
-Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's *both* about Planet *and* describes an orbital relationship:
+Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's _both_ about Planet _and_ describes an orbital relationship:
 
-``````
+```
 match_axioms(path="solar.ontology.db",
              pattern={"sub_class": "sol:Planet", "super_class": "?super"},
              into="planet_facts")
@@ -62,7 +62,7 @@ create_selection(path="solar.ontology.db",
 Saved 1 axiom to "planet_orbit".
 
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
-``````
+```
 
 ## What you can do with it
 
@@ -78,6 +78,7 @@ Saved 1 axiom to "planet_orbit".
 `create_ontology` | `set_prefix` | `remove_prefix`
 
 **Build**
+
 - `add_axioms` - add validated axioms; duplicates are skipped
 - `remove_axioms` - remove by hash or by axiom selection
 - `annotate_axiom` - change axiom-level annotations without touching identity
@@ -85,6 +86,7 @@ Saved 1 axiom to "planet_orbit".
 - `rename_iri` - rewrite an IRI across all (or scoped) axioms
 
 **Query**
+
 - `describe_ontology` - entity and axiom counts, top entities, prefix mappings
 - `get_entity` - roles, annotations, and asserted axiom counts for one entity
 - `find_entities` - text search, optionally filtered by role or namespace
@@ -93,6 +95,7 @@ Saved 1 axiom to "planet_orbit".
 - `match_axioms` - structural pattern matching with `?vars` and `*` wildcards
 
 **Selections** - named, persistent sets of axiom hashes or entity IRIs
+
 - `create_selection` - build from set algebra over existing selections
 - `read_selection` - paginated view with present/missing visibility
 - `list_selections` - show all named selections
@@ -126,7 +129,14 @@ Drop this into your `.mcp.json`, adjusting the paths for your clone:
     "ontoloom": {
       "type": "stdio",
       "command": "uv",
-      "args": ["run", "--project", "packages/mcp", "python", "-m", "ontoloom_mcp.server"]
+      "args": [
+        "run",
+        "--project",
+        "packages/mcp",
+        "python",
+        "-m",
+        "ontoloom_mcp.server"
+      ]
     }
   }
 }
@@ -147,11 +157,3 @@ Set `ONTOLOOM_WORKSPACE_ROOT=/path/to/workspace` to confine all `Ontology(...)`,
 Each ontology lives in a single `.db` file that works the same whether it has a dozen axioms or millions. SQLite is the source of truth; the MCP layer is the only writer, so axioms are always validated before they reach disk.
 
 Axioms are typed Pydantic models hashed by canonical logical content, ignoring annotations - you can edit a comment without changing the hash, and exact duplicates are caught automatically.
-
-## Status
-
-Alpha. The pieces work and are in use, but the API isn't frozen yet. Issues and PRs welcome.
-
-## License
-
-BSD-3-Clause - see [LICENSE](LICENSE).
