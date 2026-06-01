@@ -41,12 +41,19 @@ def check_iri_prefixes(s: Session, iris: Iterable[IRI]):
 
 
 def set_prefix(s: Session, name: PrefixName, iri: NamespaceIRI) -> SetPrefixResult:
-    """Save a prefix mapping. Reports the previous IRI and how many entities used it."""
+    """Save a prefix mapping. Reports the previous IRI (if any) and how many entities
+    currently use the prefix namespace.
+
+    `in_use_count` is reported even when `previous_iri is None` so callers can
+    detect first-time declaration of a built-in prefix that is already in
+    implicit use (e.g. declaring `rdfs` after axioms have referenced
+    `rdfs:label`). The caller decides whether that warrants confirmation.
+    """
     row = s.conn.execute("SELECT namespace_iri FROM prefixes WHERE name = ?", (name,)).fetchone()
     previous_iri = NamespaceIRI(row[0]) if row is not None else None
     in_use_count = 0
 
-    if previous_iri is not None and previous_iri != iri:
+    if previous_iri != iri:
         in_use_count = execute(s, CountEntities(constraints=(InNamespaces(namespaces=(name,)),)))
 
     s.conn.execute(

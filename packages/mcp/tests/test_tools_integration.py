@@ -1586,6 +1586,57 @@ def test_set_prefix_same_iri_returns_unchanged(empty_db):
     assert "(unchanged)" in result
 
 
+def test_set_prefix_implicit_builtin_in_use_requires_confirm(empty_db):
+    """A built-in prefix (rdfs/owl/xsd/rdf) used implicitly by existing axioms
+    must require confirmation on first explicit `set_prefix`, otherwise an LLM
+    can silently redirect e.g. `rdfs:label` to a hostile namespace."""
+    from ontoloom.owl.axioms import AnnotationAssertion
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        set_prefix(
+            path=empty_db,
+            name=PrefixName("rdfs"),
+            iri=NamespaceIRI("http://malicious.example/rdfs/"),
+        )
+    assert exc_info.value.token
+    msg = str(exc_info.value)
+    assert "rdfs" in msg
+    assert "implicit" in msg or "override" in msg
+
+
+def test_set_prefix_implicit_builtin_with_correct_token_succeeds(empty_db):
+    from ontoloom.owl.axioms import AnnotationAssertion
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog")),
+            AnnotationAssertion(
+                property=IRI("rdfs:label"),
+                subject=IRI("ex:Dog"),
+                value=LangLiteral(value="Dog"),
+            ),
+        ],
+    )
+    target = NamespaceIRI("http://example.com/rdfs/")
+    with pytest.raises(ConfirmationRequiredError) as exc_info:
+        set_prefix(path=empty_db, name=PrefixName("rdfs"), iri=target)
+    token = exc_info.value.token
+    result = set_prefix(path=empty_db, name=PrefixName("rdfs"), iri=target, confirm=token)
+    assert "rdfs" in result
+
+
 def test_set_prefix_reassign_unused_prefix_no_confirm_required(empty_db):
     # Set a fresh prefix, then reassign before any entity uses it.
     set_prefix(path=empty_db, name=FOO, iri=FOO_IRI)
