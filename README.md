@@ -10,55 +10,83 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 ## Example
 
-A coding agent sketching a tiny solar-system ontology:
+A coding agent sketches a tiny solar-system ontology. Create the database, declare a prefix, and add the planet hierarchy:
 
-````
+```python
 create_ontology(path="solar.ontology.db")
+```
+```
 Created ontology at `solar.ontology.db`.
+```
 
-set_prefix(path="solar.ontology.db", name="sol", iri="http://example.org/solar-system#")
+```python
+set_prefix(
+    path="solar.ontology.db",
+    name="sol",
+    iri="http://example.org/solar-system#",
+)
+```
+```
 Set prefix `sol:` -> `http://example.org/solar-system#`
+```
 
+```python
 add_axioms(path="solar.ontology.db", axioms=[...])
+```
+```
 Added 6 axioms, skipped 0 axioms.
 
-```diff
-+ [bb5496d24bd1] SubClassOf(sol:Star, sol:CelestialBody)
-+ [f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
-+ [e4e965a69712] SubClassOf(sol:Moon, sol:CelestialBody)
-+ [3f335b35490c] SubClassOf(sol:TerrestrialPlanet, sol:Planet)
-+ [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
-+ [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
+[bb5496d24bd1] SubClassOf(sol:Star, sol:CelestialBody)
+[f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
+[e4e965a69712] SubClassOf(sol:Moon, sol:CelestialBody)
+[3f335b35490c] SubClassOf(sol:TerrestrialPlanet, sol:Planet)
+[7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
+[f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
-````
 
-Now the agent queries the structure. `match_axioms` does structural pattern matching with `?vars` - same variable in two positions enforces equality, and every solution comes back as a saved selection:
+Now query the structure. `match_axioms` does structural pattern matching with `?vars`: the same variable in two positions enforces equality, and every solution comes back as a saved selection.
 
+```python
+match_axioms(
+    path="solar.ontology.db",
+    pattern={
+        "sub_class": "?body",
+        "super_class": {"property": "sol:orbits", "filler": "?center"},
+    },
+    into="orbits",
+)
 ```
-match_axioms(path="solar.ontology.db",
-             pattern={"sub_class": "?body",
-                      "super_class": {"property": "sol:orbits", "filler": "?center"}},
-             into="orbits")
+```
 Saved 2 axioms to "orbits".
 
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
 
-Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's _both_ about Planet _and_ describes an orbital relationship:
+Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's *both* about Planet *and* describes an orbital relationship.
 
+```python
+match_axioms(
+    path="solar.ontology.db",
+    pattern={"sub_class": "sol:Planet", "super_class": "?super"},
+    into="planet_facts",
+)
 ```
-match_axioms(path="solar.ontology.db",
-             pattern={"sub_class": "sol:Planet", "super_class": "?super"},
-             into="planet_facts")
+```
 Saved 2 axioms to "planet_facts".
 
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 [f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
+```
 
-create_selection(path="solar.ontology.db",
-                 name="planet_orbit",
-                 expr={"intersect": ["orbits", "planet_facts"]})
+```python
+create_selection(
+    path="solar.ontology.db",
+    name="planet_orbit",
+    expr={"intersect": ["orbits", "planet_facts"]},
+)
+```
+```
 Saved 1 axiom to "planet_orbit".
 
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
