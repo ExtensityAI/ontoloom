@@ -1,6 +1,6 @@
 from fastmcp import FastMCP
 
-from ontoloom_mcp.middleware import LastResortMiddleware, TimingMiddleware
+from ontoloom_mcp.middleware import ErrorMiddleware, TimingMiddleware
 from ontoloom_mcp.tools.axioms.add_axioms import tool_add_axioms
 from ontoloom_mcp.tools.axioms.annotate_axiom import tool_annotate_axiom
 from ontoloom_mcp.tools.axioms.find_axioms import tool_find_axioms
@@ -39,7 +39,7 @@ mcp = FastMCP(
     ),
 )
 
-mcp.add_middleware(LastResortMiddleware())
+mcp.add_middleware(ErrorMiddleware())
 mcp.add_middleware(TimingMiddleware())
 
 mcp.add_tool(tool_create_ontology)

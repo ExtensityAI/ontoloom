@@ -4,8 +4,14 @@ Each test calls a tool function directly (the same callable wrapped by
 `create_tool`) to exercise input validation, formatting, and error translation.
 """
 
+import asyncio
+from collections.abc import Callable
+from typing import Any
+
+import mcp.types as mt
 import pytest
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import MiddlewareContext
 from ontoloom.axioms.hashing import AxiomHashPrefix
 from ontoloom.connection import Ontology, session
 from ontoloom.owl.annotations import Annotation
@@ -16,7 +22,7 @@ from ontoloom.owl.markers import EntityType
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 from ontoloom.selections.types import SelectionName
 from ontoloom_mcp.components.confirmation import ConfirmationRequiredError
-from ontoloom_mcp.components.errors import translate_errors
+from ontoloom_mcp.middleware import ErrorMiddleware
 from ontoloom_mcp.tools.axioms.add_axioms import add_axioms
 from ontoloom_mcp.tools.axioms.remove_axioms import remove_axioms
 from ontoloom_mcp.tools.axioms.rename_iri import rename_iri
@@ -27,6 +33,30 @@ from ontoloom_mcp.tools.ontology.describe_ontology import describe_ontology
 from ontoloom_mcp.tools.prefixes.set_prefix import set_prefix
 from ontoloom_mcp.tools.selections.create_selection import create_selection
 from ontoloom_mcp.tools.selections.read_selection import read_selection
+
+
+def _via_middleware(fn: Callable[..., Any], tool_name: str = "test_tool"):
+    """Wrap `fn` so it routes through `ErrorMiddleware.on_call_tool`.
+
+    Mirrors what the MCP server does: the tool body raises a domain error;
+    the middleware translates it to `ToolError`. The bridge runs the sync
+    tool body inside an asyncio event loop.
+    """
+
+    mw = ErrorMiddleware()
+
+    def call(*args: Any, **kwargs: Any):
+        async def call_next(context: MiddlewareContext[Any]):  # noqa: ARG001
+            return fn(*args, **kwargs)
+
+        ctx: MiddlewareContext[Any] = MiddlewareContext(
+            message=mt.CallToolRequestParams(name=tool_name, arguments=kwargs),
+            method="tools/call",
+        )
+        return asyncio.run(mw.on_call_tool(ctx, call_next))
+
+    return call
+
 
 EX = PrefixName("ex")
 EX_IRI = NamespaceIRI("http://example.org/")
@@ -791,7 +821,7 @@ def test_find_axioms_no_results_message(empty_db):
 def test_find_axioms_requires_query_or_properties(empty_db):
     from ontoloom_mcp.tools.axioms.find_axioms import find_axioms
 
-    wrapped = translate_errors(find_axioms)
+    wrapped = _via_middleware(find_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=empty_db, into=SelectionName("x"))
     assert str(exc_info.value) == "find_axioms requires at least one of `query` or `properties`."
@@ -899,14 +929,14 @@ def test_match_axioms_no_results_within_scope_renders_within_suffix(empty_db):
 
 
 def test_create_ontology_existing_file_raises(empty_db):
-    wrapped = translate_errors(create_ontology)
+    wrapped = _via_middleware(create_ontology)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=empty_db)
     assert "already exists" in str(exc_info.value)
 
 
 def test_create_ontology_missing_parent_dir_echoes_path(tmp_path):
-    wrapped = translate_errors(create_ontology)
+    wrapped = _via_middleware(create_ontology)
     target = tmp_path / "no_such" / "nested" / "x.db"
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=target)
@@ -928,7 +958,7 @@ def test_session_against_non_database_file_echoes_path(tmp_path):
 
 
 def test_add_axioms_rejects_undeclared_prefix(empty_db):
-    wrapped = translate_errors(add_axioms)
+    wrapped = _via_middleware(add_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=empty_db,
@@ -966,7 +996,7 @@ def test_add_axioms_accepts_builtin_prefixes(empty_db):
 def test_find_duplicate_entities_within_missing_selection_translates(populated_db):
     from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
 
-    wrapped = translate_errors(find_duplicate_entities)
+    wrapped = _via_middleware(find_duplicate_entities)
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
@@ -1247,12 +1277,14 @@ def test_undeclared_entity_selection_reads_back_present(empty_db):
 
 def test_bcp47_lang_validation_error_message():
     from ontoloom.owl.literals import LangLiteral
-    from ontoloom_mcp.components.errors import format_error
-    from pydantic import ValidationError
 
-    with pytest.raises(ValidationError) as exc_info:
+    def stub():
         LangLiteral(value="x", lang="invalid lang!")  # pyright: ignore[reportArgumentType]
-    msg = format_error(exc_info.value)
+
+    wrapped = _via_middleware(stub)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped()
+    msg = str(exc_info.value)
     assert "BCP 47" in msg
     assert '"invalid lang!"' in msg
 
@@ -1260,7 +1292,7 @@ def test_bcp47_lang_validation_error_message():
 def test_get_entity_not_found_includes_suggestion(populated_db):
     # IRI that doesn't exist but whose local name is a substring of an existing
     # entity's text should produce a ToolError with a "did you mean" suggestion.
-    wrapped = translate_errors(get_entity)
+    wrapped = _via_middleware(get_entity)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=populated_db, iri=IRI("ex:Anima"))
     msg = str(exc_info.value)
@@ -1270,7 +1302,7 @@ def test_get_entity_not_found_includes_suggestion(populated_db):
 
 
 def test_read_selection_not_found_translates(populated_db):
-    wrapped = translate_errors(read_selection)
+    wrapped = _via_middleware(read_selection)
     with pytest.raises(ToolError) as exc_info:
         wrapped(
             path=populated_db,
@@ -1417,18 +1449,20 @@ def test_remove_axioms_by_hashes_plural_summary(populated_db):
 
 def test_axiom_dispatch_failure_renders_focused_mcp_message():
     """A bad axiom dict, validated through the Axiom union adapter, should
-    raise UnionDispatchError; the MCP-layer formatter renders it as a focused
+    raise UnionDispatchError; the MCP-layer middleware renders it as a focused
     single-line message - not the multi-KB union signature dump."""
-    from ontoloom.models import UnionDispatchError
     from ontoloom.owl.axioms import Axiom
-    from ontoloom_mcp.components.errors import format_error
     from pydantic import TypeAdapter
 
     adapter: TypeAdapter[Axiom] = TypeAdapter(Axiom)
-    with pytest.raises(UnionDispatchError) as exc_info:
+
+    def stub():
         adapter.validate_python({"sub_class": "ex:Dog"})
 
-    msg = format_error(exc_info.value)
+    wrapped = _via_middleware(stub)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped()
+    msg = str(exc_info.value)
     assert "Axiom" in msg
     assert "SubClassOf" in msg
     assert "super_class" in msg
@@ -1788,7 +1822,7 @@ def test_find_axioms_create_refuses_then_replace_overwrites(empty_db):
     assert 'Saved 1 axiom to "t".' in first
     assert "axioms:t" not in first
 
-    wrapped = translate_errors(find_axioms)
+    wrapped = _via_middleware(find_axioms)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=empty_db, into=SelectionName("t"), query="dog")
     msg = str(exc_info.value)
@@ -1811,7 +1845,7 @@ def test_find_entities_create_refuses_then_replace_overwrites(populated_db):
 
     find_entities(path=populated_db, into=SelectionName("t"), query="Dog")
 
-    wrapped = translate_errors(find_entities)
+    wrapped = _via_middleware(find_entities)
     with pytest.raises(ToolError) as exc_info:
         wrapped(path=populated_db, into=SelectionName("t"), query="Dog")
     msg = str(exc_info.value)

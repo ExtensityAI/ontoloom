@@ -5,7 +5,6 @@ from fastmcp.tools import Tool
 from fastmcp.tools.function_tool import FunctionTool
 from mcp.types import ToolAnnotations
 
-from ontoloom_mcp.components.errors import translate_errors
 from ontoloom_mcp.components.retry import retry_on_busy
 
 
@@ -15,7 +14,7 @@ def create_tool(
     name: str,
     annotations: ToolAnnotations | None = None,
 ) -> FunctionTool:
-    """Create an MCP tool with retry and error translation applied.
+    """Create an MCP tool with retry applied. Error translation happens at the middleware.
 
     `annotations` convention: omit when all hints take their MCP defaults
     (`readOnlyHint=False`, `destructiveHint=True`, `idempotentHint=False`,
@@ -24,5 +23,4 @@ def create_tool(
     mutations set `idempotentHint=True`; benign writes opt out of
     `destructiveHint`.
     """
-    wrapped = retry_on_busy(translate_errors(fn))
-    return Tool.from_function(wrapped, name=name, annotations=annotations)
+    return Tool.from_function(retry_on_busy(fn), name=name, annotations=annotations)
