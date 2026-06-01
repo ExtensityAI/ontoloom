@@ -69,20 +69,23 @@ def remove_by_hash(s: Session, hashes: Sequence[AxiomHash]) -> RemoveResult:
     if not hashes:
         return RemoveResult(removed=())
 
-    placeholders = ",".join("?" for _ in hashes)
+    # Hashes are content-addressed; a repeated hash is the same axiom. Dedupe
+    # first so the result count and diff reflect distinct deletions.
+    deduped = tuple(dict.fromkeys(hashes))
+    placeholders = ",".join("?" for _ in deduped)
     found: dict[AxiomHash, str] = {
         AxiomHash(h): data
         for h, data in s.conn.execute(
             f"SELECT hash, json(data) FROM axioms WHERE hash IN ({placeholders})",
-            tuple(hashes),
+            deduped,
         )
     }
-    for h in hashes:
+    for h in deduped:
         if h not in found:
             raise AxiomNotFoundError(h)
 
     to_remove: list[HashedAxiom] = []
-    for h in hashes:
+    for h in deduped:
         try:
             axiom = load_axiom(found[h])
         except StoreCorruptionError as e:

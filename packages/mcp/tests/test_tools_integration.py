@@ -273,6 +273,47 @@ def test_add_axioms_summary_all_duplicates(empty_db):
     assert result.startswith("Added 0 axioms, skipped 2 axioms.\n\n```diff\n")
 
 
+def test_add_axioms_dedupes_duplicate_annotations_on_one_axiom(empty_db):
+    """Regression: annotations on an axiom are a set; duplicates collapse on insert."""
+    from ontoloom.owl.annotations import Annotation
+    from ontoloom.owl.axioms import SubClassOf
+
+    dup = Annotation(property=IRI("rdfs:comment"), value=LangLiteral(value="hi"))
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            SubClassOf(
+                sub_class=IRI("ex:Dog"),
+                super_class=IRI("ex:Animal"),
+                annotations=(dup, dup),
+            )
+        ],
+    )
+    with session(Ontology(empty_db)) as s:
+        row = s.conn.execute("SELECT json(data) FROM axioms").fetchone()
+        s.commit()
+    import json
+
+    data = json.loads(row[0])
+    # Two identical Annotation inputs collapsed to one row.
+    assert len(data["annotations"]) == 1
+
+
+def test_remove_axioms_dedupes_duplicate_hashes(empty_db):
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom_mcp.tools.axioms.remove_axioms import ByHashes
+
+    dog = Declaration(entity_type=EntityType.CLASS, iri=IRI("ex:Dog"))
+    add_axioms(path=empty_db, axioms=[dog])
+
+    h = HashedAxiom.of(dog).hash
+    short = AxiomHashPrefix(h[:12])
+    # Passing the same hash twice should remove once, not "Removed 2".
+    result = remove_axioms(path=empty_db, target=ByHashes(hashes=(short, short)))
+    assert "Removed 1 axiom." in result
+    assert "Removed 2" not in result
+
+
 def test_get_entity_returns_info(populated_db):
     result = get_entity(path=populated_db, iri=IRI("ex:Dog"))
     # Header is roles-then-label form; no label set so just `iri (roles)`.

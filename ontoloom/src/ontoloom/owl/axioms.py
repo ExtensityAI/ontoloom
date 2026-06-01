@@ -3,7 +3,7 @@ import operator
 from enum import StrEnum
 from typing import Annotated, Literal, override
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl._render import format_owl_struct
@@ -21,6 +21,14 @@ from ontoloom.owl.markers import EntityType, Position, Unordered
 
 class BaseAxiom(FrozenModel):
     annotations: tuple[Annotation, ...] = ()
+
+    @field_validator("annotations", mode="after")
+    @classmethod
+    def _dedupe_annotations(cls, value: tuple[Annotation, ...]) -> tuple[Annotation, ...]:
+        """Annotations are semantically a set; collapse duplicates on construction."""
+        if len(value) <= 1:
+            return value
+        return tuple(dict.fromkeys(value))
 
     @override
     def __str__(self) -> str:
