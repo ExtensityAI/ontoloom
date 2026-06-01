@@ -16,6 +16,7 @@ A coding agent sketches a tiny solar-system ontology. Create the database, decla
 >>> create_ontology(path="solar.ontology.db")
 Created ontology at `solar.ontology.db`.
 
+
 >>> set_prefix(
 ...     path="solar.ontology.db",
 ...     name="sol",
@@ -23,9 +24,9 @@ Created ontology at `solar.ontology.db`.
 ... )
 Set prefix `sol:` -> `http://example.org/solar-system#`
 
+
 >>> add_axioms(path="solar.ontology.db", axioms=[...])
 Added 6 axioms, skipped 0 axioms.
-
 [bb5496d24bd1] SubClassOf(sol:Star, sol:CelestialBody)
 [f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
 [e4e965a69712] SubClassOf(sol:Moon, sol:CelestialBody)
@@ -46,7 +47,6 @@ Now query the structure. `match_axioms` does structural pattern matching with `?
 ...     into="orbits",
 ... )
 Saved 2 axioms to "orbits".
-
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
@@ -60,9 +60,9 @@ Selections persist across calls and compose. A second match picks up everything 
 ...     into="planet_facts",
 ... )
 Saved 2 axioms to "planet_facts".
-
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 [f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
+
 
 >>> create_selection(
 ...     path="solar.ontology.db",
@@ -70,7 +70,6 @@ Saved 2 axioms to "planet_facts".
 ...     expr={"intersect": ["orbits", "planet_facts"]},
 ... )
 Saved 1 axiom to "planet_orbit".
-
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 ```
 
