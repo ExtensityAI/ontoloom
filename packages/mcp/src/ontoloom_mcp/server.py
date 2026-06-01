@@ -1,3 +1,5 @@
+from textwrap import dedent
+
 from fastmcp import FastMCP
 
 from ontoloom_mcp.middleware import ErrorMiddleware, TimingMiddleware
@@ -24,18 +26,23 @@ from ontoloom_mcp.tools.selections.remove_selections import tool_remove_selectio
 mcp = FastMCP(
     "ontoloom",
     mask_error_details=False,  # exception messages reach agent context; set True in untrusted/multi-user deployments
-    instructions=(
-        "OWL 2 EL ontology editor backed by SQLite. Each .ontology.db file is one ontology.\n\n"
-        "Entities (classes, properties, individuals) are not managed directly -> they are "
-        "derived from axioms. Add/remove axioms to change the ontology.\n\n"
-        "Selections are named sets of axiom hashes or entity IRIs that persist across calls. "
-        "Use them to build up working sets incrementally: search, save, narrow, combine, "
-        "then act (export, delete, inspect). Reference a selection by its bare kind-prefixed "
-        "name: `axioms:NAME` or `entities:NAME`. Writing to an existing name is refused by "
-        'default; pass `mode="replace"` to overwrite, or combine sets via set-algebra in '
-        "create_selection. Destructive ops (remove_axioms by selection, rename_iri) show a "
-        "preview and return a `confirm` token; call again with `confirm=<token>` to apply. "
-        "If the selection changed meanwhile, the token is rejected and a fresh preview shown."
+    instructions=dedent(
+        """\
+        OWL 2 EL ontology editor backed by SQLite. Each .ontology.db file is one ontology.
+
+        Entities (classes, properties, individuals) are not managed directly -> they are
+        derived from axioms. Add/remove axioms to change the ontology.
+
+        Selections are named sets of axiom hashes or entity IRIs that persist across calls.
+        Use them to build up working sets incrementally: search, save, narrow, combine, then
+        act (export, delete, inspect). Reference a selection by its bare name (e.g. `my_sel`).
+        Each selection has a fixed kind (axioms or entities) set at creation; tools that read
+        a selection expect a particular kind. Writing to an existing name is refused by
+        default; pass `mode="replace"` to overwrite, or combine sets via set-algebra in
+        create_selection. Destructive ops (remove_axioms by selection, rename_iri) show a
+        preview and return a `confirm` token; call again with `confirm=<token>` to apply. If
+        the selection changed meanwhile, the token is rejected and a fresh preview shown.
+        """
     ),
 )
 
