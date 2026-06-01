@@ -35,7 +35,7 @@ Added 6 axioms, skipped 0 axioms.
 [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
 
-Now query the structure. `match_axioms` does structural pattern matching with `?vars`: the same variable in two positions enforces equality, and every solution comes back as a saved selection.
+Now query the structure. `match_axioms` does structural pattern matching: `?vars` bind to whatever fills the slot, and every match is saved as a selection.
 
 ```
 >>> match_axioms(
@@ -51,7 +51,7 @@ Saved 2 axioms to "orbits".
 [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
 ```
 
-Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's *both* about Planet *and* describes an orbital relationship.
+Selections persist and compose. A second match grabs every axiom where `sol:Planet` is the sub-class; `create_selection` intersects the two to find the one axiom that is *both* about Planet *and* describes an orbit.
 
 ```
 >>> match_axioms(
@@ -73,7 +73,7 @@ Saved 1 axiom to "planet_orbit".
 [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
 ```
 
-## What you can do with it
+## What you can do
 
 - Build an ontology from scratch by talking to an agent
 - Poke around an existing one: search by text or structure, inspect entities
