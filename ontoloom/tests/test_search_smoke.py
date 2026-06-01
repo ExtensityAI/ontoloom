@@ -448,6 +448,16 @@ class TestFindEntitiesComprehensive:
         # skos:definition should not match (wrong namespace)
         assert "skos:definition" not in iris
 
+    def test_search_query_with_properties_drops_local_name_match(self, s):
+        """Regression: properties= must restrict the search.
+
+        owl:deprecated has the local name "deprecated" but no rdfs:label. A
+        query for "deprecat" scoped to rdfs:label must NOT match owl:deprecated.
+        """
+        add_axioms(s, AXIOMS)
+        iris = {str(i) for i in find_entities(s, query="deprecat", properties=(IRI("rdfs:label"),))}
+        assert "owl:deprecated" not in iris
+
     def test_search_match_quality_ordering(self, s):
         add_axioms(s, AXIOMS)
         # "Dog" should match :Dog as exact (local_name) before substring matches

@@ -142,43 +142,54 @@ def build_entity_predicate(constraints: Sequence[EntityConstraint]) -> Predicate
             case EntityTextMatches(query=q, properties=properties):
                 ql = q.lower()
 
-                if properties:
-                    ann_scope = "IN (" + ",".join("?" for _ in properties) + ")"
-                else:
-                    ann_scope = "!= 'local_name'"
-
-                def _local_name_exists(op: str) -> str:
-                    return (
-                        "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
-                        f"AND et.property = 'local_name' AND {op})"
-                    )
-
-                def _annotation_exists(op: str, scope: str = ann_scope) -> str:
+                def _annotation_exists(op: str, scope: str) -> str:
                     return (
                         "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
                         f"AND et.property {scope} AND {op})"
                     )
 
-                ln_contains = _local_name_exists("INSTR(LOWER(et.text), ?) > 0")
-                ln_exact = _local_name_exists("LOWER(et.text) = ?")
-                ann_contains = _annotation_exists("INSTR(LOWER(et.text), ?) > 0")
-                ann_exact = _annotation_exists("LOWER(et.text) = ?")
+                if properties:
+                    # User scoped the search to specific annotation properties.
+                    # Local-name matching is dropped entirely so `properties=` does
+                    # what its docstring promises: restrict the search.
+                    ann_scope = "IN (" + ",".join("?" for _ in properties) + ")"
+                    ann_contains = _annotation_exists("INSTR(LOWER(et.text), ?) > 0", ann_scope)
+                    ann_exact = _annotation_exists("LOWER(et.text) = ?", ann_scope)
 
-                # filter: matched local-name or annotation as substring (case-insensitive)
-                fragments.append(f"({ln_contains} OR {ann_contains})")
-                params.append(ql)  # ln_contains
-                params.extend(properties)  # ann_contains scope
-                params.append(ql)  # ann_contains
+                    fragments.append(ann_contains)
+                    params.extend(properties)  # ann_contains scope
+                    params.append(ql)  # ann_contains
 
-                # rank: single ordinal CASE, ordered WHENs (first match wins).
-                # local-name claims the source; quality is taken within it.
-                rank_sql = (
-                    f"CASE WHEN {ln_exact} THEN 0 "
-                    f"WHEN {ln_contains} THEN 2 "
-                    f"WHEN {ann_exact} THEN 1 ELSE 3 END"
-                )
-                rank_params = (ql, ql, *properties, ql)  # ln_exact, ln_contains, ann_exact
-                rank_terms.append(RankTerm(sql=rank_sql, params=rank_params))
+                    rank_sql = f"CASE WHEN {ann_exact} THEN 0 ELSE 1 END"
+                    rank_params = (*properties, ql)  # ann_exact
+                    rank_terms.append(RankTerm(sql=rank_sql, params=rank_params))
+                else:
+                    # Unscoped: local-name OR any non-local-name annotation.
+                    ann_scope = "!= 'local_name'"
+
+                    def _local_name_exists(op: str) -> str:
+                        return (
+                            "EXISTS (SELECT 1 FROM entity_text et WHERE et.entity_iri = ae.entity_iri "
+                            f"AND et.property = 'local_name' AND {op})"
+                        )
+
+                    ln_contains = _local_name_exists("INSTR(LOWER(et.text), ?) > 0")
+                    ln_exact = _local_name_exists("LOWER(et.text) = ?")
+                    ann_contains = _annotation_exists("INSTR(LOWER(et.text), ?) > 0", ann_scope)
+                    ann_exact = _annotation_exists("LOWER(et.text) = ?", ann_scope)
+
+                    fragments.append(f"({ln_contains} OR {ann_contains})")
+                    params.append(ql)  # ln_contains
+                    params.append(ql)  # ann_contains
+
+                    # rank: ordinal CASE, ordered WHENs (first match wins).
+                    rank_sql = (
+                        f"CASE WHEN {ln_exact} THEN 0 "
+                        f"WHEN {ln_contains} THEN 2 "
+                        f"WHEN {ann_exact} THEN 1 ELSE 3 END"
+                    )
+                    rank_params = (ql, ql, ql)  # ln_exact, ln_contains, ann_exact
+                    rank_terms.append(RankTerm(sql=rank_sql, params=rank_params))
             case InEntitySelection(name=name):
                 fragments.append(
                     "EXISTS (SELECT 1 FROM entity_selection_items si_w "
