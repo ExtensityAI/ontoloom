@@ -31,8 +31,7 @@ class NamespaceIRI(TypedStr):
 
 
 # Always-accepted prefixes — the OWL/RDF/XSD core that any ontology can reference
-# without declaring. The empty prefix (e.g. ":Dog") is also accepted as the
-# default namespace.
+# without declaring.
 BUILTIN_PREFIXES: frozenset[PrefixName] = frozenset(
     {PrefixName("rdf"), PrefixName("rdfs"), PrefixName("owl"), PrefixName("xsd")}
 )

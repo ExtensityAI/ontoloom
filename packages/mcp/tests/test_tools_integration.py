@@ -993,6 +993,39 @@ def test_add_axioms_accepts_builtin_prefixes(empty_db):
     assert "Added 1" in result
 
 
+def test_add_axioms_rejects_empty_prefix_when_undeclared(empty_db):
+    wrapped = _via_middleware(add_axioms)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(
+            path=empty_db,
+            axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI(":Dog"))],
+        )
+    msg = str(exc_info.value)
+    assert "Undeclared prefix" in msg
+    assert "set_prefix" in msg
+
+
+def test_add_axioms_accepts_empty_prefix_when_declared(empty_db):
+    set_prefix(path=empty_db, name=PrefixName(""), iri=NamespaceIRI("http://default.example/"))
+    result = add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI(":Dog"))],
+    )
+    assert "Added 1" in result
+
+
+def test_describe_ontology_renders_empty_prefix(empty_db):
+    set_prefix(path=empty_db, name=PrefixName(""), iri=NamespaceIRI("http://default.example/"))
+    add_axioms(
+        path=empty_db,
+        axioms=[Declaration(entity_type=EntityType.CLASS, iri=IRI(":Dog"))],
+    )
+    # Regression: empty prefix used to crash describe with
+    # "PrefixName must start with a letter ... got """
+    result = describe_ontology(path=empty_db)
+    assert ":Dog" in result or "1 Class" in result
+
+
 def test_find_duplicate_entities_within_missing_selection_translates(populated_db):
     from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
 
@@ -1580,6 +1613,15 @@ def test_rename_iri_no_collision_renders_diff_with_summary(populated_db):
 def test_rename_iri_no_op_when_iri_absent(populated_db):
     result = rename_iri(path=populated_db, old_iri=IRI("ex:NotPresent"), new_iri=IRI("ex:Other"))
     assert result == "No axioms found mentioning ex:NotPresent. No-op."
+
+
+def test_rename_iri_rejects_empty_prefix_target_when_undeclared(populated_db):
+    wrapped = _via_middleware(rename_iri)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=populated_db, old_iri=IRI("ex:Dog"), new_iri=IRI(":Dog"))
+    msg = str(exc_info.value)
+    assert "Undeclared prefix" in msg
+    assert "set_prefix" in msg
 
 
 def test_rename_iri_into_appends_saved_line(populated_db):

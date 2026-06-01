@@ -13,6 +13,7 @@ from ontoloom.prefixes.store import set_prefix
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
 
 _TEST_PREFIXES: dict[PrefixName, NamespaceIRI] = {
+    PrefixName(""): NamespaceIRI("http://default.example/"),
     PrefixName("ex"): NamespaceIRI("http://example.org/"),
     PrefixName("other"): NamespaceIRI("http://other.org/"),
     PrefixName("bio"): NamespaceIRI("http://bio.org/"),

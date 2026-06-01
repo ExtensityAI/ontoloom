@@ -66,6 +66,14 @@ def test_export_jsonl(populated, tmp_path):
         assert "annotations" in obj
 
 
+def test_export_jsonl_header_includes_empty_prefix(populated, tmp_path):
+    """Empty prefix is a real prefix; the export header must round-trip it."""
+    export_path = tmp_path / "export.jsonl"
+    export_jsonl(populated, export_path)
+    header = json.loads(export_path.read_text().splitlines()[0])
+    assert "" in header["prefixes"]
+
+
 def test_export_jsonl_hash_roundtrip(populated, tmp_path):
     original_hashes = {r[0] for r in populated.conn.execute("SELECT hash FROM axioms")}
 

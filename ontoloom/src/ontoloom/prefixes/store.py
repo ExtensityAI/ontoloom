@@ -31,11 +31,11 @@ def list_prefixes(s: Session) -> dict[PrefixName, NamespaceIRI]:
 
 def check_iri_prefixes(s: Session, iris: Iterable[IRI]):
     """Raise `UndeclaredPrefixError` if any IRI uses a prefix that is neither
-    declared in this ontology nor in `BUILTIN_PREFIXES`. Empty prefixes
-    (default namespace, e.g. `:Dog`) are accepted."""
+    declared in this ontology nor in `BUILTIN_PREFIXES`. The empty prefix
+    (used by IRIs of the form `:Dog`) must be declared like any other."""
     declared = frozenset(list_prefixes(s))
     allowed = declared | BUILTIN_PREFIXES
-    unknown = {PrefixName(iri.prefix) for iri in iris if iri.prefix and iri.prefix not in allowed}
+    unknown = {PrefixName(iri.prefix) for iri in iris if iri.prefix not in allowed}
     if unknown:
         raise UndeclaredPrefixError(frozenset(unknown))
 
