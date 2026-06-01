@@ -1,9 +1,9 @@
 from typing import Annotated
 
 from annotated_types import MinLen
+from fastmcp.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from ontoloom.connection import Ontology, session
-from ontoloom.errors import InvalidArgumentsError
 from ontoloom.owl.iri import IRI
 from ontoloom.query.constraints import (
     AnnotationTextMatches,
@@ -50,7 +50,7 @@ def find_axioms(
     """
     if query is None and properties is None:
         msg = "find_axioms requires at least one of `query` or `properties`."
-        raise InvalidArgumentsError(msg)
+        raise ToolError(msg)
 
     props_tuple = tuple(properties or ())
     src = FindAxiomsSource(query=query, properties=props_tuple, within=within)

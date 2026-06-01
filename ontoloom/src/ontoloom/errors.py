@@ -34,10 +34,3 @@ class DatabaseOpenError(OntoloomError):
         self.path = path
         self.detail = detail
         super().__init__(f"Cannot open ontology at {dquoted(path)}: {detail}")
-
-
-class InvalidArgumentsError(OntoloomError):
-    """Caller passed an invalid combination of arguments."""
-
-    def __init__(self, message: str):
-        super().__init__(message)
