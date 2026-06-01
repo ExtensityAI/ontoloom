@@ -12,7 +12,7 @@ ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with O
 
 A coding agent sketches a tiny solar-system ontology. Create the database, declare a prefix, and add the planet hierarchy:
 
-```python
+```
 >>> create_ontology(path="solar.ontology.db")
 Created ontology at `solar.ontology.db`.
 
@@ -36,7 +36,7 @@ Added 6 axioms, skipped 0 axioms.
 
 Now query the structure. `match_axioms` does structural pattern matching with `?vars`: the same variable in two positions enforces equality, and every solution comes back as a saved selection.
 
-```python
+```
 >>> match_axioms(
 ...     path="solar.ontology.db",
 ...     pattern={
@@ -53,7 +53,7 @@ Saved 2 axioms to "orbits".
 
 Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's *both* about Planet *and* describes an orbital relationship.
 
-```python
+```
 >>> match_axioms(
 ...     path="solar.ontology.db",
 ...     pattern={"sub_class": "sol:Planet", "super_class": "?super"},
