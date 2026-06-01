@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from ontoloom.errors import ConcurrentWriteError, OntoloomError
+from ontoloom.errors import DatabaseOpenError, OntoloomError
 from ontoloom.models import FrozenModel
 from ontoloom.utils import dquoted
 
@@ -46,16 +46,6 @@ class Metadata(FrozenModel):
 
 def _apply_pragmas(conn: sqlite3.Connection):
     conn.executescript(_PRAGMAS)
-
-
-def _is_lock_error(e: sqlite3.OperationalError) -> bool:
-    """True if the OperationalError is SQLite's busy/lock signal.
-
-    Matches both `database is locked` (write contention) and
-    `database table is locked` (shared-lock-after-write under WAL).
-    """
-    msg = str(e).lower()
-    return "database is locked" in msg or "database table is locked" in msg
 
 
 def _validate_schema(conn: sqlite3.Connection):
@@ -122,8 +112,7 @@ class Ontology:
         try:
             conn = sqlite3.connect(str(path), autocommit=True)
         except sqlite3.OperationalError as e:
-            msg = f"Cannot open database at {dquoted(path)}: {e}"
-            raise OntoloomError(msg) from e
+            raise DatabaseOpenError(path=str(path), detail=str(e)) from e
         try:
             _apply_pragmas(conn)
             conn.executescript(_SCHEMA)
@@ -169,25 +158,21 @@ def session(ont: Ontology) -> Iterator[Session]:
     try:
         raw = sqlite3.connect(str(ont.path), autocommit=True)
     except sqlite3.OperationalError as e:
-        msg = f"Cannot open database at {dquoted(ont.path)}: {e}"
-        raise OntoloomError(msg) from e
+        raise DatabaseOpenError(path=str(ont.path), detail=str(e)) from e
     try:
         try:
             _apply_pragmas(raw)
         except sqlite3.DatabaseError as e:
-            msg = f"Cannot read database at {dquoted(ont.path)}: {e}"
-            raise OntoloomError(msg) from e
+            raise DatabaseOpenError(path=str(ont.path), detail=str(e)) from e
         _validate_schema(raw)
         raw.execute("BEGIN")
         s = Session(ontology=ont, conn=raw)
         try:
             yield s
-        except BaseException as e:
+        except BaseException:
             if raw.in_transaction:
                 with contextlib.suppress(sqlite3.OperationalError):
                     raw.execute("ROLLBACK")
-            if isinstance(e, sqlite3.OperationalError) and _is_lock_error(e):
-                raise ConcurrentWriteError(str(e)) from e
             raise
         else:
             if raw.in_transaction:

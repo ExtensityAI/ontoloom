@@ -26,23 +26,28 @@ def test_resolve_hash_prefix_not_found_raises(s):
         resolve_hash_prefix(s, AxiomHashPrefix("deadbeef"))
 
 
+_DECL_X = '{"annotations":[],"entity_type":"Class","iri":"ex:X"}'
+_DECL_Y = '{"annotations":[],"entity_type":"Class","iri":"ex:Y"}'
+
+
 def test_ambiguous_hash_error(s):
     prefix = "aaaa"
     h1 = prefix + "0" * 60
     h2 = prefix + "1" + "0" * 59
     s.conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-        (h1, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+        (h1, _DECL_X),
     )
     s.conn.execute(
         "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-        (h2, '{"type":"Declaration","iri":"ex:Y","entity_type":"Class","annotations":[]}'),
+        (h2, _DECL_Y),
     )
 
     with pytest.raises(AmbiguousHashError) as exc_info:
         resolve_hash_prefix(s, AxiomHashPrefix(prefix))
     assert exc_info.value.count == 2
     assert exc_info.value.prefix == prefix
+    assert len(exc_info.value.matches) == 2
 
 
 def test_resolve_hash_prefix_range_scan(s):
@@ -54,7 +59,7 @@ def test_resolve_hash_prefix_range_scan(s):
     for h in (near_miss, sibling, target):
         s.conn.execute(
             "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-            (h, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+            (h, _DECL_X),
         )
 
     assert resolve_hash_prefix(s, AxiomHashPrefix("ab")) == AxiomHash(target)
@@ -74,7 +79,7 @@ def test_resolve_hash_prefix_upper_bound_edges(s):
     for h in hashes:
         s.conn.execute(
             "INSERT INTO axioms (hash, type, data) VALUES (?, 'Declaration', jsonb(?))",
-            (h, '{"type":"Declaration","iri":"ex:X","entity_type":"Class","annotations":[]}'),
+            (h, _DECL_X),
         )
 
     assert resolve_hash_prefix(s, AxiomHashPrefix("9")) == AxiomHash(hashes[0])

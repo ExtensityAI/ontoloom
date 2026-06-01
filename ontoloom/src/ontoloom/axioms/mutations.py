@@ -1,13 +1,19 @@
+import logging
 from collections.abc import Sequence
 from typing import cast
 
 from ontoloom.axioms.deserialize import load_axiom
 from ontoloom.axioms.entity_walker import iter_axiom_entities
-from ontoloom.axioms.hashing import AxiomHash, AxiomNotFoundError, load_axiom_row, short_hash
+from ontoloom.axioms.hashing import (
+    AxiomHash,
+    AxiomNotFoundError,
+    HashedAxiom,
+    load_axiom_row,
+    short_hash,
+)
 from ontoloom.axioms.types import (
     AddResult,
     AnnotateResult,
-    HashedAxiom,
     RemoveBySelectionResult,
     RemoveResult,
     RenameResult,
@@ -29,6 +35,8 @@ from ontoloom.query.list_axioms import ListAxioms
 from ontoloom.selections.store import get_axiom_selection
 from ontoloom.selections.types import SelectionName
 from ontoloom.utils import dedupe
+
+logger = logging.getLogger("ontoloom")
 
 
 def add_axioms(s: Session, axioms: Sequence[BaseAxiom]) -> AddResult:
@@ -324,8 +332,8 @@ def insert_axiom(s: Session, axiom: BaseAxiom) -> int | None:
 
     axiom_id = cursor.lastrowid
     if axiom_id is None:
-        msg = "INSERT succeeded but lastrowid is None"
-        raise InternalError(msg)
+        logger.error("INSERT succeeded but lastrowid is None for hash %s", h)
+        raise InternalError
     _populate_indexes(s, axiom, axiom_id)
     return axiom_id
 

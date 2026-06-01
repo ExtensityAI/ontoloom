@@ -4,6 +4,8 @@ Domain-specific errors live with the code that raises them; only the base class
 and cross-cutting errors (raised from multiple modules) live here.
 """
 
+from ontoloom.utils import dquoted
+
 
 class OntoloomError(Exception):
     """Base for all ontoloom domain errors."""
@@ -18,24 +20,20 @@ class StoreCorruptionError(OntoloomError):
         super().__init__(f"Corrupted stored data: {detail}")
 
 
-class ConcurrentWriteError(OntoloomError):
-    """Another writer held the SQLite write lock past the busy_timeout.
-
-    The transaction has been rolled back. Safe to retry — persistent failures
-    usually mean another process is holding a long write transaction open.
-    """
-
-    def __init__(self, detail: str):
-        self.detail = detail
-        super().__init__(f"Database is locked by another writer: {detail}. Retry the operation.")
-
-
 class InternalError(OntoloomError):
     """Internal invariant violated. Indicates a bug in ontoloom itself, not user input."""
 
-    def __init__(self, detail: str):
+    def __init__(self):
+        super().__init__("internal invariant violated")
+
+
+class DatabaseOpenError(OntoloomError):
+    """Failed to open or read the underlying SQLite database file."""
+
+    def __init__(self, path: str, detail: str):
+        self.path = path
         self.detail = detail
-        super().__init__(detail)
+        super().__init__(f"Cannot open ontology at {dquoted(path)}: {detail}")
 
 
 class InvalidArgumentsError(OntoloomError):

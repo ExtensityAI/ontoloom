@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 from ontoloom.connection import Ontology, session
-from ontoloom.errors import ConcurrentWriteError
 from ontoloom.selections.store import upsert_entity_selection
 from ontoloom.selections.types import SelectionName
 
@@ -66,9 +65,11 @@ def test_wal_snapshot_isolation_prevents_lost_update_toctou(tmp_path):
     assert row[0] == "B-write"
 
 
-def test_session_translates_snapshot_conflict_to_concurrent_write_error(tmp_path):
-    """Snapshot conflict inside `session()` surfaces as `ConcurrentWriteError`,
-    not raw `sqlite3.OperationalError`, so MCP callers get an actionable message."""
+def test_session_propagates_snapshot_conflict_as_operational_error(tmp_path):
+    """Snapshot conflict inside `session()` propagates as raw
+    `sqlite3.OperationalError`. The MCP layer's `retry_on_busy` decorator
+    catches BUSY/LOCKED codes; anything that escapes that retry surfaces
+    via the middleware's generic Exception fallback."""
     db = tmp_path / "iso.db"
     ont = Ontology.create(db)
 
@@ -78,7 +79,7 @@ def test_session_translates_snapshot_conflict_to_concurrent_write_error(tmp_path
 
     raw_b = _raw(db)
     try:
-        with pytest.raises(ConcurrentWriteError, match="locked"), session(ont) as a:
+        with pytest.raises(sqlite3.OperationalError, match="locked"), session(ont) as a:
             # A pins its snapshot with an initial read.
             a.conn.execute("SELECT hash FROM entity_selections WHERE name = 'foo'").fetchone()
 
@@ -92,7 +93,7 @@ def test_session_translates_snapshot_conflict_to_concurrent_write_error(tmp_path
             )
             raw_b.execute("COMMIT")
 
-            # A's first write hits the snapshot conflict -> translated.
+            # A's first write hits the snapshot conflict.
             a.conn.execute("DELETE FROM entity_selections WHERE name = 'foo'")
             a.commit()
     finally:
