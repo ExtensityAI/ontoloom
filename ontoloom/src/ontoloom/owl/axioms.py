@@ -3,7 +3,7 @@ import operator
 from enum import StrEnum
 from typing import Annotated, Literal, override
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator
 
 from ontoloom.models import FrozenModel, make_tag_resolver, tagged, tagged_union_meta
 from ontoloom.owl._render import format_owl_struct
