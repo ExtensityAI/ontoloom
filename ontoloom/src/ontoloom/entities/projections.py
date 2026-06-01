@@ -16,6 +16,7 @@ from ontoloom.entities.types import (
 )
 from ontoloom.owl.iri import IRI
 from ontoloom.owl.markers import EntityType
+from ontoloom.query.constraints import InAxiomSelection, InEntitySelection
 
 
 def batch_fetch_entity_display(s: Session, iris: list[str]) -> dict[str, EntityDisplay]:
@@ -46,16 +47,49 @@ def batch_fetch_entity_display(s: Session, iris: list[str]) -> dict[str, EntityD
     }
 
 
-def find_top_entities_by_axiom_count(s: Session, n: int) -> list[tuple[IRI, int]]:
-    """Top n entities by number of distinct axioms they appear in."""
-    return [
-        (IRI(row[0]), row[1])
-        for row in s.conn.execute(
-            "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
-            "FROM axiom_entities ae "
-            "GROUP BY ae.entity_iri "
-            "ORDER BY cnt DESC "
-            "LIMIT ?",
-            (n,),
-        ).fetchall()
-    ]
+def find_top_entities_by_axiom_count(
+    s: Session,
+    n: int,
+    *,
+    within: InAxiomSelection | InEntitySelection | None = None,
+) -> list[tuple[IRI, int]]:
+    """Top n entities by number of distinct axioms they appear in.
+
+    Scoping:
+    - within=None: all axioms.
+    - within=InAxiomSelection: count only axioms in that selection.
+    - within=InEntitySelection: restrict to entities in that selection (count
+      stays each entity's full appearance count across the ontology).
+    """
+    match within:
+        case None:
+            sql = (
+                "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
+                "FROM axiom_entities ae "
+                "GROUP BY ae.entity_iri ORDER BY cnt DESC LIMIT ?"
+            )
+            params: tuple[object, ...] = (n,)
+        case InAxiomSelection(name=ax_name):
+            sql = (
+                "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
+                "FROM axiom_entities ae "
+                "JOIN axioms a ON a.id = ae.axiom_id "
+                "JOIN axiom_selection_items asi "
+                "  ON asi.item = a.hash AND asi.selection_name = ? "
+                "GROUP BY ae.entity_iri ORDER BY cnt DESC LIMIT ?"
+            )
+            params = (ax_name, n)
+        case InEntitySelection(name=en_name):
+            sql = (
+                "SELECT ae.entity_iri, COUNT(DISTINCT ae.axiom_id) AS cnt "
+                "FROM axiom_entities ae "
+                "JOIN entity_selection_items esi "
+                "  ON esi.item = ae.entity_iri AND esi.selection_name = ? "
+                "GROUP BY ae.entity_iri ORDER BY cnt DESC LIMIT ?"
+            )
+            params = (en_name, n)
+        case _:
+            msg = f"unhandled within constraint: {within!r}"
+            raise ValueError(msg)
+
+    return [(IRI(row[0]), row[1]) for row in s.conn.execute(sql, params).fetchall()]

@@ -167,6 +167,75 @@ def test_describe_ontology_within_entity_selection_plural(populated_db):
     assert "(entities):" not in result
 
 
+def test_describe_ontology_within_axiom_selection_scopes_top_entities(empty_db):
+    """Regression: top-entities table must not show entities mentioned only in
+    out-of-scope axioms."""
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    in_scope = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    out_scope = SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Predator"))
+    add_axioms(path=empty_db, axioms=[in_scope, out_scope])
+
+    with session(Ontology(empty_db)) as s:
+        upsert_axiom_selection(
+            s, SelectionName("dogs_only"), [HashedAxiom.of(in_scope).hash], "test"
+        )
+        s.commit()
+
+    result = describe_ontology(path=empty_db, within=SelectionName("dogs_only"))
+    top_section = result.split("Top ")[1] if "Top " in result else ""
+    assert "ex:Dog" in top_section
+    assert "ex:Animal" in top_section
+    assert "ex:Cat" not in top_section
+    assert "ex:Predator" not in top_section
+
+
+def test_describe_ontology_within_axiom_selection_scopes_prefix_usage(empty_db):
+    """Regression: prefix-usage table must reflect only in-scope entities."""
+    from ontoloom.axioms.types import HashedAxiom
+    from ontoloom.selections.store import upsert_axiom_selection
+
+    set_prefix(path=empty_db, name=PrefixName("other"), iri=NamespaceIRI("http://other.org/"))
+    in_scope = SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal"))
+    out_scope = SubClassOf(sub_class=IRI("other:Fish"), super_class=IRI("other:Animal"))
+    add_axioms(path=empty_db, axioms=[in_scope, out_scope])
+
+    with session(Ontology(empty_db)) as s:
+        upsert_axiom_selection(s, SelectionName("ex_only"), [HashedAxiom.of(in_scope).hash], "test")
+        s.commit()
+
+    result = describe_ontology(path=empty_db, within=SelectionName("ex_only"))
+    # Prefix block must be present and report 0 for `other:` (out of scope),
+    # > 0 for `ex:` (in scope).
+    assert "Prefixes:" in result
+    prefix_block = result.split("Prefixes:", 1)[1]
+    assert "ex: -> http://example.org/ (2 entities)" in prefix_block
+    assert "other: -> http://other.org/ (0 entities)" in prefix_block
+
+
+def test_describe_ontology_within_entity_selection_scopes_top_entities(empty_db):
+    """Top-entities ranks only entities in the selection."""
+    from ontoloom.selections.store import upsert_entity_selection
+
+    add_axioms(
+        path=empty_db,
+        axioms=[
+            SubClassOf(sub_class=IRI("ex:Dog"), super_class=IRI("ex:Animal")),
+            SubClassOf(sub_class=IRI("ex:Cat"), super_class=IRI("ex:Animal")),
+        ],
+    )
+    with session(Ontology(empty_db)) as s:
+        upsert_entity_selection(s, SelectionName("just_dog"), [IRI("ex:Dog")], "test")
+        s.commit()
+
+    result = describe_ontology(path=empty_db, within=SelectionName("just_dog"))
+    top_section = result.split("Top ")[1] if "Top " in result else ""
+    assert "ex:Dog" in top_section
+    assert "ex:Cat" not in top_section
+    assert "ex:Animal" not in top_section
+
+
 def test_add_axioms_returns_diff(empty_db):
     result = add_axioms(
         path=empty_db,

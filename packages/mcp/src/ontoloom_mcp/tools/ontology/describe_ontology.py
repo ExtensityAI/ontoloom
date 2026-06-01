@@ -11,7 +11,7 @@ from ontoloom.entities.types import EntitySummary
 from ontoloom.owl.iri import IRI
 from ontoloom.prefixes.store import count_prefix_usage, list_prefixes
 from ontoloom.prefixes.types import NamespaceIRI, PrefixName
-from ontoloom.query.constraints import InAxiomSelection
+from ontoloom.query.constraints import InAxiomSelection, InEntitySelection
 from ontoloom.query.dispatch import resolve_within
 from ontoloom.selections.store import get_axiom_selection, get_entity_selection
 from ontoloom.selections.types import AxiomSelection, EntitySelection, SelectionName
@@ -43,22 +43,27 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
         ent_summary = summarize_entities(s, within=within)
         prefix_map = list_prefixes(s)
 
-        scope_meta: AxiomSelection | EntitySelection | None = None
-        if within is not None:
-            if isinstance(resolve_within(s, within), InAxiomSelection):
-                scope_meta = get_axiom_selection(s, within)
-            else:
-                scope_meta = get_entity_selection(s, within)
+        scope: InAxiomSelection | InEntitySelection | None = (
+            resolve_within(s, within) if within is not None else None
+        )
+        scope_meta: AxiomSelection | EntitySelection | None
+        match scope:
+            case None:
+                scope_meta = None
+            case InAxiomSelection(name=ax_name):
+                scope_meta = get_axiom_selection(s, ax_name)
+            case InEntitySelection(name=en_name):
+                scope_meta = get_entity_selection(s, en_name)
 
         # `excl` matches `find_entities(declared=False)` (exclude_deprecated=True);
         # `incl` is the raw count for transparency.
         undeclared_excl = count_undeclared_entities(s, within, exclude_deprecated=True)
         undeclared_incl = count_undeclared_entities(s, within, exclude_deprecated=False)
 
-        top_rows = find_top_entities_by_axiom_count(s, _TOP_ENTITIES)
+        top_rows = find_top_entities_by_axiom_count(s, _TOP_ENTITIES, within=scope)
         top_refs = build_refs(s, [iri for iri, _ in top_rows]) if top_rows else []
 
-        prefix_usage = count_prefix_usage(s) if (within is None and prefix_map) else {}
+        prefix_usage = count_prefix_usage(s, within=scope) if prefix_map else {}
 
         s.commit()
 
@@ -83,8 +88,7 @@ def describe_ontology(path: OntologyPath, within: SelectionName | None = None):
     if top_rows:
         parts.append(_format_top_entities(top_rows, top_refs))
 
-    if within is None:
-        parts.append(_format_prefix_block(prefix_map, prefix_usage))
+    parts.append(_format_prefix_block(prefix_map, prefix_usage))
 
     return "\n\n".join(parts)
 

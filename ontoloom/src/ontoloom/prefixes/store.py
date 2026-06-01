@@ -11,7 +11,7 @@ from ontoloom.prefixes.types import (
     PrefixNotFoundError,
     UndeclaredPrefixError,
 )
-from ontoloom.query.constraints import InNamespaces
+from ontoloom.query.constraints import InAxiomSelection, InEntitySelection, InNamespaces
 from ontoloom.query.count_entities import CountEntities
 from ontoloom.query.dispatch import execute
 
@@ -76,16 +76,52 @@ def remove_prefix(s: Session, name: PrefixName):
     s.conn.execute("DELETE FROM prefixes WHERE name = ?", (name,))
 
 
-def count_prefix_usage(s: Session) -> dict[PrefixName, int]:
-    """Count how many distinct entities use each registered prefix namespace."""
+def count_prefix_usage(
+    s: Session,
+    *,
+    within: InAxiomSelection | InEntitySelection | None = None,
+) -> dict[PrefixName, int]:
+    """Count how many distinct entities use each registered prefix namespace.
+
+    Scoping:
+    - within=None: counts entities mentioned by any axiom.
+    - within=InAxiomSelection: counts only entities mentioned by axioms in the
+      selection.
+    - within=InEntitySelection: counts only entities in the selection.
+    """
     registered = list_prefixes(s)
-    db_counts = {
-        PrefixName(row[0]): row[1]
-        for row in s.conn.execute(
-            "SELECT substr(entity_iri, 1, instr(entity_iri, ':') - 1) AS prefix, "
-            "COUNT(DISTINCT entity_iri) "
-            "FROM axiom_entities WHERE instr(entity_iri, ':') > 0 "
-            "GROUP BY prefix"
-        )
-    }
+
+    base = (
+        "SELECT substr(ae.entity_iri, 1, instr(ae.entity_iri, ':') - 1) AS prefix, "
+        "COUNT(DISTINCT ae.entity_iri) "
+        "FROM axiom_entities ae"
+    )
+    filter_clause = " WHERE instr(ae.entity_iri, ':') > 0 "
+
+    match within:
+        case None:
+            sql = f"{base}{filter_clause}GROUP BY prefix"
+            params: tuple[object, ...] = ()
+        case InAxiomSelection(name=ax_name):
+            sql = (
+                f"{base} "
+                "JOIN axioms a ON a.id = ae.axiom_id "
+                "JOIN axiom_selection_items asi "
+                "  ON asi.item = a.hash AND asi.selection_name = ?"
+                f"{filter_clause}GROUP BY prefix"
+            )
+            params = (ax_name,)
+        case InEntitySelection(name=en_name):
+            sql = (
+                f"{base} "
+                "JOIN entity_selection_items esi "
+                "  ON esi.item = ae.entity_iri AND esi.selection_name = ?"
+                f"{filter_clause}GROUP BY prefix"
+            )
+            params = (en_name,)
+        case _:
+            msg = f"unhandled within constraint: {within!r}"
+            raise ValueError(msg)
+
+    db_counts = {PrefixName(row[0]): row[1] for row in s.conn.execute(sql, params)}
     return {prefix: db_counts.get(prefix, 0) for prefix in registered}
