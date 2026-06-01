@@ -23,6 +23,8 @@ from ontoloom.selections.store import upsert_axiom_selection, upsert_entity_sele
 from ontoloom.selections.types import (
     AxiomSelection,
     EntitySelection,
+    SelectionKind,
+    SelectionKindMismatchError,
     SelectionName,
     SelectionNotFoundError,
     ShowFilter,
@@ -30,14 +32,6 @@ from ontoloom.selections.types import (
 from pydantic import ValidationError
 
 SEL = SelectionName("sel")
-
-
-def _axiom_ref(name: str) -> SelectionName:
-    return SelectionName(name)
-
-
-def _entity_ref(name: str) -> SelectionName:
-    return SelectionName(name)
 
 
 def _seed_axioms_present_missing(s: Any, name: SelectionName) -> None:
@@ -101,7 +95,7 @@ class _ReadParams:
 
 _AXIOM_PARAMS = _ReadParams(
     query_class=ReadAxiomSelection,
-    ref_factory=_axiom_ref,
+    ref_factory=SelectionName,
     meta_class=AxiomSelection,
     seed_pm=_seed_axioms_present_missing,
     seed_pag=_seed_axioms_for_pagination,
@@ -109,7 +103,7 @@ _AXIOM_PARAMS = _ReadParams(
 )
 _ENTITY_PARAMS = _ReadParams(
     query_class=ReadEntitySelection,
-    ref_factory=_entity_ref,
+    ref_factory=SelectionName,
     meta_class=EntitySelection,
     seed_pm=_seed_entities_present_missing,
     seed_pag=_seed_entities_for_pagination,
@@ -205,20 +199,24 @@ def test_axiom_run_returns_items_in_insertion_order(s):
     hashes = [HashedAxiom.of(a).hash for a in axs]
     upsert_axiom_selection(s, SEL, hashes, "test")
 
-    page = execute(s, ReadAxiomSelection(selection=_axiom_ref("sel")))
+    page = execute(s, ReadAxiomSelection(selection=SelectionName("sel")))
     assert [item.hash for item in page.items] == hashes
 
 
 def test_axiom_read_does_not_see_entity_selection_with_same_name(s):
     upsert_entity_selection(s, SelectionName("foo"), ["ex:Dog"], "test")
-    with pytest.raises(SelectionNotFoundError):
-        execute(s, ReadAxiomSelection(selection=_axiom_ref("foo")))
+    with pytest.raises(SelectionKindMismatchError) as exc_info:
+        execute(s, ReadAxiomSelection(selection=SelectionName("foo")))
+    assert exc_info.value.actual == SelectionKind.ENTITIES
+    assert exc_info.value.expected == SelectionKind.AXIOMS
 
 
 def test_entity_read_does_not_see_axiom_selection_with_same_name(s):
     upsert_axiom_selection(s, SelectionName("foo"), ["a" * 64], "test")
-    with pytest.raises(SelectionNotFoundError):
-        execute(s, ReadEntitySelection(selection=_entity_ref("foo")))
+    with pytest.raises(SelectionKindMismatchError) as exc_info:
+        execute(s, ReadEntitySelection(selection=SelectionName("foo")))
+    assert exc_info.value.actual == SelectionKind.AXIOMS
+    assert exc_info.value.expected == SelectionKind.ENTITIES
 
 
 def test_entity_run_returns_items_in_lex_order(s):
@@ -237,7 +235,7 @@ def test_entity_run_returns_items_in_lex_order(s):
         "test",
     )
 
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel")))
     assert [str(item.iri) for item in page.items] == ["ex:Antelope", "ex:Mongoose", "ex:Zebra"]
 
 
@@ -256,7 +254,7 @@ def test_run_empty_selection(s, p: _ReadParams):
 
 def test_entity_run_present_and_missing_classified(s):
     _seed_entities_present_missing(s, SEL)
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel")))
     by_iri = {item.iri: item for item in page.items}
     assert by_iri[IRI("ex:Dog")].present is True
     assert by_iri[IRI("ex:Dog")].roles == frozenset({EntityType.CLASS})
@@ -266,14 +264,14 @@ def test_entity_run_present_and_missing_classified(s):
 
 def test_entity_run_show_present_returns_only_dog(s):
     _seed_entities_present_missing(s, SEL)
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel"), show=ShowFilter.PRESENT))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel"), show=ShowFilter.PRESENT))
     assert page.items[0].iri == IRI("ex:Dog")
     assert page.items[0].present is True
 
 
 def test_entity_run_show_missing_returns_only_ghost(s):
     _seed_entities_present_missing(s, SEL)
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel"), show=ShowFilter.MISSING))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel"), show=ShowFilter.MISSING))
     assert page.items[0].iri == IRI("ex:Ghost")
     assert page.items[0].present is False
 
@@ -291,7 +289,7 @@ def test_entity_run_labels_populated_for_present_entities(s):
         ],
     )
     upsert_entity_selection(s, SEL, ["ex:Dog"], "test")
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel")))
     assert page.items[0].label == "Dog"
 
 
@@ -304,7 +302,7 @@ def test_entity_run_punned_entity_present_missing_invariant(s):
         ],
     )
     upsert_entity_selection(s, SEL, ["ex:X", "ex:Ghost"], "test")
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel")))
     assert page.present + page.missing == page.meta.size
     assert page.present == 1
     assert page.missing == 1
@@ -319,7 +317,7 @@ def test_entity_run_punned_entity_reports_all_roles(s):
         ],
     )
     upsert_entity_selection(s, SEL, ["ex:Pun"], "test")
-    page = execute(s, ReadEntitySelection(selection=_entity_ref("sel")))
+    page = execute(s, ReadEntitySelection(selection=SelectionName("sel")))
     item = next(i for i in page.items if i.iri == IRI("ex:Pun"))
     assert item.roles == frozenset({EntityType.CLASS, EntityType.OBJECT_PROPERTY})
 
@@ -329,17 +327,17 @@ def test_entity_run_punned_entity_reports_all_roles(s):
 
 def test_axiom_run_show_present_items_not_missing(s):
     _seed_axioms_present_missing(s, SEL)
-    page = execute(s, ReadAxiomSelection(selection=_axiom_ref("sel"), show=ShowFilter.PRESENT))
+    page = execute(s, ReadAxiomSelection(selection=SelectionName("sel"), show=ShowFilter.PRESENT))
     assert all(not item.missing for item in page.items)
 
 
 def test_axiom_run_show_missing_items_all_missing(s):
     _seed_axioms_present_missing(s, SEL)
-    page = execute(s, ReadAxiomSelection(selection=_axiom_ref("sel"), show=ShowFilter.MISSING))
+    page = execute(s, ReadAxiomSelection(selection=SelectionName("sel"), show=ShowFilter.MISSING))
     assert all(item.missing for item in page.items)
 
 
 def test_axiom_run_basic_meta_name(s):
     _seed_axioms_present_missing(s, SEL)
-    page = execute(s, ReadAxiomSelection(selection=_axiom_ref("sel")))
+    page = execute(s, ReadAxiomSelection(selection=SelectionName("sel")))
     assert page.meta.name == "sel"

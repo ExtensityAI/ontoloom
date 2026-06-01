@@ -11,6 +11,7 @@ occupied name. Multi-process callers need real transactions for safety.
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import NoReturn
 
 from ontoloom.axioms.hashing import AxiomHash
 from ontoloom.connection import Session
@@ -24,6 +25,7 @@ from ontoloom.selections.types import (
     SelectionExistsError,
     SelectionKind,
     SelectionKindConflictError,
+    SelectionKindMismatchError,
     SelectionName,
     SelectionNotFoundError,
     WriteMode,
@@ -84,6 +86,24 @@ def _selection_exists(s: Session, table: str, name: SelectionName) -> bool:
     return row is not None
 
 
+def _raise_missing_or_mismatch(
+    s: Session,
+    name: SelectionName,
+    expected: SelectionKind,
+) -> NoReturn:
+    """Called when a kind-specific lookup misses. Distinguishes wrong-kind from absent."""
+    other_table, other_kind = (
+        ("entity_selections", SelectionKind.ENTITIES)
+        if expected is SelectionKind.AXIOMS
+        else ("axiom_selections", SelectionKind.AXIOMS)
+    )
+
+    if _selection_exists(s, other_table, name):
+        raise SelectionKindMismatchError(name, actual=other_kind, expected=expected)
+
+    raise SelectionNotFoundError(name)
+
+
 def _get_items(s: Session, items_table: str, name: SelectionName) -> list[str]:
     return [
         r[0]
@@ -141,11 +161,16 @@ def _upsert_selection(
 
 
 def get_axiom_selection(s: Session, name: SelectionName) -> AxiomSelection:
-    """Fetch axiom-selection metadata. Raises SelectionNotFoundError if absent."""
+    """Fetch axiom-selection metadata.
+
+    Raises:
+        SelectionKindMismatchError: name refers to an entity selection.
+        SelectionNotFoundError: name is absent from both tables.
+    """
     row = _get_selection_row(s, "axiom_selections", name)
 
     if row is None:
-        raise SelectionNotFoundError(name)
+        _raise_missing_or_mismatch(s, name, expected=SelectionKind.AXIOMS)
 
     return AxiomSelection(name=name, hash=SelectionContentHash(row[0]), size=row[1], source=row[2])
 
@@ -235,11 +260,16 @@ def get_axiom_selection_items(s: Session, name: SelectionName) -> list[AxiomHash
 
 
 def get_entity_selection(s: Session, name: SelectionName) -> EntitySelection:
-    """Fetch entity-selection metadata. Raises SelectionNotFoundError if absent."""
+    """Fetch entity-selection metadata.
+
+    Raises:
+        SelectionKindMismatchError: name refers to an axiom selection.
+        SelectionNotFoundError: name is absent from both tables.
+    """
     row = _get_selection_row(s, "entity_selections", name)
 
     if row is None:
-        raise SelectionNotFoundError(name)
+        _raise_missing_or_mismatch(s, name, expected=SelectionKind.ENTITIES)
 
     return EntitySelection(name=name, hash=SelectionContentHash(row[0]), size=row[1], source=row[2])
 

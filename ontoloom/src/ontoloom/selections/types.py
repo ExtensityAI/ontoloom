@@ -138,6 +138,25 @@ class SelectionKindConflictError(OntoloomError):
         super().__init__(msg)
 
 
+class SelectionKindMismatchError(OntoloomError):
+    """A read-side consumer received a selection of the wrong kind.
+
+    Distinct from `SelectionNotFoundError`: the selection exists, but as the
+    other kind. The caller likely passed an entity selection to an axiom-only
+    tool (or vice versa).
+    """
+
+    def __init__(self, name: SelectionName, actual: SelectionKind, expected: SelectionKind):
+        self.name = name
+        self.actual = actual
+        self.expected = expected
+        msg = (
+            f"Selection {dquoted(name)} contains {actual.value}, "
+            f"but this operation requires {expected.value}."
+        )
+        super().__init__(msg)
+
+
 @dataclass(frozen=True, slots=True)
 class AxiomSelection:
     name: SelectionName

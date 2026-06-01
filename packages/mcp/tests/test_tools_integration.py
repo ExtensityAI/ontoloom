@@ -1042,6 +1042,68 @@ def test_find_duplicate_entities_within_missing_selection_translates(populated_d
     assert "find_entities" in msg or "match_axioms" in msg
 
 
+def test_find_duplicate_entities_within_axiom_selection_reports_kind_mismatch(populated_db):
+    from ontoloom.patterns.types import SubClassOfPattern
+    from ontoloom_mcp.tools.axioms.match_axioms import match_axioms
+    from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities
+
+    match_axioms(
+        path=populated_db,
+        pattern=SubClassOfPattern(sub_class="?x", super_class="?y"),
+        into=SelectionName("ax_sel"),
+    )
+    wrapped = _via_middleware(find_duplicate_entities)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(
+            path=populated_db,
+            into=SelectionName("dups"),
+            annotation_property=IRI("rdfs:label"),
+            within=SelectionName("ax_sel"),
+        )
+    msg = str(exc_info.value)
+    assert '"ax_sel"' in msg
+    assert "axioms" in msg
+    assert "entities" in msg
+
+
+def test_remove_axioms_by_entity_selection_reports_kind_mismatch(populated_db):
+    from ontoloom_mcp.tools.axioms.remove_axioms import BySelection
+
+    find_entities(
+        path=populated_db,
+        into=SelectionName("ent_sel"),
+        query="Dog",
+    )
+    wrapped = _via_middleware(remove_axioms)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(path=populated_db, target=BySelection(name=SelectionName("ent_sel")))
+    msg = str(exc_info.value)
+    assert '"ent_sel"' in msg
+    assert "entities" in msg
+    assert "axioms" in msg
+
+
+def test_export_jsonl_within_entity_selection_reports_kind_mismatch(populated_db, tmp_path):
+    from ontoloom_mcp.tools.ontology.export_jsonl import export_jsonl
+
+    find_entities(
+        path=populated_db,
+        into=SelectionName("ent_sel"),
+        query="Dog",
+    )
+    wrapped = _via_middleware(export_jsonl)
+    with pytest.raises(ToolError) as exc_info:
+        wrapped(
+            path=populated_db,
+            output_path=tmp_path / "out.jsonl",
+            within=SelectionName("ent_sel"),
+        )
+    msg = str(exc_info.value)
+    assert '"ent_sel"' in msg
+    assert "entities" in msg
+    assert "axioms" in msg
+
+
 def test_find_duplicate_entities_no_duplicates_still_writes_selection(populated_db):
     from ontoloom.selections.store import get_entity_selection
     from ontoloom_mcp.tools.entities.find_duplicate_entities import find_duplicate_entities

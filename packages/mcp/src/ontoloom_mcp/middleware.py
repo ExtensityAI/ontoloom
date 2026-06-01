@@ -27,6 +27,7 @@ from ontoloom.selections.types import (
     SelectionExistsError,
     SelectionExprError,
     SelectionKindConflictError,
+    SelectionKindMismatchError,
     SelectionNotFoundError,
 )
 from ontoloom.utils import dquoted
@@ -133,6 +134,15 @@ class ErrorMiddleware(Middleware):
                 f"Selection {dquoted(e.name)} already exists as the other kind "
                 f"(axiom vs entity); names are unique across both kinds. "
                 f"Remove it first to reuse the name."
+            )
+            raise ToolError(msg) from e
+        except SelectionKindMismatchError as e:
+            logger.debug("translated", exc_info=e)
+            msg = (
+                f"Selection {dquoted(e.name)} contains {e.actual.value}, but this "
+                f"operation requires {e.expected.value}. Pass a {e.expected.value} "
+                f"selection, or use `create_selection` with `axioms_for=` / "
+                f"`entities_in=` to convert."
             )
             raise ToolError(msg) from e
         except SelectionExprError as e:
