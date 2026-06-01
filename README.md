@@ -1,111 +1,159 @@
-# **HyDRA: A Hybrid-Driven Reasoning Architecture for Verifiable Knowledge Graphs**
-<img src="https://raw.githubusercontent.com/ExtensityAI/symbolicai/refs/heads/main/assets/images/banner.png">
+# ontoloom
 
-<div align="center">
+MCP tools for building and exploring OWL 2 ontologies with AI agents.
 
-[![SymbolicAI](https://img.shields.io/badge/SymbolicAI-blue?style=for-the-badge)](https://github.com/ExtensityAI/symbolicai)
-[![Paper](https://img.shields.io/badge/Paper-32758e?style=for-the-badge)](?)
-[![DeepWiki](https://img.shields.io/badge/DeepWiki-yellow?style=for-the-badge)](https://deepwiki.com/ExtensityAI/ontology-hydra)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-BSD--3--Clause-green.svg)](LICENSE)
+[![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)]()
 
-[![Twitter](https://img.shields.io/twitter/url/https/twitter.com/symbolicapi.svg?style=social&label=@ExtensityAI)](https://twitter.com/ExtensityAI)
+ontoloom is an [MCP](https://modelcontextprotocol.io/) server for working with OWL 2 EL ontologies. Each ontology is a single SQLite file. Axioms are typed and validated at the API boundary, and identity is a content hash so duplicates can't slip in.
 
-</div>
+## Example
 
----
+A coding agent sketching a tiny solar-system ontology:
 
-<div align="center">
-  <img src=".assets/ontology.gif" alt="Knowledge Graph Visualization" width="800"/>
-</div>
+````
+create_ontology(path="solar.ontology.db")
+Created ontology at `solar.ontology.db`.
 
-## About
+set_prefix(path="solar.ontology.db", name="sol", iri="http://example.org/solar-system#")
+Set prefix `sol:` -> `http://example.org/solar-system#`
 
-`HyDRA` is a framework for generating **domain-specific ontologies** and **knowledge graphs**. It employs an AI persona committee-based approach to comprehensively scope domains, generate ontological structures, and create knowledge graphs for various applications including question answering and domain exploration. `HyDRA` is built entirely on the [symbolicai](https://github.com/ExtensityAI/symbolicAI) framework. Please support the project by starring the repository.
+add_axioms(path="solar.ontology.db", axioms=[...])
+Added 6 axioms, skipped 0 axioms.
 
-## Setup
+```diff
++ [bb5496d24bd1] SubClassOf(sol:Star, sol:CelestialBody)
++ [f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
++ [e4e965a69712] SubClassOf(sol:Moon, sol:CelestialBody)
++ [3f335b35490c] SubClassOf(sol:TerrestrialPlanet, sol:Planet)
++ [7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
++ [f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
+```
+````
+
+Now the agent queries the structure. `match_axioms` does structural pattern matching with `?vars` - same variable in two positions enforces equality, and every solution comes back as a saved selection:
+
+```
+match_axioms(path="solar.ontology.db",
+             pattern={"sub_class": "?body",
+                      "super_class": {"property": "sol:orbits", "filler": "?center"}},
+             into="orbits")
+Saved 2 axioms to "orbits".
+
+[7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
+[f3de1afbfd6c] SubClassOf(sol:Moon, ObjectSomeValuesFrom(sol:orbits, sol:Planet))
+```
+
+Selections persist across calls and compose. A second match picks up everything asserted about Planet on the LHS; `create_selection` then intersects the two to find the axiom that's _both_ about Planet _and_ describes an orbital relationship:
+
+```
+match_axioms(path="solar.ontology.db",
+             pattern={"sub_class": "sol:Planet", "super_class": "?super"},
+             into="planet_facts")
+Saved 2 axioms to "planet_facts".
+
+[7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
+[f3b454b634a3] SubClassOf(sol:Planet, sol:CelestialBody)
+
+create_selection(path="solar.ontology.db",
+                 name="planet_orbit",
+                 expr={"intersect": ["orbits", "planet_facts"]})
+Saved 1 axiom to "planet_orbit".
+
+[7bc195f4d6a6] SubClassOf(sol:Planet, ObjectSomeValuesFrom(sol:orbits, sol:Star))
+```
+
+## What you can do with it
+
+- Build an ontology from scratch by talking to an agent
+- Poke around an existing one: search by text or structure, inspect entities
+- Hand an agent an existing ontology and ask it to clean up or extend
+- Dump everything to JSONL for sharing or archival
+- Manage prefix mappings and axiom-level annotations
+
+## Tools
+
+**Setup**
+`create_ontology` | `set_prefix` | `remove_prefix`
+
+**Build**
+
+- `add_axioms` - add validated axioms; duplicates are skipped
+- `remove_axioms` - remove by hash or by axiom selection
+- `annotate_axiom` - change axiom-level annotations without touching identity
+- `replace_axiom` - atomic delete + add for one axiom
+- `rename_iri` - rewrite an IRI across all (or scoped) axioms
+
+**Query**
+
+- `describe_ontology` - entity and axiom counts, top entities, prefix mappings
+- `get_entity` - roles, annotations, and asserted axiom counts for one entity
+- `find_entities` - text search, optionally filtered by role or namespace
+- `find_axioms` - text search on axiom-level annotations
+- `find_duplicate_entities` - entities sharing the same value for an annotation property
+- `match_axioms` - structural pattern matching with `?vars` and `*` wildcards
+
+**Selections** - named, persistent sets of axiom hashes or entity IRIs
+
+- `create_selection` - build from set algebra over existing selections
+- `read_selection` - paginated view with present/missing visibility
+- `list_selections` - show all named selections
+- `remove_selections` - drop one or more selections
+
+**Export**
+`export_jsonl` - dump all axioms to a sorted JSONL file
+
+## Getting started
+
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-git clone git@github.com:ExtensityAI/ontology-hydra.git
-cd ontology-hydra
+git clone git@github.com:ExtensityAI/ontoloom.git
+cd ontoloom
 ```
 
-To set up the environment, install the Python package manager [uv](https://github.com/astral-sh/uv).
+### Claude Code plugin (recommended)
 
-Then, create a virtual environment and install the dependencies by running:
+```
+/plugins add /path/to/ontoloom/plugins/claude-plugin
+```
+
+### Manual MCP configuration
+
+Drop this into your `.mcp.json`, adjusting the paths for your clone:
+
+```json
+{
+  "mcpServers": {
+    "ontoloom": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "packages/mcp",
+        "python",
+        "-m",
+        "ontoloom_mcp.server"
+      ]
+    }
+  }
+}
+```
+
+### Standalone
 
 ```bash
-uv sync
+uv run --project packages/mcp python -m ontoloom_mcp.server
 ```
 
-Now, you need to configure your `symbolicai` config. First, run:
-```bash
-uv run symconfig
-```
+### Sandboxing (optional)
 
-Upon running this command for the first time, it will start the initial packages caching and initializing the `symbolicai` configuration files in the `uv`'s `.venv` directory, ultimately displaying the following warning:
-```text
-UserWarning: No configuration file found for the environment. A new configuration file has been created at <full-path>/ontology-hydra/.venv/.symai/symai.config.json. Please configure your environment.
-```
+Set `ONTOLOOM_WORKSPACE_ROOT=/path/to/workspace` to confine all `Ontology(...)`, `export_jsonl`, and import paths to that directory tree. Useful when running an agent that may take instructions from untrusted documents - the agent can't open or write SQLite files outside the workspace. Unset (default) means unrestricted single-user behavior.
 
-You then must edit the `symai.config.json` file. A neurosymbolic engine is **required** for the `symbolicai` framework to be used. More about configuration management [here](https://extensityai.gitbook.io/symbolicai/installation#configuration-file).
+## How it works
 
-Once you've set up the `symbolicai` config, you can must also installed an additional plugin for the `ontopipe` package:
-```bash
-uv run sympkg i ExtensityAI/chonkie-symai
-```
+Each ontology lives in a single `.db` file that works the same whether it has a dozen axioms or millions. SQLite is the source of truth; the MCP layer is the only writer, so axioms are always validated before they reach disk.
 
-Now, you are set up.
-
-## Usage
-
-### Generating Ontologies and Knowledge Graphs
-
-You can use the ontopipe API to generate ontologies and knowledge graphs for a specific domain:
-
-```python
-from pathlib import Path
-
-from symai import Import, Symbol
-
-from ontopipe import generate_kg, ontopipe
-from ontopipe.models import KG, Ontology
-
-# Define the domain and output directory
-domain = "fiction"
-cache_path = Path("cache")
-
-# Generate ontology
-ontology = ontopipe(domain, cache_path=cache_path) # saves to cache_path / 'ontology.json'
-# or load from cache
-# ontology = Ontology.from_json_file(cache_path / 'ontology.json')
-
-texts = ['...'] # provide your list of texts chunks here
-                # the chunk length has an impact on the quality of the generated KG
-                # shorter chunks, denser KG
-                # longer chunks, sparser KG
-
-# We also provide functionality to easily chunk text appropriately to your needs.
-# We built on top of the chonkie library.
-# E.g.:
-# ex_str = Symbol('this is a test string to generate a knowledge graph')
-# ChonkieChunker = Import.load_expression(
-#     'ExtensityAI/chonkie-symai',
-#     'ChonkieChunker'
-# )
-# chonkie = ChonkieChunker(tokenizer_name='gpt2')
-# texts = chonkie(ex_str, chunk_size=...)
-
-kg = generate_kg(
-    texts=texts,
-    ontology=ontology,
-    cache_path=cache_path,
-    kg_name='test_kg',
-    epochs=1 # iterates multiple times over the texts to improve the KG
-)
-# or load from cache
-# kg = KG.from_json_file(cache_path / 'kg.json')
-
-from ontopipe.vis import visualize_kg, visualize_ontology
-
-visualize_ontology(ontology, output_html_path=cache_path / 'ontology_vis.html')
-visualize_kg(kg, output_html_path=cache_path / 'kg_vis.html')
-```
+Axioms are typed Pydantic models hashed by canonical logical content, ignoring annotations - you can edit a comment without changing the hash, and exact duplicates are caught automatically.

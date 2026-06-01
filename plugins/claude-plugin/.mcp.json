@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "ontoloom": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "packages/mcp",
+        "python",
+        "-m",
+        "ontoloom_mcp.server"
+      ]
+    }
+  }
+}

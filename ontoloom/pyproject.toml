@@ -1,0 +1,23 @@
+[project]
+name = "ontoloom"
+version = "0.1.0"
+description = "A structured toolkit for building and exploring OWL 2 ontologies."
+readme = "../README.md"
+requires-python = "==3.12.*"
+authors = [{ name = "ExtensityAI" }]
+keywords = ["ontology", "knowledge graph", "domain modeling"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pydantic>=2.12.5",
+]
+
+[project.scripts]
+ontoloom-gen-patterns = "ontoloom.patterns.codegen:main"
+
+[build-system]
+requires = ["uv_build>=0.11.0,<0.12.0"]
+build-backend = "uv_build"
+

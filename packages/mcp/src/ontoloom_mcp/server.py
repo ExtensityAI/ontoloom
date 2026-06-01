@@ -1,0 +1,73 @@
+from textwrap import dedent
+
+from fastmcp import FastMCP
+
+from ontoloom_mcp.middleware import ErrorMiddleware, TimingMiddleware
+from ontoloom_mcp.tools.axioms.add_axioms import tool_add_axioms
+from ontoloom_mcp.tools.axioms.annotate_axiom import tool_annotate_axiom
+from ontoloom_mcp.tools.axioms.find_axioms import tool_find_axioms
+from ontoloom_mcp.tools.axioms.match_axioms import tool_match_axioms
+from ontoloom_mcp.tools.axioms.remove_axioms import tool_remove_axioms
+from ontoloom_mcp.tools.axioms.rename_iri import tool_rename_iri
+from ontoloom_mcp.tools.axioms.replace_axiom import tool_replace_axiom
+from ontoloom_mcp.tools.entities.find_duplicate_entities import tool_find_duplicate_entities
+from ontoloom_mcp.tools.entities.find_entities import tool_find_entities
+from ontoloom_mcp.tools.entities.get_entity import tool_get_entity
+from ontoloom_mcp.tools.ontology.create_ontology import tool_create_ontology
+from ontoloom_mcp.tools.ontology.describe_ontology import tool_describe_ontology
+from ontoloom_mcp.tools.ontology.export_jsonl import tool_export_jsonl
+from ontoloom_mcp.tools.prefixes.remove_prefix import tool_remove_prefix
+from ontoloom_mcp.tools.prefixes.set_prefix import tool_set_prefix
+from ontoloom_mcp.tools.selections.create_selection import tool_create_selection
+from ontoloom_mcp.tools.selections.list_selections import tool_list_selections
+from ontoloom_mcp.tools.selections.read_selection import tool_read_selection
+from ontoloom_mcp.tools.selections.remove_selections import tool_remove_selections
+
+mcp = FastMCP(
+    "ontoloom",
+    mask_error_details=False,  # exception messages reach agent context; set True in untrusted/multi-user deployments
+    instructions=dedent(
+        """\
+        OWL 2 EL ontology editor backed by SQLite. Each .ontology.db file is one ontology.
+
+        Entities (classes, properties, individuals) are not managed directly -> they are
+        derived from axioms. Add/remove axioms to change the ontology.
+
+        Selections are named sets of axiom hashes or entity IRIs that persist across calls.
+        Use them to build up working sets incrementally: search, save, narrow, combine, then
+        act (export, delete, inspect). Reference a selection by its bare name (e.g. `my_sel`).
+        Each selection has a fixed kind (axioms or entities) set at creation; tools that read
+        a selection expect a particular kind. Writing to an existing name is refused by
+        default; pass `mode="replace"` to overwrite, or combine sets via set-algebra in
+        create_selection. Destructive ops (remove_axioms by selection, rename_iri) show a
+        preview and return a `confirm` token; call again with `confirm=<token>` to apply. If
+        the selection changed meanwhile, the token is rejected and a fresh preview shown.
+        """
+    ),
+)
+
+mcp.add_middleware(ErrorMiddleware())
+mcp.add_middleware(TimingMiddleware())
+
+mcp.add_tool(tool_create_ontology)
+mcp.add_tool(tool_add_axioms)
+mcp.add_tool(tool_remove_axioms)
+mcp.add_tool(tool_annotate_axiom)
+mcp.add_tool(tool_replace_axiom)
+mcp.add_tool(tool_rename_iri)
+mcp.add_tool(tool_describe_ontology)
+mcp.add_tool(tool_find_duplicate_entities)
+mcp.add_tool(tool_get_entity)
+mcp.add_tool(tool_find_entities)
+mcp.add_tool(tool_match_axioms)
+mcp.add_tool(tool_find_axioms)
+mcp.add_tool(tool_set_prefix)
+mcp.add_tool(tool_remove_prefix)
+mcp.add_tool(tool_export_jsonl)
+mcp.add_tool(tool_create_selection)
+mcp.add_tool(tool_read_selection)
+mcp.add_tool(tool_list_selections)
+mcp.add_tool(tool_remove_selections)
+
+if __name__ == "__main__":
+    mcp.run()
